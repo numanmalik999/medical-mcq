@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
 import { TimerIcon } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface MCQ {
   id: string;
@@ -32,20 +34,31 @@ interface MCQExplanation {
   image_url: string | null;
 }
 
-const TOTAL_QUESTIONS = 300;
-const TEST_DURATION_SECONDS = 3 * 60 * 60; // 3 hours
+interface Category {
+  id: string;
+  name: string;
+}
+
+const DEFAULT_TEST_DURATION_SECONDS = 3 * 60 * 60; // 3 hours
+const DEFAULT_TOTAL_QUESTIONS = 300; // Fallback if custom selection yields less
 
 const TakeTestPage = () => {
   const { user, isLoading: isSessionLoading } = useSession();
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [selectedPercentage, setSelectedPercentage] = useState<string>('100'); // '10', '25', '50', '100', 'all'
+  const [showConfiguration, setShowConfiguration] = useState(true);
+  const [showInstructions, setShowInstructions] = useState(false);
+
   const [mcqs, setMcqs] = useState<MCQ[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Map<string, string | null>>(new Map());
   const [isTestSubmitted, setIsTestSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [timer, setTimer] = useState(TEST_DURATION_SECONDS);
+  const [timer, setTimer] = useState(DEFAULT_TEST_DURATION_SECONDS);
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
@@ -76,36 +89,25 @@ const TakeTestPage = () => {
     return null;
   }, [explanations, toast]);
 
-  // Fetch MCQs
+  // Initial load: Fetch all categories
   useEffect(() => {
-    const fetchAllMcqsAndSelectRandom = async () => {
+    const fetchCategories = async () => {
       setIsLoading(true);
       const { data, error } = await supabase
-        .from('mcqs')
+        .from('categories')
         .select('*');
 
       if (error) {
-        console.error('Error fetching MCQs:', error);
-        toast({ title: "Error", description: "Failed to load test questions.", variant: "destructive" });
-        setIsLoading(false);
-        return;
+        console.error('Error fetching categories:', error);
+        toast({ title: "Error", description: "Failed to load categories for test configuration.", variant: "destructive" });
+      } else {
+        setAllCategories(data || []);
       }
-
-      if (!data || data.length === 0) {
-        toast({ title: "No MCQs", description: "No MCQs available to create a test.", variant: "default" });
-        setIsLoading(false);
-        return;
-      }
-
-      // Shuffle and select up to TOTAL_QUESTIONS
-      const shuffledMcqs = data.sort(() => 0.5 - Math.random());
-      const selectedMcqs = shuffledMcqs.slice(0, TOTAL_QUESTIONS);
-      setMcqs(selectedMcqs);
       setIsLoading(false);
     };
 
     if (!isSessionLoading && user) {
-      fetchAllMcqsAndSelectRandom();
+      fetchCategories();
     } else if (!isSessionLoading && !user) {
       navigate('/login'); // Redirect if not logged in
     }
@@ -113,7 +115,7 @@ const TakeTestPage = () => {
 
   // Timer effect
   useEffect(() => {
-    if (isLoading || isTestSubmitted || showResults || mcqs.length === 0) return;
+    if (isLoading || isTestSubmitted || showResults || showConfiguration || showInstructions || mcqs.length === 0) return;
 
     const interval = setInterval(() => {
       setTimer((prevTimer) => {
@@ -127,7 +129,81 @@ const TakeTestPage = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isLoading, isTestSubmitted, showResults, mcqs.length]); // Added mcqs.length to dependencies to ensure timer starts after questions load
+  }, [isLoading, isTestSubmitted, showResults, showConfiguration, showInstructions, mcqs.length]);
+
+  const handleCategoryToggle = (categoryId: string) => {
+    setSelectedCategoryIds((prev) =>
+      prev.includes(categoryId)
+        ? prev.filter((id) => id !== categoryId)
+        : [...prev, categoryId]
+    );
+  };
+
+  const startTestPreparation = async () => {
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in to start a test.", variant: "destructive" });
+      return;
+    }
+
+    setIsLoading(true);
+    let query = supabase.from('mcqs').select('*');
+
+    if (selectedCategoryIds.length > 0) {
+      query = query.in('category_id', selectedCategoryIds);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching MCQs:', error);
+      toast({ title: "Error", description: "Failed to load test questions.", variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      toast({ title: "No MCQs", description: "No MCQs available for the selected criteria.", variant: "default" });
+      setIsLoading(false);
+      return;
+    }
+
+    let selectedMcqs: MCQ[] = [];
+    if (selectedPercentage === 'all') {
+      selectedMcqs = data;
+    } else {
+      const percentageValue = parseInt(selectedPercentage, 10) / 100;
+      const numToSelect = Math.max(1, Math.floor(data.length * percentageValue)); // Ensure at least 1 MCQ if available
+      const shuffledMcqs = data.sort(() => 0.5 - Math.random());
+      selectedMcqs = shuffledMcqs.slice(0, numToSelect);
+    }
+
+    // If selected MCQs are less than DEFAULT_TOTAL_QUESTIONS, and user selected 'all' or 100%,
+    // or if the calculated number is very small, we might want to adjust.
+    // For now, we'll just use what was selected.
+    if (selectedMcqs.length === 0) {
+      toast({ title: "No MCQs", description: "No MCQs could be selected based on your criteria. Please adjust.", variant: "default" });
+      setIsLoading(false);
+      return;
+    }
+
+    setMcqs(selectedMcqs);
+    setTimer(DEFAULT_TEST_DURATION_SECONDS); // Reset timer for new test
+    setCurrentQuestionIndex(0);
+    setUserAnswers(new Map());
+    setIsTestSubmitted(false);
+    setScore(0);
+    setShowResults(false);
+    setExplanations(new Map());
+
+    setShowConfiguration(false);
+    setShowInstructions(true); // Show instructions before starting
+    setIsLoading(false);
+  };
+
+  const beginTest = () => {
+    setShowInstructions(false);
+    // The timer useEffect will now start since showInstructions is false and mcqs.length > 0
+  };
 
   const currentMcq = mcqs[currentQuestionIndex];
 
@@ -217,7 +293,7 @@ const TakeTestPage = () => {
   if (isLoading || isSessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-gray-700 dark:text-gray-300">Loading test questions...</p>
+        <p className="text-gray-700 dark:text-gray-300">Loading...</p>
       </div>
     );
   }
@@ -226,21 +302,123 @@ const TakeTestPage = () => {
     return null; // Redirect handled by useEffect
   }
 
-  if (mcqs.length === 0 && !isLoading) {
+  if (showConfiguration) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+        <Card className="w-full max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-2xl">Configure Your Test</CardTitle>
+            <CardDescription>Select categories and the percentage of questions you'd like to include.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label className="text-lg font-semibold">Select Categories (Optional)</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border rounded-md">
+                {allCategories.length === 0 ? (
+                  <p className="col-span-full text-center text-muted-foreground">No categories available. Please add some via the admin panel.</p>
+                ) : (
+                  allCategories.map((category) => (
+                    <div key={category.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`category-${category.id}`}
+                        checked={selectedCategoryIds.includes(category.id)}
+                        onCheckedChange={() => handleCategoryToggle(category.id)}
+                      />
+                      <Label htmlFor={`category-${category.id}`}>{category.name}</Label>
+                    </div>
+                  ))
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                If no categories are selected, questions will be pulled from all available categories.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="percentage-select" className="text-lg font-semibold">Percentage of MCQs</Label>
+              <Select onValueChange={setSelectedPercentage} value={selectedPercentage}>
+                <SelectTrigger id="percentage-select" className="w-full">
+                  <SelectValue placeholder="Select percentage" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10%</SelectItem>
+                  <SelectItem value="25">25%</SelectItem>
+                  <SelectItem value="50">50%</SelectItem>
+                  <SelectItem value="100">100%</SelectItem>
+                  <SelectItem value="all">All Available</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Select how many questions (by percentage) you want from the chosen categories.
+              </p>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <Button onClick={startTestPreparation} disabled={isLoading}>
+              {isLoading ? "Preparing Test..." : "Start Test"}
+            </Button>
+          </CardFooter>
+        </Card>
+        <MadeWithDyad />
+      </div>
+    );
+  }
+
+  if (showInstructions) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+        <Card className="w-full max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-2xl">Test Instructions</CardTitle>
+            <CardDescription>Please read the following instructions carefully before starting your test.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p><strong>Number of Questions:</strong> {mcqs.length}</p>
+            <p><strong>Time Limit:</strong> {formatTime(DEFAULT_TEST_DURATION_SECONDS)}</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>You will be presented with {mcqs.length} multiple-choice questions.</li>
+              <li>You have {formatTime(DEFAULT_TEST_DURATION_SECONDS)} to complete the test.</li>
+              <li>Select one option for each question.</li>
+              <li>You can navigate between questions using the "Previous" and "Next" buttons.</li>
+              <li>Your answers will be saved automatically as you select them.</li>
+              <li>The test will automatically submit when the time runs out.</li>
+              <li>You can submit the test manually at any time by clicking "Submit Test" on the last question.</li>
+              <li>Once submitted, you will see your score and can review your answers with explanations.</li>
+            </ul>
+            <p className="font-semibold text-red-600">Good luck!</p>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <Button onClick={beginTest}>Begin Test</Button>
+          </CardFooter>
+        </Card>
+        <MadeWithDyad />
+      </div>
+    );
+  }
+
+  if (mcqs.length === 0 && !isLoading && !showConfiguration && !showInstructions) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
         <Card className="w-full max-w-2xl">
           <CardHeader>
             <CardTitle>No Test Available</CardTitle>
             <CardDescription>
-              There are no MCQs available to create a test. Please add more MCQs via the admin panel.
+              There are no MCQs available to create a test based on your selections.
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex justify-center">
-            <Button onClick={() => navigate('/user/dashboard')}>Go to Dashboard</Button>
+            <Button onClick={() => setShowConfiguration(true)}>Go Back to Configuration</Button>
           </CardFooter>
         </Card>
         <MadeWithDyad />
+      </div>
+    );
+  }
+
+  if (!currentMcq) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-gray-700 dark:text-gray-300">Loading current question...</p>
       </div>
     );
   }

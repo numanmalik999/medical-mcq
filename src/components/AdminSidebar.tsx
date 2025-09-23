@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom'; // Removed useNavigate
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -43,7 +43,6 @@ const NavLink = ({ to, icon, label, isMobile, onLinkClick }: NavLinkProps) => {
 const AdminSidebar = () => {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
-  // const navigate = useNavigate(); // Removed as it's not used
 
   const handleLinkClick = () => {
     if (isMobile) {

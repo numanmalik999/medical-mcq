@@ -17,8 +17,9 @@ interface UserProfile {
   first_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
-  email: string | null; // Will be fetched from auth.users
+  email: string | null;
   created_at: string;
+  is_admin: boolean; // Added is_admin to UserProfile
 }
 
 const ManageUsersPage = () => {
@@ -32,6 +33,21 @@ const ManageUsersPage = () => {
 
   const fetchUsers = async () => {
     setIsLoading(true);
+
+    // 1. Fetch all users from Supabase Auth via Edge Function
+    const { data: authUsersResponse, error: edgeFunctionError } = await supabase.functions.invoke('list-users');
+
+    let authUsersData: User[] = [];
+    if (edgeFunctionError) {
+      console.error('Error fetching auth users from Edge Function:', edgeFunctionError);
+      toast({ title: "Error", description: "Failed to load user authentication data from server.", variant: "destructive" });
+      setIsLoading(false);
+      return;
+    } else if (authUsersResponse) {
+      authUsersData = authUsersResponse as User[];
+    }
+
+    // 2. Fetch all profiles from the public.profiles table
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
       .select('*');
@@ -39,30 +55,22 @@ const ManageUsersPage = () => {
     if (profilesError) {
       console.error('Error fetching user profiles:', profilesError);
       toast({ title: "Error", description: "Failed to load user profiles.", variant: "destructive" });
-      setUsers([]);
-      setIsLoading(false);
-      return;
+      // We can still proceed with authUsersData even if profiles fail
     }
 
-    // Fetch auth.users data via Edge Function
-    const { data: authUsersResponse, error: edgeFunctionError } = await supabase.functions.invoke('list-users');
+    const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile]) || []);
 
-    let authUsersData: User[] = [];
-    if (edgeFunctionError) {
-      console.error('Error fetching auth users from Edge Function:', edgeFunctionError);
-      toast({ title: "Error", description: "Failed to load user authentication data from server.", variant: "destructive" });
-      // Proceed with profiles data only if auth data fails
-    } else if (authUsersResponse) {
-      authUsersData = authUsersResponse as User[];
-    }
-
-    const authUsersMap = new Map(authUsersData.map((user: User): [string, User] => [user.id, user]));
-
-    const combinedUsers: UserProfile[] = profilesData.map(profile => {
-      const authUser: User | undefined = authUsersMap.get(profile.id);
+    // 3. Combine the data: Iterate through authUsersData and merge with profile data
+    const combinedUsers: UserProfile[] = authUsersData.map(authUser => {
+      const profile = profilesMap.get(authUser.id);
       return {
-        ...profile,
-        email: authUser?.email || null,
+        id: authUser.id,
+        email: authUser.email || null,
+        created_at: authUser.created_at,
+        first_name: profile?.first_name || null,
+        last_name: profile?.last_name || null,
+        avatar_url: profile?.avatar_url || null,
+        is_admin: profile?.is_admin || false, // Default to false if no profile or not set
       };
     });
 
@@ -102,6 +110,11 @@ const ManageUsersPage = () => {
       accessorKey: 'created_at',
       header: 'Joined On',
       cell: ({ row }) => new Date(row.original.created_at).toLocaleDateString(),
+    },
+    {
+      accessorKey: 'is_admin',
+      header: 'Admin',
+      cell: ({ row }) => (row.original.is_admin ? 'Yes' : 'No'),
     },
     // Future: Add actions like "Edit User", "Reset Password", "Delete User"
   ];

@@ -12,17 +12,17 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User as UserIcon } from 'lucide-react';
 
-interface Profile {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  avatar_url: string | null;
-}
+// Removed unused 'Profile' interface
+// interface Profile {
+//   id: string;
+//   first_name: string | null;
+//   last_name: string | null;
+//   avatar_url: string | null;
+// }
 
 const UserProfilePage = () => {
   const { user, isLoading: isSessionLoading } = useSession();
   const { toast } = useToast();
-  // const [profile, setProfile] = useState<Profile | null>(null); // Removed as its value was never read
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -50,7 +50,6 @@ const UserProfilePage = () => {
       console.error('Error fetching profile:', error);
       toast({ title: "Error", description: "Failed to load profile.", variant: "destructive" });
     } else if (data) {
-      // setProfile(data); // No longer needed
       setFirstName(data.first_name || '');
       setLastName(data.last_name || '');
       setAvatarUrl(data.avatar_url || '');

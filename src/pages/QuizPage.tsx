@@ -43,10 +43,11 @@ interface CategoryStat {
   user_accuracy: string;
 }
 
-interface Category {
-  id: string;
-  name: string;
-}
+// Removed unused 'Category' interface
+// interface Category {
+//   id: string;
+//   name: string;
+// }
 
 interface Subcategory {
   id: string;
@@ -262,7 +263,6 @@ const QuizPage = () => {
     }
 
     setQuizQuestions(mcqsToLoad);
-    // Removed setCurrentQuizCategoryId as it's no longer used
     setCurrentQuizSubcategoryId(subcategoryId);
     setShowCategorySelection(false);
     setIsLoading(false);

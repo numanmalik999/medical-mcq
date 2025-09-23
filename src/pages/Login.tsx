@@ -4,15 +4,30 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { MadeWithDyad } from '@/components/made-with-dyad';
+// Removed useToast import as onError prop is removed
+// import { useToast } from '@/hooks/use-toast'; 
 
 const Login = () => {
+  // Removed toast initialization as onError prop is removed
+  // const { toast } = useToast(); 
+
+  // Removed handleAuthError function as onError prop is removed
+  // const handleAuthError = (error: Error) => {
+  //   console.error("Supabase Auth Error:", error);
+  //   toast({
+  //     title: "Authentication Error",
+  //     description: error.message,
+  //     variant: "destructive",
+  //   });
+  // };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
       <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
         <h1 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-6">Welcome Back!</h1>
         <Auth
           supabaseClient={supabase}
-          providers={[]} // Corrected: Use an empty array to enable email/password and disable social providers
+          providers={[]}
           appearance={{
             theme: ThemeSupa,
             variables: {
@@ -24,7 +39,8 @@ const Login = () => {
               },
             },
           }}
-          theme="light" // You can make this dynamic based on system theme if needed
+          theme="light"
+          // Removed onError prop
         />
       </div>
       <MadeWithDyad />

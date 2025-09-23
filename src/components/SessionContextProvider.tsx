@@ -5,9 +5,13 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 
-// Extend the User type to include is_admin
+// Extend the User type to include profile fields
 interface AuthUser extends User {
   is_admin?: boolean;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone_number?: string | null;
+  whatsapp_number?: string | null;
 }
 
 interface SessionContextType {
@@ -44,28 +48,42 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         try {
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('is_admin')
+            .select('is_admin, first_name, last_name, phone_number, whatsapp_number') // Fetch new fields
             .eq('id', currentSession.user.id)
             .single();
 
           let isAdmin = false;
+          let firstName = null;
+          let lastName = null;
+          let phoneNumber = null;
+          let whatsappNumber = null;
+
           if (profileError) {
             console.error('SessionContextProvider: onAuthStateChange: Error fetching profile:', profileError);
-            // If no profile found (PGRST116), isAdmin remains false.
-            // If it's another error, we log it but don't block.
+            // If no profile found (PGRST116), fields remain null/false.
           } else if (profileData) {
             isAdmin = profileData.is_admin || false;
+            firstName = profileData.first_name || null;
+            lastName = profileData.last_name || null;
+            phoneNumber = profileData.phone_number || null;
+            whatsappNumber = profileData.whatsapp_number || null;
             console.log('SessionContextProvider: onAuthStateChange: Profile data fetched:', profileData);
-            console.log('SessionContextProvider: onAuthStateChange: Is Admin status from DB:', isAdmin);
           }
           
-          const authUser: AuthUser = { ...currentSession.user, is_admin: isAdmin };
+          const authUser: AuthUser = { 
+            ...currentSession.user, 
+            is_admin: isAdmin,
+            first_name: firstName,
+            last_name: lastName,
+            phone_number: phoneNumber,
+            whatsapp_number: whatsappNumber,
+          };
           setSession(currentSession);
           setUser(authUser);
           console.log('SessionContextProvider: onAuthStateChange: Session and user set. User is_admin:', authUser.is_admin);
 
-          if (location.pathname === '/login') {
-            console.log('SessionContextProvider: onAuthStateChange: On /login page, redirecting...');
+          if (location.pathname === '/login' || location.pathname === '/signup') {
+            console.log('SessionContextProvider: onAuthStateChange: On /login or /signup page, redirecting...');
             if (isAdmin) {
               navigate('/admin/dashboard');
             } else {
@@ -76,7 +94,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           console.error('SessionContextProvider: onAuthStateChange: Unhandled error during profile fetch:', err);
           setSession(null);
           setUser(null);
-          if (location.pathname !== '/login') {
+          if (location.pathname !== '/login' && location.pathname !== '/signup') {
             navigate('/login');
           }
         } finally {
@@ -87,7 +105,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.log('SessionContextProvider: onAuthStateChange: No current session, clearing session and user.');
         setSession(null);
         setUser(null);
-        if (location.pathname !== '/login') {
+        if (location.pathname !== '/login' && location.pathname !== '/signup') {
           navigate('/login');
         }
         setIsLoading(false);
@@ -104,26 +122,41 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         try {
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('is_admin')
+            .select('is_admin, first_name, last_name, phone_number, whatsapp_number') // Fetch new fields
             .eq('id', initialSession.user.id)
             .single();
 
           let isAdmin = false;
+          let firstName = null;
+          let lastName = null;
+          let phoneNumber = null;
+          let whatsappNumber = null;
+
           if (profileError) {
             console.error('SessionContextProvider: Initial Session Check: Error fetching profile:', profileError);
           } else if (profileData) {
             isAdmin = profileData.is_admin || false;
+            firstName = profileData.first_name || null;
+            lastName = profileData.last_name || null;
+            phoneNumber = profileData.phone_number || null;
+            whatsappNumber = profileData.whatsapp_number || null;
             console.log('SessionContextProvider: Initial Session Check: Profile data fetched:', profileData);
-            console.log('SessionContextProvider: Initial Session Check: Is Admin status from DB:', isAdmin);
           }
 
-          const authUser: AuthUser = { ...initialSession.user, is_admin: isAdmin };
+          const authUser: AuthUser = { 
+            ...initialSession.user, 
+            is_admin: isAdmin,
+            first_name: firstName,
+            last_name: lastName,
+            phone_number: phoneNumber,
+            whatsapp_number: whatsappNumber,
+          };
           setSession(initialSession);
           setUser(authUser);
           console.log('SessionContextProvider: Initial Session Check: Session and user set. User is_admin:', authUser.is_admin);
 
-          if (location.pathname === '/login') {
-            console.log('SessionContextProvider: Initial Session Check: On /login page, redirecting...');
+          if (location.pathname === '/login' || location.pathname === '/signup') {
+            console.log('SessionContextProvider: Initial Session Check: On /login or /signup page, redirecting...');
             if (isAdmin) {
               navigate('/admin/dashboard');
             } else {
@@ -134,7 +167,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           console.error('SessionContextProvider: Initial Session Check: Unhandled error during profile fetch:', err);
           setSession(null);
           setUser(null);
-          if (location.pathname !== '/login') {
+          if (location.pathname !== '/login' && location.pathname !== '/signup') {
             navigate('/login');
           }
         } finally {
@@ -145,7 +178,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.log('SessionContextProvider: Initial Session Check: No initial session, clearing session and user.');
         setSession(null);
         setUser(null);
-        if (location.pathname !== '/login') {
+        if (location.pathname !== '/login' && location.pathname !== '/signup') {
           navigate('/login');
         }
         setIsLoading(false);

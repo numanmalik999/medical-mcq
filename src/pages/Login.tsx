@@ -12,7 +12,7 @@ const Login = () => {
         <h1 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-6">Welcome Back!</h1>
         <Auth
           supabaseClient={supabase}
-          providers={[]}
+          providers={[]} // Corrected: Use an empty array to enable email/password and disable social providers
           appearance={{
             theme: ThemeSupa,
             variables: {

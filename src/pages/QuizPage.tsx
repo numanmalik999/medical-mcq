@@ -8,7 +8,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 interface MCQ {
@@ -31,15 +30,14 @@ interface MCQExplanation {
   image_url: string | null;
 }
 
-interface Category {
+interface CategoryStat {
   id: string;
   name: string;
-}
-
-interface Subcategory {
-  id: string;
-  category_id: string;
-  name: string;
+  total_mcqs: number;
+  user_attempts: number;
+  user_correct: number;
+  user_incorrect: number;
+  user_accuracy: string;
 }
 
 const QuizPage = () => {
@@ -52,50 +50,73 @@ const QuizPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
-  const [quizStarted, setQuizStarted] = useState(false);
+  const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
+  const [currentQuizCategoryId, setCurrentQuizCategoryId] = useState<string | null>(null);
+  const [showCategorySelection, setShowCategorySelection] = useState(true);
 
   useEffect(() => {
-    fetchCategoriesAndSubcategories();
-  }, []);
+    fetchQuizOverview();
+  }, [user]); // Refetch overview if user changes
 
-  useEffect(() => {
-    if (selectedCategoryId) {
-      setFilteredSubcategories(subcategories.filter(sub => sub.category_id === selectedCategoryId));
-      setSelectedSubcategoryId(null); // Reset subcategory when category changes
-    } else {
-      setFilteredSubcategories([]);
-      setSelectedSubcategoryId(null);
-    }
-  }, [selectedCategoryId, subcategories]);
-
-  const fetchCategoriesAndSubcategories = async () => {
+  const fetchQuizOverview = async () => {
     setIsLoading(true);
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*');
 
-    const { data: subcategoriesData, error: subcategoriesError } = await supabase
-      .from('subcategories')
-      .select('*');
-
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
-    } else {
-      setCategories(categoriesData || []);
+      setIsLoading(false);
+      return;
     }
 
-    if (subcategoriesError) {
-      console.error('Error fetching subcategories:', subcategoriesError);
-      toast({ title: "Error", description: "Failed to load subcategories.", variant: "destructive" });
-    } else {
-      setSubcategories(subcategoriesData || []);
+    const categoriesWithStats: CategoryStat[] = [];
+
+    for (const category of categoriesData || []) {
+      // Fetch MCQ count for this category
+      const { count: mcqCount, error: mcqCountError } = await supabase
+        .from('mcqs')
+        .select('id', { count: 'exact' })
+        .eq('category_id', category.id);
+
+      if (mcqCountError) {
+        console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
+        // Continue even if one category fails
+      }
+
+      let totalAttempts = 0;
+      let correctAttempts = 0;
+
+      if (user) { // Only fetch user-specific stats if logged in
+        const { data: userAttemptsData, error: userAttemptsError } = await supabase
+          .from('user_quiz_attempts')
+          .select('is_correct')
+          .eq('user_id', user.id)
+          .eq('category_id', category.id);
+
+        if (userAttemptsError) {
+          console.error(`Error fetching user attempts for category ${category.name}:`, userAttemptsError);
+        } else {
+          totalAttempts = userAttemptsData.length;
+          correctAttempts = userAttemptsData.filter(attempt => attempt.is_correct).length;
+        }
+      }
+
+      const incorrectAttempts = totalAttempts - correctAttempts;
+      const accuracy = totalAttempts > 0 ? ((correctAttempts / totalAttempts) * 100).toFixed(2) : '0.00';
+
+      categoriesWithStats.push({
+        ...category,
+        total_mcqs: mcqCount || 0,
+        user_attempts: totalAttempts,
+        user_correct: correctAttempts,
+        user_incorrect: incorrectAttempts,
+        user_accuracy: `${accuracy}%`,
+      });
     }
+
+    setCategoryStats(categoriesWithStats);
     setIsLoading(false);
   };
 
@@ -107,15 +128,14 @@ const QuizPage = () => {
     setFeedback(null);
     setShowExplanation(false);
 
-    console.log("Attempting to fetch MCQ with category:", selectedCategoryId, "and subcategory:", selectedSubcategoryId);
+    if (!currentQuizCategoryId) {
+      toast({ title: "Error", description: "No category selected for quiz.", variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
 
-    let countQuery = supabase.from('mcqs').select('id', { count: 'exact' });
-    if (selectedCategoryId) {
-      countQuery = countQuery.eq('category_id', selectedCategoryId);
-    }
-    if (selectedSubcategoryId) {
-      countQuery = countQuery.eq('subcategory_id', selectedSubcategoryId);
-    }
+    let countQuery = supabase.from('mcqs').select('id', { count: 'exact' })
+      .eq('category_id', currentQuizCategoryId);
 
     const { count, error: countError } = await countQuery;
 
@@ -126,32 +146,22 @@ const QuizPage = () => {
       return;
     }
 
-    console.log("MCQ count for criteria:", count);
-
     if (count === 0) {
-      toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
+      toast({ title: "No MCQs", description: "No MCQs found for the selected category.", variant: "default" });
       setIsLoading(false);
       setMcq(null);
       return;
     }
 
     const randomIndex = Math.floor(Math.random() * count!);
-    console.log("Fetching MCQ at random index:", randomIndex);
 
-    let mcqQuery = supabase
+    const { data, error } = await supabase
       .from('mcqs')
       .select('*')
+      .eq('category_id', currentQuizCategoryId)
       .limit(1)
-      .range(randomIndex, randomIndex);
-
-    if (selectedCategoryId) {
-      mcqQuery = mcqQuery.eq('category_id', selectedCategoryId);
-    }
-    if (selectedSubcategoryId) {
-      mcqQuery = mcqQuery.eq('subcategory_id', selectedSubcategoryId);
-    }
-
-    const { data, error } = await mcqQuery.single();
+      .range(randomIndex, randomIndex)
+      .single();
 
     if (error) {
       console.error('Supabase Error fetching single MCQ:', error);
@@ -161,7 +171,6 @@ const QuizPage = () => {
         variant: "destructive",
       });
     } else if (data) {
-      console.log("Successfully fetched MCQ:", data);
       setMcq(data);
       if (data.explanation_id) {
         try {
@@ -175,11 +184,9 @@ const QuizPage = () => {
           });
         }
       } else {
-        console.log("MCQ has no explanation_id.");
         setExplanation(null);
       }
     } else {
-      console.warn("No MCQ data returned despite no error.");
       toast({
         title: "Warning",
         description: "No MCQ data found. Please try again.",
@@ -191,7 +198,6 @@ const QuizPage = () => {
   };
 
   const fetchExplanation = async (explanationId: string) => {
-    console.log("Attempting to fetch explanation for ID:", explanationId);
     const { data, error } = await supabase
       .from('mcq_explanations')
       .select('*')
@@ -207,16 +213,14 @@ const QuizPage = () => {
       });
       setExplanation(null);
     } else if (data) {
-      console.log("Successfully fetched explanation:", data);
       setExplanation(data);
     } else {
-      console.warn(`No explanation found for ID: ${explanationId} (or PGRST116 error).`);
       setExplanation(null);
     }
   };
 
-  const handleSubmitAnswer = async () => { // Made async to await Supabase insert
-    if (!selectedAnswer || !mcq || !user) return; // Ensure user is logged in
+  const handleSubmitAnswer = async () => {
+    if (!selectedAnswer || !mcq || !user) return;
 
     const isCorrect = selectedAnswer === mcq.correct_answer;
     if (isCorrect) {
@@ -260,99 +264,86 @@ const QuizPage = () => {
       title: "AI Explanation",
       description: "This feature is coming soon! The AI will provide a deeper dive into the topic.",
     });
-    console.log("Requesting AI explanation for:", mcq?.question_text);
   };
 
-  const handleStartQuiz = () => {
-    if (!selectedCategoryId) {
-      toast({ title: "Error", description: "Please select a category to start the quiz.", variant: "destructive" });
-      return;
-    }
-    setQuizStarted(true);
+  const handleStartQuizForCategory = (categoryId: string) => {
+    setCurrentQuizCategoryId(categoryId);
+    setShowCategorySelection(false);
     fetchMcq();
   };
 
-  if (isLoading && !quizStarted) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-gray-700 dark:text-gray-300">Loading categories...</p>
+        <p className="text-gray-700 dark:text-gray-300">Loading quiz overview...</p>
       </div>
     );
   }
 
-  if (!quizStarted) {
+  if (showCategorySelection) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-        <Card className="w-full max-w-2xl">
+        <Card className="w-full max-w-4xl">
           <CardHeader>
-            <CardTitle>Select Quiz Options</CardTitle>
-            <CardDescription>Choose a category and optionally a subcategory to start your quiz.</CardDescription>
+            <CardTitle>Select a Quiz Category</CardTitle>
+            <CardDescription>Choose a category to start your quiz and view your performance.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="category-select">Category</Label>
-              <Select onValueChange={setSelectedCategoryId} value={selectedCategoryId || ''}>
-                <SelectTrigger id="category-select">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.length === 0 ? (
-                    <SelectItem value="no-categories" disabled>No categories available</SelectItem>
-                  ) : (
-                    categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="subcategory-select">Subcategory (Optional)</Label>
-              <Select
-                onValueChange={(value) => setSelectedSubcategoryId(value === "all" ? null : value)}
-                value={selectedSubcategoryId || "all"}
-                disabled={!selectedCategoryId || filteredSubcategories.length === 0}
-              >
-                <SelectTrigger id="subcategory-select">
-                  <SelectValue placeholder="Select a subcategory" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Any Subcategory</SelectItem>
-                  {filteredSubcategories.map((subcat) => (
-                    <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {categoryStats.length === 0 ? (
+              <p className="text-center text-gray-600 dark:text-gray-400">
+                No categories available. Please add categories and MCQs via the admin panel.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {categoryStats.map((cat) => (
+                  <Card key={cat.id} className="flex flex-col">
+                    <CardHeader>
+                      <CardTitle className="text-lg">{cat.name}</CardTitle>
+                      <CardDescription>{cat.total_mcqs} MCQs available</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-grow space-y-2 text-sm">
+                      <p>Attempts: {cat.user_attempts}</p>
+                      <p>Correct: {cat.user_correct}</p>
+                      <p>Incorrect: {cat.user_incorrect}</p>
+                      <p>Accuracy: {cat.user_accuracy}</p>
+                    </CardContent>
+                    <CardFooter>
+                      <Button
+                        onClick={() => handleStartQuizForCategory(cat.id)}
+                        className="w-full"
+                        disabled={cat.total_mcqs === 0}
+                      >
+                        Start Quiz
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            )}
           </CardContent>
-          <CardFooter className="flex justify-center">
-            <Button onClick={handleStartQuiz} disabled={!selectedCategoryId || categories.length === 0}>
-              Start Quiz
-            </Button>
-          </CardFooter>
         </Card>
         <MadeWithDyad />
       </div>
     );
   }
 
-  if (!mcq && quizStarted && !isLoading) {
+  if (!mcq && !isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
         <Card className="w-full max-w-2xl">
           <CardHeader>
             <CardTitle>No MCQs Found</CardTitle>
             <CardDescription>
-              It looks like there are no MCQs for the selected criteria.
+              It looks like there are no MCQs for the selected category.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-center text-gray-600 dark:text-gray-400">
-              Please try a different category/subcategory or add more MCQs.
+              Please try a different category or add more MCQs.
             </p>
           </CardContent>
           <CardFooter className="flex justify-center">
-            <Button onClick={() => setQuizStarted(false)}>Go Back to Selection</Button>
+            <Button onClick={() => setShowCategorySelection(true)}>Go Back to Category Selection</Button>
           </CardFooter>
         </Card>
         <MadeWithDyad />
@@ -365,9 +356,9 @@ const QuizPage = () => {
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="text-xl">{mcq?.question_text}</CardTitle>
-          {mcq?.category_id && mcq?.difficulty && (
+          {mcq?.difficulty && (
             <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
-              Category ID: {mcq.category_id} | Difficulty: {mcq.difficulty}
+              Difficulty: {mcq.difficulty}
             </CardDescription>
           )}
         </CardHeader>

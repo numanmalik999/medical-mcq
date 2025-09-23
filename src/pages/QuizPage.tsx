@@ -105,7 +105,7 @@ const QuizPage = () => {
     setFeedback(null);
     setShowExplanation(false);
 
-    console.log("Fetching MCQ with category:", selectedCategoryId, "and subcategory:", selectedSubcategoryId);
+    console.log("Attempting to fetch MCQ with category:", selectedCategoryId, "and subcategory:", selectedSubcategoryId);
 
     let countQuery = supabase.from('mcqs').select('count()', { head: true, count: 'exact' });
     if (selectedCategoryId) {
@@ -158,32 +158,58 @@ const QuizPage = () => {
         description: `Failed to load MCQ: ${error.message || 'Unknown error'}. Please try again.`,
         variant: "destructive",
       });
-    } else {
-      console.log("Fetched MCQ:", data);
+    } else if (data) { // Ensure data is not null
+      console.log("Successfully fetched MCQ:", data);
       setMcq(data);
       if (data.explanation_id) {
-        fetchExplanation(data.explanation_id);
+        try {
+          await fetchExplanation(data.explanation_id);
+        } catch (explanationFetchError: any) {
+          console.error('Client-side error during explanation fetch:', explanationFetchError);
+          toast({
+            title: "Error",
+            description: `An unexpected error occurred while fetching explanation: ${explanationFetchError.message || 'Unknown error'}`,
+            variant: "destructive",
+          });
+        }
+      } else {
+        console.log("MCQ has no explanation_id.");
+        setExplanation(null); // Explicitly clear explanation if no ID
       }
+    } else {
+      console.warn("No MCQ data returned despite no error.");
+      toast({
+        title: "Warning",
+        description: "No MCQ data found. Please try again.",
+        variant: "default",
+      });
+      setMcq(null);
     }
     setIsLoading(false);
   };
 
   const fetchExplanation = async (explanationId: string) => {
+    console.log("Attempting to fetch explanation for ID:", explanationId);
     const { data, error } = await supabase
       .from('mcq_explanations')
       .select('*')
       .eq('id', explanationId)
       .single();
 
-    if (error) {
-      console.error('Error fetching explanation:', error);
+    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+      console.error('Supabase Error fetching explanation:', error);
       toast({
         title: "Error",
-        description: "Failed to load explanation.",
+        description: `Failed to load explanation: ${error.message || 'Unknown error'}.`,
         variant: "destructive",
       });
-    } else {
+      setExplanation(null);
+    } else if (data) {
+      console.log("Successfully fetched explanation:", data);
       setExplanation(data);
+    } else {
+      console.warn(`No explanation found for ID: ${explanationId} (or PGRST116 error).`);
+      setExplanation(null);
     }
   };
 

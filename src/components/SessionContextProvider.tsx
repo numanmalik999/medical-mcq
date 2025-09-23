@@ -25,18 +25,23 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('SessionContextProvider: useEffect mounted, initial isLoading:', isLoading);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log('Auth State Change Event:', event);
-      console.log('Auth State Change Session:', currentSession);
-      setIsLoading(true); // Start loading for auth state change
+      console.log('onAuthStateChange: Event:', event, 'Session:', currentSession);
+      setIsLoading(true); // Start loading for any auth state change
+      console.log('onAuthStateChange: setIsLoading(true)');
+
       if (event === 'SIGNED_OUT') {
+        console.log('onAuthStateChange: SIGNED_OUT, clearing session and user, navigating to /login');
         setSession(null);
         setUser(null);
         navigate('/login');
-        setIsLoading(false); // Ensure loading is false after sign out
+        setIsLoading(false);
+        console.log('onAuthStateChange: setIsLoading(false) after SIGNED_OUT');
       } else if (currentSession) {
+        console.log('onAuthStateChange: Session exists, attempting to fetch profile...');
         try {
-          // Fetch profile to get is_admin status
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('is_admin')
@@ -45,50 +50,57 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
           let isAdmin = false;
           if (profileError) {
-            console.error('Error fetching profile for session (onAuthStateChange):', profileError);
-            // If no profile found (PGRST116), isAdmin remains false, which is correct.
-            // If it's another error, we log it.
+            console.error('onAuthStateChange: Error fetching profile:', profileError);
+            // If no profile found (PGRST116), isAdmin remains false.
+            // If it's another error, we log it but don't block.
           } else if (profileData) {
             isAdmin = profileData.is_admin || false;
-            console.log('Profile data fetched (onAuthStateChange):', profileData);
-            console.log('Is Admin status (onAuthStateChange):', isAdmin);
+            console.log('onAuthStateChange: Profile data fetched:', profileData);
+            console.log('onAuthStateChange: Is Admin status:', isAdmin);
           }
           
           const authUser: AuthUser = { ...currentSession.user, is_admin: isAdmin };
           setSession(currentSession);
           setUser(authUser);
+          console.log('onAuthStateChange: Session and user set.');
 
           if (location.pathname === '/login') {
+            console.log('onAuthStateChange: On /login page, redirecting...');
             if (isAdmin) {
               navigate('/admin/dashboard');
             } else {
               navigate('/user/dashboard');
             }
           }
-        } catch (err) {
-          console.error('Unhandled error during profile fetch in SessionContextProvider (onAuthStateChange):', err);
+        } catch (err: any) {
+          console.error('onAuthStateChange: Unhandled error during profile fetch:', err);
           setSession(null);
           setUser(null);
           if (location.pathname !== '/login') {
             navigate('/login');
           }
         } finally {
-          setIsLoading(false); // Ensure loading is always false
+          setIsLoading(false);
+          console.log('onAuthStateChange: setIsLoading(false) in finally block.');
         }
       } else {
+        console.log('onAuthStateChange: No current session, clearing session and user.');
         setSession(null);
         setUser(null);
         if (location.pathname !== '/login') {
           navigate('/login');
         }
-        setIsLoading(false); // Ensure loading is false if no session
+        setIsLoading(false);
+        console.log('onAuthStateChange: setIsLoading(false) for no session.');
       }
     });
 
     // Initial session check
+    console.log('SessionContextProvider: Performing initial session check...');
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      console.log('Initial Session Check:', initialSession);
+      console.log('Initial Session Check Result:', initialSession);
       if (initialSession) {
+        console.log('Initial Session Check: Session exists, attempting to fetch profile...');
         try {
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
@@ -98,46 +110,54 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
           let isAdmin = false;
           if (profileError) {
-            console.error('Error fetching profile for initial session:', profileError);
+            console.error('Initial Session Check: Error fetching profile:', profileError);
           } else if (profileData) {
             isAdmin = profileData.is_admin || false;
-            console.log('Profile data fetched (initial session):', profileData);
-            console.log('Is Admin status (initial session):', isAdmin);
+            console.log('Initial Session Check: Profile data fetched:', profileData);
+            console.log('Initial Session Check: Is Admin status:', isAdmin);
           }
 
           const authUser: AuthUser = { ...initialSession.user, is_admin: isAdmin };
           setSession(initialSession);
           setUser(authUser);
+          console.log('Initial Session Check: Session and user set.');
 
           if (location.pathname === '/login') {
+            console.log('Initial Session Check: On /login page, redirecting...');
             if (isAdmin) {
               navigate('/admin/dashboard');
             } else {
               navigate('/user/dashboard');
             }
           }
-        } catch (err) {
-          console.error('Unhandled error during profile fetch in SessionContextProvider (initial session):', err);
+        } catch (err: any) {
+          console.error('Initial Session Check: Unhandled error during profile fetch:', err);
           setSession(null);
           setUser(null);
           if (location.pathname !== '/login') {
             navigate('/login');
           }
         } finally {
-          setIsLoading(false); // Ensure loading is always false
+          setIsLoading(false);
+          console.log('Initial Session Check: setIsLoading(false) in finally block.');
         }
       } else {
+        console.log('Initial Session Check: No initial session, clearing session and user.');
         setSession(null);
         setUser(null);
         if (location.pathname !== '/login') {
           navigate('/login');
         }
-        setIsLoading(false); // Ensure loading is false if no initial session
+        setIsLoading(false);
+        console.log('Initial Session Check: setIsLoading(false) for no initial session.');
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    return () => {
+      console.log('SessionContextProvider: useEffect cleanup, unsubscribing from auth state changes.');
+      subscription.unsubscribe();
+    };
+  }, [navigate]); // Added navigate to dependency array
 
   return (
     <SessionContext.Provider value={{ session, user, isLoading }}>

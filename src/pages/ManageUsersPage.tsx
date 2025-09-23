@@ -29,6 +29,8 @@ interface UserProfile {
   email: string | null;
   created_at: string;
   is_admin: boolean;
+  phone_number: string | null; // Added
+  whatsapp_number: string | null; // Added
 }
 
 const ManageUsersPage = () => {
@@ -83,6 +85,8 @@ const ManageUsersPage = () => {
         last_name: profile?.last_name || null,
         avatar_url: profile?.avatar_url || null,
         is_admin: profile?.is_admin || false, // Default to false if no profile or not set
+        phone_number: profile?.phone_number || null, // Added
+        whatsapp_number: profile?.whatsapp_number || null, // Added
       };
     });
 

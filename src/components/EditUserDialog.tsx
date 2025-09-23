@@ -4,13 +4,12 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// Removed unused 'Label' import
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form'; // Added FormDescription
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User as UserIcon } from 'lucide-react';
@@ -22,6 +21,8 @@ interface UserProfile {
   avatar_url: string | null;
   email: string | null;
   is_admin: boolean;
+  phone_number: string | null; // Added
+  whatsapp_number: string | null; // Added
 }
 
 const formSchema = z.object({
@@ -30,6 +31,8 @@ const formSchema = z.object({
   last_name: z.string().optional().or(z.literal('')),
   avatar_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
   is_admin: z.boolean(),
+  phone_number: z.string().optional().or(z.literal('')), // Added
+  whatsapp_number: z.string().optional().or(z.literal('')), // Added
 });
 
 interface EditUserDialogProps {
@@ -51,6 +54,8 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
       last_name: userProfile.last_name || "",
       avatar_url: userProfile.avatar_url || "",
       is_admin: userProfile.is_admin,
+      phone_number: userProfile.phone_number || "", // Added
+      whatsapp_number: userProfile.whatsapp_number || "", // Added
     },
   });
 
@@ -63,6 +68,8 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
         last_name: userProfile.last_name || "",
         avatar_url: userProfile.avatar_url || "",
         is_admin: userProfile.is_admin,
+        phone_number: userProfile.phone_number || "", // Added
+        whatsapp_number: userProfile.whatsapp_number || "", // Added
       });
     }
   }, [userProfile, open, form]);
@@ -76,6 +83,8 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
         last_name: values.last_name || null,
         avatar_url: values.avatar_url || null,
         is_admin: values.is_admin,
+        phone_number: values.phone_number || null, // Added
+        whatsapp_number: values.whatsapp_number || null, // Added
         updated_at: new Date().toISOString(),
       };
 
@@ -170,6 +179,35 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
               <Input value={userProfile.email || 'N/A'} disabled />
               <p className="text-sm text-muted-foreground">Email cannot be changed here.</p>
             </FormItem>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="phone_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl>
+                      <Input type="tel" placeholder="e.g., +1234567890" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="whatsapp_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>WhatsApp Number</FormLabel>
+                    <FormControl>
+                      <Input type="tel" placeholder="e.g., +1234567890" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}

@@ -12,20 +12,14 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User as UserIcon } from 'lucide-react';
 
-// Removed unused 'Profile' interface
-// interface Profile {
-//   id: string;
-//   first_name: string | null;
-//   last_name: string | null;
-//   avatar_url: string | null;
-// }
-
 const UserProfilePage = () => {
   const { user, isLoading: isSessionLoading } = useSession();
   const { toast } = useToast();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -53,6 +47,8 @@ const UserProfilePage = () => {
       setFirstName(data.first_name || '');
       setLastName(data.last_name || '');
       setAvatarUrl(data.avatar_url || '');
+      setPhoneNumber(data.phone_number || '');
+      setWhatsappNumber(data.whatsapp_number || '');
     }
     setIsLoading(false);
   };
@@ -66,6 +62,8 @@ const UserProfilePage = () => {
       first_name: firstName.trim() || null,
       last_name: lastName.trim() || null,
       avatar_url: avatarUrl.trim() || null,
+      phone_number: phoneNumber.trim() || null,
+      whatsapp_number: whatsappNumber.trim() || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -155,6 +153,28 @@ const UserProfilePage = () => {
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" value={user.email || ''} disabled />
               <p className="text-sm text-muted-foreground">Email cannot be changed here.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone-number">Phone Number</Label>
+                <Input
+                  id="phone-number"
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="e.g., +1234567890"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp-number">WhatsApp Number</Label>
+                <Input
+                  id="whatsapp-number"
+                  type="tel"
+                  value={whatsappNumber}
+                  onChange={(e) => setWhatsappNumber(e.target.value)}
+                  placeholder="e.g., +1234567890"
+                />
+              </div>
             </div>
           </div>
           <Button onClick={handleSaveProfile} disabled={isSaving}>

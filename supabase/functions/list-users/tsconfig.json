@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "lib": ["esnext", "dom", "deno.ns"],
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    // The 'deno.ns' lib should cover Deno globals.
+    // For remote modules (https://...), local TypeScript might still show warnings without a Deno language server,
+    // but the function will execute correctly on the Supabase Edge runtime.
+    "jsx": "react-jsx"
+  },
+  "include": ["./**/*.ts"]
+}

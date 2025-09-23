@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
+import { MadeWithDyad }
+ from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -43,27 +44,21 @@ const ManageUsersPage = () => {
       return;
     }
 
-    // Fetch auth.users data to get emails
-    const { data: authUsersData, error: authUsersError } = await supabase.auth.admin.listUsers();
+    // Fetch auth.users data via Edge Function
+    const { data: authUsersResponse, error: edgeFunctionError } = await supabase.functions.invoke('list-users');
 
-    if (authUsersError) {
-      console.error('Error fetching auth users:', authUsersError);
-      toast({ title: "Error", description: "Failed to load user authentication data.", variant: "destructive" });
+    let authUsersData: User[] = [];
+    if (edgeFunctionError) {
+      console.error('Error fetching auth users from Edge Function:', edgeFunctionError);
+      toast({ title: "Error", description: "Failed to load user authentication data from server.", variant: "destructive" });
       // Proceed with profiles data only if auth data fails
-      const usersWithEmails: UserProfile[] = profilesData.map(profile => ({
-        ...profile,
-        email: null, // Email will be null if auth data couldn't be fetched
-      }));
-      setUsers(usersWithEmails);
-      setIsLoading(false);
-      return;
+    } else if (authUsersResponse) {
+      authUsersData = authUsersResponse as User[];
     }
 
-    // Fix 1: Explicitly type 'user' in the map function and ensure tuple return type
-    const authUsersMap = new Map(authUsersData.users.map((user: User): [string, User] => [user.id, user]));
+    const authUsersMap = new Map(authUsersData.map((user: User): [string, User] => [user.id, user]));
 
     const combinedUsers: UserProfile[] = profilesData.map(profile => {
-      // Fix 2: Explicitly type 'authUser'
       const authUser: User | undefined = authUsersMap.get(profile.id);
       return {
         ...profile,

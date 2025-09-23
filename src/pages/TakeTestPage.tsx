@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +40,6 @@ interface Category {
 }
 
 const DEFAULT_TEST_DURATION_SECONDS = 3 * 60 * 60; // 3 hours
-const DEFAULT_TOTAL_QUESTIONS = 300; // Fallback if custom selection yields less
 
 const TakeTestPage = () => {
   const { user, isLoading: isSessionLoading } = useSession();

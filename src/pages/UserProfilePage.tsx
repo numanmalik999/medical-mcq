@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/SessionContextProvider';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -22,7 +22,7 @@ interface Profile {
 const UserProfilePage = () => {
   const { user, isLoading: isSessionLoading } = useSession();
   const { toast } = useToast();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  // const [profile, setProfile] = useState<Profile | null>(null); // Removed as its value was never read
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -50,7 +50,7 @@ const UserProfilePage = () => {
       console.error('Error fetching profile:', error);
       toast({ title: "Error", description: "Failed to load profile.", variant: "destructive" });
     } else if (data) {
-      setProfile(data);
+      // setProfile(data); // No longer needed
       setFirstName(data.first_name || '');
       setLastName(data.last_name || '');
       setAvatarUrl(data.avatar_url || '');

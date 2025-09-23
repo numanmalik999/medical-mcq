@@ -43,7 +43,7 @@ const NavLink = ({ to, icon, label, isMobile, onLinkClick }: NavLinkProps) => {
 const AdminSidebar = () => {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
-  const navigate = useNavigate(); // Initialize useNavigate
+  // const navigate = useNavigate(); // Removed as it's not used
 
   const handleLinkClick = () => {
     if (isMobile) {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,7 +69,6 @@ const QuizPage = () => {
 
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
   const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
-  const [currentQuizCategoryId, setCurrentQuizCategoryId] = useState<string | null>(null);
   const [currentQuizSubcategoryId, setCurrentQuizSubcategoryId] = useState<string | null>(null);
   const [showCategorySelection, setShowCategorySelection] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -263,7 +262,7 @@ const QuizPage = () => {
     }
 
     setQuizQuestions(mcqsToLoad);
-    setCurrentQuizCategoryId(categoryId);
+    // Removed setCurrentQuizCategoryId as it's no longer used
     setCurrentQuizSubcategoryId(subcategoryId);
     setShowCategorySelection(false);
     setIsLoading(false);
@@ -402,13 +401,6 @@ const QuizPage = () => {
     await Promise.all(explanationPromises); // Ensure all explanations are fetched
     setShowResults(true);
     setIsLoading(false);
-  };
-
-  const handleAiExplanation = () => {
-    toast({
-      title: "AI Explanation",
-      description: "This feature is coming soon! The AI will provide a deeper dive into the topic.",
-    });
   };
 
   const filteredCategories = categoryStats.filter(cat =>

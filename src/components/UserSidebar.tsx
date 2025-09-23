@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, User, BookOpenText, CreditCard, LogOut, ClipboardCheck } from 'lucide-react'; // Import ClipboardCheck icon
+import { MenuIcon, LayoutDashboard, User, BookOpenText, LogOut, ClipboardCheck } from 'lucide-react'; // Import ClipboardCheck icon
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';

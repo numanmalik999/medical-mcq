@@ -26,6 +26,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log('Auth State Change Event:', event);
+      console.log('Auth State Change Session:', currentSession);
       setIsLoading(true); // Start loading for auth state change
       if (event === 'SIGNED_OUT') {
         setSession(null);
@@ -82,6 +84,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
     // Initial session check
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+      console.log('Initial Session Check:', initialSession);
       if (initialSession) {
         try {
           const { data: profileData, error: profileError } = await supabase

@@ -3,11 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-console.log('Supabase URL:', supabaseUrl);
-console.log('Supabase Anon Key:', supabaseAnonKey);
+console.log('Supabase Client Init - URL:', supabaseUrl ? 'Loaded' : 'UNDEFINED');
+console.log('Supabase Client Init - Anon Key:', supabaseAnonKey ? 'Loaded' : 'UNDEFINED');
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL and Anon Key are required!');
+  // This error should now be visible in the console if variables are missing
+  throw new Error('Supabase URL and Anon Key are required! Please check your .env.local file.');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

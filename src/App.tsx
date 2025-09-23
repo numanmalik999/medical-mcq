@@ -18,8 +18,9 @@ import AdminLayout from "./components/AdminLayout";
 import UserLayout from "./components/UserLayout";
 import UserDashboardPage from "./pages/UserDashboardPage";
 import UserProfilePage from "./pages/UserProfilePage";
-import AdminProtectedRoute from "./components/AdminProtectedRoute"; // Import AdminProtectedRoute
-import UserProtectedRoute from "./components/UserProtectedRoute"; // Import UserProtectedRoute
+import AdminProtectedRoute from "./components/AdminProtectedRoute";
+import UserProtectedRoute from "./components/UserProtectedRoute";
+import TakeTestPage from "./pages/TakeTestPage"; // Import the new page
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
                 <Route index element={<UserDashboardPage />} />
                 <Route path="dashboard" element={<UserDashboardPage />} />
                 <Route path="profile" element={<UserProfilePage />} />
+                <Route path="take-test" element={<TakeTestPage />} /> {/* New route */}
                 {/* Add more user-specific routes here */}
               </Route>
             </Route>

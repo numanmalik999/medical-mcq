@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, User, BookOpenText, CreditCard, LogOut } from 'lucide-react';
+import { MenuIcon, LayoutDashboard, User, BookOpenText, CreditCard, LogOut, ClipboardCheck } from 'lucide-react'; // Import ClipboardCheck icon
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -72,6 +72,7 @@ const UserSidebar = () => {
     { to: "/user/dashboard", icon: <LayoutDashboard className="h-4 w-4" />, label: "Dashboard" },
     { to: "/user/profile", icon: <User className="h-4 w-4" />, label: "Profile" },
     { to: "/quiz", icon: <BookOpenText className="h-4 w-4" />, label: "Take Quiz" },
+    { to: "/user/take-test", icon: <ClipboardCheck className="h-4 w-4" />, label: "Take A Test" }, // New nav item
     // { to: "/user/subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "My Subscriptions" }, // Future feature
   ];
 

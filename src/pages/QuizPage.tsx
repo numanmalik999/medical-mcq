@@ -105,6 +105,8 @@ const QuizPage = () => {
     setFeedback(null);
     setShowExplanation(false);
 
+    console.log("Fetching MCQ with category:", selectedCategoryId, "and subcategory:", selectedSubcategoryId);
+
     let countQuery = supabase.from('mcqs').select('count()', { head: true, count: 'exact' });
     if (selectedCategoryId) {
       countQuery = countQuery.eq('category_id', selectedCategoryId);
@@ -116,11 +118,13 @@ const QuizPage = () => {
     const { count, error: countError } = await countQuery;
 
     if (countError) {
-      console.error('Error fetching MCQ count:', countError);
-      toast({ title: "Error", description: "Failed to load quiz. Please try again.", variant: "destructive" });
+      console.error('Supabase Error fetching MCQ count:', countError);
+      toast({ title: "Error", description: `Failed to load quiz count: ${countError.message}. Please try again.`, variant: "destructive" });
       setIsLoading(false);
       return;
     }
+
+    console.log("MCQ count for criteria:", count);
 
     if (count === 0) {
       toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
@@ -130,6 +134,7 @@ const QuizPage = () => {
     }
 
     const randomIndex = Math.floor(Math.random() * count!);
+    console.log("Fetching MCQ at random index:", randomIndex);
 
     let mcqQuery = supabase
       .from('mcqs')
@@ -147,13 +152,14 @@ const QuizPage = () => {
     const { data, error } = await mcqQuery.single();
 
     if (error) {
-      console.error('Error fetching MCQ:', error);
+      console.error('Supabase Error fetching single MCQ:', error);
       toast({
         title: "Error",
-        description: "Failed to load MCQ. Please try again.",
+        description: `Failed to load MCQ: ${error.message || 'Unknown error'}. Please try again.`,
         variant: "destructive",
       });
     } else {
+      console.log("Fetched MCQ:", data);
       setMcq(data);
       if (data.explanation_id) {
         fetchExplanation(data.explanation_id);
@@ -246,15 +252,15 @@ const QuizPage = () => {
             <div className="space-y-2">
               <Label htmlFor="subcategory-select">Subcategory (Optional)</Label>
               <Select
-                onValueChange={(value) => setSelectedSubcategoryId(value === "all" ? null : value)} // Handle "all" value
-                value={selectedSubcategoryId || "all"} // Set default value to "all"
+                onValueChange={(value) => setSelectedSubcategoryId(value === "all" ? null : value)}
+                value={selectedSubcategoryId || "all"}
                 disabled={!selectedCategoryId || filteredSubcategories.length === 0}
               >
                 <SelectTrigger id="subcategory-select">
                   <SelectValue placeholder="Select a subcategory" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Any Subcategory</SelectItem> {/* Changed value from "" to "all" */}
+                  <SelectItem value="all">Any Subcategory</SelectItem>
                   {filteredSubcategories.map((subcat) => (
                     <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
                   ))}

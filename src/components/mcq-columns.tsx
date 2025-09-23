@@ -21,17 +21,24 @@ export type MCQ = {
   option_c: string;
   option_d: string;
   correct_answer: 'A' | 'B' | 'C' | 'D';
-  category_id: string | null; // Updated to category_id
-  subcategory_id: string | null; // Added subcategory_id
+  category_id: string | null;
+  subcategory_id: string | null;
   difficulty: string | null;
   explanation_id: string | null;
 };
 
+// Extend MCQ type for display purposes to include category/subcategory names
+type DisplayMCQ = MCQ & {
+  category_name: string | null;
+  subcategory_name: string | null;
+};
+
 interface MCQColumnsProps {
   onDelete: (mcqId: string, explanationId: string | null) => void;
+  onEdit: (mcq: MCQ) => void; // Added onEdit prop
 }
 
-export const createMcqColumns = ({ onDelete }: MCQColumnsProps): ColumnDef<MCQ>[] => [
+export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnDef<DisplayMCQ>[] => [
   {
     accessorKey: "question_text",
     header: "Question",
@@ -45,12 +52,12 @@ export const createMcqColumns = ({ onDelete }: MCQColumnsProps): ColumnDef<MCQ>[
     header: "Correct",
   },
   {
-    accessorKey: "category_id", // Display category ID for now, will fetch name later
-    header: "Category ID",
+    accessorKey: "category_name", // Display category name
+    header: "Category",
   },
   {
-    accessorKey: "subcategory_id", // Display subcategory ID for now
-    header: "Subcategory ID",
+    accessorKey: "subcategory_name", // Display subcategory name
+    header: "Subcategory",
   },
   {
     accessorKey: "difficulty",
@@ -77,7 +84,7 @@ export const createMcqColumns = ({ onDelete }: MCQColumnsProps): ColumnDef<MCQ>[
               Copy MCQ ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => toast({ title: "Edit MCQ", description: "Edit functionality coming soon!" })}>
+            <DropdownMenuItem onClick={() => onEdit(mcq)}> {/* Call onEdit */}
               Edit
             </DropdownMenuItem>
             <DropdownMenuItem

@@ -10,7 +10,8 @@ import QuizPage from "./pages/QuizPage";
 import AddMcqPage from "./pages/AddMcqPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ManageMcqsPage from "./pages/ManageMcqsPage";
-import ManageCategoriesPage from "./pages/ManageCategoriesPage"; // Import ManageCategoriesPage
+import ManageCategoriesPage from "./pages/ManageCategoriesPage";
+import ManageSubscriptionsPage from "./pages/ManageSubscriptionsPage"; // Import ManageSubscriptionsPage
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import AdminLayout from "./components/AdminLayout";
 
@@ -34,7 +35,8 @@ const App = () => (
               <Route path="dashboard" element={<AdminDashboardPage />} />
               <Route path="add-mcq" element={<AddMcqPage />} />
               <Route path="manage-mcqs" element={<ManageMcqsPage />} />
-              <Route path="manage-categories" element={<ManageCategoriesPage />} /> {/* New admin route */}
+              <Route path="manage-categories" element={<ManageCategoriesPage />} />
+              <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} /> {/* New admin route */}
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

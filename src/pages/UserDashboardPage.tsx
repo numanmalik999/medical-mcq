@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge'; // Import Badge for correct/incorrect status
 
 interface QuizPerformance {
   totalAttempts: number;
@@ -13,17 +14,30 @@ interface QuizPerformance {
   accuracy: string;
 }
 
+interface RecentAttempt {
+  id: string;
+  mcq_id: string;
+  question_text: string; // From mcqs table
+  selected_option: string;
+  is_correct: boolean;
+  attempt_timestamp: string;
+}
+
 const UserDashboardPage = () => {
   const { user, isLoading: isSessionLoading } = useSession();
   const { toast } = useToast();
   const [quizPerformance, setQuizPerformance] = useState<QuizPerformance | null>(null);
+  const [recentAttempts, setRecentAttempts] = useState<RecentAttempt[]>([]);
   const [isLoadingPerformance, setIsLoadingPerformance] = useState(true);
+  const [isLoadingRecentAttempts, setIsLoadingRecentAttempts] = useState(true);
 
   useEffect(() => {
     if (user && !isSessionLoading) {
       fetchQuizPerformance();
+      fetchRecentAttempts();
     } else if (!user && !isSessionLoading) {
       setIsLoadingPerformance(false);
+      setIsLoadingRecentAttempts(false);
     }
   }, [user, isSessionLoading]);
 
@@ -54,7 +68,43 @@ const UserDashboardPage = () => {
     setIsLoadingPerformance(false);
   };
 
-  if (isSessionLoading || isLoadingPerformance) {
+  const fetchRecentAttempts = async () => {
+    if (!user) return;
+    setIsLoadingRecentAttempts(true);
+
+    const { data, error } = await supabase
+      .from('user_quiz_attempts')
+      .select(`
+        id,
+        mcq_id,
+        selected_option,
+        is_correct,
+        attempt_timestamp,
+        mcqs (question_text)
+      `)
+      .eq('user_id', user.id)
+      .order('attempt_timestamp', { ascending: false })
+      .limit(5); // Fetch last 5 attempts
+
+    if (error) {
+      console.error('Error fetching recent attempts:', error);
+      toast({ title: "Error", description: "Failed to load recent quiz activity.", variant: "destructive" });
+      setRecentAttempts([]);
+    } else {
+      const formattedAttempts: RecentAttempt[] = data.map((attempt: any) => ({
+        id: attempt.id,
+        mcq_id: attempt.mcq_id,
+        question_text: attempt.mcqs?.question_text || 'N/A',
+        selected_option: attempt.selected_option,
+        is_correct: attempt.is_correct,
+        attempt_timestamp: attempt.attempt_timestamp,
+      }));
+      setRecentAttempts(formattedAttempts);
+    }
+    setIsLoadingRecentAttempts(false);
+  };
+
+  if (isSessionLoading || isLoadingPerformance || isLoadingRecentAttempts) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading user dashboard...</p>
@@ -107,6 +157,42 @@ const UserDashboardPage = () => {
             <p className="text-2xl font-bold">{quizPerformance?.accuracy || '0.00%'}</p>
             <p className="text-sm text-muted-foreground">Accuracy</p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent Quiz Activity Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Quiz Activity</CardTitle>
+          <CardDescription>Your last 5 quiz attempts.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {recentAttempts.length > 0 ? (
+            <div className="space-y-4">
+              {recentAttempts.map((attempt) => (
+                <div key={attempt.id} className="border-b pb-3 last:border-b-0 last:pb-0">
+                  <p className="font-semibold text-gray-900 dark:text-white line-clamp-2">
+                    Q: {attempt.question_text}
+                  </p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                    Your Answer: {attempt.selected_option}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant={attempt.is_correct ? "default" : "destructive"}>
+                      {attempt.is_correct ? "Correct" : "Incorrect"}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(attempt.attempt_timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-gray-600 dark:text-gray-400">
+              No recent quiz attempts found. Start a quiz to see your activity here!
+            </p>
+          )}
         </CardContent>
       </Card>
 

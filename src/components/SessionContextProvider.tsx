@@ -31,26 +31,44 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         setSession(null);
         setUser(null);
         navigate('/login');
+        setIsLoading(false); // Ensure loading is false after sign out
       } else if (currentSession) {
-        // Fetch profile to get is_admin status
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('id', currentSession.user.id)
-          .single();
+        try {
+          // Fetch profile to get is_admin status
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', currentSession.user.id)
+            .single();
 
-        const isAdmin = profileData?.is_admin || false;
-        const authUser: AuthUser = { ...currentSession.user, is_admin: isAdmin };
-
-        setSession(currentSession);
-        setUser(authUser);
-
-        if (location.pathname === '/login') {
-          if (isAdmin) {
-            navigate('/admin/dashboard');
-          } else {
-            navigate('/user/dashboard');
+          let isAdmin = false;
+          if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows found, which is fine
+            console.error('Error fetching profile for session:', profileError);
+            // isAdmin remains false if there's an actual error
+          } else if (profileData) {
+            isAdmin = profileData.is_admin || false;
           }
+          
+          const authUser: AuthUser = { ...currentSession.user, is_admin: isAdmin };
+          setSession(currentSession);
+          setUser(authUser);
+
+          if (location.pathname === '/login') {
+            if (isAdmin) {
+              navigate('/admin/dashboard');
+            } else {
+              navigate('/user/dashboard');
+            }
+          }
+        } catch (err) {
+          console.error('Unhandled error during profile fetch in SessionContextProvider (onAuthStateChange):', err);
+          setSession(null);
+          setUser(null);
+          if (location.pathname !== '/login') {
+            navigate('/login');
+          }
+        } finally {
+          setIsLoading(false); // Ensure loading is always false
         }
       } else {
         setSession(null);
@@ -58,31 +76,47 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         if (location.pathname !== '/login') {
           navigate('/login');
         }
+        setIsLoading(false); // Ensure loading is false if no session
       }
-      setIsLoading(false);
     });
 
     // Initial session check
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (initialSession) {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('id', initialSession.user.id)
-          .single();
+        try {
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', initialSession.user.id)
+            .single();
 
-        const isAdmin = profileData?.is_admin || false;
-        const authUser: AuthUser = { ...initialSession.user, is_admin: isAdmin };
-
-        setSession(initialSession);
-        setUser(authUser);
-
-        if (location.pathname === '/login') {
-          if (isAdmin) {
-            navigate('/admin/dashboard');
-          } else {
-            navigate('/user/dashboard');
+          let isAdmin = false;
+          if (profileError && profileError.code !== 'PGRST116') {
+            console.error('Error fetching profile for initial session:', profileError);
+          } else if (profileData) {
+            isAdmin = profileData.is_admin || false;
           }
+
+          const authUser: AuthUser = { ...initialSession.user, is_admin: isAdmin };
+          setSession(initialSession);
+          setUser(authUser);
+
+          if (location.pathname === '/login') {
+            if (isAdmin) {
+              navigate('/admin/dashboard');
+            } else {
+              navigate('/user/dashboard');
+            }
+          }
+        } catch (err) {
+          console.error('Unhandled error during profile fetch in SessionContextProvider (initial session):', err);
+          setSession(null);
+          setUser(null);
+          if (location.pathname !== '/login') {
+            navigate('/login');
+          }
+        } finally {
+          setIsLoading(false); // Ensure loading is always false
         }
       } else {
         setSession(null);
@@ -90,8 +124,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         if (location.pathname !== '/login') {
           navigate('/login');
         }
+        setIsLoading(false); // Ensure loading is false if no initial session
       }
-      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();

@@ -2,11 +2,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom"; // Added Link import
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import SignUp from "./pages/SignUp";
+// import SignUp from "./pages/SignUp"; // Temporarily comment out custom SignUp import
 import QuizPage from "./pages/QuizPage";
 import AddMcqPage from "./pages/AddMcqPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
@@ -23,6 +23,12 @@ import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import UserProtectedRoute from "./components/UserProtectedRoute";
 import TakeTestPage from "./pages/TakeTestPage";
 
+// Import Supabase Auth UI components for temporary diagnostic
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { supabase } from '@/integrations/supabase/client';
+
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -33,10 +39,42 @@ const App = () => (
       <BrowserRouter>
         <SessionContextProvider>
           <Routes>
-            <Route path="/" element={<Index />} /> {/* Index is back on the root path */}
+            <Route path="/" element={<Index />} />
 
             <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} /> {/* SignUp is on its dedicated path */}
+            {/* TEMPORARY: Render Supabase Auth UI with sign_up view directly on /signup */}
+            <Route path="/signup" element={
+              <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+                <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
+                  <h1 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-6">Supabase Sign Up Test</h1>
+                  <Auth
+                    supabaseClient={supabase}
+                    providers={[]}
+                    appearance={{
+                      theme: ThemeSupa,
+                      variables: {
+                        default: {
+                          colors: {
+                            brand: 'hsl(var(--primary))',
+                            brandAccent: 'hsl(var(--primary-foreground))',
+                          },
+                        },
+                      },
+                    }}
+                    theme="light"
+                    view="sign_up" // Explicitly set to sign_up view
+                  />
+                  <p className="mt-4 text-center text-sm text-muted-foreground">
+                    Already have an account?{" "}
+                    <Link to="/login" className="text-primary hover:underline">
+                      Log In
+                    </Link>
+                  </p>
+                </div>
+              </div>
+            } />
+            {/* Original custom SignUp route: <Route path="/signup" element={<SignUp />} /> */}
+
             <Route path="/quiz" element={<QuizPage />} />
             
             {/* Admin Routes - Protected */}

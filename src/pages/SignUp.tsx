@@ -86,6 +86,9 @@ const SignUp = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+      {/* TEMPORARY HEADING TO CONFIRM FILE IS LOADING */}
+      <h1 className="text-5xl font-extrabold text-red-600 dark:text-red-400 mb-8">CUSTOM SIGN UP FORM</h1>
+      {/* END TEMPORARY HEADING */}
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl text-center">Create an Account</CardTitle>

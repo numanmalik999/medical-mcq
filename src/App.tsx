@@ -7,8 +7,11 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import QuizPage from "./pages/QuizPage";
-import AddMcqPage from "./pages/AddMcqPage"; // Import the new AddMcqPage
+import AddMcqPage from "./pages/AddMcqPage";
+import AdminDashboardPage from "./pages/AdminDashboardPage"; // Import AdminDashboardPage
+import ManageMcqsPage from "./pages/ManageMcqsPage"; // Import ManageMcqsPage
 import { SessionContextProvider } from "./components/SessionContextProvider";
+import AdminLayout from "./components/AdminLayout"; // Import AdminLayout
 
 const queryClient = new QueryClient();
 
@@ -23,7 +26,15 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Index />} />
             <Route path="/quiz" element={<QuizPage />} />
-            <Route path="/add-mcq" element={<AddMcqPage />} /> {/* Add the new AddMcqPage route */}
+            
+            {/* Admin Routes */}
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboardPage />} /> {/* Default admin page */}
+              <Route path="dashboard" element={<AdminDashboardPage />} />
+              <Route path="add-mcq" element={<AddMcqPage />} />
+              <Route path="manage-mcqs" element={<ManageMcqsPage />} />
+            </Route>
+
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

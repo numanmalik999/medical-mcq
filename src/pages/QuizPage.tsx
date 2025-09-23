@@ -123,7 +123,7 @@ const QuizPage = () => {
     }
 
     if (count === 0) {
-      toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" }); // Changed 'info' to 'default'
+      toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
       setIsLoading(false);
       setMcq(null);
       return;
@@ -246,15 +246,15 @@ const QuizPage = () => {
             <div className="space-y-2">
               <Label htmlFor="subcategory-select">Subcategory (Optional)</Label>
               <Select
-                onValueChange={setSelectedSubcategoryId}
-                value={selectedSubcategoryId || ''}
+                onValueChange={(value) => setSelectedSubcategoryId(value === "all" ? null : value)} // Handle "all" value
+                value={selectedSubcategoryId || "all"} // Set default value to "all"
                 disabled={!selectedCategoryId || filteredSubcategories.length === 0}
               >
                 <SelectTrigger id="subcategory-select">
                   <SelectValue placeholder="Select a subcategory" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any Subcategory</SelectItem>
+                  <SelectItem value="all">Any Subcategory</SelectItem> {/* Changed value from "" to "all" */}
                   {filteredSubcategories.map((subcat) => (
                     <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
                   ))}

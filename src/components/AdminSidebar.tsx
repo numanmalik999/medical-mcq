@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard } from 'lucide-react'; // Import CreditCard icon
+import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users } from 'lucide-react'; // Import Users icon
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface NavLinkProps {
@@ -54,7 +54,8 @@ const AdminSidebar = () => {
     { to: "/admin/add-mcq", icon: <PlusCircle className="h-4 w-4" />, label: "Add MCQ" },
     { to: "/admin/manage-mcqs", icon: <BookOpenText className="h-4 w-4" />, label: "Manage MCQs" },
     { to: "/admin/manage-categories", icon: <FolderKanban className="h-4 w-4" />, label: "Manage Categories" },
-    { to: "/admin/manage-subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "Manage Subscriptions" }, // New link
+    { to: "/admin/manage-subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "Manage Subscriptions" },
+    { to: "/admin/manage-users", icon: <Users className="h-4 w-4" />, label: "Manage Users" }, // New link
   ];
 
   if (isMobile) {

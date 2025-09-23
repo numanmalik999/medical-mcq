@@ -15,9 +15,11 @@ import ManageSubscriptionsPage from "./pages/ManageSubscriptionsPage";
 import ManageUsersPage from "./pages/ManageUsersPage";
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import AdminLayout from "./components/AdminLayout";
-import UserLayout from "./components/UserLayout"; // Import UserLayout
-import UserDashboardPage from "./pages/UserDashboardPage"; // Import UserDashboardPage
-import UserProfilePage from "./pages/UserProfilePage"; // Import UserProfilePage
+import UserLayout from "./components/UserLayout";
+import UserDashboardPage from "./pages/UserDashboardPage";
+import UserProfilePage from "./pages/UserProfilePage";
+import AdminProtectedRoute from "./components/AdminProtectedRoute"; // Import AdminProtectedRoute
+import UserProtectedRoute from "./components/UserProtectedRoute"; // Import UserProtectedRoute
 
 const queryClient = new QueryClient();
 
@@ -33,23 +35,27 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/quiz" element={<QuizPage />} />
             
-            {/* Admin Routes */}
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminDashboardPage />} />
-              <Route path="dashboard" element={<AdminDashboardPage />} />
-              <Route path="add-mcq" element={<AddMcqPage />} />
-              <Route path="manage-mcqs" element={<ManageMcqsPage />} />
-              <Route path="manage-categories" element={<ManageCategoriesPage />} />
-              <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
-              <Route path="manage-users" element={<ManageUsersPage />} />
+            {/* Admin Routes - Protected */}
+            <Route path="/admin" element={<AdminProtectedRoute />}>
+              <Route element={<AdminLayout />}>
+                <Route index element={<AdminDashboardPage />} />
+                <Route path="dashboard" element={<AdminDashboardPage />} />
+                <Route path="add-mcq" element={<AddMcqPage />} />
+                <Route path="manage-mcqs" element={<ManageMcqsPage />} />
+                <Route path="manage-categories" element={<ManageCategoriesPage />} />
+                <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
+                <Route path="manage-users" element={<ManageUsersPage />} />
+              </Route>
             </Route>
 
-            {/* User Routes */}
-            <Route path="/user" element={<UserLayout />}>
-              <Route index element={<UserDashboardPage />} />
-              <Route path="dashboard" element={<UserDashboardPage />} />
-              <Route path="profile" element={<UserProfilePage />} />
-              {/* Add more user-specific routes here */}
+            {/* User Routes - Protected */}
+            <Route path="/user" element={<UserProtectedRoute />}>
+              <Route element={<UserLayout />}>
+                <Route index element={<UserDashboardPage />} />
+                <Route path="dashboard" element={<UserDashboardPage />} />
+                <Route path="profile" element={<UserProfilePage />} />
+                {/* Add more user-specific routes here */}
+              </Route>
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

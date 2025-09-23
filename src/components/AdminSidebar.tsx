@@ -1,12 +1,13 @@
 "use client";
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users } from 'lucide-react'; // Import Users icon
+import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users, LogOut } from 'lucide-react'; // Import LogOut icon
 import { useIsMobile } from '@/hooks/use-mobile';
+import { supabase } from '@/integrations/supabase/client'; // Import supabase client
 
 interface NavLinkProps {
   to: string;
@@ -42,8 +43,17 @@ const NavLink = ({ to, icon, label, isMobile, onLinkClick }: NavLinkProps) => {
 const AdminSidebar = () => {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
+  const navigate = useNavigate(); // Initialize useNavigate
 
   const handleLinkClick = () => {
+    if (isMobile) {
+      setIsOpen(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    // The SessionContextProvider will handle the navigation to /login
     if (isMobile) {
       setIsOpen(false);
     }
@@ -55,7 +65,7 @@ const AdminSidebar = () => {
     { to: "/admin/manage-mcqs", icon: <BookOpenText className="h-4 w-4" />, label: "Manage MCQs" },
     { to: "/admin/manage-categories", icon: <FolderKanban className="h-4 w-4" />, label: "Manage Categories" },
     { to: "/admin/manage-subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "Manage Subscriptions" },
-    { to: "/admin/manage-users", icon: <Users className="h-4 w-4" />, label: "Manage Users" }, // New link
+    { to: "/admin/manage-users", icon: <Users className="h-4 w-4" />, label: "Manage Users" },
   ];
 
   if (isMobile) {
@@ -67,9 +77,9 @@ const AdminSidebar = () => {
             <span className="sr-only">Toggle navigation</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-4 bg-sidebar">
+        <SheetContent side="left" className="w-64 p-4 bg-sidebar flex flex-col">
           <h2 className="text-2xl font-bold text-sidebar-primary-foreground mb-6">Admin Panel</h2>
-          <nav className="flex flex-col gap-2">
+          <nav className="flex flex-col gap-2 flex-grow">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -81,6 +91,16 @@ const AdminSidebar = () => {
               />
             ))}
           </nav>
+          <div className="mt-auto pt-4 border-t border-sidebar-border">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </Button>
+          </div>
         </SheetContent>
       </Sheet>
     );
@@ -89,11 +109,21 @@ const AdminSidebar = () => {
   return (
     <aside className="w-64 min-h-screen bg-sidebar text-sidebar-foreground p-4 border-r border-sidebar-border flex flex-col">
       <h2 className="text-2xl font-bold text-sidebar-primary-foreground mb-6">Admin Panel</h2>
-      <nav className="flex flex-col gap-2">
+      <nav className="flex flex-col gap-2 flex-grow">
         {navItems.map((item) => (
           <NavLink key={item.to} to={item.to} icon={item.icon} label={item.label} />
         ))}
       </nav>
+      <div className="mt-auto pt-4 border-t border-sidebar-border">
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          onClick={handleLogout}
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Logout</span>
+        </Button>
+      </div>
     </aside>
   );
 };

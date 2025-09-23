@@ -8,7 +8,9 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
-import { useSession } from '@/components/SessionContextProvider'; // Import useSession
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input'; // Import Input for search
+import { useSession } from '@/components/SessionContextProvider';
 
 interface MCQ {
   id: string;
@@ -40,8 +42,19 @@ interface CategoryStat {
   user_accuracy: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+}
+
+interface Subcategory {
+  id: string;
+  category_id: string;
+  name: string;
+}
+
 const QuizPage = () => {
-  const { user } = useSession(); // Get user from session
+  const { user } = useSession();
   const [mcq, setMcq] = useState<MCQ | null>(null);
   const [explanation, setExplanation] = useState<MCQExplanation | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -51,12 +64,26 @@ const QuizPage = () => {
   const { toast } = useToast();
 
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
+  const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]); // Store all subcategories
+  const [filteredSubcategoriesForQuiz, setFilteredSubcategoriesForQuiz] = useState<Subcategory[]>([]); // For quiz selection
   const [currentQuizCategoryId, setCurrentQuizCategoryId] = useState<string | null>(null);
+  const [currentQuizSubcategoryId, setCurrentQuizSubcategoryId] = useState<string | null>(null); // New state for subcategory in quiz
   const [showCategorySelection, setShowCategorySelection] = useState(true);
+  const [searchTerm, setSearchTerm] = useState(''); // New state for search term
 
   useEffect(() => {
     fetchQuizOverview();
-  }, [user]); // Refetch overview if user changes
+  }, [user]);
+
+  useEffect(() => {
+    if (currentQuizCategoryId) {
+      setFilteredSubcategoriesForQuiz(allSubcategories.filter(sub => sub.category_id === currentQuizCategoryId));
+      setCurrentQuizSubcategoryId(null); // Reset subcategory when category changes
+    } else {
+      setFilteredSubcategoriesForQuiz([]);
+      setCurrentQuizSubcategoryId(null);
+    }
+  }, [currentQuizCategoryId, allSubcategories]);
 
   const fetchQuizOverview = async () => {
     setIsLoading(true);
@@ -64,11 +91,21 @@ const QuizPage = () => {
       .from('categories')
       .select('*');
 
+    const { data: subcategoriesData, error: subcategoriesError } = await supabase
+      .from('subcategories')
+      .select('*');
+
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
       setIsLoading(false);
       return;
+    }
+    if (subcategoriesError) {
+      console.error('Error fetching subcategories:', subcategoriesError);
+      toast({ title: "Error", description: "Failed to load subcategories.", variant: "destructive" });
+    } else {
+      setAllSubcategories(subcategoriesData || []);
     }
 
     const categoriesWithStats: CategoryStat[] = [];
@@ -82,13 +119,12 @@ const QuizPage = () => {
 
       if (mcqCountError) {
         console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
-        // Continue even if one category fails
       }
 
       let totalAttempts = 0;
       let correctAttempts = 0;
 
-      if (user) { // Only fetch user-specific stats if logged in
+      if (user) {
         const { data: userAttemptsData, error: userAttemptsError } = await supabase
           .from('user_quiz_attempts')
           .select('is_correct')
@@ -136,6 +172,10 @@ const QuizPage = () => {
 
     let countQuery = supabase.from('mcqs').select('id', { count: 'exact' })
       .eq('category_id', currentQuizCategoryId);
+    
+    if (currentQuizSubcategoryId) {
+      countQuery = countQuery.eq('subcategory_id', currentQuizSubcategoryId);
+    }
 
     const { count, error: countError } = await countQuery;
 
@@ -147,7 +187,7 @@ const QuizPage = () => {
     }
 
     if (count === 0) {
-      toast({ title: "No MCQs", description: "No MCQs found for the selected category.", variant: "default" });
+      toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
       setIsLoading(false);
       setMcq(null);
       return;
@@ -155,13 +195,18 @@ const QuizPage = () => {
 
     const randomIndex = Math.floor(Math.random() * count!);
 
-    const { data, error } = await supabase
+    let mcqQuery = supabase
       .from('mcqs')
       .select('*')
       .eq('category_id', currentQuizCategoryId)
       .limit(1)
-      .range(randomIndex, randomIndex)
-      .single();
+      .range(randomIndex, randomIndex);
+    
+    if (currentQuizSubcategoryId) {
+      mcqQuery = mcqQuery.eq('subcategory_id', currentQuizSubcategoryId);
+    }
+
+    const { data, error } = await mcqQuery.single();
 
     if (error) {
       console.error('Supabase Error fetching single MCQ:', error);
@@ -230,7 +275,6 @@ const QuizPage = () => {
     }
     setShowExplanation(true);
 
-    // Record the quiz attempt
     try {
       const { error } = await supabase.from('user_quiz_attempts').insert({
         user_id: user.id,
@@ -272,6 +316,10 @@ const QuizPage = () => {
     fetchMcq();
   };
 
+  const filteredCategories = categoryStats.filter(cat =>
+    cat.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
@@ -286,16 +334,22 @@ const QuizPage = () => {
         <Card className="w-full max-w-4xl">
           <CardHeader>
             <CardTitle>Select a Quiz Category</CardTitle>
-            <CardDescription>Choose a category to start your quiz and view your performance.</CardDescription>
+            <CardDescription>Choose a category and optionally a subcategory to start your quiz and view your performance.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {categoryStats.length === 0 ? (
+            <Input
+              placeholder="Search categories..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="mb-4"
+            />
+            {filteredCategories.length === 0 ? (
               <p className="text-center text-gray-600 dark:text-gray-400">
-                No categories available. Please add categories and MCQs via the admin panel.
+                No categories found matching your search.
               </p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {categoryStats.map((cat) => (
+                {filteredCategories.map((cat) => (
                   <Card key={cat.id} className="flex flex-col">
                     <CardHeader>
                       <CardTitle className="text-lg">{cat.name}</CardTitle>
@@ -306,6 +360,26 @@ const QuizPage = () => {
                       <p>Correct: {cat.user_correct}</p>
                       <p>Incorrect: {cat.user_incorrect}</p>
                       <p>Accuracy: {cat.user_accuracy}</p>
+                      <div className="space-y-2 mt-4">
+                        <Label htmlFor={`subcategory-select-${cat.id}`}>Subcategory (Optional)</Label>
+                        <Select
+                          onValueChange={(value) => setCurrentQuizSubcategoryId(value === "all" ? null : value)}
+                          value={currentQuizSubcategoryId || "all"}
+                          disabled={!cat.id || allSubcategories.filter(sub => sub.category_id === cat.id).length === 0}
+                        >
+                          <SelectTrigger id={`subcategory-select-${cat.id}`}>
+                            <SelectValue placeholder="Any Subcategory" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Any Subcategory</SelectItem>
+                            {allSubcategories
+                              .filter(sub => sub.category_id === cat.id)
+                              .map((subcat) => (
+                                <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </CardContent>
                     <CardFooter>
                       <Button
@@ -334,16 +408,16 @@ const QuizPage = () => {
           <CardHeader>
             <CardTitle>No MCQs Found</CardTitle>
             <CardDescription>
-              It looks like there are no MCQs for the selected category.
+              It looks like there are no MCQs for the selected category and subcategory.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-center text-gray-600 dark:text-gray-400">
-              Please try a different category or add more MCQs.
+              Please try a different selection or add more MCQs.
             </p>
           </CardContent>
           <CardFooter className="flex justify-center">
-            <Button onClick={() => setShowCategorySelection(true)}>Go Back to Category Selection</Button>
+            <Button onClick={() => setShowCategorySelection(true)}>Go Back to Selection</Button>
           </CardFooter>
         </Card>
         <MadeWithDyad />

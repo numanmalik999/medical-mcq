@@ -12,9 +12,12 @@ import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ManageMcqsPage from "./pages/ManageMcqsPage";
 import ManageCategoriesPage from "./pages/ManageCategoriesPage";
 import ManageSubscriptionsPage from "./pages/ManageSubscriptionsPage";
-import ManageUsersPage from "./pages/ManageUsersPage"; // Import ManageUsersPage
+import ManageUsersPage from "./pages/ManageUsersPage";
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import AdminLayout from "./components/AdminLayout";
+import UserLayout from "./components/UserLayout"; // Import UserLayout
+import UserDashboardPage from "./pages/UserDashboardPage"; // Import UserDashboardPage
+import UserProfilePage from "./pages/UserProfilePage"; // Import UserProfilePage
 
 const queryClient = new QueryClient();
 
@@ -38,7 +41,15 @@ const App = () => (
               <Route path="manage-mcqs" element={<ManageMcqsPage />} />
               <Route path="manage-categories" element={<ManageCategoriesPage />} />
               <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
-              <Route path="manage-users" element={<ManageUsersPage />} /> {/* New admin route */}
+              <Route path="manage-users" element={<ManageUsersPage />} />
+            </Route>
+
+            {/* User Routes */}
+            <Route path="/user" element={<UserLayout />}>
+              <Route index element={<UserDashboardPage />} />
+              <Route path="dashboard" element={<UserDashboardPage />} />
+              <Route path="profile" element={<UserProfilePage />} />
+              {/* Add more user-specific routes here */}
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

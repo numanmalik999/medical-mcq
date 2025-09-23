@@ -16,6 +16,9 @@ const Index = () => {
           <Link to="/quiz">
             <Button size="lg">Start Quiz</Button>
           </Link>
+          <Link to="/user/dashboard"> {/* Link to user dashboard */}
+            <Button size="lg" variant="outline">Go to User Dashboard</Button>
+          </Link>
           <Link to="/admin/dashboard">
             <Button size="lg" variant="outline">Go to Admin Dashboard</Button>
           </Link>

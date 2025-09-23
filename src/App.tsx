@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import SignUp from "./pages/SignUp"; // Import the new SignUp page
+import SignUp from "./pages/SignUp";
 import QuizPage from "./pages/QuizPage";
 import AddMcqPage from "./pages/AddMcqPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
@@ -33,9 +33,10 @@ const App = () => (
       <BrowserRouter>
         <SessionContextProvider>
           <Routes>
+            <Route path="/" element={<Index />} /> {/* Index is back on the root path */}
+
             <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} /> {/* New SignUp route */}
-            <Route path="/" element={<Index />} />
+            <Route path="/signup" element={<SignUp />} /> {/* SignUp is on its dedicated path */}
             <Route path="/quiz" element={<QuizPage />} />
             
             {/* Admin Routes - Protected */}

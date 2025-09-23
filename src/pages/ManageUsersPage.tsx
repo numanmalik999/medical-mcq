@@ -9,8 +9,17 @@ import { MadeWithDyad }
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User as UserIcon } from 'lucide-react';
+import { User as UserIcon, MoreHorizontal } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 import { User } from '@supabase/supabase-js'; // Import User type
+import EditUserDialog from '@/components/EditUserDialog'; // Import the new dialog
 
 interface UserProfile {
   id: string;
@@ -19,13 +28,16 @@ interface UserProfile {
   avatar_url: string | null;
   email: string | null;
   created_at: string;
-  is_admin: boolean; // Added is_admin to UserProfile
+  is_admin: boolean;
 }
 
 const ManageUsersPage = () => {
   const { toast } = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -78,6 +90,11 @@ const ManageUsersPage = () => {
     setIsLoading(false);
   };
 
+  const handleEditClick = (userProfile: UserProfile) => {
+    setSelectedUserForEdit(userProfile);
+    setIsEditDialogOpen(true);
+  };
+
   const columns: ColumnDef<UserProfile>[] = [
     {
       accessorKey: 'avatar_url',
@@ -116,7 +133,29 @@ const ManageUsersPage = () => {
       header: 'Admin',
       cell: ({ row }) => (row.original.is_admin ? 'Yes' : 'No'),
     },
-    // Future: Add actions like "Edit User", "Reset Password", "Delete User"
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const userProfile = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleEditClick(userProfile)}>
+                Edit User
+              </DropdownMenuItem>
+              {/* Future: Add Delete User, Reset Password, etc. */}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
   ];
 
   if (isLoading) {
@@ -142,6 +181,15 @@ const ManageUsersPage = () => {
       </Card>
 
       <MadeWithDyad />
+
+      {selectedUserForEdit && (
+        <EditUserDialog
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          userProfile={selectedUserForEdit}
+          onSave={fetchUsers} // Refresh the list after saving
+        />
+      )}
     </div>
   );
 };

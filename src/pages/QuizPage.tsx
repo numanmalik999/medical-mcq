@@ -107,7 +107,8 @@ const QuizPage = () => {
 
     console.log("Attempting to fetch MCQ with category:", selectedCategoryId, "and subcategory:", selectedSubcategoryId);
 
-    let countQuery = supabase.from('mcqs').select('count()', { head: true, count: 'exact' });
+    // Changed from select('count()', { head: true, count: 'exact' }) to select('id', { count: 'exact' })
+    let countQuery = supabase.from('mcqs').select('id', { count: 'exact' });
     if (selectedCategoryId) {
       countQuery = countQuery.eq('category_id', selectedCategoryId);
     }

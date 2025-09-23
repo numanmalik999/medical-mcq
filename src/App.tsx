@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import SignUp from "./pages/SignUp"; // Import the new SignUp page
 import QuizPage from "./pages/QuizPage";
 import AddMcqPage from "./pages/AddMcqPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
@@ -20,7 +21,7 @@ import UserDashboardPage from "./pages/UserDashboardPage";
 import UserProfilePage from "./pages/UserProfilePage";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import UserProtectedRoute from "./components/UserProtectedRoute";
-import TakeTestPage from "./pages/TakeTestPage"; // Import the new page
+import TakeTestPage from "./pages/TakeTestPage";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
         <SessionContextProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<SignUp />} /> {/* New SignUp route */}
             <Route path="/" element={<Index />} />
             <Route path="/quiz" element={<QuizPage />} />
             
@@ -55,7 +57,7 @@ const App = () => (
                 <Route index element={<UserDashboardPage />} />
                 <Route path="dashboard" element={<UserDashboardPage />} />
                 <Route path="profile" element={<UserProfilePage />} />
-                <Route path="take-test" element={<TakeTestPage />} /> {/* New route */}
+                <Route path="take-test" element={<TakeTestPage />} />
                 {/* Add more user-specific routes here */}
               </Route>
             </Route>

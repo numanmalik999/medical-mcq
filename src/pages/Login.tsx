@@ -4,21 +4,9 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-// Removed useToast as handleAuthError is no longer needed
-// import { useToast } from '@/hooks/use-toast';
+import { Link } from 'react-router-dom'; // Import Link
 
 const Login = () => {
-  // Removed handleAuthError function as onError prop is not supported
-  // const { toast } = useToast();
-  // const handleAuthError = (error: Error) => {
-  //   console.error("Supabase Auth Error:", error);
-  //   toast({
-  //     title: "Authentication Error",
-  //     description: error.message,
-  //     variant: "destructive",
-  //   });
-  // };
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
       <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
@@ -38,9 +26,14 @@ const Login = () => {
             },
           }}
           theme="light"
-          view="sign_in" // Default to sign_in view, users can switch to sign_up within the UI
-          // Removed onError prop
+          view="sign_in" // Ensure it only shows the sign_in view
         />
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          Don't have an account?{" "}
+          <Link to="/signup" className="text-primary hover:underline">
+            Sign Up
+          </Link>
+        </p>
       </div>
       <MadeWithDyad />
     </div>

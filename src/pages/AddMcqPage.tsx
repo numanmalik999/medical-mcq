@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
+interface Category {
+  id: string;
+  name: string;
+}
+
+interface Subcategory {
+  id: string;
+  category_id: string;
+  name: string;
+}
+
 const formSchema = z.object({
   question_text: z.string().min(1, "Question text is required."),
   option_a: z.string().min(1, "Option A is required."),
@@ -25,13 +36,26 @@ const formSchema = z.object({
   correct_answer: z.enum(['A', 'B', 'C', 'D'], { message: "Correct answer is required." }),
   explanation_text: z.string().min(1, "Explanation text is required."),
   image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
-  category: z.string().optional().or(z.literal('')),
+  category_id: z.string().uuid("Invalid category ID.").optional().or(z.literal('')), // Updated to category_id
+  subcategory_id: z.string().uuid("Invalid subcategory ID.").optional().or(z.literal('')), // Added subcategory_id
   difficulty: z.string().optional().or(z.literal('')),
+}).refine((data) => {
+  // If a subcategory is selected, a category must also be selected
+  if (data.subcategory_id && !data.category_id) {
+    return false;
+  }
+  return true;
+}, {
+  message: "A category must be selected if a subcategory is chosen.",
+  path: ["category_id"],
 });
 
 const AddMcqPage = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -44,10 +68,47 @@ const AddMcqPage = () => {
       correct_answer: 'A',
       explanation_text: "",
       image_url: "",
-      category: "",
+      category_id: "",
+      subcategory_id: "",
       difficulty: "",
     },
   });
+
+  const selectedCategoryId = form.watch("category_id");
+
+  useEffect(() => {
+    const fetchCategoriesAndSubcategories = async () => {
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*');
+      if (categoriesError) {
+        console.error('Error fetching categories:', categoriesError);
+        toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
+      } else {
+        setCategories(categoriesData || []);
+      }
+
+      const { data: subcategoriesData, error: subcategoriesError } = await supabase
+        .from('subcategories')
+        .select('*');
+      if (subcategoriesError) {
+        console.error('Error fetching subcategories:', subcategoriesError);
+        toast({ title: "Error", description: "Failed to load subcategories.", variant: "destructive" });
+      } else {
+        setSubcategories(subcategoriesData || []);
+      }
+    };
+    fetchCategoriesAndSubcategories();
+  }, [toast]);
+
+  useEffect(() => {
+    if (selectedCategoryId) {
+      setFilteredSubcategories(subcategories.filter(sub => sub.category_id === selectedCategoryId));
+    } else {
+      setFilteredSubcategories([]);
+      form.setValue("subcategory_id", ""); // Clear subcategory if category is unselected
+    }
+  }, [selectedCategoryId, subcategories, form]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
@@ -66,7 +127,7 @@ const AddMcqPage = () => {
         throw explanationError;
       }
 
-      // Then, insert the MCQ with the explanation_id
+      // Then, insert the MCQ with the explanation_id, category_id, and subcategory_id
       const { error: mcqError } = await supabase
         .from('mcqs')
         .insert({
@@ -77,7 +138,8 @@ const AddMcqPage = () => {
           option_d: values.option_d,
           correct_answer: values.correct_answer,
           explanation_id: explanationData.id,
-          category: values.category || null,
+          category_id: values.category_id || null, // Use category_id
+          subcategory_id: values.subcategory_id || null, // Use subcategory_id
           difficulty: values.difficulty || null,
         });
 
@@ -200,13 +262,45 @@ const AddMcqPage = () => {
 
               <FormField
                 control={form.control}
-                name="category"
+                name="category_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Anatomy, Physiology, Pharmacology" {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="subcategory_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subcategory (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''} disabled={!selectedCategoryId || filteredSubcategories.length === 0}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a subcategory" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {filteredSubcategories.map((subcat) => (
+                          <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

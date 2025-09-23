@@ -21,7 +21,8 @@ export type MCQ = {
   option_c: string;
   option_d: string;
   correct_answer: 'A' | 'B' | 'C' | 'D';
-  category: string | null;
+  category_id: string | null; // Updated to category_id
+  subcategory_id: string | null; // Added subcategory_id
   difficulty: string | null;
   explanation_id: string | null;
 };
@@ -44,8 +45,12 @@ export const createMcqColumns = ({ onDelete }: MCQColumnsProps): ColumnDef<MCQ>[
     header: "Correct",
   },
   {
-    accessorKey: "category",
-    header: "Category",
+    accessorKey: "category_id", // Display category ID for now, will fetch name later
+    header: "Category ID",
+  },
+  {
+    accessorKey: "subcategory_id", // Display subcategory ID for now
+    header: "Subcategory ID",
   },
   {
     accessorKey: "difficulty",

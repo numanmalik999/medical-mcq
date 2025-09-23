@@ -18,7 +18,8 @@ interface MCQ {
   option_d: string;
   correct_answer: 'A' | 'B' | 'C' | 'D';
   explanation_id: string | null;
-  category: string | null;
+  category_id: string | null; // Updated to category_id
+  subcategory_id: string | null; // Added subcategory_id
   difficulty: string | null;
 }
 
@@ -147,9 +148,9 @@ const QuizPage = () => {
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="text-xl">{mcq.question_text}</CardTitle>
-          {mcq.category && mcq.difficulty && (
+          {mcq.category_id && mcq.difficulty && ( // Updated to category_id
             <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
-              Category: {mcq.category} | Difficulty: {mcq.difficulty}
+              Category ID: {mcq.category_id} | Difficulty: {mcq.difficulty}
             </CardDescription>
           )}
         </CardHeader>

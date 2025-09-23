@@ -6,7 +6,7 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
+// Removed unused 'useNavigate' import
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -29,7 +29,6 @@ const formSchema = z.object({
 
 const Login = () => {
   const { toast } = useToast();
-  // const navigate = useNavigate(); // Removed as its value is never read
   const [isSigningUp, setIsSigningUp] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({

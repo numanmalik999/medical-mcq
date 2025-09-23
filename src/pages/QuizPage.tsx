@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input'; // Import Input for search
+import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
+import { AlertCircle, CheckCircle2, RotateCcw } from 'lucide-react'; // Import icons
 
 interface MCQ {
   id: string;
@@ -55,35 +56,57 @@ interface Subcategory {
 
 const QuizPage = () => {
   const { user } = useSession();
-  const [mcq, setMcq] = useState<MCQ | null>(null);
-  const [explanation, setExplanation] = useState<MCQExplanation | null>(null);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const [quizQuestions, setQuizQuestions] = useState<MCQ[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [userAnswers, setUserAnswers] = useState<Map<string, string | null>>(new Map());
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null); // Re-introduced state
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
 
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
-  const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]); // Store all subcategories
-  const [filteredSubcategoriesForQuiz, setFilteredSubcategoriesForQuiz] = useState<Subcategory[]>([]); // For quiz selection
+  const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
   const [currentQuizCategoryId, setCurrentQuizCategoryId] = useState<string | null>(null);
-  const [currentQuizSubcategoryId, setCurrentQuizSubcategoryId] = useState<string | null>(null); // New state for subcategory in quiz
+  const [currentQuizSubcategoryId, setCurrentQuizSubcategoryId] = useState<string | null>(null);
   const [showCategorySelection, setShowCategorySelection] = useState(true);
-  const [searchTerm, setSearchTerm] = useState(''); // New state for search term
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showResults, setShowResults] = useState(false);
+  const [score, setScore] = useState(0);
+  const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
+
+
+  // Memoized function to fetch a single explanation
+  const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
+    if (explanations.has(explanationId)) {
+      return explanations.get(explanationId)!;
+    }
+    const { data, error } = await supabase
+      .from('mcq_explanations')
+      .select('*')
+      .eq('id', explanationId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Supabase Error fetching explanation:', error);
+      toast({
+        title: "Error",
+        description: `Failed to load explanation: ${error.message || 'Unknown error'}.`,
+        variant: "destructive",
+      });
+      return null;
+    } else if (data) {
+      setExplanations(prev => new Map(prev).set(explanationId, data));
+      return data;
+    }
+    return null;
+  }, [explanations, toast]);
 
   useEffect(() => {
     fetchQuizOverview();
   }, [user]);
-
-  useEffect(() => {
-    if (currentQuizCategoryId) {
-      setFilteredSubcategoriesForQuiz(allSubcategories.filter(sub => sub.category_id === currentQuizCategoryId));
-      setCurrentQuizSubcategoryId(null); // Reset subcategory when category changes
-    } else {
-      setFilteredSubcategoriesForQuiz([]);
-      setCurrentQuizSubcategoryId(null);
-    }
-  }, [currentQuizCategoryId, allSubcategories]);
 
   const fetchQuizOverview = async () => {
     setIsLoading(true);
@@ -127,7 +150,7 @@ const QuizPage = () => {
       if (user) {
         const { data: userAttemptsData, error: userAttemptsError } = await supabase
           .from('user_quiz_attempts')
-          .select('is_correct')
+          .select('is_correct, mcq_id') // Corrected: select multiple columns as a single string
           .eq('user_id', user.id)
           .eq('category_id', category.id);
 
@@ -156,131 +179,155 @@ const QuizPage = () => {
     setIsLoading(false);
   };
 
-  const fetchMcq = async () => {
+  const startQuizSession = async (categoryId: string, subcategoryId: string | null, mode: 'random' | 'incorrect') => {
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in to start a quiz.", variant: "destructive" });
+      return;
+    }
+
     setIsLoading(true);
-    setMcq(null);
-    setExplanation(null);
-    setSelectedAnswer(null);
+    setQuizQuestions([]);
+    setCurrentQuestionIndex(0);
+    setUserAnswers(new Map());
+    setSelectedAnswer(null); // Reset selected answer for new session
     setFeedback(null);
     setShowExplanation(false);
+    setScore(0);
+    setShowResults(false);
+    setExplanations(new Map());
 
-    if (!currentQuizCategoryId) {
-      toast({ title: "Error", description: "No category selected for quiz.", variant: "destructive" });
-      setIsLoading(false);
-      return;
-    }
-
-    let countQuery = supabase.from('mcqs').select('id', { count: 'exact' })
-      .eq('category_id', currentQuizCategoryId);
-    
-    if (currentQuizSubcategoryId) {
-      countQuery = countQuery.eq('subcategory_id', currentQuizSubcategoryId);
-    }
-
-    const { count, error: countError } = await countQuery;
-
-    if (countError) {
-      console.error('Supabase Error fetching MCQ count:', countError);
-      toast({ title: "Error", description: `Failed to load quiz count: ${countError.message}. Please try again.`, variant: "destructive" });
-      setIsLoading(false);
-      return;
-    }
-
-    if (count === 0) {
-      toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
-      setIsLoading(false);
-      setMcq(null);
-      return;
-    }
-
-    const randomIndex = Math.floor(Math.random() * count!);
-
-    let mcqQuery = supabase
+    let query = supabase
       .from('mcqs')
       .select('*')
-      .eq('category_id', currentQuizCategoryId)
-      .limit(1)
-      .range(randomIndex, randomIndex);
-    
-    if (currentQuizSubcategoryId) {
-      mcqQuery = mcqQuery.eq('subcategory_id', currentQuizSubcategoryId);
+      .eq('category_id', categoryId);
+
+    if (subcategoryId) {
+      query = query.eq('subcategory_id', subcategoryId);
     }
 
-    const { data, error } = await mcqQuery.single();
+    let mcqsToLoad: MCQ[] = [];
+
+    if (mode === 'random') {
+      const { data, error } = await query;
+      if (error) {
+        console.error('Error fetching random MCQs:', error);
+        toast({ title: "Error", description: "Failed to load quiz questions.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+      if (!data || data.length === 0) {
+        toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
+        setIsLoading(false);
+        return;
+      }
+      // Shuffle and take a reasonable number, e.g., 10 for a quick quiz
+      mcqsToLoad = data.sort(() => 0.5 - Math.random()).slice(0, Math.min(data.length, 10));
+    } else if (mode === 'incorrect') {
+      const { data: incorrectAttempts, error: attemptsError } = await supabase
+        .from('user_quiz_attempts')
+        .select('mcq_id')
+        .eq('user_id', user.id)
+        .eq('category_id', categoryId)
+        .eq('is_correct', false);
+
+      if (attemptsError) {
+        console.error('Error fetching incorrect attempts:', attemptsError);
+        toast({ title: "Error", description: "Failed to load incorrect questions.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+
+      // Get unique incorrect MCQ IDs
+      const incorrectMcqIds = Array.from(new Set(incorrectAttempts?.map(attempt => attempt.mcq_id) || []));
+      
+      if (incorrectMcqIds.length === 0) {
+        toast({ title: "No Incorrect MCQs", description: "You have no incorrect answers in this category to re-attempt.", variant: "default" });
+        setIsLoading(false);
+        return;
+      }
+
+      const { data: mcqsData, error: mcqsError } = await query.in('id', incorrectMcqIds);
+      if (mcqsError) {
+        console.error('Error fetching incorrect MCQs data:', mcqsError);
+        toast({ title: "Error", description: "Failed to load incorrect questions data.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+      mcqsToLoad = mcqsData || [];
+    }
+
+    if (mcqsToLoad.length === 0) {
+      toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
+      setIsLoading(false);
+      return;
+    }
+
+    setQuizQuestions(mcqsToLoad);
+    setCurrentQuizCategoryId(categoryId);
+    setCurrentQuizSubcategoryId(subcategoryId);
+    setShowCategorySelection(false);
+    setIsLoading(false);
+    // Set initial selected answer for the first question if it was previously answered
+    if (mcqsToLoad.length > 0) {
+      setSelectedAnswer(userAnswers.get(mcqsToLoad[0].id) || null);
+    }
+  };
+
+  const handleResetProgress = async (categoryId: string) => {
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in to reset progress.", variant: "destructive" });
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete your quiz progress for this category? This action cannot be undone.")) {
+      return;
+    }
+
+    setIsLoading(true);
+    const { error } = await supabase
+      .from('user_quiz_attempts')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('category_id', categoryId);
 
     if (error) {
-      console.error('Supabase Error fetching single MCQ:', error);
-      toast({
-        title: "Error",
-        description: `Failed to load MCQ: ${error.message || 'Unknown error'}. Please try again.`,
-        variant: "destructive",
-      });
-    } else if (data) {
-      setMcq(data);
-      if (data.explanation_id) {
-        try {
-          await fetchExplanation(data.explanation_id);
-        } catch (explanationFetchError: any) {
-          console.error('Client-side error during explanation fetch:', explanationFetchError);
-          toast({
-            title: "Error",
-            description: `An unexpected error occurred while fetching explanation: ${explanationFetchError.message || 'Unknown error'}`,
-            variant: "destructive",
-          });
-        }
-      } else {
-        setExplanation(null);
-      }
+      console.error('Error resetting progress:', error);
+      toast({ title: "Error", description: `Failed to reset progress: ${error.message}`, variant: "destructive" });
     } else {
-      toast({
-        title: "Warning",
-        description: "No MCQ data found. Please try again.",
-        variant: "default",
-      });
-      setMcq(null);
+      toast({ title: "Success", description: "Quiz progress reset successfully." });
+      fetchQuizOverview(); // Refresh stats
     }
     setIsLoading(false);
   };
 
-  const fetchExplanation = async (explanationId: string) => {
-    const { data, error } = await supabase
-      .from('mcq_explanations')
-      .select('*')
-      .eq('id', explanationId)
-      .single();
+  const currentMcq = quizQuestions[currentQuestionIndex];
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Supabase Error fetching explanation:', error);
-      toast({
-        title: "Error",
-        description: `Failed to load explanation: ${error.message || 'Unknown error'}.`,
-        variant: "destructive",
-      });
-      setExplanation(null);
-    } else if (data) {
-      setExplanation(data);
-    } else {
-      setExplanation(null);
+  const handleOptionSelect = useCallback((value: string) => {
+    if (currentMcq) {
+      setSelectedAnswer(value); // Update selected answer for current question
+      setUserAnswers((prev) => new Map(prev).set(currentMcq.id, value));
+      setFeedback(null); // Clear feedback when a new option is selected
+      setShowExplanation(false); // Hide explanation
     }
-  };
+  }, [currentMcq]);
 
   const handleSubmitAnswer = async () => {
-    if (!selectedAnswer || !mcq || !user) return;
+    if (!selectedAnswer || !currentMcq || !user) return;
 
-    const isCorrect = selectedAnswer === mcq.correct_answer;
+    setIsSubmittingAnswer(true);
+    const isCorrect = selectedAnswer === currentMcq.correct_answer;
     if (isCorrect) {
       setFeedback('Correct!');
     } else {
-      setFeedback(`Incorrect. The correct answer was ${mcq.correct_answer}.`);
+      setFeedback(`Incorrect. The correct answer was ${currentMcq.correct_answer}.`);
     }
     setShowExplanation(true);
 
     try {
       const { error } = await supabase.from('user_quiz_attempts').insert({
         user_id: user.id,
-        mcq_id: mcq.id,
-        category_id: mcq.category_id,
-        subcategory_id: mcq.subcategory_id,
+        mcq_id: currentMcq.id,
+        category_id: currentMcq.category_id,
+        subcategory_id: currentMcq.subcategory_id,
         selected_option: selectedAnswer,
         is_correct: isCorrect,
       });
@@ -300,7 +347,61 @@ const QuizPage = () => {
         description: `An unexpected error occurred while recording your attempt: ${error.message}`,
         variant: "destructive",
       });
+    } finally {
+      setIsSubmittingAnswer(false);
+      if (currentMcq.explanation_id) {
+        fetchExplanation(currentMcq.explanation_id); // Pre-fetch explanation for review
+      }
     }
+  };
+
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < quizQuestions.length - 1) {
+      const nextQuestion = quizQuestions[currentQuestionIndex + 1];
+      setCurrentQuestionIndex((prev) => prev + 1);
+      setSelectedAnswer(userAnswers.get(nextQuestion?.id || '') || null); // Load saved answer for next question
+      setFeedback(null);
+      setShowExplanation(false);
+    } else {
+      // This is the last question, submit the test
+      submitFullQuiz();
+    }
+  };
+
+  const handlePreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      const prevQuestion = quizQuestions[currentQuestionIndex - 1];
+      setCurrentQuestionIndex((prev) => prev - 1);
+      setSelectedAnswer(userAnswers.get(prevQuestion?.id || '') || null); // Load saved answer for previous question
+      setFeedback(null);
+      setShowExplanation(false);
+    }
+  };
+
+  const submitFullQuiz = async () => {
+    if (!user) return;
+
+    setIsLoading(true);
+    let correctCount = 0;
+    const explanationPromises: Promise<MCQExplanation | null>[] = [];
+    const mcqExplanationIds = new Set<string>();
+
+    for (const mcq of quizQuestions) {
+      const userAnswer = userAnswers.get(mcq.id);
+      const isCorrect = userAnswer === mcq.correct_answer;
+      if (isCorrect) {
+        correctCount++;
+      }
+      if (mcq.explanation_id && !mcqExplanationIds.has(mcq.explanation_id)) {
+        mcqExplanationIds.add(mcq.explanation_id);
+        explanationPromises.push(fetchExplanation(mcq.explanation_id));
+      }
+    }
+
+    setScore(correctCount);
+    await Promise.all(explanationPromises); // Ensure all explanations are fetched
+    setShowResults(true);
+    setIsLoading(false);
   };
 
   const handleAiExplanation = () => {
@@ -308,12 +409,6 @@ const QuizPage = () => {
       title: "AI Explanation",
       description: "This feature is coming soon! The AI will provide a deeper dive into the topic.",
     });
-  };
-
-  const handleStartQuizForCategory = (categoryId: string) => {
-    setCurrentQuizCategoryId(categoryId);
-    setShowCategorySelection(false);
-    fetchMcq();
   };
 
   const filteredCategories = categoryStats.filter(cat =>
@@ -381,13 +476,29 @@ const QuizPage = () => {
                         </Select>
                       </div>
                     </CardContent>
-                    <CardFooter>
+                    <CardFooter className="flex flex-col gap-2">
                       <Button
-                        onClick={() => handleStartQuizForCategory(cat.id)}
+                        onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'random')}
                         className="w-full"
                         disabled={cat.total_mcqs === 0}
                       >
                         Start Quiz
+                      </Button>
+                      <Button
+                        onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'incorrect')}
+                        className="w-full"
+                        variant="secondary"
+                        disabled={cat.user_incorrect === 0}
+                      >
+                        Attempt Incorrect ({cat.user_incorrect})
+                      </Button>
+                      <Button
+                        onClick={() => handleResetProgress(cat.id)}
+                        className="w-full"
+                        variant="destructive"
+                        disabled={cat.user_attempts === 0}
+                      >
+                        <RotateCcw className="h-4 w-4 mr-2" /> Reset Progress
                       </Button>
                     </CardFooter>
                   </Card>
@@ -401,7 +512,7 @@ const QuizPage = () => {
     );
   }
 
-  if (!mcq && !isLoading) {
+  if (quizQuestions.length === 0 && !isLoading && !showCategorySelection && !showResults) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
         <Card className="w-full max-w-2xl">
@@ -425,26 +536,108 @@ const QuizPage = () => {
     );
   }
 
+  if (showResults) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+        <Card className="w-full max-w-4xl">
+          <CardHeader>
+            <CardTitle className="text-3xl">Quiz Results</CardTitle>
+            <CardDescription>Review your performance on this quiz session.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="text-center text-2xl font-bold">
+              Your Score: {score} / {quizQuestions.length}
+            </div>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto p-2 border rounded-md">
+              {quizQuestions.map((mcq, index) => {
+                const userAnswer = userAnswers.get(mcq.id);
+                const isCorrect = userAnswer === mcq.correct_answer;
+                const explanation = explanations.get(mcq.explanation_id || '');
+
+                return (
+                  <div key={mcq.id} className="border-b pb-4 mb-4 last:border-b-0">
+                    <p className="font-semibold text-lg">
+                      {index + 1}. {mcq.question_text}
+                    </p>
+                    <ul className="list-disc list-inside ml-4 mt-2">
+                      {['A', 'B', 'C', 'D'].map((optionKey) => {
+                        const optionText = mcq[`option_${optionKey.toLowerCase()}` as keyof MCQ];
+                        const isSelected = userAnswer === optionKey;
+                        const isCorrectOption = mcq.correct_answer === optionKey;
+
+                        let className = "";
+                        if (isSelected && isCorrect) {
+                          className = "text-green-600 font-medium";
+                        } else if (isSelected && !isCorrect) {
+                          className = "text-red-600 font-medium";
+                        } else if (isCorrectOption) {
+                          className = "text-green-600 font-medium";
+                        }
+
+                        return (
+                          <li key={optionKey} className={className}>
+                            {optionKey}. {optionText}
+                            {isSelected && !isCorrect && <span className="ml-2">(Your Answer)</span>}
+                            {isCorrectOption && <span className="ml-2">(Correct Answer)</span>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {explanation && (
+                      <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md text-sm">
+                        <h4 className="font-semibold">Explanation:</h4>
+                        <p>{explanation.explanation_text}</p>
+                        {explanation.image_url && (
+                          <img src={explanation.image_url} alt="Explanation" className="mt-2 max-w-full h-auto rounded-md" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <Button onClick={() => { setShowCategorySelection(true); fetchQuizOverview(); }}>Back to Categories</Button>
+          </CardFooter>
+        </Card>
+        <MadeWithDyad />
+      </div>
+    );
+  }
+
+  if (!currentMcq) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-gray-700 dark:text-gray-300">Loading current question...</p>
+      </div>
+    );
+  }
+
+  const isAnswered = selectedAnswer !== null;
+  const isLastQuestion = currentQuestionIndex === quizQuestions.length - 1;
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle className="text-xl">{mcq?.question_text}</CardTitle>
-          {mcq?.difficulty && (
+          <CardTitle className="text-xl">Question {currentQuestionIndex + 1} / {quizQuestions.length}</CardTitle>
+          {currentMcq?.difficulty && (
             <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
-              Difficulty: {mcq.difficulty}
+              Difficulty: {currentMcq.difficulty}
             </CardDescription>
           )}
         </CardHeader>
         <CardContent>
+          <p className="text-lg font-semibold mb-4">{currentMcq?.question_text}</p>
           <RadioGroup
-            onValueChange={setSelectedAnswer}
+            onValueChange={handleOptionSelect}
             value={selectedAnswer || ""}
             className="space-y-2"
-            disabled={showExplanation}
+            disabled={showExplanation} // Disable radio group after submission
           >
             {['A', 'B', 'C', 'D'].map((optionKey) => {
-              const optionText = mcq?.[`option_${optionKey.toLowerCase()}` as keyof MCQ];
+              const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as keyof MCQ];
               return (
                 <div key={optionKey} className="flex items-center space-x-2">
                   <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
@@ -455,31 +648,34 @@ const QuizPage = () => {
           </RadioGroup>
 
           {feedback && (
-            <p className={`mt-4 text-lg font-semibold ${feedback.startsWith('Correct') ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`mt-4 text-lg font-semibold flex items-center gap-2 ${feedback.startsWith('Correct') ? 'text-green-600' : 'text-red-600'}`}>
+              {feedback.startsWith('Correct') ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
               {feedback}
             </p>
           )}
 
-          {showExplanation && explanation && (
+          {showExplanation && explanations.has(currentMcq.explanation_id || '') && (
             <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
               <h3 className="text-lg font-semibold mb-2">Explanation:</h3>
-              <p className="text-gray-800 dark:text-gray-200">{explanation.explanation_text}</p>
-              {explanation.image_url && (
-                <img src={explanation.image_url} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
+              <p className="text-gray-800 dark:text-gray-200">{explanations.get(currentMcq.explanation_id || '')?.explanation_text}</p>
+              {explanations.get(currentMcq.explanation_id || '')?.image_url && (
+                <img src={explanations.get(currentMcq.explanation_id || '')?.image_url || ''} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
               )}
             </div>
           )}
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row justify-between gap-2">
+          <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0 || isSubmittingAnswer} variant="outline">
+            Previous
+          </Button>
           {!showExplanation ? (
-            <Button onClick={handleSubmitAnswer} disabled={!selectedAnswer}>
-              Submit Answer
+            <Button onClick={handleSubmitAnswer} disabled={!isAnswered || isSubmittingAnswer}>
+              {isSubmittingAnswer ? "Submitting..." : "Submit Answer"}
             </Button>
           ) : (
-            <>
-              <Button onClick={fetchMcq} variant="outline">Next MCQ</Button>
-              <Button onClick={handleAiExplanation}>Get more explanation with AI</Button>
-            </>
+            <Button onClick={handleNextQuestion} disabled={isSubmittingAnswer}>
+              {isLastQuestion ? "Submit Quiz" : "Next Question"}
+            </Button>
           )}
         </CardFooter>
       </Card>

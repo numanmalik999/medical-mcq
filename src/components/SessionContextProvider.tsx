@@ -44,11 +44,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             .single();
 
           let isAdmin = false;
-          if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows found, which is fine
-            console.error('Error fetching profile for session:', profileError);
-            // isAdmin remains false if there's an actual error
+          if (profileError) {
+            console.error('Error fetching profile for session (onAuthStateChange):', profileError);
+            // If no profile found (PGRST116), isAdmin remains false, which is correct.
+            // If it's another error, we log it.
           } else if (profileData) {
             isAdmin = profileData.is_admin || false;
+            console.log('Profile data fetched (onAuthStateChange):', profileData);
+            console.log('Is Admin status (onAuthStateChange):', isAdmin);
           }
           
           const authUser: AuthUser = { ...currentSession.user, is_admin: isAdmin };
@@ -94,10 +97,12 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             .single();
 
           let isAdmin = false;
-          if (profileError && profileError.code !== 'PGRST116') {
+          if (profileError) {
             console.error('Error fetching profile for initial session:', profileError);
           } else if (profileData) {
             isAdmin = profileData.is_admin || false;
+            console.log('Profile data fetched (initial session):', profileData);
+            console.log('Is Admin status (initial session):', isAdmin);
           }
 
           const authUser: AuthUser = { ...initialSession.user, is_admin: isAdmin };

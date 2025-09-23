@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 interface MCQ {
   id: string;
@@ -42,6 +43,7 @@ interface Subcategory {
 }
 
 const QuizPage = () => {
+  const { user } = useSession(); // Get user from session
   const [mcq, setMcq] = useState<MCQ | null>(null);
   const [explanation, setExplanation] = useState<MCQExplanation | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -107,7 +109,6 @@ const QuizPage = () => {
 
     console.log("Attempting to fetch MCQ with category:", selectedCategoryId, "and subcategory:", selectedSubcategoryId);
 
-    // Changed from select('count()', { head: true, count: 'exact' }) to select('id', { count: 'exact' })
     let countQuery = supabase.from('mcqs').select('id', { count: 'exact' });
     if (selectedCategoryId) {
       countQuery = countQuery.eq('category_id', selectedCategoryId);
@@ -159,7 +160,7 @@ const QuizPage = () => {
         description: `Failed to load MCQ: ${error.message || 'Unknown error'}. Please try again.`,
         variant: "destructive",
       });
-    } else if (data) { // Ensure data is not null
+    } else if (data) {
       console.log("Successfully fetched MCQ:", data);
       setMcq(data);
       if (data.explanation_id) {
@@ -175,7 +176,7 @@ const QuizPage = () => {
         }
       } else {
         console.log("MCQ has no explanation_id.");
-        setExplanation(null); // Explicitly clear explanation if no ID
+        setExplanation(null);
       }
     } else {
       console.warn("No MCQ data returned despite no error.");
@@ -197,7 +198,7 @@ const QuizPage = () => {
       .eq('id', explanationId)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+    if (error && error.code !== 'PGRST116') {
       console.error('Supabase Error fetching explanation:', error);
       toast({
         title: "Error",
@@ -214,15 +215,44 @@ const QuizPage = () => {
     }
   };
 
-  const handleSubmitAnswer = () => {
-    if (!selectedAnswer || !mcq) return;
+  const handleSubmitAnswer = async () => { // Made async to await Supabase insert
+    if (!selectedAnswer || !mcq || !user) return; // Ensure user is logged in
 
-    if (selectedAnswer === mcq.correct_answer) {
+    const isCorrect = selectedAnswer === mcq.correct_answer;
+    if (isCorrect) {
       setFeedback('Correct!');
     } else {
       setFeedback(`Incorrect. The correct answer was ${mcq.correct_answer}.`);
     }
     setShowExplanation(true);
+
+    // Record the quiz attempt
+    try {
+      const { error } = await supabase.from('user_quiz_attempts').insert({
+        user_id: user.id,
+        mcq_id: mcq.id,
+        category_id: mcq.category_id,
+        subcategory_id: mcq.subcategory_id,
+        selected_option: selectedAnswer,
+        is_correct: isCorrect,
+      });
+
+      if (error) {
+        console.error('Error recording quiz attempt:', error);
+        toast({
+          title: "Error",
+          description: `Failed to record quiz attempt: ${error.message}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Unhandled error recording quiz attempt:', error);
+      toast({
+        title: "Error",
+        description: `An unexpected error occurred while recording your attempt: ${error.message}`,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAiExplanation = () => {

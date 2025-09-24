@@ -1,19 +1,16 @@
 "use client";
 
-import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Link } from 'react-router-dom';
 
 const SignUp = () => {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-      <h1 className="text-5xl font-extrabold text-green-600 dark:text-green-400 mb-8">MINIMAL SIGN UP TEST</h1>
-      <p className="mt-4 text-center text-sm text-muted-foreground">
-        This is a test page. If you see this, the routing is working!
+    <div className="min-h-screen flex flex-col items-center justify-center bg-red-500 text-white p-4">
+      <h1 className="text-5xl font-extrabold mb-8">DIAGNOSTIC SIGN UP PAGE</h1>
+      <p className="text-xl">
+        If you see this red page, the custom SignUp component is finally rendering!
       </p>
-      <Link to="/login" className="text-primary hover:underline mt-4">
-        Go to Login
-      </Link>
-      <MadeWithDyad />
+      <p className="mt-4 text-center text-sm">
+        Please report exactly what you see.
+      </p>
     </div>
   );
 };

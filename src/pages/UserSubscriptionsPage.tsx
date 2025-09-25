@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'; // Import Loader2 for loading state
 
 interface SubscriptionTier {
   id: string;
@@ -24,6 +24,7 @@ const UserSubscriptionsPage = () => {
   const { toast } = useToast();
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null); // Stores tierId being processed
 
   useEffect(() => {
     if (!isSessionLoading && user) {
@@ -50,30 +51,60 @@ const UserSubscriptionsPage = () => {
     setIsLoading(false);
   };
 
-  const handleSubscribe = async (tierId: string) => {
+  const handleSubscribe = async (tier: SubscriptionTier) => {
     if (!user) {
       toast({ title: "Error", description: "You must be logged in to subscribe.", variant: "destructive" });
       return;
     }
-    // Placeholder for actual subscription logic (e.g., redirect to payment gateway)
-    toast({ title: "Subscription Initiated", description: `You selected tier ${tierId}. (Payment integration needed)`, variant: "default" });
-    console.log(`User ${user.id} attempting to subscribe to tier ${tierId}`);
 
-    // For demonstration, let's simulate an active subscription update
-    // In a real app, this would happen after successful payment
+    setIsProcessingPayment(tier.id);
+    toast({ title: "Processing Payment", description: `Simulating payment for ${tier.name}...`, variant: "default" });
+
+    // Simulate a payment processing delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     try {
-      const { error } = await supabase
+      // 1. Update user's profile to mark as having an active subscription
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ has_active_subscription: true })
         .eq('id', user.id);
 
-      if (error) throw error;
-      toast({ title: "Success", description: "Subscription status updated (simulated).", variant: "default" });
-      // Optionally, refresh session context or redirect
-      // window.location.reload(); // Force refresh to update session context
+      if (profileError) throw profileError;
+
+      // 2. Create a new entry in user_subscriptions
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setMonth(startDate.getMonth() + tier.duration_in_months);
+
+      const { error: subscriptionError } = await supabase
+        .from('user_subscriptions')
+        .insert({
+          user_id: user.id,
+          subscription_tier_id: tier.id,
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          status: 'active',
+        });
+
+      if (subscriptionError) throw subscriptionError;
+
+      toast({ title: "Success!", description: `You have successfully subscribed to ${tier.name}!`, variant: "default" });
+      
+      // Optionally, force a session refresh to update the user object in context
+      // For a real app, you might want to trigger a re-fetch of the user session
+      // or update the local user object in SessionContextProvider.
+      window.location.reload(); // Simple way to refresh session context for now
+
     } catch (error: any) {
-      console.error("Error simulating subscription update:", error);
-      toast({ title: "Error", description: `Failed to update subscription status: ${error.message}`, variant: "destructive" });
+      console.error("Error during subscription process:", error);
+      toast({
+        title: "Subscription Failed",
+        description: `Failed to process subscription: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingPayment(null);
     }
   };
 
@@ -161,10 +192,19 @@ const UserSubscriptionsPage = () => {
               <CardFooter>
                 <Button
                   className="w-full"
-                  onClick={() => handleSubscribe(tier.id)}
-                  disabled={hasActiveSubscription} // Disable if already subscribed
+                  onClick={() => handleSubscribe(tier)}
+                  disabled={hasActiveSubscription || isProcessingPayment === tier.id}
                 >
-                  {hasActiveSubscription ? "Current Plan" : "Choose Plan"}
+                  {isProcessingPayment === tier.id ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : hasActiveSubscription ? (
+                    "Current Plan"
+                  ) : (
+                    "Choose Plan"
+                  )}
                 </Button>
               </CardFooter>
             </Card>

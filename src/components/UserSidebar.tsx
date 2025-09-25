@@ -9,6 +9,7 @@ import { MenuIcon, LayoutDashboard, User, BookOpenText, LogOut, ClipboardCheck }
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSession } from './SessionContextProvider'; // Import useSession
 
 interface NavLinkProps {
   to: string;
@@ -16,14 +17,15 @@ interface NavLinkProps {
   label: string;
   isMobile?: boolean;
   onLinkClick?: () => void;
+  disabled?: boolean; // Added disabled prop
 }
 
-const NavLink = ({ to, icon, label, isMobile, onLinkClick }: NavLinkProps) => {
+const NavLink = ({ to, icon, label, isMobile, onLinkClick, disabled }: NavLinkProps) => {
   const location = useLocation();
   const isActive = location.pathname === to;
 
   return (
-    <Link to={to} onClick={onLinkClick}>
+    <Link to={to} onClick={onLinkClick} className={disabled ? "pointer-events-none opacity-50" : ""}>
       <Button
         variant="ghost"
         className={cn(
@@ -33,6 +35,7 @@ const NavLink = ({ to, icon, label, isMobile, onLinkClick }: NavLinkProps) => {
             : "text-foreground hover:bg-accent hover:text-accent-foreground",
           isMobile && "text-base py-3"
         )}
+        disabled={disabled} // Apply disabled prop to button
       >
         {icon}
         <span>{label}</span>
@@ -45,6 +48,7 @@ const UserSidebar = () => {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
   const { toast } = useToast();
+  const { user } = useSession(); // Get user from session
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -72,7 +76,12 @@ const UserSidebar = () => {
     { to: "/user/dashboard", icon: <LayoutDashboard className="h-4 w-4" />, label: "Dashboard" },
     { to: "/user/profile", icon: <User className="h-4 w-4" />, label: "Profile" },
     { to: "/quiz", icon: <BookOpenText className="h-4 w-4" />, label: "Take Quiz" },
-    { to: "/user/take-test", icon: <ClipboardCheck className="h-4 w-4" />, label: "Take A Test" }, // New nav item
+    { 
+      to: "/user/take-test", 
+      icon: <ClipboardCheck className="h-4 w-4" />, 
+      label: "Take A Test",
+      disabled: !user?.has_active_subscription // Disable if no active subscription
+    },
     // { to: "/user/subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "My Subscriptions" }, // Future feature
   ];
 
@@ -96,6 +105,7 @@ const UserSidebar = () => {
                 label={item.label}
                 isMobile={true}
                 onLinkClick={handleLinkClick}
+                disabled={item.disabled}
               />
             ))}
           </nav>
@@ -119,7 +129,7 @@ const UserSidebar = () => {
       <h2 className="text-2xl font-bold text-foreground mb-6">User Panel</h2>
       <nav className="flex flex-col gap-2 flex-grow">
         {navItems.map((item) => (
-          <NavLink key={item.to} to={item.to} icon={item.icon} label={item.label} />
+          <NavLink key={item.to} to={item.to} icon={item.icon} label={item.label} disabled={item.disabled} />
         ))}
       </nav>
       <div className="mt-auto pt-4 border-t border-border">

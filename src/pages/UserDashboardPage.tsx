@@ -327,6 +327,29 @@ const UserDashboardPage = () => {
         </CardContent>
       </Card>
 
+      {/* Quick Actions Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Jump right into your learning journey.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-4">
+          <Link to="/quiz">
+            <Button>Take a Quiz</Button>
+          </Link>
+          <Link to="/user/take-test">
+            <Button disabled={!hasActiveSubscription} variant="secondary">
+              Take a Test
+            </Button>
+          </Link>
+          {!hasActiveSubscription && (
+            <Link to="/user/subscriptions">
+              <Button variant="outline">Subscribe Now</Button>
+            </Link>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Quiz Performance Summary Card */}
       <Card>
         <CardHeader>

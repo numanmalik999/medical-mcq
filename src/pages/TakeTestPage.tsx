@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { TimerIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -88,27 +88,88 @@ const TakeTestPage = () => {
     return null;
   }, [explanations, toast]);
 
+  const handleSubmitTest = useCallback(async () => {
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in to submit a test.", variant: "destructive" });
+      return;
+    }
+
+    setIsTestSubmitted(true);
+    let correctCount = 0;
+    const attemptsToRecord = [];
+    const explanationPromises: Promise<MCQExplanation | null>[] = [];
+    const mcqExplanationIds = new Set<string>();
+
+    for (const mcq of mcqs) {
+      const userAnswer = userAnswers.get(mcq.id);
+      const isCorrect = userAnswer === mcq.correct_answer;
+      if (isCorrect) {
+        correctCount++;
+      }
+      attemptsToRecord.push({
+        user_id: user.id,
+        mcq_id: mcq.id,
+        category_id: mcq.category_id,
+        subcategory_id: mcq.subcategory_id,
+        selected_option: userAnswer || 'N/A', // Store 'N/A' if not answered
+        is_correct: isCorrect,
+      });
+      if (mcq.explanation_id && !mcqExplanationIds.has(mcq.explanation_id)) {
+        mcqExplanationIds.add(mcq.explanation_id);
+        explanationPromises.push(fetchExplanation(mcq.explanation_id));
+      }
+    }
+
+    setScore(correctCount);
+
+    // Fetch all explanations concurrently
+    await Promise.all(explanationPromises); // fetchExplanation updates state internally
+
+    setShowResults(true);
+
+    // Record all attempts in a single batch insert
+    if (attemptsToRecord.length > 0) {
+      const { error } = await supabase.from('user_quiz_attempts').insert(attemptsToRecord);
+      if (error) {
+        console.error('Error recording test attempts:', error);
+        toast({
+          title: "Error",
+          description: `Failed to record test attempts: ${error.message}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Test Submitted!",
+          description: `You scored ${correctCount} out of ${mcqs.length}.`,
+        });
+      }
+    }
+  }, [user, mcqs, userAnswers, toast, fetchExplanation]);
+
   // Initial load: Fetch all categories
   useEffect(() => {
-    const fetchCategories = async () => {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*');
+    if (!isSessionLoading) {
+      if (user && user.has_active_subscription) {
+        const fetchCategories = async () => {
+          setIsLoading(true);
+          const { data, error } = await supabase
+            .from('categories')
+            .select('*');
 
-      if (error) {
-        console.error('Error fetching categories:', error);
-        toast({ title: "Error", description: "Failed to load categories for test configuration.", variant: "destructive" });
+          if (error) {
+            console.error('Error fetching categories:', error);
+            toast({ title: "Error", description: "Failed to load categories for test configuration.", variant: "destructive" });
+          } else {
+            setAllCategories(data || []);
+          }
+          setIsLoading(false);
+        };
+        fetchCategories();
+      } else if (user && !user.has_active_subscription) {
+        setIsLoading(false); // User is logged in but not subscribed
       } else {
-        setAllCategories(data || []);
+        navigate('/login'); // Redirect if not logged in
       }
-      setIsLoading(false);
-    };
-
-    if (!isSessionLoading && user) {
-      fetchCategories();
-    } else if (!isSessionLoading && !user) {
-      navigate('/login'); // Redirect if not logged in
     }
   }, [user, isSessionLoading, navigate, toast]);
 
@@ -128,7 +189,7 @@ const TakeTestPage = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isLoading, isTestSubmitted, showResults, showConfiguration, showInstructions, mcqs.length]);
+  }, [isLoading, isTestSubmitted, showResults, showConfiguration, showInstructions, mcqs.length, handleSubmitTest]);
 
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategoryIds((prev) =>
@@ -139,8 +200,8 @@ const TakeTestPage = () => {
   };
 
   const startTestPreparation = async () => {
-    if (!user) {
-      toast({ title: "Error", description: "You must be logged in to start a test.", variant: "destructive" });
+    if (!user || !user.has_active_subscription) {
+      toast({ title: "Error", description: "You must have an active subscription to start a test.", variant: "destructive" });
       return;
     }
 
@@ -224,64 +285,6 @@ const TakeTestPage = () => {
     }
   }, [currentQuestionIndex]);
 
-  const handleSubmitTest = useCallback(async () => {
-    if (!user) {
-      toast({ title: "Error", description: "You must be logged in to submit a test.", variant: "destructive" });
-      return;
-    }
-
-    setIsTestSubmitted(true);
-    let correctCount = 0;
-    const attemptsToRecord = [];
-    const explanationPromises: Promise<MCQExplanation | null>[] = [];
-    const mcqExplanationIds = new Set<string>();
-
-    for (const mcq of mcqs) {
-      const userAnswer = userAnswers.get(mcq.id);
-      const isCorrect = userAnswer === mcq.correct_answer;
-      if (isCorrect) {
-        correctCount++;
-      }
-      attemptsToRecord.push({
-        user_id: user.id,
-        mcq_id: mcq.id,
-        category_id: mcq.category_id,
-        subcategory_id: mcq.subcategory_id,
-        selected_option: userAnswer || 'N/A', // Store 'N/A' if not answered
-        is_correct: isCorrect,
-      });
-      if (mcq.explanation_id && !mcqExplanationIds.has(mcq.explanation_id)) {
-        mcqExplanationIds.add(mcq.explanation_id);
-        explanationPromises.push(fetchExplanation(mcq.explanation_id));
-      }
-    }
-
-    setScore(correctCount);
-
-    // Fetch all explanations concurrently
-    await Promise.all(explanationPromises); // fetchExplanation updates state internally
-
-    setShowResults(true);
-
-    // Record all attempts in a single batch insert
-    if (attemptsToRecord.length > 0) {
-      const { error } = await supabase.from('user_quiz_attempts').insert(attemptsToRecord);
-      if (error) {
-        console.error('Error recording test attempts:', error);
-        toast({
-          title: "Error",
-          description: `Failed to record test attempts: ${error.message}`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Test Submitted!",
-          description: `You scored ${correctCount} out of ${mcqs.length}.`,
-        });
-      }
-    }
-  }, [user, mcqs, userAnswers, toast, fetchExplanation]);
-
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -299,6 +302,31 @@ const TakeTestPage = () => {
 
   if (!user) {
     return null; // Redirect handled by useEffect
+  }
+
+  // New check for active subscription
+  if (!user.has_active_subscription) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+        <Card className="w-full max-w-2xl text-center">
+          <CardHeader>
+            <CardTitle className="text-2xl">Subscription Required</CardTitle>
+            <CardDescription>
+              You need an active subscription to take full tests.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-lg">Unlock unlimited tests and all premium features by subscribing today!</p>
+            <Link to="/user/subscriptions">
+              <Button className="w-full sm:w-auto">
+                View Subscription Plans
+              </Button>
+            </Link>
+          </CardContent>
+          <MadeWithDyad />
+        </Card>
+      </div>
+    );
   }
 
   if (showConfiguration) {

@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-// Removed unused 'Label' import (it's used in the FormField, so it should stay)
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,7 +13,8 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form'; // Added FormDescription
+import { Switch } from '@/components/ui/switch'; // Added Switch
 
 interface Category {
   id: string;
@@ -36,9 +36,10 @@ const formSchema = z.object({
   correct_answer: z.enum(['A', 'B', 'C', 'D'], { message: "Correct answer is required." }),
   explanation_text: z.string().min(1, "Explanation text is required."),
   image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
-  category_id: z.string().uuid("Invalid category ID.").optional().or(z.literal('')), // Updated to category_id
-  subcategory_id: z.string().uuid("Invalid subcategory ID.").optional().or(z.literal('')), // Added subcategory_id
+  category_id: z.string().uuid("Invalid category ID.").optional().or(z.literal('')),
+  subcategory_id: z.string().uuid("Invalid subcategory ID.").optional().or(z.literal('')),
   difficulty: z.string().optional().or(z.literal('')),
+  is_trial_mcq: z.boolean().optional(), // Added is_trial_mcq
 }).refine((data) => {
   // If a subcategory is selected, a category must also be selected
   if (data.subcategory_id && !data.category_id) {
@@ -71,6 +72,7 @@ const AddMcqPage = () => {
       category_id: "",
       subcategory_id: "",
       difficulty: "",
+      is_trial_mcq: false, // Default to false
     },
   });
 
@@ -127,7 +129,7 @@ const AddMcqPage = () => {
         throw explanationError;
       }
 
-      // Then, insert the MCQ with the explanation_id, category_id, and subcategory_id
+      // Then, insert the MCQ with the explanation_id, category_id, subcategory_id, and is_trial_mcq
       const { error: mcqError } = await supabase
         .from('mcqs')
         .insert({
@@ -138,9 +140,10 @@ const AddMcqPage = () => {
           option_d: values.option_d,
           correct_answer: values.correct_answer,
           explanation_id: explanationData.id,
-          category_id: values.category_id || null, // Use category_id
-          subcategory_id: values.subcategory_id || null, // Use subcategory_id
+          category_id: values.category_id || null,
+          subcategory_id: values.subcategory_id || null,
           difficulty: values.difficulty || null,
+          is_trial_mcq: values.is_trial_mcq, // Insert is_trial_mcq
         });
 
       if (mcqError) {
@@ -325,6 +328,28 @@ const AddMcqPage = () => {
                       </SelectContent>
                     </Select>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="is_trial_mcq"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Mark as Trial MCQ</FormLabel>
+                      <FormDescription>
+                        If enabled, this MCQ will be available to users on a free trial.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        aria-label="Mark as trial MCQ"
+                      />
+                    </FormControl>
                   </FormItem>
                 )}
               />

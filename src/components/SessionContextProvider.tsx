@@ -12,6 +12,8 @@ interface AuthUser extends User {
   last_name?: string | null;
   phone_number?: string | null;
   whatsapp_number?: string | null;
+  has_active_subscription?: boolean; // Added
+  trial_taken?: boolean; // Added
 }
 
 interface SessionContextType {
@@ -63,7 +65,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.log(`${logPrefix} Executing Supabase profile query...`);
         const { data: profileDataArray, error: profileError } = await supabase
           .from('profiles')
-          .select('is_admin, first_name, last_name, phone_number, whatsapp_number')
+          .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken') // Added subscription and trial fields
           .eq('id', currentSession.user.id);
 
         profileFetchCompleted = true;
@@ -75,10 +77,16 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         let lastName = null;
         let phoneNumber = null;
         let whatsappNumber = null;
+        let hasActiveSubscription = false; // Default value
+        let trialTaken = false; // Default value
         let profileData = null;
 
         if (profileError) {
-          console.error(`${logPrefix} Error fetching profile (code: ${profileError.code}):`, profileError);
+          if (profileError.code !== 'PGRST116') { // PGRST116 means no rows found, which is not an error for new users
+            console.error(`${logPrefix} Error fetching profile (code: ${profileError.code}):`, profileError);
+          } else {
+            console.log(`${logPrefix} No profile found for user (PGRST116), defaulting profile fields.`);
+          }
         } else if (profileDataArray && profileDataArray.length > 0) {
           profileData = profileDataArray[0]; // Take the first profile if available
           isAdmin = profileData.is_admin || false;
@@ -86,9 +94,9 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           lastName = profileData.last_name || null;
           phoneNumber = profileData.phone_number || null;
           whatsappNumber = profileData.whatsapp_number || null;
+          hasActiveSubscription = profileData.has_active_subscription || false;
+          trialTaken = profileData.trial_taken || false;
           console.log(`${logPrefix} Profile data fetched:`, profileData);
-        } else {
-          console.log(`${logPrefix} No profile found for user, defaulting profile fields.`);
         }
         
         const authUser: AuthUser = { 
@@ -98,6 +106,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           last_name: lastName,
           phone_number: phoneNumber,
           whatsapp_number: whatsappNumber,
+          has_active_subscription: hasActiveSubscription,
+          trial_taken: trialTaken,
         };
         setSession(currentSession);
         setUser(authUser);

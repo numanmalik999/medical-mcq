@@ -8,8 +8,8 @@ import { DataTable } from '@/components/data-table';
 import { createMcqColumns, MCQ } from '@/components/mcq-columns';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import EditMcqDialog from '@/components/EditMcqDialog'; // Import the new dialog
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // For filtering
+import EditMcqDialog from '@/components/EditMcqDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
 interface Category {
@@ -171,7 +171,7 @@ const ManageMcqsPage = () => {
     setIsEditDialogOpen(true);
   };
 
-  const columns = createMcqColumns({ onDelete: handleDeleteMcq, onEdit: handleEditClick }); // Pass onEdit
+  const columns = createMcqColumns({ onDelete: handleDeleteMcq, onEdit: handleEditClick });
 
   return (
     <div className="space-y-6">

@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
+import { Badge } from "@/components/ui/badge"; // Import Badge
 
 export type MCQ = {
   id: string;
@@ -24,6 +25,7 @@ export type MCQ = {
   subcategory_id: string | null;
   difficulty: string | null;
   explanation_id: string | null;
+  is_trial_mcq: boolean | null; // Added is_trial_mcq
 };
 
 // Extend MCQ type for display purposes to include category/subcategory names
@@ -34,7 +36,7 @@ type DisplayMCQ = MCQ & {
 
 interface MCQColumnsProps {
   onDelete: (mcqId: string, explanationId: string | null) => void;
-  onEdit: (mcq: MCQ) => void; // Added onEdit prop
+  onEdit: (mcq: MCQ) => void;
 }
 
 export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnDef<DisplayMCQ>[] => [
@@ -51,16 +53,28 @@ export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnD
     header: "Correct",
   },
   {
-    accessorKey: "category_name", // Display category name
+    accessorKey: "category_name",
     header: "Category",
   },
   {
-    accessorKey: "subcategory_name", // Display subcategory name
+    accessorKey: "subcategory_name",
     header: "Subcategory",
   },
   {
     accessorKey: "difficulty",
     header: "Difficulty",
+  },
+  {
+    accessorKey: "is_trial_mcq", // New column for trial status
+    header: "Trial MCQ",
+    cell: ({ row }) => {
+      const isTrial = row.original.is_trial_mcq;
+      return (
+        <Badge variant={isTrial ? "default" : "secondary"}>
+          {isTrial ? "Yes" : "No"}
+        </Badge>
+      );
+    },
   },
   {
     id: "actions",
@@ -83,7 +97,7 @@ export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnD
               Copy MCQ ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onEdit(mcq)}> {/* Call onEdit */}
+            <DropdownMenuItem onClick={() => onEdit(mcq)}>
               Edit
             </DropdownMenuItem>
             <DropdownMenuItem

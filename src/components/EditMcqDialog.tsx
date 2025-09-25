@@ -5,8 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-// Removed unused 'Label' import
-// import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,8 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { MCQ } from './mcq-columns'; // Import MCQ type
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form'; // Added FormDescription
+import { MCQ } from './mcq-columns';
+import { Switch } from '@/components/ui/switch'; // Added Switch
 
 interface Category {
   id: string;
@@ -43,6 +42,7 @@ const formSchema = z.object({
   category_id: z.string().uuid("Invalid category ID.").optional().or(z.literal('')),
   subcategory_id: z.string().uuid("Invalid subcategory ID.").optional().or(z.literal('')),
   difficulty: z.string().optional().or(z.literal('')),
+  is_trial_mcq: z.boolean().optional(), // Added is_trial_mcq
 }).refine((data) => {
   if (data.subcategory_id && !data.category_id) {
     return false;
@@ -81,6 +81,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
       category_id: "",
       subcategory_id: "",
       difficulty: "",
+      is_trial_mcq: false, // Default to false
     },
   });
 
@@ -159,6 +160,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           category_id: mcq.category_id || "",
           subcategory_id: mcq.subcategory_id || "",
           difficulty: mcq.difficulty || "",
+          is_trial_mcq: mcq.is_trial_mcq || false, // Set is_trial_mcq
         });
       };
       loadMcqData();
@@ -212,10 +214,11 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           option_c: values.option_c,
           option_d: values.option_d,
           correct_answer: values.correct_answer,
-          explanation_id: values.explanation_id, // Ensure explanation_id is updated
+          explanation_id: values.explanation_id,
           category_id: values.category_id || null,
           subcategory_id: values.subcategory_id || null,
           difficulty: values.difficulty || null,
+          is_trial_mcq: values.is_trial_mcq, // Update is_trial_mcq
         })
         .eq('id', values.id);
 
@@ -400,6 +403,28 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
                     </SelectContent>
                   </Select>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="is_trial_mcq"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Mark as Trial MCQ</FormLabel>
+                    <FormDescription>
+                      If enabled, this MCQ will be available to users on a free trial.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      aria-label="Mark as trial MCQ"
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

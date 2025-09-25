@@ -11,6 +11,7 @@ const Login = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
       <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
         <h1 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-6">Login</h1>
+        {/* The Auth component is explicitly set to show only the sign-in form and redirects to home after login. */}
         <Auth
           supabaseClient={supabase}
           providers={[]}
@@ -26,8 +27,8 @@ const Login = () => {
             },
           }}
           theme="light"
-          view="sign_in" {/* Explicitly set to show only the sign-in form */}
-          redirectTo={window.location.origin + '/'} {/* Redirect to home after login */}
+          view="sign_in"
+          redirectTo={window.location.origin + '/'}
         />
       </div>
       <MadeWithDyad />

@@ -24,25 +24,44 @@ const Index = () => {
           Start building your amazing project here!
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-          <Link to="/quiz">
-            <Button size="lg">Start Quiz</Button>
-          </Link>
           {user ? ( // Conditionally render dashboard links if logged in
             <>
               {user.is_admin ? (
                 <Link to="/admin/dashboard">
-                  <Button size="lg" variant="outline">Go to Admin Dashboard</Button>
+                  <Button size="lg">Go to Admin Dashboard</Button>
                 </Link>
               ) : (
-                <Link to="/user/dashboard">
-                  <Button size="lg" variant="outline">Go to User Dashboard</Button>
-                </Link>
+                <>
+                  <Link to="/user/dashboard">
+                    <Button size="lg">Go to User Dashboard</Button>
+                  </Link>
+                  {!user.has_active_subscription && !user.trial_taken && (
+                    <Link to="/quiz">
+                      <Button size="lg" variant="outline">Start Free Trial</Button>
+                    </Link>
+                  )}
+                  {!user.has_active_subscription && user.trial_taken && (
+                    <Link to="/user/subscriptions">
+                      <Button size="lg" variant="outline">Subscribe Now</Button>
+                    </Link>
+                  )}
+                  {user.has_active_subscription && (
+                    <Link to="/quiz">
+                      <Button size="lg" variant="outline">Continue Quizzing</Button>
+                    </Link>
+                  )}
+                </>
               )}
             </>
           ) : (
-            <Link to="/login">
-              <Button size="lg" variant="outline">Login</Button>
-            </Link>
+            <>
+              <Link to="/login">
+                <Button size="lg">Login</Button>
+              </Link>
+              <Link to="/signup">
+                <Button size="lg" variant="outline">Sign Up</Button>
+              </Link>
+            </>
           )}
         </div>
       </div>

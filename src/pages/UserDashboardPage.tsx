@@ -6,9 +6,10 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge'; // Import Badge for correct/incorrect status
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { CheckCircle2, AlertCircle } from 'lucide-react'; // Imported missing icons
 
 interface QuizPerformance {
   totalAttempts: number;
@@ -271,6 +272,8 @@ const UserDashboardPage = () => {
   }
 
   const userEmail = user?.email || 'Guest';
+  const hasActiveSubscription = user?.has_active_subscription;
+  const trialTaken = user?.trial_taken;
 
   return (
     <div className="space-y-6">
@@ -286,6 +289,41 @@ const UserDashboardPage = () => {
           <p className="mt-4 text-gray-700 dark:text-gray-300">
             Use the sidebar to navigate.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Subscription Status Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Subscription Status</CardTitle>
+          <CardDescription>Your current access level to premium content.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {hasActiveSubscription ? (
+            <div className="flex items-center gap-2 text-green-600 font-semibold">
+              <CheckCircle2 className="h-5 w-5" />
+              <span>You have an active subscription!</span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-red-600 font-semibold">
+                <AlertCircle className="h-5 w-5" />
+                <span>No active subscription.</span>
+              </div>
+              {trialTaken ? (
+                <p className="text-sm text-muted-foreground">
+                  You have already taken your free trial. Please subscribe to unlock all features.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  You are eligible for a free trial! Start a quiz to begin your trial.
+                </p>
+              )}
+              <Link to="/user/subscriptions">
+                <Button className="mt-2">View Subscription Plans</Button>
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
 

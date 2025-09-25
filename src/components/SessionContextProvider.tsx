@@ -60,34 +60,35 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       }, 5000); // 5-second timeout
 
       try {
-        const { data: profileData, error: profileError } = await supabase
+        console.log(`${logPrefix} Executing Supabase profile query...`);
+        const { data: profileDataArray, error: profileError } = await supabase
           .from('profiles')
-          .select('is_admin, first_name, last_name, phone_number, whatsapp_number') // Reverted to specific columns
-          .eq('id', currentSession.user.id)
-          .single();
+          .select('is_admin, first_name, last_name, phone_number, whatsapp_number')
+          .eq('id', currentSession.user.id);
 
         profileFetchCompleted = true;
         clearTimeout(fetchTimeout);
+        console.log(`${logPrefix} Supabase profile query completed.`);
 
         let isAdmin = false;
         let firstName = null;
         let lastName = null;
         let phoneNumber = null;
         let whatsappNumber = null;
+        let profileData = null;
 
         if (profileError) {
-          if (profileError.code !== 'PGRST116') { // PGRST116 means no rows found, which is not an error for new users
-            console.error(`${logPrefix} Error fetching profile (code: ${profileError.code}):`, profileError);
-          } else {
-            console.log(`${logPrefix} No profile found for user (PGRST116), defaulting profile fields.`);
-          }
-        } else if (profileData) {
+          console.error(`${logPrefix} Error fetching profile (code: ${profileError.code}):`, profileError);
+        } else if (profileDataArray && profileDataArray.length > 0) {
+          profileData = profileDataArray[0]; // Take the first profile if available
           isAdmin = profileData.is_admin || false;
           firstName = profileData.first_name || null;
           lastName = profileData.last_name || null;
           phoneNumber = profileData.phone_number || null;
           whatsappNumber = profileData.whatsapp_number || null;
           console.log(`${logPrefix} Profile data fetched:`, profileData);
+        } else {
+          console.log(`${logPrefix} No profile found for user, defaulting profile fields.`);
         }
         
         const authUser: AuthUser = { 

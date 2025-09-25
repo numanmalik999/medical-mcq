@@ -21,8 +21,9 @@ interface UserProfile {
   avatar_url: string | null;
   email: string | null;
   is_admin: boolean;
-  phone_number: string | null; // Added
-  whatsapp_number: string | null; // Added
+  phone_number: string | null;
+  whatsapp_number: string | null;
+  has_active_subscription: boolean; // Added
 }
 
 const formSchema = z.object({
@@ -31,8 +32,9 @@ const formSchema = z.object({
   last_name: z.string().optional().or(z.literal('')),
   avatar_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
   is_admin: z.boolean(),
-  phone_number: z.string().optional().or(z.literal('')), // Added
-  whatsapp_number: z.string().optional().or(z.literal('')), // Added
+  phone_number: z.string().optional().or(z.literal('')),
+  whatsapp_number: z.string().optional().or(z.literal('')),
+  has_active_subscription: z.boolean(), // Added
 });
 
 interface EditUserDialogProps {
@@ -54,8 +56,9 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
       last_name: userProfile.last_name || "",
       avatar_url: userProfile.avatar_url || "",
       is_admin: userProfile.is_admin,
-      phone_number: userProfile.phone_number || "", // Added
-      whatsapp_number: userProfile.whatsapp_number || "", // Added
+      phone_number: userProfile.phone_number || "",
+      whatsapp_number: userProfile.whatsapp_number || "",
+      has_active_subscription: userProfile.has_active_subscription, // Added
     },
   });
 
@@ -68,8 +71,9 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
         last_name: userProfile.last_name || "",
         avatar_url: userProfile.avatar_url || "",
         is_admin: userProfile.is_admin,
-        phone_number: userProfile.phone_number || "", // Added
-        whatsapp_number: userProfile.whatsapp_number || "", // Added
+        phone_number: userProfile.phone_number || "",
+        whatsapp_number: userProfile.whatsapp_number || "",
+        has_active_subscription: userProfile.has_active_subscription, // Added
       });
     }
   }, [userProfile, open, form]);
@@ -83,8 +87,9 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
         last_name: values.last_name || null,
         avatar_url: values.avatar_url || null,
         is_admin: values.is_admin,
-        phone_number: values.phone_number || null, // Added
-        whatsapp_number: values.whatsapp_number || null, // Added
+        phone_number: values.phone_number || null,
+        whatsapp_number: values.whatsapp_number || null,
+        has_active_subscription: values.has_active_subscription, // Added
         updated_at: new Date().toISOString(),
       };
 
@@ -225,6 +230,28 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
                       checked={field.value}
                       onCheckedChange={field.onChange}
                       aria-label="Toggle admin status"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="has_active_subscription"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Active Subscription</FormLabel>
+                    <FormDescription>
+                      Toggle this user's active subscription status.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      aria-label="Toggle active subscription status"
                     />
                   </FormControl>
                 </FormItem>

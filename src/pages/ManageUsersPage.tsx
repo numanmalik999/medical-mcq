@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { User } from '@supabase/supabase-js'; // Import User type
 import EditUserDialog from '@/components/EditUserDialog'; // Import the new dialog
+import { Badge } from '@/components/ui/badge'; // Import Badge
 
 interface UserProfile {
   id: string;
@@ -29,8 +30,9 @@ interface UserProfile {
   email: string | null;
   created_at: string;
   is_admin: boolean;
-  phone_number: string | null; // Added
-  whatsapp_number: string | null; // Added
+  phone_number: string | null;
+  whatsapp_number: string | null;
+  has_active_subscription: boolean; // Added subscription status
 }
 
 const ManageUsersPage = () => {
@@ -85,8 +87,9 @@ const ManageUsersPage = () => {
         last_name: profile?.last_name || null,
         avatar_url: profile?.avatar_url || null,
         is_admin: profile?.is_admin || false, // Default to false if no profile or not set
-        phone_number: profile?.phone_number || null, // Added
-        whatsapp_number: profile?.whatsapp_number || null, // Added
+        phone_number: profile?.phone_number || null,
+        whatsapp_number: profile?.whatsapp_number || null,
+        has_active_subscription: profile?.has_active_subscription || false, // Added
       };
     });
 
@@ -136,6 +139,15 @@ const ManageUsersPage = () => {
       accessorKey: 'is_admin',
       header: 'Admin',
       cell: ({ row }) => (row.original.is_admin ? 'Yes' : 'No'),
+    },
+    {
+      accessorKey: 'has_active_subscription', // New column for subscription status
+      header: 'Subscription',
+      cell: ({ row }) => (
+        <Badge variant={row.original.has_active_subscription ? "default" : "secondary"}>
+          {row.original.has_active_subscription ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
     },
     {
       id: "actions",

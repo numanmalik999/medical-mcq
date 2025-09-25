@@ -14,6 +14,7 @@ import ManageMcqsPage from "./pages/ManageMcqsPage";
 import ManageCategoriesPage from "./pages/ManageCategoriesPage";
 import ManageSubscriptionsPage from "./pages/ManageSubscriptionsPage";
 import ManageUsersPage from "./pages/ManageUsersPage";
+import UserSubscriptionsPage from "./pages/UserSubscriptionsPage"; // Import UserSubscriptionsPage
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import AdminLayout from "./components/AdminLayout";
 import UserLayout from "./components/UserLayout";
@@ -59,7 +60,7 @@ const App = () => (
                 <Route path="dashboard" element={<UserDashboardPage />} />
                 <Route path="profile" element={<UserProfilePage />} />
                 <Route path="take-test" element={<TakeTestPage />} />
-                {/* Add more user-specific routes here */}
+                <Route path="subscriptions" element={<UserSubscriptionsPage />} /> {/* New route for subscriptions */}
               </Route>
             </Route>
 

@@ -105,7 +105,10 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
         title: "Success!",
         description: "User profile updated successfully.",
       });
-      onSave(); // Refresh data in parent component
+      // Add a small delay before calling onSave to allow database changes to propagate
+      setTimeout(() => {
+        onSave(); // Refresh data in parent component
+      }, 500); // 500ms delay
       onOpenChange(false); // Close dialog
     } catch (error: any) {
       console.error("Error updating user profile:", error);

@@ -10,6 +10,7 @@ interface AuthUser extends User {
   is_admin?: boolean;
   first_name?: string | null;
   last_name?: string | null;
+  avatar_url?: string | null;
   phone_number?: string | null;
   whatsapp_number?: string | null;
   has_active_subscription?: boolean; // Added
@@ -111,7 +112,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         };
         setSession(currentSession);
         setUser(authUser);
-        console.log(`${logPrefix} Session and user set. User is_admin:`, authUser.is_admin);
+        console.log(`${logPrefix} Session and user set. User is_admin:`, authUser.is_admin, 'has_active_subscription:', authUser.has_active_subscription);
 
         if (location.pathname === '/login' || location.pathname === '/signup') {
           console.log(`${logPrefix} On /login or /signup page, redirecting...`);

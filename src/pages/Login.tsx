@@ -4,7 +4,7 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Link } from 'react-router-dom'; // Re-import Link
+import { Link } from 'react-router-dom';
 
 const Login = () => {
   return (
@@ -31,7 +31,11 @@ const Login = () => {
           localization={{
             variables: {
               sign_in: {
-                link_text: '', // Hide the default "Don't have an account? Sign up" link
+                link_text: '', // Hide the "Don't have an account? Sign up" link in sign_in view
+              },
+              sign_up: {
+                link_text: '', // Hide any potential "Sign in" link in sign_up view (if it were rendered)
+                // Removed button_text as it's not a valid property here
               },
             },
           }}

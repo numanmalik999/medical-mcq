@@ -4,7 +4,7 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Link } from 'react-router-dom';
+// Removed unused 'Link' import
 
 const Login = () => {
   return (
@@ -26,14 +26,9 @@ const Login = () => {
             },
           }}
           theme="light"
-          redirectTo={window.location.origin + '/'} // Redirect to home after login
+          view="sign_in" {/* Explicitly set to show only the sign-in form */}
+          redirectTo={window.location.origin + '/'} {/* Redirect to home after login */}
         />
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          Don't have an account?{" "}
-          <Link to="/signup" className="text-primary hover:underline">
-            Sign Up
-          </Link>
-        </p>
       </div>
       <MadeWithDyad />
     </div>

@@ -147,8 +147,10 @@ const UserSubscriptionsPage = () => {
       
       // Re-fetch all subscription data to update UI
       fetchSubscriptionData();
-      // Optionally, force a session refresh to update the user object in context
-      window.location.reload(); 
+      // Add a small delay before reloading to ensure database changes propagate
+      setTimeout(() => {
+        window.location.reload(); 
+      }, 500); // 500ms delay
 
     } catch (error: any) {
       console.error("Error during subscription process:", error);

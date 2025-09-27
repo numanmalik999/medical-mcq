@@ -25,7 +25,7 @@ interface MCQ {
   explanation_id: string | null;
   category_id: string | null;
   subcategory_id: string | null;
-  difficulty: string | null;
+  difficulty: string | null; // Ensure difficulty is here
 }
 
 interface MCQExplanation {
@@ -49,6 +49,7 @@ const TakeTestPage = () => {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [selectedPercentage, setSelectedPercentage] = useState<string>('100'); // '10', '25', '50', '100', 'all'
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null); // New state for difficulty filter
   const [showConfiguration, setShowConfiguration] = useState(true);
   const [showInstructions, setShowInstructions] = useState(false);
 
@@ -211,6 +212,9 @@ const TakeTestPage = () => {
     if (selectedCategoryIds.length > 0) {
       query = query.in('category_id', selectedCategoryIds);
     }
+    if (selectedDifficulty) { // Apply difficulty filter
+      query = query.eq('difficulty', selectedDifficulty);
+    }
 
     const { data, error } = await query;
 
@@ -237,9 +241,6 @@ const TakeTestPage = () => {
       selectedMcqs = shuffledMcqs.slice(0, numToSelect);
     }
 
-    // If selected MCQs are less than DEFAULT_TOTAL_QUESTIONS, and user selected 'all' or 100%,
-    // or if the calculated number is very small, we might want to adjust.
-    // For now, we'll just use what was selected.
     if (selectedMcqs.length === 0) {
       toast({ title: "No MCQs", description: "No MCQs could be selected based on your criteria. Please adjust.", variant: "default" });
       setIsLoading(false);
@@ -335,7 +336,7 @@ const TakeTestPage = () => {
         <Card className="w-full max-w-2xl">
           <CardHeader>
             <CardTitle className="text-2xl">Configure Your Test</CardTitle>
-            <CardDescription>Select categories and the percentage of questions you'd like to include.</CardDescription>
+            <CardDescription>Select categories, difficulty, and the percentage of questions you'd like to include.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -358,6 +359,24 @@ const TakeTestPage = () => {
               </div>
               <p className="text-sm text-muted-foreground">
                 If no categories are selected, questions will be pulled from all available categories.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="difficulty-select" className="text-lg font-semibold">Difficulty (Optional)</Label>
+              <Select onValueChange={(value) => setSelectedDifficulty(value === "all" ? null : value)} value={selectedDifficulty || "all"}>
+                <SelectTrigger id="difficulty-select" className="w-full">
+                  <SelectValue placeholder="Any Difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any Difficulty</SelectItem>
+                  <SelectItem value="Easy">Easy</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Filter questions by their AI-assigned difficulty level.
               </p>
             </div>
 

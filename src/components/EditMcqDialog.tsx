@@ -12,9 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form'; // Added FormDescription
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { MCQ } from './mcq-columns';
-import { Switch } from '@/components/ui/switch'; // Added Switch
+import { Switch } from '@/components/ui/switch';
+import { Loader2, Wand2 } from 'lucide-react'; // Import Wand2 icon
 
 interface Category {
   id: string;
@@ -42,7 +43,7 @@ const formSchema = z.object({
   category_id: z.string().uuid("Invalid category ID.").optional().or(z.literal('')),
   subcategory_id: z.string().uuid("Invalid subcategory ID.").optional().or(z.literal('')),
   difficulty: z.string().optional().or(z.literal('')),
-  is_trial_mcq: z.boolean().optional(), // Added is_trial_mcq
+  is_trial_mcq: z.boolean().optional(),
 }).refine((data) => {
   if (data.subcategory_id && !data.category_id) {
     return false;
@@ -61,8 +62,9 @@ interface EditMcqDialogProps {
 }
 
 const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) => {
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast(); // Destructure dismiss from useToast
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false); // New state for AI generation
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
@@ -81,7 +83,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
       category_id: "",
       subcategory_id: "",
       difficulty: "",
-      is_trial_mcq: false, // Default to false
+      is_trial_mcq: false,
     },
   });
 
@@ -160,7 +162,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           category_id: mcq.category_id || "",
           subcategory_id: mcq.subcategory_id || "",
           difficulty: mcq.difficulty || "",
-          is_trial_mcq: mcq.is_trial_mcq || false, // Set is_trial_mcq
+          is_trial_mcq: mcq.is_trial_mcq || false,
         });
       };
       loadMcqData();
@@ -168,6 +170,60 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
       form.reset(); // Reset form when dialog closes
     }
   }, [mcq, open, form, toast]);
+
+  const handleGenerateWithAI = async () => {
+    const { question_text, option_a, option_b, option_c, option_d, correct_answer } = form.getValues();
+
+    if (!question_text || !option_a || !option_b || !option_c || !option_d || !correct_answer) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in the question, all options, and the correct answer before generating with AI.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    const loadingToastId = toast({
+      title: "Generating with AI...",
+      description: "Please wait while AI generates the explanation and difficulty.",
+      duration: 999999,
+      action: <Loader2 className="h-4 w-4 animate-spin" />,
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-mcq-content', {
+        body: {
+          question: question_text,
+          options: { A: option_a, B: option_b, C: option_c, D: option_d },
+          correct_answer: correct_answer,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      form.setValue("explanation_text", data.explanation_text);
+      form.setValue("difficulty", data.difficulty);
+      dismiss(loadingToastId.id); // Corrected: pass loadingToastId.id
+      toast({
+        title: "AI Generation Complete!",
+        description: "Explanation and difficulty have been generated. Please review.",
+        variant: "default",
+      });
+    } catch (error: any) {
+      dismiss(loadingToastId.id); // Corrected: pass loadingToastId.id
+      console.error("Error generating with AI:", error);
+      toast({
+        title: "AI Generation Failed",
+        description: `Failed to generate content with AI: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
@@ -218,7 +274,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           category_id: values.category_id || null,
           subcategory_id: values.subcategory_id || null,
           difficulty: values.difficulty || null,
-          is_trial_mcq: values.is_trial_mcq, // Update is_trial_mcq
+          is_trial_mcq: values.is_trial_mcq,
         })
         .eq('id', values.id);
 
@@ -310,6 +366,23 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
               )}
             />
 
+            <Button
+              type="button"
+              onClick={handleGenerateWithAI}
+              disabled={isGeneratingAI || isSubmitting}
+              className="w-full flex items-center gap-2"
+            >
+              {isGeneratingAI ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Generating...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-4 w-4" /> Generate with AI
+                </>
+              )}
+            </Button>
+
             <FormField
               control={form.control}
               name="explanation_text"
@@ -390,7 +463,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Difficulty (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select difficulty" />
@@ -431,7 +504,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
 
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)} type="button">Cancel</Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || isGeneratingAI}>
                 {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>

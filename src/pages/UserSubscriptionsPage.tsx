@@ -69,35 +69,40 @@ const UserSubscriptionsPage = () => {
 
     // Fetch user's active subscription
     if (user) {
-      const { data: userSubData, error: userSubError } = await supabase
+      // Fetch all subscriptions for the user, then filter client-side
+      const { data: userSubsData, error: userSubError } = await supabase
         .from('user_subscriptions')
         .select('id, user_id, subscription_tier_id, start_date, end_date, status')
         .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('end_date', { ascending: false }) // Order by end_date descending
-        .limit(1) // Take only the latest one
-        .maybeSingle(); // Changed from single() to maybeSingle()
+        .order('end_date', { ascending: false }); // Order by end_date descending
 
-      console.log('UserSubscriptionsPage: fetchSubscriptionData - userSubData from user_subscriptions table:', userSubData);
+      console.log('UserSubscriptionsPage: fetchSubscriptionData - userSubsData from user_subscriptions table:', userSubsData);
       console.log('UserSubscriptionsPage: fetchSubscriptionData - userSubError from user_subscriptions table:', userSubError);
 
-      if (userSubError) { // maybeSingle() returns null for no rows, so we only check for actual errors
-        console.error('UserSubscriptionsPage: Error fetching user subscription from user_subscriptions table:', userSubError);
+      if (userSubError) {
+        console.error('UserSubscriptionsPage: Error fetching user subscriptions from user_subscriptions table:', userSubError);
         toast({ title: "Error", description: "Failed to load your subscription status.", variant: "destructive" });
         setUserActiveSubscription(null);
         setDaysRemaining(null);
-      } else if (userSubData) {
-        setUserActiveSubscription(userSubData);
-        const endDate = parseISO(userSubData.end_date);
-        const today = new Date();
-        const remaining = differenceInDays(endDate, today);
-        setDaysRemaining(Math.max(0, remaining)); // Ensure days remaining is not negative
-        console.log('UserSubscriptionsPage: Active subscription found in user_subscriptions table, days remaining:', Math.max(0, remaining));
+      } else if (userSubsData && userSubsData.length > 0) {
+        // Filter for the first active subscription client-side
+        const activeSub = userSubsData.find(sub => sub.status === 'active');
+        if (activeSub) {
+          setUserActiveSubscription(activeSub);
+          const endDate = parseISO(activeSub.end_date);
+          const today = new Date();
+          const remaining = differenceInDays(endDate, today);
+          setDaysRemaining(Math.max(0, remaining)); // Ensure days remaining is not negative
+          console.log('UserSubscriptionsPage: Active subscription found client-side, days remaining:', Math.max(0, remaining));
+        } else {
+          setUserActiveSubscription(null);
+          setDaysRemaining(null);
+          console.log('UserSubscriptionsPage: No active subscription found client-side.');
+        }
       } else {
-        // userSubData is null, meaning no active subscription found, which is handled gracefully by maybeSingle()
         setUserActiveSubscription(null);
         setDaysRemaining(null);
-        console.log('UserSubscriptionsPage: No active subscription found in user_subscriptions table.');
+        console.log('UserSubscriptionsPage: No subscriptions found for user.');
       }
     }
     setIsLoading(false);
@@ -262,7 +267,7 @@ const UserSubscriptionsPage = () => {
             return (
               <Card key={tier.id} className="flex flex-col">
                 <CardHeader>
-                  <CardTitle className="text-2xl">{tier.name}</CardTitle>
+                  <CardTitle className="2xl">{tier.name}</CardTitle>
                   <CardDescription>{tier.description}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow space-y-4">

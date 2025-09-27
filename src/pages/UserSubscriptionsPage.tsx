@@ -71,7 +71,7 @@ const UserSubscriptionsPage = () => {
     if (user) {
       const { data: userSubData, error: userSubError } = await supabase
         .from('user_subscriptions')
-        .select('*')
+        .select('id, user_id, subscription_tier_id, start_date, end_date, status') // Explicitly select columns
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('end_date', { ascending: false }) // Get the latest active subscription

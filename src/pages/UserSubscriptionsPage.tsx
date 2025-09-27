@@ -69,7 +69,6 @@ const UserSubscriptionsPage = () => {
 
     // Fetch user's active subscription
     if (user) {
-      // Re-introducing order and limit(1) to ensure single() works correctly
       const { data: userSubData, error: userSubError } = await supabase
         .from('user_subscriptions')
         .select('id, user_id, subscription_tier_id, start_date, end_date, status')
@@ -77,12 +76,12 @@ const UserSubscriptionsPage = () => {
         .eq('status', 'active')
         .order('end_date', { ascending: false }) // Order by end_date descending
         .limit(1) // Take only the latest one
-        .single();
+        .maybeSingle(); // Changed from single() to maybeSingle()
 
       console.log('UserSubscriptionsPage: fetchSubscriptionData - userSubData from user_subscriptions table:', userSubData);
       console.log('UserSubscriptionsPage: fetchSubscriptionData - userSubError from user_subscriptions table:', userSubError);
 
-      if (userSubError && userSubError.code !== 'PGRST116') { // PGRST116 means no rows found
+      if (userSubError) { // maybeSingle() returns null for no rows, so we only check for actual errors
         console.error('UserSubscriptionsPage: Error fetching user subscription from user_subscriptions table:', userSubError);
         toast({ title: "Error", description: "Failed to load your subscription status.", variant: "destructive" });
         setUserActiveSubscription(null);
@@ -95,6 +94,7 @@ const UserSubscriptionsPage = () => {
         setDaysRemaining(Math.max(0, remaining)); // Ensure days remaining is not negative
         console.log('UserSubscriptionsPage: Active subscription found in user_subscriptions table, days remaining:', Math.max(0, remaining));
       } else {
+        // userSubData is null, meaning no active subscription found, which is handled gracefully by maybeSingle()
         setUserActiveSubscription(null);
         setDaysRemaining(null);
         console.log('UserSubscriptionsPage: No active subscription found in user_subscriptions table.');

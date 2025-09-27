@@ -14,7 +14,8 @@ import ManageMcqsPage from "./pages/ManageMcqsPage";
 import ManageCategoriesPage from "./pages/ManageCategoriesPage";
 import ManageSubscriptionsPage from "./pages/ManageSubscriptionsPage";
 import ManageUsersPage from "./pages/ManageUsersPage";
-import UserSubscriptionsPage from "./pages/UserSubscriptionsPage"; // Import UserSubscriptionsPage
+import UserSubscriptionsPage from "./pages/UserSubscriptionsPage";
+import BulkUploadMcqsPage from "./pages/BulkUploadMcqsPage"; // Import new page
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import AdminLayout from "./components/AdminLayout";
 import UserLayout from "./components/UserLayout";
@@ -34,10 +35,10 @@ const App = () => (
       <BrowserRouter>
         <SessionContextProvider>
           <Routes>
-            <Route path="/" element={<Index />} /> {/* Index is back on the root path */}
+            <Route path="/" element={<Index />} />
 
             <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} /> {/* SignUp is on its dedicated path */}
+            <Route path="/signup" element={<SignUp />} />
             <Route path="/quiz" element={<QuizPage />} />
             
             {/* Admin Routes - Protected */}
@@ -46,6 +47,7 @@ const App = () => (
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="dashboard" element={<AdminDashboardPage />} />
                 <Route path="add-mcq" element={<AddMcqPage />} />
+                <Route path="bulk-upload-mcqs" element={<BulkUploadMcqsPage />} /> {/* New route */}
                 <Route path="manage-mcqs" element={<ManageMcqsPage />} />
                 <Route path="manage-categories" element={<ManageCategoriesPage />} />
                 <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
@@ -60,7 +62,7 @@ const App = () => (
                 <Route path="dashboard" element={<UserDashboardPage />} />
                 <Route path="profile" element={<UserProfilePage />} />
                 <Route path="take-test" element={<TakeTestPage />} />
-                <Route path="subscriptions" element={<UserSubscriptionsPage />} /> {/* New route for subscriptions */}
+                <Route path="subscriptions" element={<UserSubscriptionsPage />} />
               </Route>
             </Route>
 

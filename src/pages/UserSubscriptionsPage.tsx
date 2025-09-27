@@ -69,13 +69,15 @@ const UserSubscriptionsPage = () => {
 
     // Fetch user's active subscription
     if (user) {
-      // Simplified query: removed order and limit to debug 406 error
+      // Re-introducing order and limit(1) to ensure single() works correctly
       const { data: userSubData, error: userSubError } = await supabase
         .from('user_subscriptions')
         .select('id, user_id, subscription_tier_id, start_date, end_date, status')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .single(); // Use single() to expect one or zero results
+        .order('end_date', { ascending: false }) // Order by end_date descending
+        .limit(1) // Take only the latest one
+        .single();
 
       console.log('UserSubscriptionsPage: fetchSubscriptionData - userSubData from user_subscriptions table:', userSubData);
       console.log('UserSubscriptionsPage: fetchSubscriptionData - userSubError from user_subscriptions table:', userSubError);

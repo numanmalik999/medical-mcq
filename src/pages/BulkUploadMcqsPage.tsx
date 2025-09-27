@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { showLoading, dismissToast, showError, showSuccess } from '@/utils/toast'; // Corrected import for toast utilities
+import { showLoading, dismissToast, showError, showSuccess } from '@/utils/toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Loader2 } from 'lucide-react';
 
@@ -21,8 +21,8 @@ interface IncomingMcq {
   correct_answer: 'A' | 'B' | 'C' | 'D';
   explanation: string;
   image_url?: string;
-  category_id?: string;
-  subcategory_id?: string;
+  category_name?: string; // Changed from category_id to category_name
+  subcategory_name?: string; // Changed from subcategory_id to subcategory_name
   difficulty?: string;
   is_trial_mcq?: boolean;
 }
@@ -109,8 +109,8 @@ const BulkUploadMcqsPage = () => {
     "correct_answer": "A",
     "explanation": "Detailed explanation for the correct answer.",
     "image_url": "https://example.com/image.jpg", // Optional
-    "category_id": "uuid-of-category", // Optional
-    "subcategory_id": "uuid-of-subcategory", // Optional
+    "category_name": "Biology", // Changed from category_id
+    "subcategory_name": "Cell Biology", // Changed from subcategory_id
     "difficulty": "Easy", // Optional: "Easy", "Medium", "Hard"
     "is_trial_mcq": true // Optional: defaults to false
   },

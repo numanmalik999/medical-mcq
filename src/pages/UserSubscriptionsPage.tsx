@@ -39,15 +39,18 @@ const UserSubscriptionsPage = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null); // Stores tierId being processed
 
   useEffect(() => {
+    console.log('UserSubscriptionsPage: useEffect mounted. Current user has_active_subscription from session:', user?.has_active_subscription);
     if (!isSessionLoading && user) {
       fetchSubscriptionData();
     } else if (!isSessionLoading && !user) {
       setIsLoading(false); // Not logged in, no tiers to show
+      console.log('UserSubscriptionsPage: Not logged in, setting isLoading to false.');
     }
   }, [user, isSessionLoading]);
 
   const fetchSubscriptionData = async () => {
     setIsLoading(true);
+    console.log('UserSubscriptionsPage: fetchSubscriptionData started.');
 
     // Fetch all subscription tiers
     const { data: tiersData, error: tiersError } = await supabase
@@ -56,11 +59,12 @@ const UserSubscriptionsPage = () => {
       .order('price', { ascending: true });
 
     if (tiersError) {
-      console.error('Error fetching subscription tiers:', tiersError);
+      console.error('UserSubscriptionsPage: Error fetching subscription tiers:', tiersError);
       toast({ title: "Error", description: "Failed to load subscription plans.", variant: "destructive" });
       setSubscriptionTiers([]);
     } else {
       setSubscriptionTiers(tiersData || []);
+      console.log('UserSubscriptionsPage: Fetched subscription tiers:', tiersData);
     }
 
     // Fetch user's active subscription
@@ -74,8 +78,11 @@ const UserSubscriptionsPage = () => {
         .limit(1)
         .single();
 
+      console.log('UserSubscriptionsPage: fetchSubscriptionData - userSubData from user_subscriptions table:', userSubData);
+      console.log('UserSubscriptionsPage: fetchSubscriptionData - userSubError from user_subscriptions table:', userSubError);
+
       if (userSubError && userSubError.code !== 'PGRST116') { // PGRST116 means no rows found
-        console.error('Error fetching user subscription:', userSubError);
+        console.error('UserSubscriptionsPage: Error fetching user subscription from user_subscriptions table:', userSubError);
         toast({ title: "Error", description: "Failed to load your subscription status.", variant: "destructive" });
         setUserActiveSubscription(null);
         setDaysRemaining(null);
@@ -85,12 +92,15 @@ const UserSubscriptionsPage = () => {
         const today = new Date();
         const remaining = differenceInDays(endDate, today);
         setDaysRemaining(Math.max(0, remaining)); // Ensure days remaining is not negative
+        console.log('UserSubscriptionsPage: Active subscription found in user_subscriptions table, days remaining:', Math.max(0, remaining));
       } else {
         setUserActiveSubscription(null);
         setDaysRemaining(null);
+        console.log('UserSubscriptionsPage: No active subscription found in user_subscriptions table.');
       }
     }
     setIsLoading(false);
+    console.log('UserSubscriptionsPage: fetchSubscriptionData finished, isLoading set to false.');
   };
 
   const handleSubscribe = async (tier: SubscriptionTier) => {
@@ -101,6 +111,7 @@ const UserSubscriptionsPage = () => {
 
     setIsProcessingPayment(tier.id);
     toast({ title: "Processing Payment", description: `Simulating payment for ${tier.name}...`, variant: "default" });
+    console.log('UserSubscriptionsPage: handleSubscribe - Starting payment simulation for tier:', tier.name);
 
     // Simulate a payment processing delay
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -112,17 +123,25 @@ const UserSubscriptionsPage = () => {
         .update({ has_active_subscription: true })
         .eq('id', user.id);
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('UserSubscriptionsPage: handleSubscribe - profileError during profiles update:', profileError);
+        throw profileError;
+      } else {
+        console.log('UserSubscriptionsPage: handleSubscribe - profiles table updated for has_active_subscription to TRUE.');
+      }
 
       // 2. Deactivate any existing active subscriptions for the user
       if (userActiveSubscription) {
+        console.log('UserSubscriptionsPage: handleSubscribe - Deactivating previous subscription:', userActiveSubscription.id);
         const { error: deactivateError } = await supabase
           .from('user_subscriptions')
           .update({ status: 'inactive' })
           .eq('id', userActiveSubscription.id);
         if (deactivateError) {
-          console.warn('Failed to deactivate previous subscription:', deactivateError);
+          console.warn('UserSubscriptionsPage: handleSubscribe - Failed to deactivate previous subscription:', deactivateError);
           // Don't throw, as the new subscription is more important
+        } else {
+          console.log('UserSubscriptionsPage: handleSubscribe - Previous subscription deactivated.');
         }
       }
 
@@ -141,7 +160,12 @@ const UserSubscriptionsPage = () => {
           status: 'active',
         });
 
-      if (subscriptionError) throw subscriptionError;
+      if (subscriptionError) {
+        console.error('UserSubscriptionsPage: handleSubscribe - subscriptionError during user_subscriptions insert:', subscriptionError);
+        throw subscriptionError;
+      } else {
+        console.log('UserSubscriptionsPage: handleSubscribe - New entry added to user_subscriptions table.');
+      }
 
       toast({ title: "Success!", description: `You have successfully subscribed to ${tier.name}!`, variant: "default" });
       
@@ -149,11 +173,12 @@ const UserSubscriptionsPage = () => {
       fetchSubscriptionData();
       // Add a small delay before reloading to ensure database changes propagate
       setTimeout(() => {
+        console.log('UserSubscriptionsPage: handleSubscribe - Reloading page after 1 second delay.');
         window.location.reload(); 
-      }, 500); // 500ms delay
+      }, 1000); // Increased delay to 1 second
 
     } catch (error: any) {
-      console.error("Error during subscription process:", error);
+      console.error("UserSubscriptionsPage: handleSubscribe - Error during subscription process:", error);
       toast({
         title: "Subscription Failed",
         description: `Failed to process subscription: ${error.message || 'Unknown error'}`,
@@ -161,6 +186,7 @@ const UserSubscriptionsPage = () => {
       });
     } finally {
       setIsProcessingPayment(null);
+      console.log('UserSubscriptionsPage: handleSubscribe - Payment processing finished.');
     }
   };
 
@@ -189,7 +215,8 @@ const UserSubscriptionsPage = () => {
     );
   }
 
-  const hasActiveSubscription = user?.has_active_subscription;
+  // Use the user.has_active_subscription from the session context for the main status display
+  const hasActiveSubscriptionFromSession = user?.has_active_subscription;
 
   return (
     <div className="space-y-6">
@@ -200,7 +227,7 @@ const UserSubscriptionsPage = () => {
           <CardTitle>Your Current Status</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {hasActiveSubscription && userActiveSubscription && daysRemaining !== null ? (
+          {hasActiveSubscriptionFromSession && userActiveSubscription && daysRemaining !== null ? (
             <div className="flex items-center gap-2 text-green-600 font-semibold">
               <CheckCircle2 className="h-5 w-5" />
               <span>You have an active subscription!</span>
@@ -215,7 +242,7 @@ const UserSubscriptionsPage = () => {
             </div>
           )}
           <p className="text-sm text-muted-foreground">
-            {hasActiveSubscription ? "Enjoy all premium features." : "Subscribe to unlock full access to all content and features."}
+            {hasActiveSubscriptionFromSession ? "Enjoy all premium features." : "Subscribe to unlock full access to all content and features."}
           </p>
         </CardContent>
       </Card>
@@ -230,7 +257,7 @@ const UserSubscriptionsPage = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {subscriptionTiers.map((tier) => {
-            const isCurrentPlan = userActiveSubscription?.subscription_tier_id === tier.id && hasActiveSubscription;
+            const isCurrentPlan = userActiveSubscription?.subscription_tier_id === tier.id && hasActiveSubscriptionFromSession;
             return (
               <Card key={tier.id} className="flex flex-col">
                 <CardHeader>

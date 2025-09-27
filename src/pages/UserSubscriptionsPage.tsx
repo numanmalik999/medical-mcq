@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'; // Import Loader2 for loading state
+import { differenceInDays, parseISO } from 'date-fns'; // Import date-fns for date calculations
 
 interface SubscriptionTier {
   id: string;
@@ -19,34 +20,75 @@ interface SubscriptionTier {
   features: string[] | null;
 }
 
+interface UserSubscription {
+  id: string;
+  user_id: string;
+  subscription_tier_id: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+}
+
 const UserSubscriptionsPage = () => {
   const { user, isLoading: isSessionLoading } = useSession();
   const { toast } = useToast();
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
+  const [userActiveSubscription, setUserActiveSubscription] = useState<UserSubscription | null>(null);
+  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null); // Stores tierId being processed
 
   useEffect(() => {
     if (!isSessionLoading && user) {
-      fetchSubscriptionTiers();
+      fetchSubscriptionData();
     } else if (!isSessionLoading && !user) {
       setIsLoading(false); // Not logged in, no tiers to show
     }
   }, [user, isSessionLoading]);
 
-  const fetchSubscriptionTiers = async () => {
+  const fetchSubscriptionData = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
+
+    // Fetch all subscription tiers
+    const { data: tiersData, error: tiersError } = await supabase
       .from('subscription_tiers')
       .select('*')
       .order('price', { ascending: true });
 
-    if (error) {
-      console.error('Error fetching subscription tiers:', error);
+    if (tiersError) {
+      console.error('Error fetching subscription tiers:', tiersError);
       toast({ title: "Error", description: "Failed to load subscription plans.", variant: "destructive" });
       setSubscriptionTiers([]);
     } else {
-      setSubscriptionTiers(data || []);
+      setSubscriptionTiers(tiersData || []);
+    }
+
+    // Fetch user's active subscription
+    if (user) {
+      const { data: userSubData, error: userSubError } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('end_date', { ascending: false }) // Get the latest active subscription
+        .limit(1)
+        .single();
+
+      if (userSubError && userSubError.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error('Error fetching user subscription:', userSubError);
+        toast({ title: "Error", description: "Failed to load your subscription status.", variant: "destructive" });
+        setUserActiveSubscription(null);
+        setDaysRemaining(null);
+      } else if (userSubData) {
+        setUserActiveSubscription(userSubData);
+        const endDate = parseISO(userSubData.end_date);
+        const today = new Date();
+        const remaining = differenceInDays(endDate, today);
+        setDaysRemaining(Math.max(0, remaining)); // Ensure days remaining is not negative
+      } else {
+        setUserActiveSubscription(null);
+        setDaysRemaining(null);
+      }
     }
     setIsLoading(false);
   };
@@ -72,7 +114,19 @@ const UserSubscriptionsPage = () => {
 
       if (profileError) throw profileError;
 
-      // 2. Create a new entry in user_subscriptions
+      // 2. Deactivate any existing active subscriptions for the user
+      if (userActiveSubscription) {
+        const { error: deactivateError } = await supabase
+          .from('user_subscriptions')
+          .update({ status: 'inactive' })
+          .eq('id', userActiveSubscription.id);
+        if (deactivateError) {
+          console.warn('Failed to deactivate previous subscription:', deactivateError);
+          // Don't throw, as the new subscription is more important
+        }
+      }
+
+      // 3. Create a new entry in user_subscriptions
       const startDate = new Date();
       const endDate = new Date();
       endDate.setMonth(startDate.getMonth() + tier.duration_in_months);
@@ -91,10 +145,10 @@ const UserSubscriptionsPage = () => {
 
       toast({ title: "Success!", description: `You have successfully subscribed to ${tier.name}!`, variant: "default" });
       
+      // Re-fetch all subscription data to update UI
+      fetchSubscriptionData();
       // Optionally, force a session refresh to update the user object in context
-      // For a real app, you might want to trigger a re-fetch of the user session
-      // or update the local user object in SessionContextProvider.
-      window.location.reload(); // Simple way to refresh session context for now
+      window.location.reload(); 
 
     } catch (error: any) {
       console.error("Error during subscription process:", error);
@@ -144,10 +198,13 @@ const UserSubscriptionsPage = () => {
           <CardTitle>Your Current Status</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {hasActiveSubscription ? (
+          {hasActiveSubscription && userActiveSubscription && daysRemaining !== null ? (
             <div className="flex items-center gap-2 text-green-600 font-semibold">
               <CheckCircle2 className="h-5 w-5" />
               <span>You have an active subscription!</span>
+              <span className="text-sm text-muted-foreground ml-2">
+                ({daysRemaining} day{daysRemaining === 1 ? '' : 's'} remaining)
+              </span>
             </div>
           ) : (
             <div className="flex items-center gap-2 text-red-600 font-semibold">
@@ -170,45 +227,48 @@ const UserSubscriptionsPage = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {subscriptionTiers.map((tier) => (
-            <Card key={tier.id} className="flex flex-col">
-              <CardHeader>
-                <CardTitle className="text-2xl">{tier.name}</CardTitle>
-                <CardDescription>{tier.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow space-y-4">
-                <p className="text-4xl font-bold">
-                  {tier.currency} {tier.price.toFixed(2)}
-                  <span className="text-lg font-normal text-muted-foreground"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
-                </p>
-                {tier.features && tier.features.length > 0 && (
-                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                    {tier.features.map((feature, index) => (
-                      <li key={index}>{feature}</li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  onClick={() => handleSubscribe(tier)}
-                  disabled={hasActiveSubscription || isProcessingPayment === tier.id}
-                >
-                  {isProcessingPayment === tier.id ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : hasActiveSubscription ? (
-                    "Current Plan"
-                  ) : (
-                    "Choose Plan"
+          {subscriptionTiers.map((tier) => {
+            const isCurrentPlan = userActiveSubscription?.subscription_tier_id === tier.id && hasActiveSubscription;
+            return (
+              <Card key={tier.id} className="flex flex-col">
+                <CardHeader>
+                  <CardTitle className="text-2xl">{tier.name}</CardTitle>
+                  <CardDescription>{tier.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow space-y-4">
+                  <p className="text-4xl font-bold">
+                    {tier.currency} {tier.price.toFixed(2)}
+                    <span className="text-lg font-normal text-muted-foreground"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
+                  </p>
+                  {tier.features && tier.features.length > 0 && (
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      {tier.features.map((feature, index) => (
+                        <li key={index}>{feature}</li>
+                      ))}
+                    </ul>
                   )}
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    className="w-full"
+                    onClick={() => handleSubscribe(tier)}
+                    disabled={isCurrentPlan || isProcessingPayment === tier.id}
+                  >
+                    {isProcessingPayment === tier.id ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : isCurrentPlan ? (
+                      "Current Plan"
+                    ) : (
+                      "Choose Plan"
+                    )}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
       )}
 

@@ -76,7 +76,7 @@ const UserSubscriptionsPage = () => {
         .eq('user_id', user.id)
         .order('end_date', { ascending: false }); // Order by end_date descending
 
-      console.log('UserSubscriptionsPage: fetchSubscriptionData - userSubsData from user_subscriptions table:', userSubsData);
+      console.log('UserSubscriptionsPage: fetchSubscriptionData - RAW userSubsData from user_subscriptions table:', userSubsData); // ADDED LOG
       console.log('UserSubscriptionsPage: fetchSubscriptionData - userSubError from user_subscriptions table:', userSubError);
 
       if (userSubError) {
@@ -87,6 +87,7 @@ const UserSubscriptionsPage = () => {
       } else if (userSubsData && userSubsData.length > 0) {
         // Filter for the first active subscription client-side
         const activeSub = userSubsData.find(sub => sub.status === 'active');
+        console.log('UserSubscriptionsPage: fetchSubscriptionData - Client-side filtered activeSub:', activeSub); // ADDED LOG
         if (activeSub) {
           setUserActiveSubscription(activeSub);
           const endDate = parseISO(activeSub.end_date);

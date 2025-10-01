@@ -8,15 +8,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// @ts-ignore // Ignore the Deno global type error
-const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY') ?? '');
-const model = genAI.getGenerativeModel({ model: "gemini-pro" }); // You can choose other models like 'gemini-1.5-flash' if available and preferred
-
 async function generateExplanationAndDifficulty(
   question: string,
   options: { A: string; B: string; C: string; D: string },
   correct_answer: 'A' | 'B' | 'C' | 'D'
 ) {
+  // @ts-ignore // Ignore the Deno global type error
+  const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+  if (!geminiApiKey) {
+    console.error('GEMINI_API_KEY is not set in environment variables.');
+    throw new Error('Gemini API key is missing. Please configure it in Supabase secrets.');
+  }
+
+  // @ts-ignore // Ignore the Deno global type error
+  const genAI = new GoogleGenerativeAI(geminiApiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
   const prompt = `Given the following multiple-choice question, its options, and the correct answer, generate a detailed explanation for why the correct answer is right and why the other options are wrong. Also, assign a difficulty level (Easy, Medium, Hard) to the question.
 
 Question: ${question}

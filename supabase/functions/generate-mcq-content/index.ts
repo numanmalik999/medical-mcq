@@ -20,6 +20,7 @@ async function generateExplanationAndDifficulty(
     throw new Error('Gemini API key is missing. Please configure it in Supabase secrets.');
   }
 
+  // Initialize genAI and model *inside* the function, so it only runs when needed
   // @ts-ignore // Ignore the Deno global type error
   const genAI = new GoogleGenerativeAI(geminiApiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-pro" });

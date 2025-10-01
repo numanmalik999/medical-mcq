@@ -128,7 +128,7 @@ const AddMcqPage = () => {
     setIsGeneratingAI(true);
     const loadingToastId = toast({
       title: "Generating with AI...",
-      description: "Please wait while AI generates the explanation and difficulty.",
+      description: "Please wait while AI generates the explanation, difficulty, and subcategory.",
       duration: 999999,
       action: <Loader2 className="h-4 w-4 animate-spin" />,
     });
@@ -148,14 +148,48 @@ const AddMcqPage = () => {
 
       form.setValue("explanation_text", data.explanation_text);
       form.setValue("difficulty", data.difficulty);
-      dismiss(loadingToastId.id); // Corrected: pass loadingToastId.id
+
+      // NEW LOGIC: Handle suggested subcategory
+      if (data.suggested_subcategory_name) {
+        if (selectedCategoryId) {
+          const matchedSubcategory = filteredSubcategories.find(
+            (sub) => sub.name.toLowerCase() === data.suggested_subcategory_name.toLowerCase()
+          );
+          if (matchedSubcategory) {
+            form.setValue("subcategory_id", matchedSubcategory.id);
+            toast({
+              title: "Subcategory Suggested",
+              description: `AI suggested and matched subcategory: "${matchedSubcategory.name}".`,
+              variant: "default",
+            });
+          } else {
+            toast({
+              title: "Subcategory Suggested",
+              description: `AI suggested subcategory "${data.suggested_subcategory_name}", but no match found in selected category. Please select manually.`,
+              variant: "default",
+            });
+            form.setValue("subcategory_id", ""); // Clear if no match
+          }
+        } else {
+          toast({
+            title: "Subcategory Suggested",
+            description: `AI suggested subcategory "${data.suggested_subcategory_name}", but a category must be selected first. Please select manually.`,
+            variant: "default",
+          });
+          form.setValue("subcategory_id", ""); // Clear if no category selected
+        }
+      } else {
+        form.setValue("subcategory_id", ""); // Clear if AI didn't suggest one
+      }
+
+      dismiss(loadingToastId.id);
       toast({
         title: "AI Generation Complete!",
-        description: "Explanation and difficulty have been generated. Please review.",
+        description: "Explanation, difficulty, and subcategory (if matched) have been generated. Please review.",
         variant: "default",
       });
     } catch (error: any) {
-      dismiss(loadingToastId.id); // Corrected: pass loadingToastId.id
+      dismiss(loadingToastId.id);
       console.error("Error generating with AI:", error);
       toast({
         title: "AI Generation Failed",

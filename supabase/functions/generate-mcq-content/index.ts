@@ -25,7 +25,7 @@ async function generateExplanationAndDifficulty(
     apiKey: openaiApiKey,
   });
 
-  const prompt = `Given the following multiple-choice question, its options, and the correct answer, generate a detailed explanation for why the correct answer is right and why the other options are wrong. Also, assign a difficulty level (Easy, Medium, Hard) to the question.
+  const prompt = `Given the following multiple-choice question, its options, and the correct answer, generate a detailed explanation for why the correct answer is right and why the other options are wrong. Also, assign a difficulty level (Easy, Medium, Hard) to the question and suggest a relevant subcategory name.
 
 Question: ${question}
 Options:
@@ -35,7 +35,7 @@ C: ${options.C}
 D: ${options.D}
 Correct Answer: ${correct_answer}
 
-Please provide the output in a JSON format with two fields: "explanation_text" (string) and "difficulty" (string, one of "Easy", "Medium", "Hard").
+Please provide the output in a JSON format with three fields: "explanation_text" (string), "difficulty" (string, one of "Easy", "Medium", "Hard"), and "suggested_subcategory_name" (string, e.g., "Cell Biology", "Anatomy", "Pharmacology").
 IMPORTANT: Only return the JSON object, no other text or markdown.`;
 
   console.log('OpenAI Prompt:', prompt); // Log the prompt being sent to OpenAI
@@ -59,6 +59,7 @@ IMPORTANT: Only return the JSON object, no other text or markdown.`;
     return {
       explanation_text: parsedContent.explanation_text,
       difficulty: parsedContent.difficulty,
+      suggested_subcategory_name: parsedContent.suggested_subcategory_name || null, // Include suggested subcategory
     };
   } catch (error) {
     console.error('Failed to generate content with OpenAI AI:', error);

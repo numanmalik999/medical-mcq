@@ -1,7 +1,7 @@
 // @ts-ignore
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
-import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.14.1'; // Using a specific version for stability
+import OpenAI from 'https://esm.sh/openai@4.52.0'; // Using a specific version for stability
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,17 +14,16 @@ async function generateExplanationAndDifficulty(
   correct_answer: 'A' | 'B' | 'C' | 'D'
 ) {
   // @ts-ignore // Ignore the Deno global type error
-  const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
-  if (!geminiApiKey) {
-    console.error('GEMINI_API_KEY is not set in environment variables.');
-    throw new Error('Gemini API key is missing. Please configure it in Supabase secrets.');
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiApiKey) {
+    console.error('OPENAI_API_KEY is not set in environment variables.');
+    throw new Error('OpenAI API key is missing. Please configure it in Supabase secrets.');
   }
 
-  // Initialize genAI and model *inside* the function, so it only runs when needed
-  // @ts-ignore // Ignore the Deno global type error
-  const genAI = new GoogleGenerativeAI(geminiApiKey);
-  // Changed model from 'gemini-1.5-flash' to 'gemini-1.0-pro'
-  const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
+  // Initialize OpenAI client
+  const openai = new OpenAI({
+    apiKey: openaiApiKey,
+  });
 
   const prompt = `Given the following multiple-choice question, its options, and the correct answer, generate a detailed explanation for why the correct answer is right and why the other options are wrong. Also, assign a difficulty level (Easy, Medium, Hard) to the question.
 
@@ -39,26 +38,31 @@ Correct Answer: ${correct_answer}
 Please provide the output in a JSON format with two fields: "explanation_text" (string) and "difficulty" (string, one of "Easy", "Medium", "Hard").
 IMPORTANT: Only return the JSON object, no other text or markdown.`;
 
-  console.log('Gemini Prompt:', prompt); // Log the prompt being sent to Gemini
+  console.log('OpenAI Prompt:', prompt); // Log the prompt being sent to OpenAI
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text(); // Gemini often returns raw text, which we expect to be JSON
-    console.log('Gemini Raw Response Text:', text); // Log the raw response from Gemini
+    const chatCompletion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo", // Using a widely available and capable model
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" }, // Request JSON output
+      temperature: 0.7, // Adjust for creativity vs. consistency
+    });
 
-    if (!text) {
-      throw new Error('Gemini AI did not return any content.');
+    const responseContent = chatCompletion.choices[0].message.content;
+    console.log('OpenAI Raw Response Content:', responseContent); // Log the raw response from OpenAI
+
+    if (!responseContent) {
+      throw new Error('OpenAI AI did not return any content.');
     }
 
-    const parsedContent = JSON.parse(text);
+    const parsedContent = JSON.parse(responseContent);
     return {
       explanation_text: parsedContent.explanation_text,
       difficulty: parsedContent.difficulty,
     };
   } catch (error) {
-    console.error('Failed to generate content with Gemini AI:', error);
-    throw new Error(`Gemini AI generation failed: ${(error as Error).message}`);
+    console.error('Failed to generate content with OpenAI AI:', error);
+    throw new Error(`OpenAI AI generation failed: ${(error as Error).message}`);
   }
 }
 

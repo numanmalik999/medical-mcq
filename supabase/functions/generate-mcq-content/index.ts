@@ -23,8 +23,8 @@ async function generateExplanationAndDifficulty(
   // Initialize genAI and model *inside* the function, so it only runs when needed
   // @ts-ignore // Ignore the Deno global type error
   const genAI = new GoogleGenerativeAI(geminiApiKey);
-  // Changed model from 'gemini-pro' to 'gemini-1.5-flash'
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // Changed model from 'gemini-1.5-flash' to 'gemini-1.0-pro'
+  const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
 
   const prompt = `Given the following multiple-choice question, its options, and the correct answer, generate a detailed explanation for why the correct answer is right and why the other options are wrong. Also, assign a difficulty level (Easy, Medium, Hard) to the question.
 

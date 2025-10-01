@@ -21,6 +21,7 @@ async function generateExplanationAndDifficulty(
   }
 
   // Initialize genAI and model *inside* the function, so it only runs when needed
+  // This prevents blocking the OPTIONS preflight request.
   // @ts-ignore // Ignore the Deno global type error
   const genAI = new GoogleGenerativeAI(geminiApiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-pro" });
@@ -60,6 +61,7 @@ IMPORTANT: Only return the JSON object, no other text or markdown.`;
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
+    // Handle CORS preflight requests immediately without AI initialization
     return new Response(null, { headers: corsHeaders });
   }
 

@@ -1,6 +1,4 @@
 // @ts-ignore
-/// <reference lib="deno.ns" />
-// @ts-ignore
 import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.14.1'; // Using a specific version for stability
 
 // @ts-ignore // Ignore the Deno global type error

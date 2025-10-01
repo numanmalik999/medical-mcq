@@ -1,7 +1,7 @@
 // @ts-ignore
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
-import { generateExplanationAndDifficulty } from './gemini-client.ts'; // Updated import path to Gemini client
+import { generateExplanationAndDifficulty } from './gemini-client.ts'; // Explicitly added .ts extension
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

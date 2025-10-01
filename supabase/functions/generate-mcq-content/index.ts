@@ -21,7 +21,6 @@ async function generateExplanationAndDifficulty(
   }
 
   // Initialize genAI and model *inside* the function, so it only runs when needed
-  // This prevents blocking the OPTIONS preflight request.
   // @ts-ignore // Ignore the Deno global type error
   const genAI = new GoogleGenerativeAI(geminiApiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-pro" });
@@ -39,10 +38,13 @@ Correct Answer: ${correct_answer}
 Please provide the output in a JSON format with two fields: "explanation_text" (string) and "difficulty" (string, one of "Easy", "Medium", "Hard").
 IMPORTANT: Only return the JSON object, no other text or markdown.`;
 
+  console.log('Gemini Prompt:', prompt); // Log the prompt being sent to Gemini
+
   try {
     const result = await model.generateContent(prompt);
     const response = result.response;
     const text = response.text(); // Gemini often returns raw text, which we expect to be JSON
+    console.log('Gemini Raw Response Text:', text); // Log the raw response from Gemini
 
     if (!text) {
       throw new Error('Gemini AI did not return any content.');
@@ -61,12 +63,14 @@ IMPORTANT: Only return the JSON object, no other text or markdown.`;
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    // Handle CORS preflight requests immediately without AI initialization
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { question, options, correct_answer } = await req.json();
+    const requestBody = await req.json();
+    console.log('Incoming Request Body:', requestBody); // Log the incoming request body
+
+    const { question, options, correct_answer } = requestBody;
 
     if (!question || !options || !correct_answer) {
       return new Response(JSON.stringify({ error: 'Missing required fields: question, options, or correct_answer.' }), {

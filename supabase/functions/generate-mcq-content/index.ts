@@ -1,7 +1,7 @@
 // @ts-ignore
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
-import { generateExplanationAndDifficulty } from './openai-client.ts'; // Updated import path to be local
+import { generateExplanationAndDifficulty } from './gemini-client.ts'; // Updated import path to Gemini client
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

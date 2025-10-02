@@ -56,6 +56,7 @@ const ManageSubmittedMcqsPage = () => {
     const { data, error } = await supabase
       .from('user_submitted_mcqs')
       .select('*')
+      .eq('status', 'pending') // Only fetch MCQs with 'pending' status
       .order('created_at', { ascending: false });
 
     if (error) {

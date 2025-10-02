@@ -11,8 +11,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw } from 'lucide-react'; // Import icons
-import { useNavigate } from 'react-router-dom'; // Removed Link import
+import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText } from 'lucide-react'; // Import icons
+import { useNavigate } from 'react-router-dom';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 interface MCQ {
   id: string;
@@ -26,7 +28,7 @@ interface MCQ {
   category_id: string | null;
   subcategory_id: string | null;
   difficulty: string | null;
-  is_trial_mcq: boolean | null; // Ensure this is included
+  is_trial_mcq: boolean | null;
 }
 
 interface MCQExplanation {
@@ -39,7 +41,7 @@ interface CategoryStat {
   id: string;
   name: string;
   total_mcqs: number;
-  total_trial_mcqs: number; // New field for trial MCQs count
+  total_trial_mcqs: number;
   user_attempts: number;
   user_correct: number;
   user_incorrect: number;
@@ -52,7 +54,7 @@ interface Subcategory {
   name: string;
 }
 
-const TRIAL_MCQ_LIMIT = 10; // Define a limit for trial questions
+const TRIAL_MCQ_LIMIT = 10;
 
 const QuizPage = () => {
   const { user, isLoading: isSessionLoading } = useSession();
@@ -77,10 +79,14 @@ const QuizPage = () => {
   const [score, setScore] = useState(0);
   const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
 
-  const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false); // New state for subscription prompt
-  const [isTrialActiveSession, setIsTrialActiveSession] = useState(false); // New state to track if current session is a trial
+  const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
+  const [isTrialActiveSession, setIsTrialActiveSession] = useState(false);
 
-  // Memoized function to fetch a single explanation
+  // State for feedback dialog
+  const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+
   const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
     if (explanations.has(explanationId)) {
       return explanations.get(explanationId)!;
@@ -110,14 +116,12 @@ const QuizPage = () => {
     if (!isSessionLoading) {
       if (user) {
         fetchQuizOverview();
-        // Determine initial trial status
         if (!user.has_active_subscription && !user.trial_taken) {
           setIsTrialActiveSession(true);
         } else {
           setIsTrialActiveSession(false);
         }
       } else {
-        // Not logged in, maybe redirect or show login prompt
         setIsLoading(false);
       }
     }
@@ -149,7 +153,6 @@ const QuizPage = () => {
     const categoriesWithStats: CategoryStat[] = [];
 
     for (const category of categoriesData || []) {
-      // Fetch total MCQ count for this category
       const { count: mcqCount, error: mcqCountError } = await supabase
         .from('mcqs')
         .select('id', { count: 'exact' })
@@ -159,7 +162,6 @@ const QuizPage = () => {
         console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
       }
 
-      // Fetch trial MCQ count for this category
       const { count: trialMcqCount, error: trialMcqCountError } = await supabase
         .from('mcqs')
         .select('id', { count: 'exact' })
@@ -194,7 +196,7 @@ const QuizPage = () => {
       categoriesWithStats.push({
         ...category,
         total_mcqs: mcqCount || 0,
-        total_trial_mcqs: trialMcqCount || 0, // Store trial MCQ count
+        total_trial_mcqs: trialMcqCount || 0,
         user_attempts: totalAttempts,
         user_correct: correctAttempts,
         user_incorrect: incorrectAttempts,
@@ -213,19 +215,16 @@ const QuizPage = () => {
       return;
     }
 
-    // Check subscription/trial status
     const isSubscribed = user.has_active_subscription;
     const hasTakenTrial = user.trial_taken;
 
     if (!isSubscribed) {
       if (hasTakenTrial) {
-        setShowSubscriptionPrompt(true); // User has taken trial, needs to subscribe
+        setShowSubscriptionPrompt(true);
         return;
       }
-      // User has not taken trial, this will be their trial session
       setIsTrialActiveSession(true);
     } else {
-      // User has active subscription, full access
       setIsTrialActiveSession(false);
     }
 
@@ -249,7 +248,6 @@ const QuizPage = () => {
       query = query.eq('subcategory_id', subcategoryId);
     }
 
-    // Apply trial filter if user is not subscribed and is in trial mode
     if (isTrialActiveSession) {
       query = query.eq('is_trial_mcq', true);
     }
@@ -269,12 +267,10 @@ const QuizPage = () => {
         setIsLoading(false);
         return;
       }
-      // Shuffle and take a reasonable number, e.g., 10 for a quick quiz
       mcqsToLoad = data.sort(() => 0.5 - Math.random()).slice(0, Math.min(data.length, isTrialActiveSession ? TRIAL_MCQ_LIMIT : data.length));
     } else if (mode === 'incorrect') {
-      // Incorrect mode is only for subscribed users
       if (isTrialActiveSession) {
-        toast({ title: "Trial Mode", description: "You can only attempt random trial questions during your free trial.", variant: "default" }); // Changed variant to "default"
+        toast({ title: "Trial Mode", description: "You can only attempt random trial questions during your free trial.", variant: "default" });
         setIsLoading(false);
         return;
       }
@@ -325,7 +321,6 @@ const QuizPage = () => {
       setSelectedAnswer(userAnswers.get(mcqsToLoad[0].id) || null);
     }
 
-    // If this is a trial session and user hasn't taken trial yet, mark trial_taken
     if (isTrialActiveSession && !hasTakenTrial) {
       const { error: updateError } = await supabase
         .from('profiles')
@@ -335,9 +330,8 @@ const QuizPage = () => {
         console.error('Error marking trial_taken:', updateError);
         toast({ title: "Error", description: "Failed to update trial status.", variant: "destructive" });
       } else {
-        // Optimistically update user object in session context
         if (user) user.trial_taken = true;
-        toast({ title: "Trial Started!", description: `You have started your free trial. Enjoy ${TRIAL_MCQ_LIMIT} trial questions!`, variant: "default" }); // Changed variant to "default"
+        toast({ title: "Trial Started!", description: `You have started your free trial. Enjoy ${TRIAL_MCQ_LIMIT} trial questions!`, variant: "default" });
       }
     }
   };
@@ -363,7 +357,7 @@ const QuizPage = () => {
       toast({ title: "Error", description: `Failed to reset progress: ${error.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Quiz progress reset successfully." });
-      fetchQuizOverview(); // Refresh stats
+      fetchQuizOverview();
     }
     setIsLoading(false);
   };
@@ -372,10 +366,10 @@ const QuizPage = () => {
 
   const handleOptionSelect = useCallback((value: string) => {
     if (currentMcq) {
-      setSelectedAnswer(value); // Update selected answer for current question
+      setSelectedAnswer(value);
       setUserAnswers((prev) => new Map(prev).set(currentMcq.id, value));
-      setFeedback(null); // Clear feedback when a new option is selected
-      setShowExplanation(false); // Hide explanation
+      setFeedback(null);
+      setShowExplanation(false);
     }
   }, [currentMcq]);
 
@@ -419,15 +413,14 @@ const QuizPage = () => {
     } finally {
       setIsSubmittingAnswer(false);
       if (currentMcq.explanation_id) {
-        fetchExplanation(currentMcq.explanation_id); // Pre-fetch explanation for review
+        fetchExplanation(currentMcq.explanation_id);
       }
     }
   };
 
   const handleNextQuestion = () => {
-    // If in trial mode and about to exceed limit, force submit
     if (isTrialActiveSession && currentQuestionIndex + 1 >= TRIAL_MCQ_LIMIT) {
-      toast({ title: "Trial Limit Reached", description: "You have reached the limit for trial questions. Please subscribe to continue.", variant: "default" }); // Changed variant to "default"
+      toast({ title: "Trial Limit Reached", description: "You have reached the limit for trial questions. Please subscribe to continue.", variant: "default" });
       submitFullQuiz();
       return;
     }
@@ -435,11 +428,10 @@ const QuizPage = () => {
     if (currentQuestionIndex < quizQuestions.length - 1) {
       const nextQuestion = quizQuestions[currentQuestionIndex + 1];
       setCurrentQuestionIndex((prev) => prev + 1);
-      setSelectedAnswer(userAnswers.get(nextQuestion?.id || '') || null); // Load saved answer for next question
+      setSelectedAnswer(userAnswers.get(nextQuestion?.id || '') || null);
       setFeedback(null);
       setShowExplanation(false);
     } else {
-      // This is the last question, submit the test
       submitFullQuiz();
     }
   };
@@ -448,7 +440,7 @@ const QuizPage = () => {
     if (currentQuestionIndex > 0) {
       const prevQuestion = quizQuestions[currentQuestionIndex - 1];
       setCurrentQuestionIndex((prev) => prev - 1);
-      setSelectedAnswer(userAnswers.get(prevQuestion?.id || '') || null); // Load saved answer for previous question
+      setSelectedAnswer(userAnswers.get(prevQuestion?.id || '') || null);
       setFeedback(null);
       setShowExplanation(false);
     }
@@ -475,9 +467,56 @@ const QuizPage = () => {
     }
 
     setScore(correctCount);
-    await Promise.all(explanationPromises); // Ensure all explanations are fetched
+    await Promise.all(explanationPromises);
     setShowResults(true);
     setIsLoading(false);
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!user || !currentMcq || !feedbackText.trim()) {
+      toast({ title: "Error", description: "Feedback cannot be empty.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmittingFeedback(true);
+    try {
+      const { error: insertError } = await supabase.from('mcq_feedback').insert({
+        user_id: user.id,
+        mcq_id: currentMcq.id,
+        feedback_text: feedbackText.trim(),
+      });
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      // Send email notification to admin
+      const { error: emailError } = await supabase.functions.invoke('send-email', {
+        body: {
+          to: 'ADMIN_EMAIL', // This will be replaced by the actual ADMIN_EMAIL from env in the Edge Function
+          subject: `New MCQ Feedback from ${user.email}`,
+          body: `User ${user.email} (${user.id}) submitted feedback for MCQ ID: ${currentMcq.id}.<br/><br/>
+                 Question: ${currentMcq.question_text}<br/><br/>
+                 Feedback: ${feedbackText.trim()}<br/><br/>
+                 Review in admin panel (future feature).`,
+        },
+      });
+
+      if (emailError) {
+        console.error('Error sending feedback email:', emailError);
+        toast({ title: "Warning", description: "Feedback submitted, but failed to send email notification.", variant: "default" });
+      } else {
+        toast({ title: "Feedback Submitted!", description: "Thank you for your notes. We will review them shortly.", variant: "default" });
+      }
+
+      setFeedbackText('');
+      setIsFeedbackDialogOpen(false);
+    } catch (error: any) {
+      console.error("Error submitting feedback:", error);
+      toast({ title: "Error", description: `Failed to submit feedback: ${error.message}`, variant: "destructive" });
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
   };
 
   const filteredCategories = categoryStats.filter(cat =>
@@ -493,7 +532,6 @@ const QuizPage = () => {
   }
 
   if (!user) {
-    // If not logged in, redirect to login page
     navigate('/login');
     return null;
   }
@@ -594,7 +632,7 @@ const QuizPage = () => {
                         onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'incorrect')}
                         className="w-full"
                         variant="secondary"
-                        disabled={cat.user_incorrect === 0 || !user.has_active_subscription} // Incorrect mode only for subscribed users
+                        disabled={cat.user_incorrect === 0 || !user.has_active_subscription}
                       >
                         Attempt Incorrect ({cat.user_incorrect})
                       </Button>
@@ -745,7 +783,7 @@ const QuizPage = () => {
             onValueChange={handleOptionSelect}
             value={selectedAnswer || ""}
             className="space-y-2"
-            disabled={showExplanation} // Disable radio group after submission
+            disabled={showExplanation}
           >
             {['A', 'B', 'C', 'D'].map((optionKey) => {
               const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as keyof MCQ];
@@ -772,6 +810,13 @@ const QuizPage = () => {
               {explanations.get(currentMcq.explanation_id || '')?.image_url && (
                 <img src={explanations.get(currentMcq.explanation_id || '')?.image_url || ''} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
               )}
+              <Button
+                variant="outline"
+                className="mt-4 w-full"
+                onClick={() => setIsFeedbackDialogOpen(true)}
+              >
+                <MessageSquareText className="h-4 w-4 mr-2" /> Add Notes or Feedback
+              </Button>
             </div>
           )}
         </CardContent>
@@ -791,6 +836,33 @@ const QuizPage = () => {
         </CardFooter>
       </Card>
       <MadeWithDyad />
+
+      {/* Feedback Dialog */}
+      <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Notes or Feedback for this MCQ</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Your feedback helps us improve the questions and explanations.
+            </p>
+            <Textarea
+              placeholder="Write your notes or feedback here..."
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              rows={5}
+              disabled={isSubmittingFeedback}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)} disabled={isSubmittingFeedback}>Cancel</Button>
+            <Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()}>
+              {isSubmittingFeedback ? "Submitting..." : "Submit Feedback"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,0 +1,61 @@
+// @ts-ignore
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+// @ts-ignore
+import { Resend } from 'https://esm.sh/resend@1.1.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { to, subject, body } = await req.json();
+
+    // @ts-ignore
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    // @ts-ignore
+    const adminEmail = Deno.env.get('ADMIN_EMAIL');
+
+    if (!resendApiKey || !adminEmail) {
+      throw new Error('RESEND_API_KEY or ADMIN_EMAIL environment variables are not set.');
+    }
+
+    if (!to || !subject || !body) {
+      return new Response(JSON.stringify({ error: 'Missing required fields: to, subject, or body.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const resend = new Resend(resendApiKey);
+
+    const { data, error } = await resend.emails.send({
+      from: `Admin Notifications <${adminEmail}>`, // Use adminEmail as the sender
+      to: [to],
+      subject: subject,
+      html: body,
+    });
+
+    if (error) {
+      console.error('Resend email error:', error);
+      throw new Error(`Failed to send email: ${error.message}`);
+    }
+
+    return new Response(JSON.stringify({ message: 'Email sent successfully', data }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Error in send-email Edge Function:', error);
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});

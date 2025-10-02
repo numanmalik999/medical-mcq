@@ -5,11 +5,11 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, User, BookOpenText, LogOut, ClipboardCheck, CreditCard } from 'lucide-react'; // Import CreditCard icon
+import { MenuIcon, LayoutDashboard, User, BookOpenText, LogOut, ClipboardCheck, CreditCard, FilePlus } from 'lucide-react'; // Import FilePlus icon
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useSession } from './SessionContextProvider'; // Import useSession
+import { useSession } from './SessionContextProvider';
 
 interface NavLinkProps {
   to: string;
@@ -17,7 +17,7 @@ interface NavLinkProps {
   label: string;
   isMobile?: boolean;
   onLinkClick?: () => void;
-  disabled?: boolean; // Added disabled prop
+  disabled?: boolean;
 }
 
 const NavLink = ({ to, icon, label, isMobile, onLinkClick, disabled }: NavLinkProps) => {
@@ -35,7 +35,7 @@ const NavLink = ({ to, icon, label, isMobile, onLinkClick, disabled }: NavLinkPr
             : "text-foreground hover:bg-accent hover:text-accent-foreground",
           isMobile && "text-base py-3"
         )}
-        disabled={disabled} // Apply disabled prop to button
+        disabled={disabled}
       >
         {icon}
         <span>{label}</span>
@@ -48,7 +48,7 @@ const UserSidebar = () => {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
   const { toast } = useToast();
-  const { user } = useSession(); // Get user from session
+  const { user } = useSession();
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -66,7 +66,6 @@ const UserSidebar = () => {
         variant: "destructive",
       });
     }
-    // SessionContextProvider will handle redirection to /login
     if (isMobile) {
       setIsOpen(false);
     }
@@ -80,9 +79,10 @@ const UserSidebar = () => {
       to: "/user/take-test", 
       icon: <ClipboardCheck className="h-4 w-4" />, 
       label: "Take A Test",
-      disabled: !user?.has_active_subscription // Disable if no active subscription
+      disabled: !user?.has_active_subscription
     },
-    { to: "/user/subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "My Subscriptions" }, // Future feature
+    { to: "/user/subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "My Subscriptions" },
+    { to: "/user/submit-mcq", icon: <FilePlus className="h-4 w-4" />, label: "Submit MCQ" }, // New link
   ];
 
   if (isMobile) {

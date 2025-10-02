@@ -15,7 +15,8 @@ import ManageCategoriesPage from "./pages/ManageCategoriesPage";
 import ManageSubscriptionsPage from "./pages/ManageSubscriptionsPage";
 import ManageUsersPage from "./pages/ManageUsersPage";
 import UserSubscriptionsPage from "./pages/UserSubscriptionsPage";
-import BulkUploadMcqsPage from "./pages/BulkUploadMcqsPage"; // Import new page
+import BulkUploadMcqsPage from "./pages/BulkUploadMcqsPage";
+import SubmitMcqPage from "./pages/SubmitMcqPage"; // Import new page
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import AdminLayout from "./components/AdminLayout";
 import UserLayout from "./components/UserLayout";
@@ -47,7 +48,7 @@ const App = () => (
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="dashboard" element={<AdminDashboardPage />} />
                 <Route path="add-mcq" element={<AddMcqPage />} />
-                <Route path="bulk-upload-mcqs" element={<BulkUploadMcqsPage />} /> {/* New route */}
+                <Route path="bulk-upload-mcqs" element={<BulkUploadMcqsPage />} />
                 <Route path="manage-mcqs" element={<ManageMcqsPage />} />
                 <Route path="manage-categories" element={<ManageCategoriesPage />} />
                 <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
@@ -63,6 +64,7 @@ const App = () => (
                 <Route path="profile" element={<UserProfilePage />} />
                 <Route path="take-test" element={<TakeTestPage />} />
                 <Route path="subscriptions" element={<UserSubscriptionsPage />} />
+                <Route path="submit-mcq" element={<SubmitMcqPage />} /> {/* New route */}
               </Route>
             </Route>
 

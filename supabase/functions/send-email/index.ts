@@ -34,9 +34,12 @@ serve(async (req: Request) => {
 
     const resend = new Resend(resendApiKey);
 
+    // Determine the actual recipient email
+    const recipientEmail = (to === 'ADMIN_EMAIL') ? adminEmail : to;
+
     const { data, error } = await resend.emails.send({
       from: `Admin Notifications <${adminEmail}>`, // Use adminEmail as the sender
-      to: [to],
+      to: [recipientEmail], // Use the resolved recipient email
       subject: subject,
       html: body,
     });

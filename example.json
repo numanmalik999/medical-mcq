@@ -1,0 +1,19 @@
+[
+  {
+    "question": "Your question text here...",
+    "options": {
+      "A": "Option A text",
+      "B": "Option B text",
+      "C": "Option C text",
+      "D": "Option D text"
+    },
+    "correct_answer": "A",
+    "explanation": "Detailed explanation for the correct answer.",
+    "image_url": "https://example.com/image.jpg", // Optional
+    "category_name": "Biology", // Optional: If not provided, you'll need to assign manually later
+    "subcategory_name": "Cell Biology", // Optional: If not provided, you'll need to assign manually later
+    "difficulty": "Easy", // Optional: "Easy", "Medium", "Hard"
+    "is_trial_mcq": true // Optional: defaults to false
+  },
+  // ... more MCQs
+]

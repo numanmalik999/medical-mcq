@@ -245,7 +245,10 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
         toast({ title: "Success!", description: "MCQ approved and added to main bank. User notified.", variant: "default" });
       }
 
-      onSave();
+      // Add a small delay before calling onSave to allow database changes to propagate
+      setTimeout(() => {
+        onSave();
+      }, 500);
       onOpenChange(false);
     } catch (error: any) {
       console.error("Error approving MCQ:", error);
@@ -289,7 +292,10 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
         toast({ title: "Success!", description: "MCQ rejected. User notified.", variant: "default" });
       }
 
-      onSave();
+      // Add a small delay before calling onSave to allow database changes to propagate
+      setTimeout(() => {
+        onSave();
+      }, 500);
       onOpenChange(false);
     } catch (error: any) {
       console.error("Error rejecting MCQ:", error);
@@ -327,7 +333,10 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
       if (updateError) throw updateError;
 
       toast({ title: "Success!", description: "Submitted MCQ edits saved.", variant: "default" });
-      onSave();
+      // Add a small delay before calling onSave to allow database changes to propagate
+      setTimeout(() => {
+        onSave(); // Refresh data in parent component
+      }, 500); // 500ms delay
       onOpenChange(false);
     } catch (error: any) {
       console.error("Error saving edits to submitted MCQ:", error);

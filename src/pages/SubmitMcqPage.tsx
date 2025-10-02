@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSession } from '@/components/SessionContextProvider';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Save, Trash2 } from 'lucide-react'; // Import Save and Trash2 icons
 
 const formSchema = z.object({
   question_text: z.string().min(1, "Question text is required."),
@@ -30,6 +30,8 @@ const formSchema = z.object({
   suggested_subcategory_name: z.string().optional().or(z.literal('')),
   suggested_difficulty: z.string().optional().or(z.literal('')),
 });
+
+const LOCAL_STORAGE_KEY = 'submit_mcq_draft';
 
 const SubmitMcqPage = () => {
   const { user } = useSession();
@@ -52,6 +54,45 @@ const SubmitMcqPage = () => {
       suggested_difficulty: "",
     },
   });
+
+  // Load draft from localStorage on component mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        form.reset(draft);
+        toast({
+          title: "Draft Loaded",
+          description: "Your previous draft has been loaded.",
+          duration: 3000,
+        });
+      } catch (e) {
+        console.error("Failed to parse saved draft:", e);
+        localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear corrupted draft
+      }
+    }
+  }, [form, toast]);
+
+  // Save form data to localStorage on changes
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(value));
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
+  const clearDraft = () => {
+    if (window.confirm("Are you sure you want to clear your saved draft? This action cannot be undone.")) {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      form.reset(); // Reset form to default values
+      toast({
+        title: "Draft Cleared",
+        description: "Your saved draft has been removed.",
+        duration: 3000,
+      });
+    }
+  };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user) {
@@ -109,6 +150,7 @@ const SubmitMcqPage = () => {
         });
       }
       form.reset();
+      localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear draft after successful submission
     } catch (error: any) {
       console.error("Error submitting MCQ:", error);
       toast({
@@ -268,15 +310,20 @@ const SubmitMcqPage = () => {
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...
-                  </>
-                ) : (
-                  "Submit MCQ for Review"
-                )}
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button type="submit" className="w-full sm:flex-1" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...
+                    </>
+                  ) : (
+                    "Submit MCQ for Review"
+                  )}
+                </Button>
+                <Button type="button" variant="outline" onClick={clearDraft} className="w-full sm:flex-1">
+                  <Trash2 className="mr-2 h-4 w-4" /> Clear Saved Draft
+                </Button>
+              </div>
             </form>
           </Form>
         </CardContent>

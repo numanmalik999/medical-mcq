@@ -15,7 +15,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSession } from '@/components/SessionContextProvider';
-import { Loader2, Save, Trash2 } from 'lucide-react'; // Import Save and Trash2 icons
+import { Loader2, Trash2 } from 'lucide-react'; // Removed Save icon
 
 const formSchema = z.object({
   question_text: z.string().min(1, "Question text is required."),

@@ -11,10 +11,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText } from 'lucide-react'; // Import icons
+import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import QuizNavigator from '@/components/QuizNavigator'; // Import QuizNavigator
 
 interface MCQ {
   id: string;
@@ -446,6 +447,16 @@ const QuizPage = () => {
     }
   };
 
+  const goToQuestion = useCallback((index: number) => {
+    if (index >= 0 && index < quizQuestions.length) {
+      setCurrentQuestionIndex(index);
+      const targetMcq = quizQuestions[index];
+      setSelectedAnswer(userAnswers.get(targetMcq.id) || null);
+      setFeedback(null);
+      setShowExplanation(false);
+    }
+  }, [quizQuestions, userAnswers]);
+
   const submitFullQuiz = async () => {
     if (!user) return;
 
@@ -683,68 +694,78 @@ const QuizPage = () => {
   if (showResults) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-        <Card className="w-full max-w-4xl">
-          <CardHeader>
-            <CardTitle className="text-3xl">Quiz Results</CardTitle>
-            <CardDescription>Review your performance on this quiz session.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="text-center text-2xl font-bold">
-              Your Score: {score} / {quizQuestions.length}
-            </div>
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto p-2 border rounded-md">
-              {quizQuestions.map((mcq, index) => {
-                const userAnswer = userAnswers.get(mcq.id);
-                const isCorrect = userAnswer === mcq.correct_answer;
-                const explanation = explanations.get(mcq.explanation_id || '');
+        <div className="flex w-full max-w-6xl"> {/* Added flex container */}
+          <QuizNavigator
+            mcqs={quizQuestions}
+            userAnswers={userAnswers}
+            currentQuestionIndex={currentQuestionIndex}
+            goToQuestion={goToQuestion}
+            showResults={true}
+            score={score}
+          />
+          <Card className="flex-1">
+            <CardHeader>
+              <CardTitle className="text-3xl">Quiz Results</CardTitle>
+              <CardDescription>Review your performance on this quiz session.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="text-center text-2xl font-bold">
+                Your Score: {score} / {quizQuestions.length}
+              </div>
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto p-2 border rounded-md">
+                {quizQuestions.map((mcq, index) => {
+                  const userAnswer = userAnswers.get(mcq.id);
+                  const isCorrect = userAnswer === mcq.correct_answer;
+                  const explanation = explanations.get(mcq.explanation_id || '');
 
-                return (
-                  <div key={mcq.id} className="border-b pb-4 mb-4 last:border-b-0">
-                    <p className="font-semibold text-lg">
-                      {index + 1}. {mcq.question_text}
-                    </p>
-                    <ul className="list-disc list-inside ml-4 mt-2">
-                      {['A', 'B', 'C', 'D'].map((optionKey) => {
-                        const optionText = mcq[`option_${optionKey.toLowerCase()}` as keyof MCQ];
-                        const isSelected = userAnswer === optionKey;
-                        const isCorrectOption = mcq.correct_answer === optionKey;
+                  return (
+                    <div key={mcq.id} className="border-b pb-4 mb-4 last:border-b-0">
+                      <p className="font-semibold text-lg">
+                        {index + 1}. {mcq.question_text}
+                      </p>
+                      <ul className="list-disc list-inside ml-4 mt-2">
+                        {['A', 'B', 'C', 'D'].map((optionKey) => {
+                          const optionText = mcq[`option_${optionKey.toLowerCase()}` as keyof MCQ];
+                          const isSelected = userAnswer === optionKey;
+                          const isCorrectOption = mcq.correct_answer === optionKey;
 
-                        let className = "";
-                        if (isSelected && isCorrect) {
-                          className = "text-green-600 font-medium";
-                        } else if (isSelected && !isCorrect) {
-                          className = "text-red-600 font-medium";
-                        } else if (isCorrectOption) {
-                          className = "text-green-600 font-medium";
-                        }
+                          let className = "";
+                          if (isSelected && isCorrect) {
+                            className = "text-green-600 font-medium";
+                          } else if (isSelected && !isCorrect) {
+                            className = "text-red-600 font-medium";
+                          } else if (isCorrectOption) {
+                            className = "text-green-600 font-medium";
+                          }
 
-                        return (
-                          <li key={optionKey} className={className}>
-                            {optionKey}. {optionText}
-                            {isSelected && !isCorrect && <span className="ml-2">(Your Answer)</span>}
-                            {isCorrectOption && <span className="ml-2">(Correct Answer)</span>}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    {explanation && (
-                      <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md text-sm">
-                        <h4 className="font-semibold">Explanation:</h4>
-                        <p>{explanation.explanation_text}</p>
-                        {explanation.image_url && (
-                          <img src={explanation.image_url} alt="Explanation" className="mt-2 max-w-full h-auto rounded-md" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-center">
-            <Button onClick={() => { setShowCategorySelection(true); fetchQuizOverview(); }}>Back to Categories</Button>
-          </CardFooter>
-        </Card>
+                          return (
+                            <li key={optionKey} className={className}>
+                              {optionKey}. {optionText}
+                              {isSelected && !isCorrect && <span className="ml-2">(Your Answer)</span>}
+                              {isCorrectOption && <span className="ml-2">(Correct Answer)</span>}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      {explanation && (
+                        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md text-sm">
+                          <h4 className="font-semibold">Explanation:</h4>
+                          <p>{explanation.explanation_text}</p>
+                          {explanation.image_url && (
+                            <img src={explanation.image_url} alt="Explanation" className="mt-2 max-w-full h-auto rounded-md" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-center">
+              <Button onClick={() => { setShowCategorySelection(true); fetchQuizOverview(); }}>Back to Categories</Button>
+            </CardFooter>
+          </Card>
+        </div>
         <MadeWithDyad />
       </div>
     );
@@ -763,78 +784,88 @@ const QuizPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
-          <CardTitle className="text-xl">Question {currentQuestionIndex + 1} / {quizQuestions.length}</CardTitle>
-          {isTrialActiveSession && (
-            <CardDescription className="text-sm text-blue-500 dark:text-blue-400">
-              Trial Mode ({currentQuestionIndex + 1} / {TRIAL_MCQ_LIMIT} questions)
-            </CardDescription>
-          )}
-          {currentMcq?.difficulty && (
-            <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
-              Difficulty: {currentMcq.difficulty}
-            </CardDescription>
-          )}
-        </CardHeader>
-        <CardContent>
-          <p className="text-lg font-semibold mb-4">{currentMcq?.question_text}</p>
-          <RadioGroup
-            onValueChange={handleOptionSelect}
-            value={selectedAnswer || ""}
-            className="space-y-2"
-            disabled={showExplanation}
-          >
-            {['A', 'B', 'C', 'D'].map((optionKey) => {
-              const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as keyof MCQ];
-              return (
-                <div key={optionKey} className="flex items-center space-x-2">
-                  <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
-                  <Label htmlFor={`option-${optionKey}`}>{`${optionKey}. ${optionText}`}</Label>
-                </div>
-              );
-            })}
-          </RadioGroup>
+      <div className="flex w-full max-w-6xl"> {/* Added flex container */}
+        <QuizNavigator
+          mcqs={quizQuestions}
+          userAnswers={userAnswers}
+          currentQuestionIndex={currentQuestionIndex}
+          goToQuestion={goToQuestion}
+          showResults={false} // Results not shown during active quiz
+          score={0} // Score not relevant during active quiz
+        />
+        <Card className="flex-1">
+          <CardHeader>
+            <CardTitle className="text-xl">Question {currentQuestionIndex + 1} / {quizQuestions.length}</CardTitle>
+            {isTrialActiveSession && (
+              <CardDescription className="text-sm text-blue-500 dark:text-blue-400">
+                Trial Mode ({currentQuestionIndex + 1} / {TRIAL_MCQ_LIMIT} questions)
+              </CardDescription>
+            )}
+            {currentMcq?.difficulty && (
+              <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
+                Difficulty: {currentMcq.difficulty}
+              </CardDescription>
+            )}
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold mb-4">{currentMcq?.question_text}</p>
+            <RadioGroup
+              onValueChange={handleOptionSelect}
+              value={selectedAnswer || ""}
+              className="space-y-2"
+              disabled={showExplanation}
+            >
+              {['A', 'B', 'C', 'D'].map((optionKey) => {
+                const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as keyof MCQ];
+                return (
+                  <div key={optionKey} className="flex items-center space-x-2">
+                    <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
+                    <Label htmlFor={`option-${optionKey}`}>{`${optionKey}. ${optionText}`}</Label>
+                  </div>
+                );
+              })}
+            </RadioGroup>
 
-          {feedback && (
-            <p className={`mt-4 text-lg font-semibold flex items-center gap-2 ${feedback.startsWith('Correct') ? 'text-green-600' : 'text-red-600'}`}>
-              {feedback.startsWith('Correct') ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-              {feedback}
-            </p>
-          )}
+            {feedback && (
+              <p className={`mt-4 text-lg font-semibold flex items-center gap-2 ${feedback.startsWith('Correct') ? 'text-green-600' : 'text-red-600'}`}>
+                {feedback.startsWith('Correct') ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+                {feedback}
+              </p>
+            )}
 
-          {showExplanation && explanations.has(currentMcq.explanation_id || '') && (
-            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
-              <h3 className="text-lg font-semibold mb-2">Explanation:</h3>
-              <p className="text-gray-800 dark:text-gray-200">{explanations.get(currentMcq.explanation_id || '')?.explanation_text}</p>
-              {explanations.get(currentMcq.explanation_id || '')?.image_url && (
-                <img src={explanations.get(currentMcq.explanation_id || '')?.image_url || ''} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
-              )}
-              <Button
-                variant="outline"
-                className="mt-4 w-full"
-                onClick={() => setIsFeedbackDialogOpen(true)}
-              >
-                <MessageSquareText className="h-4 w-4 mr-2" /> Add Notes or Feedback
+            {showExplanation && explanations.has(currentMcq.explanation_id || '') && (
+              <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+                <h3 className="text-lg font-semibold mb-2">Explanation:</h3>
+                <p className="text-gray-800 dark:text-gray-200">{explanations.get(currentMcq.explanation_id || '')?.explanation_text}</p>
+                {explanations.get(currentMcq.explanation_id || '')?.image_url && (
+                  <img src={explanations.get(currentMcq.explanation_id || '')?.image_url || ''} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
+                )}
+                <Button
+                  variant="outline"
+                  className="mt-4 w-full"
+                  onClick={() => setIsFeedbackDialogOpen(true)}
+                >
+                  <MessageSquareText className="h-4 w-4 mr-2" /> Add Notes or Feedback
+                </Button>
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="flex flex-col sm:flex-row justify-between gap-2">
+            <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0 || isSubmittingAnswer} variant="outline">
+              Previous
+            </Button>
+            {!showExplanation ? (
+              <Button onClick={handleSubmitAnswer} disabled={!isAnswered || isSubmittingAnswer}>
+                {isSubmittingAnswer ? "Submitting..." : "Submit Answer"}
               </Button>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row justify-between gap-2">
-          <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0 || isSubmittingAnswer} variant="outline">
-            Previous
-          </Button>
-          {!showExplanation ? (
-            <Button onClick={handleSubmitAnswer} disabled={!isAnswered || isSubmittingAnswer}>
-              {isSubmittingAnswer ? "Submitting..." : "Submit Answer"}
-            </Button>
-          ) : (
-            <Button onClick={handleNextQuestion} disabled={isSubmittingAnswer}>
-              {isLastQuestion ? "Submit Quiz" : "Next Question"}
-            </Button>
-          )}
-        </CardFooter>
-      </Card>
+            ) : (
+              <Button onClick={handleNextQuestion} disabled={isSubmittingAnswer}>
+                {isLastQuestion ? "Submit Quiz" : "Next Question"}
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
+      </div>
       <MadeWithDyad />
 
       {/* Feedback Dialog */}

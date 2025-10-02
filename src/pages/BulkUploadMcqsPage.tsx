@@ -7,10 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { showLoading, dismissToast, showError, showSuccess } from '@/utils/toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload, Download } from 'lucide-react'; // Import Download icon
 import { Input } from '@/components/ui/input';
-import * as XLSX from 'xlsx'; // Import xlsx library
-import { Separator } from '@/components/ui/separator'; // Import Separator
+import * as XLSX from 'xlsx';
+import { Separator } from '@/components/ui/separator';
 
 // Define the expected structure of an incoming MCQ object
 interface IncomingMcq {
@@ -38,6 +38,7 @@ const BulkUploadMcqsPage = () => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       setSelectedFile(event.target.files[0]);
+      setJsonData(''); // Clear JSON data if a file is selected
     } else {
       setSelectedFile(null);
     }
@@ -54,22 +55,46 @@ const BulkUploadMcqsPage = () => {
           const worksheet = workbook.Sheets[sheetName];
           const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-          const mcqs: IncomingMcq[] = json.map((row) => {
-            // Basic validation and mapping
+          if (json.length === 0) {
+            throw new Error("The spreadsheet is empty or contains no data rows.");
+          }
+
+          const mcqs: IncomingMcq[] = json.map((row, index) => {
+            const rowIndex = index + 2; // Account for 0-indexed array and 1-indexed spreadsheet + header row
+
             const question = row['Question'];
             const option_a = row['Option A'];
             const option_b = row['Option B'];
             const option_c = row['Option C'];
             const option_d = row['Option D'];
-            const correct_answer = row['Correct Answer']?.toUpperCase();
+            const correct_answer_raw = row['Correct Answer'];
             const explanation = row['Explanation'];
 
-            if (!question || !option_a || !option_b || !option_c || !option_d || !correct_answer || !explanation) {
-              throw new Error(`Missing required fields in row: ${JSON.stringify(row)}`);
+            // Validate required fields
+            if (!question) throw new Error(`Row ${rowIndex}: 'Question' is missing.`);
+            if (!option_a) throw new Error(`Row ${rowIndex}: 'Option A' is missing.`);
+            if (!option_b) throw new Error(`Row ${rowIndex}: 'Option B' is missing.`);
+            if (!option_c) throw new Error(`Row ${rowIndex}: 'Option C' is missing.`);
+            if (!option_d) throw new Error(`Row ${rowIndex}: 'Option D' is missing.`);
+            if (!correct_answer_raw) throw new Error(`Row ${rowIndex}: 'Correct Answer' is missing.`);
+            if (!explanation) throw new Error(`Row ${rowIndex}: 'Explanation' is missing.`);
+
+            const correct_answer = String(correct_answer_raw).toUpperCase();
+            if (!['A', 'B', 'C', 'D'].includes(correct_answer)) {
+              throw new Error(`Row ${rowIndex}: 'Correct Answer' must be A, B, C, or D. Found: "${correct_answer_raw}".`);
             }
 
-            if (!['A', 'B', 'C', 'D'].includes(correct_answer)) {
-              throw new Error(`Invalid correct answer in row: ${JSON.stringify(row)}. Must be A, B, C, or D.`);
+            let isTrialMcq: boolean | undefined = undefined;
+            const rawIsTrialMcq = row['Is Trial MCQ'];
+            if (typeof rawIsTrialMcq === 'boolean') {
+              isTrialMcq = rawIsTrialMcq;
+            } else if (typeof rawIsTrialMcq === 'string') {
+              const upperCaseValue = rawIsTrialMcq.toUpperCase();
+              if (upperCaseValue === 'TRUE') {
+                isTrialMcq = true;
+              } else if (upperCaseValue === 'FALSE') {
+                isTrialMcq = false;
+              }
             }
 
             return {
@@ -86,7 +111,7 @@ const BulkUploadMcqsPage = () => {
               category_name: row['Category Name'] ? String(row['Category Name']) : undefined,
               subcategory_name: row['Subcategory Name'] ? String(row['Subcategory Name']) : undefined,
               difficulty: row['Difficulty'] ? String(row['Difficulty']) : undefined,
-              is_trial_mcq: typeof row['Is Trial MCQ'] === 'string' ? row['Is Trial MCQ'].toUpperCase() === 'TRUE' : undefined,
+              is_trial_mcq: isTrialMcq,
             };
           });
           resolve(mcqs);
@@ -112,10 +137,8 @@ const BulkUploadMcqsPage = () => {
         loadingToastId = showLoading(`Uploading ${mcqsToUpload.length} MCQs from spreadsheet. This may take a moment.`);
       } else if (jsonData.trim()) {
         loadingToastId = showLoading(`Processing JSON data...`);
-        mcqsToUpload = JSON.parse(jsonData);
-        if (!Array.isArray(mcqsToUpload)) {
-          mcqsToUpload = [mcqsToUpload];
-        }
+        const parsedJson = JSON.parse(jsonData);
+        mcqsToUpload = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
         dismissToast(loadingToastId);
         loadingToastId = showLoading(`Uploading ${mcqsToUpload.length} MCQs from JSON. This may take a moment.`);
       } else {
@@ -179,8 +202,13 @@ const BulkUploadMcqsPage = () => {
               <Upload className="h-5 w-5" /> Upload from Spreadsheet (.xlsx, .csv)
             </h3>
             <p className="text-sm text-muted-foreground">
-              Your spreadsheet should have the following column headers: `Question`, `Option A`, `Option B`, `Option C`, `Option D`, `Correct Answer` (A, B, C, or D), `Explanation`. Optional columns: `Image URL`, `Category Name`, `Subcategory Name`, `Difficulty` (Easy, Medium, Hard), `Is Trial MCQ` (TRUE or FALSE).
+              Your spreadsheet should have the following **exact** column headers: `Question`, `Option A`, `Option B`, `Option C`, `Option D`, `Correct Answer` (A, B, C, or D), `Explanation`.
+              <br />
+              Optional columns: `Image URL`, `Category Name`, `Subcategory Name`, `Difficulty` (Easy, Medium, Hard), `Is Trial MCQ` (TRUE or FALSE).
             </p>
+            <a href="/example_mcqs.xlsx" download="example_mcqs.xlsx" className="inline-flex items-center text-primary hover:underline text-sm">
+              <Download className="h-4 w-4 mr-1" /> Download Example Spreadsheet
+            </a>
             <Input
               id="spreadsheet-upload"
               type="file"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -157,10 +157,10 @@ const SubmitMcqPage = () => {
                         <Input placeholder={`Enter option ${optionKey.toUpperCase()}`} {...field} />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ))}
+                  </FormItem>
+                )}
+              />
+            ))}
 
               <FormField
                 control={form.control}

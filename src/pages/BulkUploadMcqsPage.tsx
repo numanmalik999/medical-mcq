@@ -22,7 +22,7 @@ interface IncomingMcq {
     D: string;
   };
   correct_answer: 'A' | 'B' | 'C' | 'D';
-  explanation: string;
+  explanation: string; // Still required as a string, will default if empty
   image_url?: string;
   category_name?: string;
   subcategory_name?: string;
@@ -68,17 +68,16 @@ const BulkUploadMcqsPage = () => {
             const option_c = row['Option C'];
             const option_d = row['Option D'];
             const correct_answer_raw = row['Correct Answer'];
-            const explanation = row['Explanation'];
+            const explanation = row['Explanation']; // Now optional in spreadsheet
 
-            // Validate required fields
+            // Validate required fields (excluding explanation)
             if (!question) throw new Error(`Row ${rowIndex}: 'Question' is missing.`);
             if (!option_a) throw new Error(`Row ${rowIndex}: 'Option A' is missing.`);
             if (!option_b) throw new Error(`Row ${rowIndex}: 'Option B' is missing.`);
             if (!option_c) throw new Error(`Row ${rowIndex}: 'Option C' is missing.`);
             if (!option_d) throw new Error(`Row ${rowIndex}: 'Option D' is missing.`);
             if (!correct_answer_raw) throw new Error(`Row ${rowIndex}: 'Correct Answer' is missing.`);
-            if (!explanation) throw new Error(`Row ${rowIndex}: 'Explanation' is missing.`);
-
+            
             const correct_answer = String(correct_answer_raw).toUpperCase();
             if (!['A', 'B', 'C', 'D'].includes(correct_answer)) {
               throw new Error(`Row ${rowIndex}: 'Correct Answer' must be A, B, C, or D. Found: "${correct_answer_raw}".`);
@@ -106,7 +105,7 @@ const BulkUploadMcqsPage = () => {
                 D: String(option_d),
               },
               correct_answer: correct_answer as 'A' | 'B' | 'C' | 'D',
-              explanation: String(explanation),
+              explanation: explanation ? String(explanation) : 'No explanation provided.', // Default if empty
               image_url: row['Image URL'] ? String(row['Image URL']) : undefined,
               category_name: row['Category Name'] ? String(row['Category Name']) : undefined,
               subcategory_name: row['Subcategory Name'] ? String(row['Subcategory Name']) : undefined,
@@ -202,9 +201,9 @@ const BulkUploadMcqsPage = () => {
               <Upload className="h-5 w-5" /> Upload from Spreadsheet (.xlsx, .csv)
             </h3>
             <p className="text-sm text-muted-foreground">
-              Your spreadsheet should have the following **exact** column headers: `Question`, `Option A`, `Option B`, `Option C`, `Option D`, `Correct Answer` (A, B, C, or D), `Explanation`.
+              Your spreadsheet should have the following **exact** column headers: `Question`, `Option A`, `Option B`, `Option C`, `Option D`, `Correct Answer` (A, B, C, or D).
               <br />
-              Optional columns: `Image URL`, `Category Name`, `Subcategory Name`, `Difficulty` (Easy, Medium, Hard), `Is Trial MCQ` (TRUE or FALSE).
+              Optional columns: `Explanation` (defaults to "No explanation provided." if empty), `Image URL`, `Category Name`, `Subcategory Name`, `Difficulty` (Easy, Medium, Hard), `Is Trial MCQ` (TRUE or FALSE).
             </p>
             <a href="/example_mcqs.xlsx" download="example_mcqs.xlsx" className="inline-flex items-center text-primary hover:underline text-sm">
               <Download className="h-4 w-4 mr-1" /> Download Example Spreadsheet
@@ -239,7 +238,7 @@ const BulkUploadMcqsPage = () => {
       "D": "Option D text"
     },
     "correct_answer": "A",
-    "explanation": "Detailed explanation for the correct answer.",
+    "explanation": "Detailed explanation for the correct answer.", // Optional, will default if empty
     "image_url": "https://example.com/image.jpg", // Optional
     "category_name": "Biology", // Optional
     "subcategory_name": "Cell Biology", // Optional

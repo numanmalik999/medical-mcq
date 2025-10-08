@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input'; // Import Input component
 
 interface Category {
   id: string;
@@ -42,6 +43,7 @@ const ManageMcqsPage = () => {
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<string | null>(null);
   const [selectedFilterSubcategory, setSelectedFilterSubcategory] = useState<string | null>(null);
   const [filteredSubcategoriesForFilter, setFilteredSubcategoriesForFilter] = useState<Subcategory[]>([]);
+  const [searchTerm, setSearchTerm] = useState(''); // New state for search term
 
 
   const fetchCategoriesAndSubcategories = async () => {
@@ -82,6 +84,9 @@ const ManageMcqsPage = () => {
     if (selectedFilterSubcategory) {
       query = query.eq('subcategory_id', selectedFilterSubcategory);
     }
+    if (searchTerm) { // Apply search filter
+      query = query.ilike('question_text', `%${searchTerm}%`);
+    }
 
     const { data, error } = await query;
 
@@ -110,7 +115,7 @@ const ManageMcqsPage = () => {
 
   useEffect(() => {
     fetchMcqs();
-  }, [selectedFilterCategory, selectedFilterSubcategory]); // Refetch when filters change
+  }, [selectedFilterCategory, selectedFilterSubcategory, searchTerm]); // Refetch when filters or search term change
 
   useEffect(() => {
     if (selectedFilterCategory) {
@@ -180,38 +185,49 @@ const ManageMcqsPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Filter MCQs</CardTitle>
-          <CardDescription>Filter MCQs by category and subcategory.</CardDescription>
+          <CardDescription>Filter MCQs by category, subcategory, or search by question text.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="flex flex-col gap-4">
           <div className="flex-1">
-            <Label htmlFor="filterCategory">Category</Label>
-            <Select onValueChange={(value) => setSelectedFilterCategory(value === "all" ? null : value)} value={selectedFilterCategory || "all"}>
-              <SelectTrigger id="filterCategory">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="search-term">Search Question</Label>
+            <Input
+              id="search-term"
+              placeholder="Search by question text..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <div className="flex-1">
-            <Label htmlFor="filterSubcategory">Subcategory</Label>
-            <Select onValueChange={(value) => setSelectedFilterSubcategory(value === "all" ? null : value)} value={selectedFilterSubcategory || "all"} disabled={!selectedFilterCategory || filteredSubcategoriesForFilter.length === 0}>
-              <SelectTrigger id="filterSubcategory">
-                <SelectValue placeholder="Select subcategory" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Subcategories</SelectItem>
-                {filteredSubcategoriesForFilter.map((subcat) => (
-                  <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <Label htmlFor="filterCategory">Category</Label>
+              <Select onValueChange={(value) => setSelectedFilterCategory(value === "all" ? null : value)} value={selectedFilterCategory || "all"}>
+                <SelectTrigger id="filterCategory">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1">
+              <Label htmlFor="filterSubcategory">Subcategory</Label>
+              <Select onValueChange={(value) => setSelectedFilterSubcategory(value === "all" ? null : value)} value={selectedFilterSubcategory || "all"} disabled={!selectedFilterCategory || filteredSubcategoriesForFilter.length === 0}>
+                <SelectTrigger id="filterSubcategory">
+                  <SelectValue placeholder="Select subcategory" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subcategories</SelectItem>
+                  {filteredSubcategoriesForFilter.map((subcat) => (
+                    <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <Button onClick={() => { setSelectedFilterCategory(null); setSelectedFilterSubcategory(null); }} variant="outline" className="self-end">Clear Filters</Button>
+          <Button onClick={() => { setSelectedFilterCategory(null); setSelectedFilterSubcategory(null); setSearchTerm(''); }} variant="outline" className="self-end">Clear Filters</Button>
         </CardContent>
       </Card>
 

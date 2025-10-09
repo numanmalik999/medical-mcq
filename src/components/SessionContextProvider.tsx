@@ -13,8 +13,8 @@ interface AuthUser extends User {
   avatar_url?: string | null;
   phone_number?: string | null;
   whatsapp_number?: string | null;
-  has_active_subscription?: boolean; // Added
-  trial_taken?: boolean; // Added
+  has_active_subscription?: boolean;
+  trial_taken?: boolean;
 }
 
 interface SessionContextType {
@@ -28,142 +28,117 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Start as true for initial load
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log('SessionContextProvider: useEffect mounted, initial isLoading:', isLoading);
+    let isMounted = true; // Flag to prevent state updates on unmounted component
+    console.log('SessionContextProvider: useEffect mounted.');
 
-    const handleAuthSession = async (currentSession: Session | null, isInitialCheck: boolean = false) => {
-      setIsLoading(true);
-      const logPrefix = isInitialCheck ? 'SessionContextProvider: Initial Session Check:' : 'SessionContextProvider: onAuthStateChange:';
-      console.log(`${logPrefix} setIsLoading(true)`);
+    const fetchUserProfile = async (supabaseUser: User) => {
+      if (!isMounted) return null; // Prevent fetching if component unmounted
+      console.log(`Fetching profile for user ID: ${supabaseUser.id}`);
+      const { data: profileDataArray, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
+        .eq('id', supabaseUser.id);
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error(`Error fetching profile (code: ${profileError.code}):`, profileError);
+        return null;
+      }
+
+      const profileData = profileDataArray && profileDataArray.length > 0 ? profileDataArray[0] : null;
+      console.log('Profile data fetched:', profileData);
+
+      return {
+        ...supabaseUser,
+        is_admin: profileData?.is_admin || false,
+        first_name: profileData?.first_name || null,
+        last_name: profileData?.last_name || null,
+        phone_number: profileData?.phone_number || null,
+        whatsapp_number: profileData?.whatsapp_number || null,
+        has_active_subscription: profileData?.has_active_subscription || false,
+        trial_taken: profileData?.trial_taken || false,
+      } as AuthUser;
+    };
+
+    const handleSessionChange = async (currentSession: Session | null) => {
+      if (!isMounted) return;
 
       if (!currentSession) {
-        console.log(`${logPrefix} No session, clearing session and user.`);
+        console.log('No session, clearing user and session.');
         setSession(null);
         setUser(null);
         if (location.pathname !== '/login' && location.pathname !== '/signup') {
           navigate('/login');
         }
         setIsLoading(false);
-        console.log(`${logPrefix} setIsLoading(false) for no session.`);
         return;
       }
 
-      console.log(`${logPrefix} Session exists, attempting to fetch profile...`);
-      console.log(`${logPrefix} User ID for profile fetch:`, currentSession.user.id);
-
-      let profileFetchCompleted = false;
-      const fetchTimeout = setTimeout(() => {
-        if (!profileFetchCompleted) {
-          console.warn(`${logPrefix} Profile fetch timed out after 5 seconds. Forcing isLoading to false.`);
-          setIsLoading(false);
-        }
-      }, 5000); // 5-second timeout
-
-      try {
-        console.log(`${logPrefix} Executing Supabase profile query...`);
-        const { data: profileDataArray, error: profileError } = await supabase
-          .from('profiles')
-          .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken') // Added subscription and trial fields
-          .eq('id', currentSession.user.id);
-
-        profileFetchCompleted = true;
-        clearTimeout(fetchTimeout);
-        console.log(`${logPrefix} Supabase profile query completed.`);
-
-        let isAdmin = false;
-        let firstName = null;
-        let lastName = null;
-        let phoneNumber = null;
-        let whatsappNumber = null;
-        let hasActiveSubscription = false; // Default value
-        let trialTaken = false; // Default value
-        let profileData = null;
-
-        if (profileError) {
-          if (profileError.code !== 'PGRST116') { // PGRST116 means no rows found, which is not an error for new users
-            console.error(`${logPrefix} Error fetching profile (code: ${profileError.code}):`, profileError);
-          } else {
-            console.log(`${logPrefix} No profile found for user (PGRST116), defaulting profile fields.`);
-          }
-        } else if (profileDataArray && profileDataArray.length > 0) {
-          profileData = profileDataArray[0]; // Take the first profile if available
-          isAdmin = profileData.is_admin || false;
-          firstName = profileData.first_name || null;
-          lastName = profileData.last_name || null;
-          phoneNumber = profileData.phone_number || null;
-          whatsappNumber = profileData.whatsapp_number || null;
-          hasActiveSubscription = profileData.has_active_subscription || false;
-          trialTaken = profileData.trial_taken || false;
-          console.log(`${logPrefix} Profile data fetched:`, profileData);
-        }
-        
-        const authUser: AuthUser = { 
-          ...currentSession.user, 
-          is_admin: isAdmin,
-          first_name: firstName,
-          last_name: lastName,
-          phone_number: phoneNumber,
-          whatsapp_number: whatsappNumber,
-          has_active_subscription: hasActiveSubscription,
-          trial_taken: trialTaken,
-        };
+      // Only set loading when we are actively fetching profile or handling a new session
+      setIsLoading(true); 
+      const authUser = await fetchUserProfile(currentSession.user);
+      if (isMounted) {
         setSession(currentSession);
         setUser(authUser);
-        console.log(`${logPrefix} Session and user set. User is_admin:`, authUser.is_admin, 'has_active_subscription:', authUser.has_active_subscription);
+        setIsLoading(false);
 
         if (location.pathname === '/login' || location.pathname === '/signup') {
-          console.log(`${logPrefix} On /login or /signup page, redirecting...`);
-          if (isAdmin) {
+          console.log('On /login or /signup page, redirecting...');
+          if (authUser?.is_admin) {
             navigate('/admin/dashboard');
           } else {
             navigate('/user/dashboard');
           }
         }
-      } catch (err: any) {
-        profileFetchCompleted = true;
-        clearTimeout(fetchTimeout);
-        console.error(`${logPrefix} Unhandled error during profile fetch:`, err);
-        setSession(null);
-        setUser(null);
-        if (location.pathname !== '/login' && location.pathname !== '/signup') {
-          navigate('/login');
-        }
-      } finally {
-        console.log(`${logPrefix} Reaching finally block, setting isLoading to false.`);
-        setIsLoading(false);
-        console.log(`${logPrefix} setIsLoading(false) in finally block.`);
       }
     };
 
+    // Initial session check
+    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+      if (isMounted) {
+        console.log('Initial Session Check Result:', initialSession);
+        await handleSessionChange(initialSession);
+      }
+    });
+
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log('SessionContextProvider: onAuthStateChange: Event:', event, 'Session:', currentSession);
+      if (!isMounted) return;
+      console.log('onAuthStateChange: Event:', event, 'Session:', currentSession);
+
       if (event === 'SIGNED_OUT') {
-        console.log('SessionContextProvider: onAuthStateChange: SIGNED_OUT, clearing session and user, navigating to /login');
+        console.log('SIGNED_OUT event, clearing session and user, navigating to /login');
         setSession(null);
         setUser(null);
         navigate('/login');
-        setIsLoading(false);
-        console.log('SessionContextProvider: onAuthStateChange: setIsLoading(false) after SIGNED_OUT');
+        setIsLoading(false); // No loading needed after sign out
+      } else if (currentSession) {
+        // For SIGNED_IN, USER_UPDATED, or other events where a session exists
+        // Only re-fetch profile if the user ID has changed or it's a new sign-in
+        if (!user || user.id !== currentSession.user.id || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          await handleSessionChange(currentSession);
+        } else {
+          // For other events like TOKEN_REFRESH, if user is already set, just update session
+          setSession(currentSession);
+          setIsLoading(false); // Ensure loading is false if no profile fetch is needed
+        }
       } else {
-        handleAuthSession(currentSession);
+        // This case should ideally be covered by SIGNED_OUT, but as a fallback
+        setSession(null);
+        setUser(null);
+        setIsLoading(false);
       }
     });
 
-    // Initial session check
-    console.log('SessionContextProvider: Performing initial session check...');
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      console.log('SessionContextProvider: Initial Session Check Result:', initialSession);
-      handleAuthSession(initialSession, true);
-    });
-
     return () => {
+      isMounted = false; // Cleanup: set flag to false
       console.log('SessionContextProvider: useEffect cleanup, unsubscribing from auth state changes.');
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, user]); // Added 'user' to dependencies to react to user ID changes for profile re-fetch
 
   return (
     <SessionContext.Provider value={{ session, user, isLoading }}>

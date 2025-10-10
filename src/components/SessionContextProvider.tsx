@@ -81,56 +81,48 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     isMounted.current = true;
     console.log('SessionContextProvider: Main useEffect mounted.');
 
-    const handleSessionAndProfile = async (currentSession: Session | null) => { // Removed 'event' parameter
+    const handleAuthEvent = async (currentSession: Session | null, event: string) => {
       if (!isMounted.current) return;
 
-      try {
-        if (!currentSession) {
-          console.log('No session, clearing user and session.');
-          setSession(null);
-          setUser(null);
-          // Only navigate to login if not already on login/signup
-          if (location.pathname !== '/login' && location.pathname !== '/signup') {
-            navigate('/login');
-          }
-        } else {
-          // Fetch user profile if session exists
-          const authUser = await fetchUserProfile(currentSession.user);
-          if (isMounted.current) {
-            setSession(currentSession);
-            setUser(authUser);
-          }
-        }
-      } catch (error) {
-        console.error("Error in handleSessionAndProfile:", error);
-        // On error, ensure session and user are cleared
+      console.log(`handleAuthEvent: Event: ${event}, Session:`, currentSession);
+
+      if (!currentSession) {
+        console.log('No session, clearing user and session.');
         setSession(null);
         setUser(null);
-      } finally {
-        if (isMounted.current) {
-          setIsLoading(false); // Always set loading to false when done processing
+        // Only navigate to login if not already on login/signup
+        if (location.pathname !== '/login' && location.pathname !== '/signup') {
+          navigate('/login');
         }
+      } else {
+        // Fetch user profile if session exists or is updated
+        const authUser = await fetchUserProfile(currentSession.user);
+        if (isMounted.current) {
+          setSession(currentSession);
+          setUser(authUser);
+        }
+      }
+      // Always set isLoading to false after processing an auth event
+      if (isMounted.current) {
+        setIsLoading(false);
       }
     };
 
     // Initial session check
-    setIsLoading(true); // Ensure loading is true for the very first check
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (isMounted.current) {
         console.log('Initial Session Check Result:', initialSession);
-        await handleSessionAndProfile(initialSession); // Removed 'INITIAL_LOAD' event
+        await handleAuthEvent(initialSession, 'INITIAL_LOAD');
       }
     });
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) return;
-      console.log('onAuthStateChange: Event:', event, 'Session:', currentSession);
-
       // For any auth state change, we re-evaluate the session and profile
       // Set loading to true temporarily while processing the change
       setIsLoading(true); 
-      await handleSessionAndProfile(currentSession); // Removed 'event' parameter
+      await handleAuthEvent(currentSession, event);
     });
 
     return () => {
@@ -138,7 +130,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       console.log('SessionContextProvider: Main useEffect cleanup, unsubscribing from auth state changes.');
       subscription.unsubscribe();
     };
-  }, [navigate, location.pathname, fetchUserProfile]); // Removed 'user' from dependencies
+  }, [navigate, location.pathname, fetchUserProfile]); // Dependencies for handleAuthEvent
 
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {

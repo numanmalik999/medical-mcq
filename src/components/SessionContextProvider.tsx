@@ -44,14 +44,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         trial_taken: false,
       } as AuthUser;
     }
-    console.log(`Fetching profile for user ID: ${supabaseUser.id}`);
+    console.log(`[fetchUserProfile] Fetching profile for user ID: ${supabaseUser.id}`);
     const { data: profileDataArray, error: profileError } = await supabase
       .from('profiles')
       .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
       .eq('id', supabaseUser.id);
 
     if (profileError && profileError.code !== 'PGRST116') {
-      console.error(`Error fetching profile (code: ${profileError.code}):`, profileError);
+      console.error(`[fetchUserProfile] Error fetching profile (code: ${profileError.code}):`, profileError);
       // Always return an AuthUser object, even on error, with defaults
       return {
         ...supabaseUser,
@@ -62,7 +62,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     }
 
     const profileData = profileDataArray && profileDataArray.length > 0 ? profileDataArray[0] : null;
-    console.log('Profile data fetched:', profileData);
+    console.log('[fetchUserProfile] Profile data fetched:', profileData);
 
     return {
       ...supabaseUser,
@@ -76,16 +76,16 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     } as AuthUser;
   }, []); // No dependencies, as it only uses supabase and isMounted.current
 
-  // Function to handle session and profile updates
-  const initializeSession = useCallback(async (currentSession: Session | null, event: string) => {
+  // This function will be called on initial load and on auth state changes
+  const handleAuthChange = useCallback(async (currentSession: Session | null, event: string) => {
     if (!isMounted.current) return;
 
-    console.log(`initializeSession: Event: ${event}, Session:`, currentSession);
-    setIsLoading(true); // Always set loading to true at the start of initialization
+    console.log(`[handleAuthChange] Event: ${event}, Session:`, currentSession);
+    setIsLoading(true); // Start loading for any auth change event
 
     try {
       if (!currentSession) {
-        console.log('No session, clearing user and session.');
+        console.log('[handleAuthChange] No session, clearing user and session.');
         setSession(null);
         setUser(null);
         // Only navigate to login if not already on login/signup
@@ -101,7 +101,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         }
       }
     } catch (error) {
-      console.error("Error in initializeSession:", error);
+      console.error("[handleAuthChange] Error processing auth event:", error);
       // On error, ensure session and user are cleared
       setSession(null);
       setUser(null);
@@ -110,7 +110,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         setIsLoading(false); // Always set loading to false when done processing
       }
     }
-  }, [navigate, location.pathname, fetchUserProfile]); // Dependencies for initializeSession
+  }, [navigate, location.pathname, fetchUserProfile]);
 
   // Main effect for setting up auth listener and initial session check
   useEffect(() => {
@@ -121,7 +121,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (isMounted.current) {
         console.log('Initial Session Check Result:', initialSession);
-        await initializeSession(initialSession, 'INITIAL_LOAD');
+        await handleAuthChange(initialSession, 'INITIAL_LOAD');
       }
     });
 
@@ -129,18 +129,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) return;
       console.log('onAuthStateChange: Event:', event, 'Session:', currentSession);
-
-      // Explicitly handle SIGNED_OUT to ensure immediate redirection and state clear
-      if (event === 'SIGNED_OUT') {
-        console.log('SIGNED_OUT event, clearing session and user, navigating to /login');
-        setSession(null);
-        setUser(null);
-        navigate('/login');
-        setIsLoading(false); // No loading needed after sign out
-      } else {
-        // For other events (SIGNED_IN, USER_UPDATED, TOKEN_REFRESH), re-initialize session
-        await initializeSession(currentSession, event);
-      }
+      await handleAuthChange(currentSession, event);
     });
 
     return () => {
@@ -148,12 +137,13 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       console.log('SessionContextProvider: Main useEffect cleanup, unsubscribing from auth state changes.');
       subscription.unsubscribe();
     };
-  }, [initializeSession]); // initializeSession is now the only dependency
+  }, [handleAuthChange]); // Only handleAuthChange as a dependency
 
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {
+    console.log('Redirection useEffect: isLoading:', isLoading, 'user:', user, 'pathname:', location.pathname);
     if (!isLoading && user && (location.pathname === '/login' || location.pathname === '/signup')) {
-      console.log('Redirecting after login/signup based on user role.');
+      console.log('Attempting redirection. User is_admin:', user.is_admin, 'User has_active_subscription:', user.has_active_subscription);
       if (user.is_admin) {
         navigate('/admin/dashboard');
       } else {

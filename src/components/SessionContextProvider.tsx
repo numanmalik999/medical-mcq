@@ -76,16 +76,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     } as AuthUser;
   }, []); // No dependencies, as it only uses supabase and isMounted.current
 
-  // Main effect for setting up auth listener and initial session check
-  useEffect(() => {
-    isMounted.current = true;
-    console.log('SessionContextProvider: Main useEffect mounted.');
+  // Function to handle session and profile updates
+  const initializeSession = useCallback(async (currentSession: Session | null, event: string) => {
+    if (!isMounted.current) return;
 
-    const handleAuthEvent = async (currentSession: Session | null, event: string) => {
-      if (!isMounted.current) return;
+    console.log(`initializeSession: Event: ${event}, Session:`, currentSession);
+    setIsLoading(true); // Always set loading to true at the start of initialization
 
-      console.log(`handleAuthEvent: Event: ${event}, Session:`, currentSession);
-
+    try {
       if (!currentSession) {
         console.log('No session, clearing user and session.');
         setSession(null);
@@ -95,34 +93,54 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           navigate('/login');
         }
       } else {
-        // Fetch user profile if session exists or is updated
+        // Fetch user profile if session exists
         const authUser = await fetchUserProfile(currentSession.user);
         if (isMounted.current) {
           setSession(currentSession);
           setUser(authUser);
         }
       }
-      // Always set isLoading to false after processing an auth event
+    } catch (error) {
+      console.error("Error in initializeSession:", error);
+      // On error, ensure session and user are cleared
+      setSession(null);
+      setUser(null);
+    } finally {
       if (isMounted.current) {
-        setIsLoading(false);
+        setIsLoading(false); // Always set loading to false when done processing
       }
-    };
+    }
+  }, [navigate, location.pathname, fetchUserProfile]); // Dependencies for initializeSession
+
+  // Main effect for setting up auth listener and initial session check
+  useEffect(() => {
+    isMounted.current = true;
+    console.log('SessionContextProvider: Main useEffect mounted.');
 
     // Initial session check
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (isMounted.current) {
         console.log('Initial Session Check Result:', initialSession);
-        await handleAuthEvent(initialSession, 'INITIAL_LOAD');
+        await initializeSession(initialSession, 'INITIAL_LOAD');
       }
     });
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) return;
-      // For any auth state change, we re-evaluate the session and profile
-      // Set loading to true temporarily while processing the change
-      setIsLoading(true); 
-      await handleAuthEvent(currentSession, event);
+      console.log('onAuthStateChange: Event:', event, 'Session:', currentSession);
+
+      // Explicitly handle SIGNED_OUT to ensure immediate redirection and state clear
+      if (event === 'SIGNED_OUT') {
+        console.log('SIGNED_OUT event, clearing session and user, navigating to /login');
+        setSession(null);
+        setUser(null);
+        navigate('/login');
+        setIsLoading(false); // No loading needed after sign out
+      } else {
+        // For other events (SIGNED_IN, USER_UPDATED, TOKEN_REFRESH), re-initialize session
+        await initializeSession(currentSession, event);
+      }
     });
 
     return () => {
@@ -130,7 +148,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       console.log('SessionContextProvider: Main useEffect cleanup, unsubscribing from auth state changes.');
       subscription.unsubscribe();
     };
-  }, [navigate, location.pathname, fetchUserProfile]); // Dependencies for handleAuthEvent
+  }, [initializeSession]); // initializeSession is now the only dependency
 
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {

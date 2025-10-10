@@ -76,34 +76,44 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const updateSessionAndUser = async (currentSession: Session | null, event?: string) => {
       if (!isMounted.current) return;
 
-      if (!currentSession) {
-        console.log('No session, clearing user and session.');
+      setIsLoading(true); // Set loading at the start of processing any session change
+
+      try {
+        if (!currentSession) {
+          console.log('No session, clearing user and session.');
+          setSession(null);
+          setUser(null);
+          // Only navigate to login if not already on login/signup
+          if (location.pathname !== '/login' && location.pathname !== '/signup') {
+            navigate('/login');
+          }
+          return; // Exit, finally will set isLoading(false)
+        }
+
+        // Determine if we need to fetch/re-fetch user profile
+        // This is true for initial load, SIGNED_IN, USER_UPDATED, or if the user object is not yet populated
+        const shouldFetchProfile = !user || user.id !== currentSession.user.id || event === 'SIGNED_IN' || event === 'USER_UPDATED';
+
+        if (shouldFetchProfile) {
+          const authUser = await fetchUserProfile(currentSession.user);
+          if (isMounted.current) {
+            setSession(currentSession);
+            setUser(authUser);
+          }
+        } else {
+          // For events like TOKEN_REFRESH where user data is already loaded and stable
+          setSession(currentSession);
+          // User state remains as is
+        }
+      } catch (error) {
+        console.error("Error in updateSessionAndUser:", error);
+        // Optionally, clear session/user on critical error
         setSession(null);
         setUser(null);
-        // Only navigate to login if not already on login/signup
-        if (location.pathname !== '/login' && location.pathname !== '/signup') {
-          navigate('/login');
-        }
-        setIsLoading(false); // Ensure loading is false when no session
-        return;
-      }
-
-      // Determine if we need to fetch/re-fetch user profile
-      // This is true for initial load, SIGNED_IN, USER_UPDATED, or if the user object is not yet populated
-      const shouldFetchProfile = !user || user.id !== currentSession.user.id || event === 'SIGNED_IN' || event === 'USER_UPDATED';
-
-      if (shouldFetchProfile) {
-        setIsLoading(true); // Only set loading true if we are fetching profile
-        const authUser = await fetchUserProfile(currentSession.user);
+      } finally {
         if (isMounted.current) {
-          setSession(currentSession);
-          setUser(authUser);
-          setIsLoading(false); // Set loading false after profile fetch
+          setIsLoading(false); // Always set loading to false when done processing
         }
-      } else {
-        // For events like TOKEN_REFRESH where user data is already loaded and stable
-        setSession(currentSession);
-        setIsLoading(false); // Ensure loading is false if no profile fetch was needed
       }
     };
 
@@ -125,7 +135,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         setSession(null);
         setUser(null);
         navigate('/login');
-        setIsLoading(false);
+        setIsLoading(false); // No loading needed after sign out
       } else if (currentSession) {
         await updateSessionAndUser(currentSession, event); // Pass event type
       } else {
@@ -141,7 +151,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       console.log('SessionContextProvider: useEffect cleanup, unsubscribing from auth state changes.');
       subscription.unsubscribe();
     };
-  }, [navigate]); // Removed 'user' and 'location.pathname' from dependencies
+  }, [navigate, location.pathname, user]); // Added 'user' to dependencies for updateSessionAndUser to get latest state
 
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {

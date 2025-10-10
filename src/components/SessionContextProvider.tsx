@@ -47,7 +47,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
       if (profileError && profileError.code !== 'PGRST116') {
         console.error(`Error fetching profile (code: ${profileError.code}):`, profileError);
-        return null;
+        // Even if there's an error, we should still return the basic user info
+        // to prevent 'user' from being null and blocking protected routes.
+        return {
+          ...supabaseUser,
+          is_admin: false, // Default to false on error
+          has_active_subscription: false, // Default to false on error
+          trial_taken: false, // Default to false on error
+        } as AuthUser;
       }
 
       const profileData = profileDataArray && profileDataArray.length > 0 ? profileDataArray[0] : null;
@@ -77,14 +84,16 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         if (location.pathname !== '/login' && location.pathname !== '/signup') {
           navigate('/login');
         }
-        setIsLoading(false);
+        setIsLoading(false); // Ensure loading is false when no session
         return;
       }
 
-      // Only fetch profile if user ID changes or it's a new sign-in/update
-      // This prevents re-fetching profile on every token refresh if user data is stable
-      if (!user || user.id !== currentSession.user.id || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        setIsLoading(true); // Set loading true only when profile fetch is initiated
+      // Determine if we need to fetch/re-fetch user profile
+      // This is true for initial load, SIGNED_IN, USER_UPDATED, or if the user object is not yet populated
+      const shouldFetchProfile = !user || user.id !== currentSession.user.id || event === 'SIGNED_IN' || event === 'USER_UPDATED';
+
+      if (shouldFetchProfile) {
+        setIsLoading(true); // Only set loading true if we are fetching profile
         const authUser = await fetchUserProfile(currentSession.user);
         if (isMounted.current) {
           setSession(currentSession);
@@ -132,7 +141,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       console.log('SessionContextProvider: useEffect cleanup, unsubscribing from auth state changes.');
       subscription.unsubscribe();
     };
-  }, [navigate, location.pathname]); // Removed 'user' from dependencies, added location.pathname
+  }, [navigate]); // Removed 'user' and 'location.pathname' from dependencies
 
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {

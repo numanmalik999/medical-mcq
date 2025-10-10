@@ -1,9 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom'; // Import useLocation
 
 // Extend the User type to include profile fields
 interface AuthUser extends User {
@@ -30,13 +30,15 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true); // Start as true for initial load
   const navigate = useNavigate();
+  const location = useLocation(); // Get current location
+  const isMounted = useRef(true); // Use useRef for isMounted flag
 
   useEffect(() => {
-    let isMounted = true; // Flag to prevent state updates on unmounted component
+    isMounted.current = true; // Set to true on mount
     console.log('SessionContextProvider: useEffect mounted.');
 
     const fetchUserProfile = async (supabaseUser: User) => {
-      if (!isMounted) return null; // Prevent fetching if component unmounted
+      if (!isMounted.current) return null;
       console.log(`Fetching profile for user ID: ${supabaseUser.id}`);
       const { data: profileDataArray, error: profileError } = await supabase
         .from('profiles')
@@ -63,13 +65,15 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } as AuthUser;
     };
 
-    const handleSessionChange = async (currentSession: Session | null) => {
-      if (!isMounted) return;
+    // Function to handle session changes and update state
+    const updateSessionAndUser = async (currentSession: Session | null, event?: string) => {
+      if (!isMounted.current) return;
 
       if (!currentSession) {
         console.log('No session, clearing user and session.');
         setSession(null);
         setUser(null);
+        // Only navigate to login if not already on login/signup
         if (location.pathname !== '/login' && location.pathname !== '/signup') {
           navigate('/login');
         }
@@ -77,36 +81,34 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         return;
       }
 
-      // Only set loading when we are actively fetching profile or handling a new session
-      setIsLoading(true); 
-      const authUser = await fetchUserProfile(currentSession.user);
-      if (isMounted) {
-        setSession(currentSession);
-        setUser(authUser);
-        setIsLoading(false);
-
-        if (location.pathname === '/login' || location.pathname === '/signup') {
-          console.log('On /login or /signup page, redirecting...');
-          if (authUser?.is_admin) {
-            navigate('/admin/dashboard');
-          } else {
-            navigate('/user/dashboard');
-          }
+      // Only fetch profile if user ID changes or it's a new sign-in/update
+      // This prevents re-fetching profile on every token refresh if user data is stable
+      if (!user || user.id !== currentSession.user.id || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        setIsLoading(true); // Set loading true only when profile fetch is initiated
+        const authUser = await fetchUserProfile(currentSession.user);
+        if (isMounted.current) {
+          setSession(currentSession);
+          setUser(authUser);
+          setIsLoading(false); // Set loading false after profile fetch
         }
+      } else {
+        // For events like TOKEN_REFRESH where user data is already loaded and stable
+        setSession(currentSession);
+        setIsLoading(false); // Ensure loading is false if no profile fetch was needed
       }
     };
 
     // Initial session check
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      if (isMounted) {
+      if (isMounted.current) {
         console.log('Initial Session Check Result:', initialSession);
-        await handleSessionChange(initialSession);
+        await updateSessionAndUser(initialSession, 'INITIAL_LOAD'); // Pass event type
       }
     });
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      if (!isMounted) return;
+      if (!isMounted.current) return;
       console.log('onAuthStateChange: Event:', event, 'Session:', currentSession);
 
       if (event === 'SIGNED_OUT') {
@@ -114,19 +116,11 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         setSession(null);
         setUser(null);
         navigate('/login');
-        setIsLoading(false); // No loading needed after sign out
+        setIsLoading(false);
       } else if (currentSession) {
-        // For SIGNED_IN, USER_UPDATED, or other events where a session exists
-        // Only re-fetch profile if the user ID has changed or it's a new sign-in
-        if (!user || user.id !== currentSession.user.id || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-          await handleSessionChange(currentSession);
-        } else {
-          // For other events like TOKEN_REFRESH, if user is already set, just update session
-          setSession(currentSession);
-          setIsLoading(false); // Ensure loading is false if no profile fetch is needed
-        }
+        await updateSessionAndUser(currentSession, event); // Pass event type
       } else {
-        // This case should ideally be covered by SIGNED_OUT, but as a fallback
+        // Fallback for unexpected null session
         setSession(null);
         setUser(null);
         setIsLoading(false);
@@ -134,11 +128,23 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     });
 
     return () => {
-      isMounted = false; // Cleanup: set flag to false
+      isMounted.current = false; // Set to false on unmount
       console.log('SessionContextProvider: useEffect cleanup, unsubscribing from auth state changes.');
       subscription.unsubscribe();
     };
-  }, [navigate, user]); // Added 'user' to dependencies to react to user ID changes for profile re-fetch
+  }, [navigate, location.pathname]); // Removed 'user' from dependencies, added location.pathname
+
+  // Dedicated useEffect for redirection after login/signup
+  useEffect(() => {
+    if (!isLoading && user && (location.pathname === '/login' || location.pathname === '/signup')) {
+      console.log('Redirecting after login/signup based on user role.');
+      if (user.is_admin) {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/user/dashboard');
+      }
+    }
+  }, [user, isLoading, navigate, location.pathname]);
 
   return (
     <SessionContext.Provider value={{ session, user, isLoading }}>

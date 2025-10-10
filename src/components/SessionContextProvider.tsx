@@ -132,10 +132,23 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       await handleAuthChange(currentSession, event);
     });
 
+    // Listen for tab visibility changes to re-check session
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && isMounted.current) {
+        console.log('Tab became visible, re-checking session...');
+        setIsLoading(true); // Set loading true while re-checking
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        await handleAuthChange(currentSession, 'TAB_FOCUS');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       isMounted.current = false;
-      console.log('SessionContextProvider: Main useEffect cleanup, unsubscribing from auth state changes.');
+      console.log('SessionContextProvider: Main useEffect cleanup, unsubscribing from auth state changes and visibilitychange.');
       subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [handleAuthChange]); // Only handleAuthChange as a dependency
 

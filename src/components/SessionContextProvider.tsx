@@ -36,7 +36,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   // Memoize fetchUserProfile to prevent unnecessary re-creations and ensure it always returns AuthUser
   const fetchUserProfile = useCallback(async (supabaseUser: User): Promise<AuthUser> => {
     if (!isMounted.current) {
-      // If component unmounted during fetch, return a basic AuthUser to avoid null issues
+      console.warn('[fetchUserProfile] Component unmounted during profile fetch, returning default AuthUser.');
       return {
         ...supabaseUser,
         is_admin: false,
@@ -44,15 +44,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         trial_taken: false,
       } as AuthUser;
     }
-    console.log(`[fetchUserProfile] Fetching profile for user ID: ${supabaseUser.id}`);
+    console.log(`[fetchUserProfile] START: Fetching profile for user ID: ${supabaseUser.id}`);
     const { data: profileDataArray, error: profileError } = await supabase
       .from('profiles')
       .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
       .eq('id', supabaseUser.id);
 
     if (profileError && profileError.code !== 'PGRST116') {
-      console.error(`[fetchUserProfile] Error fetching profile (code: ${profileError.code}):`, profileError);
-      // Always return an AuthUser object, even on error, with defaults
+      console.error(`[fetchUserProfile] ERROR: fetching profile (code: ${profileError.code}):`, profileError);
       return {
         ...supabaseUser,
         is_admin: false,
@@ -64,7 +63,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const profileData = profileDataArray && profileDataArray.length > 0 ? profileDataArray[0] : null;
     console.log('[fetchUserProfile] Profile data fetched:', profileData);
 
-    return {
+    const hydratedUser: AuthUser = {
       ...supabaseUser,
       is_admin: profileData?.is_admin || false,
       first_name: profileData?.first_name || null,
@@ -73,40 +72,48 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       whatsapp_number: profileData?.whatsapp_number || null,
       has_active_subscription: profileData?.has_active_subscription || false,
       trial_taken: profileData?.trial_taken || false,
-    } as AuthUser;
-  }, []); // No dependencies, as it only uses supabase and isMounted.current
+    };
+    console.log('[fetchUserProfile] END: Hydrated user object:', hydratedUser);
+    return hydratedUser;
+  }, []);
 
   // This function will be called on initial load and on auth state changes
   const handleAuthChange = useCallback(async (currentSession: Session | null, event: string) => {
-    if (!isMounted.current) return;
+    if (!isMounted.current) {
+      console.warn(`[handleAuthChange] Component unmounted during event ${event}, skipping state update.`);
+      return;
+    }
 
-    console.log(`[handleAuthChange] Event: ${event}, Session:`, currentSession);
-    setIsLoading(true); // Start loading for any auth change event
+    console.log(`[handleAuthChange] START: Event: ${event}, Session present: ${!!currentSession}`);
+    setIsLoading(true); // Always set loading to true at the start of initialization
 
     try {
       if (!currentSession) {
-        console.log('[handleAuthChange] No session, clearing user and session.');
+        console.log('[handleAuthChange] No session, clearing user and session states.');
         setSession(null);
         setUser(null);
         // Only navigate to login if not already on login/signup
         if (location.pathname !== '/login' && location.pathname !== '/signup') {
+          console.log('[handleAuthChange] Navigating to /login due to no session.');
           navigate('/login');
         }
       } else {
-        // Fetch user profile if session exists
+        console.log('[handleAuthChange] Session exists, fetching user profile.');
         const authUser = await fetchUserProfile(currentSession.user);
         if (isMounted.current) {
           setSession(currentSession);
           setUser(authUser);
+          console.log('[handleAuthChange] User state updated:', authUser);
         }
       }
     } catch (error) {
-      console.error("[handleAuthChange] Error processing auth event:", error);
+      console.error("[handleAuthChange] ERROR: processing auth event:", error);
       // On error, ensure session and user are cleared
       setSession(null);
       setUser(null);
     } finally {
       if (isMounted.current) {
+        console.log('[handleAuthChange] END: Setting isLoading to false.');
         setIsLoading(false); // Always set loading to false when done processing
       }
     }
@@ -120,7 +127,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     // Initial session check
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (isMounted.current) {
-        console.log('Initial Session Check Result:', initialSession);
+        console.log('SessionContextProvider: Initial Session Check Result:', initialSession);
         await handleAuthChange(initialSession, 'INITIAL_LOAD');
       }
     });
@@ -128,15 +135,27 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) return;
-      console.log('onAuthStateChange: Event:', event, 'Session:', currentSession);
-      await handleAuthChange(currentSession, event);
+      console.log('SessionContextProvider: onAuthStateChange: Event:', event, 'Session:', currentSession);
+      
+      // Special handling for SIGNED_OUT to ensure immediate state clear and navigation
+      if (event === 'SIGNED_OUT') {
+        console.log('SessionContextProvider: SIGNED_OUT event detected. Clearing session/user and navigating to /login.');
+        setSession(null);
+        setUser(null);
+        setIsLoading(false); // No loading needed after sign out
+        if (location.pathname !== '/login' && location.pathname !== '/signup') {
+          navigate('/login');
+        }
+      } else {
+        await handleAuthChange(currentSession, event);
+      }
     });
 
     // Listen for tab visibility changes to re-check session
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && isMounted.current) {
-        console.log('Tab became visible, re-checking session...');
-        setIsLoading(true); // Set loading true while re-checking
+        console.log('SessionContextProvider: Tab became visible, re-checking session...');
+        // Trigger a full re-initialization to ensure all states are fresh
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         await handleAuthChange(currentSession, 'TAB_FOCUS');
       }
@@ -150,13 +169,13 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [handleAuthChange]); // Only handleAuthChange as a dependency
+  }, [handleAuthChange, navigate, location.pathname]); // Added navigate and location.pathname to dependencies for SIGNED_OUT
 
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {
-    console.log('Redirection useEffect: isLoading:', isLoading, 'user:', user, 'pathname:', location.pathname);
+    console.log('Redirection useEffect: Current state - isLoading:', isLoading, 'user:', user ? `(ID: ${user.id}, Admin: ${user.is_admin}, Subscribed: ${user.has_active_subscription})` : 'null', 'pathname:', location.pathname);
     if (!isLoading && user && (location.pathname === '/login' || location.pathname === '/signup')) {
-      console.log('Attempting redirection. User is_admin:', user.is_admin, 'User has_active_subscription:', user.has_active_subscription);
+      console.log('Redirection triggered. User is_admin:', user.is_admin, 'User has_active_subscription:', user.has_active_subscription);
       if (user.is_admin) {
         navigate('/admin/dashboard');
       } else {

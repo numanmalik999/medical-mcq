@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'; // Import Input component
 interface Category {
   id: string;
   name: string;
+  mcq_count?: number; // Added mcq_count
 }
 
 interface Subcategory {
@@ -54,7 +55,21 @@ const ManageMcqsPage = () => {
       console.error('Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories for filter.", variant: "destructive" });
     } else {
-      setCategories(categoriesData || []);
+      // Fetch MCQ counts for each category
+      const categoriesWithCounts = await Promise.all(
+        (categoriesData || []).map(async (category) => {
+          const { count, error: mcqCountError } = await supabase
+            .from('mcqs')
+            .select('id', { count: 'exact', head: true }) // Use head: true for count only
+            .eq('category_id', category.id);
+
+          if (mcqCountError) {
+            console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
+          }
+          return { ...category, mcq_count: count || 0 };
+        })
+      );
+      setCategories(categoriesWithCounts);
     }
 
     const { data: subcategoriesData, error: subcategoriesError } = await supabase
@@ -207,7 +222,7 @@ const ManageMcqsPage = () => {
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
                   {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name} ({cat.mcq_count || 0})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

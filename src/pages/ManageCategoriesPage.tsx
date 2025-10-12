@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 interface Category {
   id: string;
   name: string;
+  mcq_count?: number; // Added mcq_count
 }
 
 interface Subcategory {
@@ -65,7 +66,21 @@ const ManageCategoriesPage = () => {
       console.error('Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
     } else {
-      setCategories(categoriesData || []);
+      // Fetch MCQ counts for each category
+      const categoriesWithCounts = await Promise.all(
+        (categoriesData || []).map(async (category) => {
+          const { count, error: mcqCountError } = await supabase
+            .from('mcqs')
+            .select('id', { count: 'exact', head: true })
+            .eq('category_id', category.id);
+
+          if (mcqCountError) {
+            console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
+          }
+          return { ...category, mcq_count: count || 0 };
+        })
+      );
+      setCategories(categoriesWithCounts || []);
     }
 
     if (subcategoriesError) {
@@ -221,7 +236,11 @@ const ManageCategoriesPage = () => {
   };
 
   const categoryColumns: ColumnDef<Category>[] = [
-    { accessorKey: 'name', header: 'Category Name' },
+    { 
+      accessorKey: 'name', 
+      header: 'Category Name',
+      cell: ({ row }) => `${row.original.name} (${row.original.mcq_count || 0})`, // Display count here
+    },
     {
       id: 'actions',
       cell: ({ row }) => (

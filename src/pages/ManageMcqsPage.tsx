@@ -12,6 +12,7 @@ import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input'; // Import Input component
+import { Trash2 } from 'lucide-react'; // Import Trash2 icon
 
 interface Category {
   id: string;
@@ -176,6 +177,7 @@ const ManageMcqsPage = () => {
         description: "MCQ deleted successfully.",
       });
       fetchMcqs(); // Refresh the list
+      fetchCategoriesAndSubcategories(); // Refresh counts
     } catch (error: any) {
       console.error("Error deleting MCQ:", error);
       toast({
@@ -183,6 +185,81 @@ const ManageMcqsPage = () => {
         description: `Failed to delete MCQ: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeleteAllMcqsInCategory = async () => {
+    if (!selectedFilterCategory) {
+      toast({ title: "Error", description: "Please select a category to delete all MCQs from.", variant: "destructive" });
+      return;
+    }
+
+    const categoryName = categories.find(cat => cat.id === selectedFilterCategory)?.name || 'Selected Category';
+
+    if (!window.confirm(`Are you absolutely sure you want to delete ALL MCQs and their explanations from the "${categoryName}" category? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Fetch all MCQs in the selected category to get their explanation_ids
+      const { data: mcqsToDelete, error: fetchError } = await supabase
+        .from('mcqs')
+        .select('id, explanation_id')
+        .eq('category_id', selectedFilterCategory);
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (!mcqsToDelete || mcqsToDelete.length === 0) {
+        toast({ title: "Info", description: `No MCQs found in "${categoryName}" to delete.`, variant: "default" });
+        setIsLoading(false);
+        return;
+      }
+
+      const mcqIds = mcqsToDelete.map(mcq => mcq.id);
+      const explanationIds = mcqsToDelete.map(mcq => mcq.explanation_id).filter((id): id is string => id !== null);
+
+      // Delete explanations first
+      if (explanationIds.length > 0) {
+        const { error: deleteExplanationsError } = await supabase
+          .from('mcq_explanations')
+          .delete()
+          .in('id', explanationIds);
+
+        if (deleteExplanationsError) {
+          console.warn("Error deleting some explanations:", deleteExplanationsError);
+          // Continue with MCQ deletion even if some explanations fail
+        }
+      }
+
+      // Delete MCQs
+      const { error: deleteMcqsError } = await supabase
+        .from('mcqs')
+        .delete()
+        .in('id', mcqIds);
+
+      if (deleteMcqsError) {
+        throw deleteMcqsError;
+      }
+
+      toast({
+        title: "Success!",
+        description: `All ${mcqIds.length} MCQs and their explanations from "${categoryName}" have been deleted.`,
+      });
+      fetchMcqs(); // Refresh the list
+      fetchCategoriesAndSubcategories(); // Refresh counts
+      setSelectedFilterCategory(null); // Clear filter after mass deletion
+    } catch (error: any) {
+      console.error("Error deleting all MCQs in category:", error);
+      toast({
+        title: "Error",
+        description: `Failed to delete MCQs in category: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -242,7 +319,17 @@ const ManageMcqsPage = () => {
               </Select>
             </div>
           </div>
-          <Button onClick={() => { setSelectedFilterCategory(null); setSelectedFilterSubcategory(null); setSearchTerm(''); }} variant="outline" className="self-end">Clear Filters</Button>
+          <div className="flex gap-2 justify-end">
+            <Button onClick={() => { setSelectedFilterCategory(null); setSelectedFilterSubcategory(null); setSearchTerm(''); }} variant="outline">Clear Filters</Button>
+            <Button
+              onClick={handleDeleteAllMcqsInCategory}
+              variant="destructive"
+              disabled={!selectedFilterCategory || isLoading}
+              className="flex items-center gap-1"
+            >
+              <Trash2 className="h-4 w-4" /> Delete All in Category
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

@@ -78,45 +78,41 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   }, []);
 
   // This function will be called on initial load and on auth state changes
-  const handleAuthChange = useCallback(async (currentSession: Session | null, event: string) => {
+  const updateSessionAndUser = useCallback(async (currentSession: Session | null, event: string) => {
     if (!isMounted.current) {
-      console.warn(`[handleAuthChange] Skipping event ${event} - component unmounted.`);
+      console.warn(`[updateSessionAndUser] Skipping event ${event} - component unmounted.`);
       return;
     }
 
-    console.log(`[handleAuthChange] START: Event: ${event}, Session present: ${!!currentSession}. Setting isLoading to TRUE.`);
-    setIsLoading(true); // Always set loading to true at the start of initialization
+    console.log(`[updateSessionAndUser] Event: ${event}, Session present: ${!!currentSession}.`);
 
     try {
       if (!currentSession) {
-        console.log('[handleAuthChange] No session, clearing user and session states.');
+        console.log('[updateSessionAndUser] No session, clearing user and session states.');
         setSession(null);
         setUser(null);
         // Only navigate to login if not already on login/signup
         if (location.pathname !== '/login' && location.pathname !== '/signup') {
-          console.log('[handleAuthChange] Navigating to /login due to no session.');
+          console.log('[updateSessionAndUser] Navigating to /login due to no session.');
           navigate('/login');
         }
       } else {
-        console.log('[handleAuthChange] Session exists, fetching user profile.');
+        console.log('[updateSessionAndUser] Session exists, fetching user profile.');
         const authUser = await fetchUserProfile(currentSession.user);
         if (isMounted.current) { // Only update state if component is still mounted
           setSession(currentSession);
           setUser(authUser);
-          console.log('[handleAuthChange] User state updated:', authUser);
+          console.log('[updateSessionAndUser] User state updated:', authUser);
         }
       }
     } catch (error) {
-      console.error("[handleAuthChange] ERROR: processing auth event:", error);
+      console.error("[updateSessionAndUser] ERROR: processing auth event:", error);
       // On error, ensure session and user are cleared
       setSession(null);
       setUser(null);
-    } finally {
-      // IMPORTANT: Always set isLoading to false, even if component unmounted.
-      // React will warn, but this prevents global loading state from getting stuck.
-      console.log('[handleAuthChange] END: Setting isLoading to FALSE.');
-      setIsLoading(false);
     }
+    // IMPORTANT: isLoading is NOT set to false here for every event.
+    // It will be set to false only after the *initial* load is complete.
   }, [navigate, location.pathname, fetchUserProfile]);
 
   // Main effect for setting up auth listener and initial session check
@@ -128,15 +124,22 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (isMounted.current) {
         console.log('SessionContextProvider: Initial Session Check Result:', initialSession);
-        await handleAuthChange(initialSession, 'INITIAL_LOAD');
+        await updateSessionAndUser(initialSession, 'INITIAL_LOAD');
+        // Set isLoading to false ONLY after the initial load is complete
+        if (isMounted.current) {
+          console.log('SessionContextProvider: Initial load complete, setting isLoading to FALSE.');
+          setIsLoading(false);
+        }
       }
     });
 
-    // Listen for auth state changes
+    // Listen for auth state changes (these will update session/user but not toggle global isLoading)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) return;
       console.log('SessionContextProvider: onAuthStateChange: Event:', event, 'Session:', currentSession);
-      await handleAuthChange(currentSession, event);
+      // For subsequent events, we just update the session/user, not the global isLoading
+      // The UI will react to changes in `user` and `session` directly.
+      await updateSessionAndUser(currentSession, event);
     });
 
     // Listen for tab visibility changes to re-check session
@@ -144,7 +147,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       if (document.visibilityState === 'visible' && isMounted.current) {
         console.log('SessionContextProvider: Tab became visible, re-checking session...');
         const { data: { session: currentSession } } = await supabase.auth.getSession();
-        await handleAuthChange(currentSession, 'TAB_FOCUS');
+        await updateSessionAndUser(currentSession, 'TAB_FOCUS');
       }
     };
 
@@ -156,7 +159,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [handleAuthChange, navigate, location.pathname]);
+  }, [updateSessionAndUser, navigate, location.pathname]);
 
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {

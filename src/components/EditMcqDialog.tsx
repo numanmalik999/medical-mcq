@@ -40,8 +40,8 @@ const formSchema = z.object({
   explanation_id: z.string().uuid().nullable(), // Explanation ID
   explanation_text: z.string().min(1, "Explanation text is required."),
   image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
-  category_id: z.string().uuid("Invalid category ID.").optional().or(z.literal('')),
-  subcategory_id: z.string().uuid("Invalid subcategory ID.").optional().or(z.literal('')),
+  category_id: z.string().uuid("Invalid category ID.").optional().or(z.literal('')), // Now optional, as an MCQ might not have a category
+  subcategory_id: z.string().uuid("Invalid subcategory ID.").optional().or(z.literal('')), // Now optional
   difficulty: z.string().optional().or(z.literal('')),
   is_trial_mcq: z.boolean().optional(),
 }).refine((data) => {
@@ -148,6 +148,9 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           }
         }
 
+        // Extract category_id and subcategory_id from the first link if available
+        const firstCategoryLink = mcq.category_links && mcq.category_links.length > 0 ? mcq.category_links[0] : null;
+
         form.reset({
           id: mcq.id,
           question_text: mcq.question_text,
@@ -159,8 +162,8 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           explanation_id: mcq.explanation_id,
           explanation_text: explanationText,
           image_url: imageUrl,
-          category_id: mcq.category_id || "",
-          subcategory_id: mcq.subcategory_id || "",
+          category_id: firstCategoryLink?.category_id || "", // Use from link
+          subcategory_id: firstCategoryLink?.subcategory_id || "", // Use from link
           difficulty: mcq.difficulty || "",
           is_trial_mcq: mcq.is_trial_mcq || false,
         });
@@ -206,6 +209,40 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
 
       form.setValue("explanation_text", data.explanation_text);
       form.setValue("difficulty", data.difficulty);
+      
+      // NEW LOGIC: Handle suggested subcategory
+      if (data.suggested_subcategory_name) {
+        if (selectedCategoryId) {
+          const matchedSubcategory = filteredSubcategories.find(
+            (sub) => sub.name.toLowerCase() === data.suggested_subcategory_name.toLowerCase()
+          );
+          if (matchedSubcategory) {
+            form.setValue("subcategory_id", matchedSubcategory.id);
+            toast({
+              title: "Subcategory Suggested",
+              description: `AI suggested and matched subcategory: "${matchedSubcategory.name}".`,
+              variant: "default",
+            });
+          } else {
+            toast({
+              title: "Subcategory Suggested",
+              description: `AI suggested subcategory "${data.suggested_subcategory_name}", but no match found in selected category. Please select manually.`,
+              variant: "default",
+            });
+            form.setValue("subcategory_id", ""); // Clear if no match
+          }
+        } else {
+          toast({
+            title: "Subcategory Suggested",
+            description: `AI suggested subcategory "${data.suggested_subcategory_name}", but a category must be selected first. Please select manually.`,
+            variant: "default",
+          });
+          form.setValue("subcategory_id", ""); // Clear if no category selected
+        }
+      } else {
+        form.setValue("subcategory_id", ""); // Clear if AI didn't suggest one
+      }
+
       dismiss(loadingToastId.id); // Corrected: pass loadingToastId.id
       toast({
         title: "AI Generation Complete!",
@@ -228,15 +265,17 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      // Update explanation
-      if (values.explanation_id) {
+      let currentExplanationId = values.explanation_id;
+
+      // Update or insert explanation
+      if (currentExplanationId) {
         const { error: explanationError } = await supabase
           .from('mcq_explanations')
           .update({
             explanation_text: values.explanation_text,
             image_url: values.image_url || null,
           })
-          .eq('id', values.explanation_id);
+          .eq('id', currentExplanationId);
 
         if (explanationError) {
           throw explanationError;
@@ -256,7 +295,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           if (newExplanationError) {
             throw newExplanationError;
           }
-          values.explanation_id = newExplanationData.id; // Assign new explanation ID
+          currentExplanationId = newExplanationData.id; // Assign new explanation ID
         }
       }
 
@@ -270,9 +309,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           option_c: values.option_c,
           option_d: values.option_d,
           correct_answer: values.correct_answer,
-          explanation_id: values.explanation_id,
-          category_id: values.category_id || null,
-          subcategory_id: values.subcategory_id || null,
+          explanation_id: currentExplanationId, // Use the resolved explanation ID
           difficulty: values.difficulty || null,
           is_trial_mcq: values.is_trial_mcq,
         })
@@ -281,6 +318,35 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
       if (mcqError) {
         throw mcqError;
       }
+
+      // Handle mcq_category_links
+      // First, delete all existing links for this MCQ
+      const { error: deleteLinksError } = await supabase
+        .from('mcq_category_links')
+        .delete()
+        .eq('mcq_id', values.id);
+
+      if (deleteLinksError) {
+        console.error("Error deleting existing category links:", deleteLinksError);
+        // Don't throw, try to proceed with inserting new ones
+      }
+
+      // Then, insert new link if category_id is provided
+      if (values.category_id) {
+        const { error: insertLinkError } = await supabase
+          .from('mcq_category_links')
+          .insert({
+            mcq_id: values.id,
+            category_id: values.category_id,
+            subcategory_id: values.subcategory_id || null,
+          });
+
+        if (insertLinkError) {
+          console.error("Error inserting new category link:", insertLinkError);
+          throw insertLinkError; // Re-throw if inserting new link fails
+        }
+      }
+
 
       toast({
         title: "Success!",

@@ -13,6 +13,14 @@ import {
 import { MoreHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge"; // Import Badge
 
+// New type for a single MCQ-Category-Subcategory link
+export type McqCategoryLink = {
+  category_id: string;
+  category_name: string; // For display
+  subcategory_id: string | null;
+  subcategory_name: string | null; // For display
+};
+
 export type MCQ = {
   id: string;
   question_text: string;
@@ -21,18 +29,15 @@ export type MCQ = {
   option_c: string;
   option_d: string;
   correct_answer: 'A' | 'B' | 'C' | 'D';
-  category_id: string | null;
-  subcategory_id: string | null;
-  difficulty: string | null;
   explanation_id: string | null;
-  is_trial_mcq: boolean | null; // Added is_trial_mcq
+  difficulty: string | null;
+  is_trial_mcq: boolean | null;
+  // New: Array of category links
+  category_links: McqCategoryLink[];
 };
 
-// Extend MCQ type for display purposes to include category/subcategory names
-type DisplayMCQ = MCQ & {
-  category_name: string | null;
-  subcategory_name: string | null;
-};
+// DisplayMCQ is now the same as MCQ as category_links contains display names
+type DisplayMCQ = MCQ;
 
 interface MCQColumnsProps {
   onDelete: (mcqId: string, explanationId: string | null) => void;
@@ -53,12 +58,32 @@ export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnD
     header: "Correct",
   },
   {
-    accessorKey: "category_name",
-    header: "Category",
+    id: "categories", // New ID for categories column
+    header: "Categories",
+    cell: ({ row }) => {
+      const categories = row.original.category_links.map(link => link.category_name).filter(Boolean);
+      return (
+        <div className="w-[150px] flex flex-wrap gap-1">
+          {categories.length > 0 ? categories.map((name, index) => (
+            <Badge key={index} variant="secondary">{name}</Badge>
+          )) : 'N/A'}
+        </div>
+      );
+    },
   },
   {
-    accessorKey: "subcategory_name",
-    header: "Subcategory",
+    id: "subcategories", // New ID for subcategories column
+    header: "Subcategories",
+    cell: ({ row }) => {
+      const subcategories = row.original.category_links.map(link => link.subcategory_name).filter(Boolean);
+      return (
+        <div className="w-[150px] flex flex-wrap gap-1">
+          {subcategories.length > 0 ? subcategories.map((name, index) => (
+            <Badge key={index} variant="outline">{name}</Badge>
+          )) : 'N/A'}
+        </div>
+      );
+    },
   },
   {
     accessorKey: "difficulty",

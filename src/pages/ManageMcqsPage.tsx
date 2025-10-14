@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
-import { createMcqColumns, MCQ } from '@/components/mcq-columns';
+import { createMcqColumns, MCQ } from '@/components/mcq-columns'; // Removed McqCategoryLink import
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import EditMcqDialog from '@/components/EditMcqDialog';
@@ -26,11 +26,8 @@ interface Subcategory {
   name: string;
 }
 
-// Extend MCQ type for display purposes to include category/subcategory names
-type DisplayMCQ = MCQ & {
-  category_name: string | null;
-  subcategory_name: string | null;
-};
+// DisplayMCQ is now the same as MCQ as category_links contains display names
+type DisplayMCQ = MCQ;
 
 const ManageMcqsPage = () => {
   const [mcqs, setMcqs] = useState<DisplayMCQ[]>([]);
@@ -60,8 +57,8 @@ const ManageMcqsPage = () => {
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
           const { count, error: mcqCountError } = await supabase
-            .from('mcqs')
-            .select('id', { count: 'exact', head: true }) // Use head: true for count only
+            .from('mcq_category_links') // Count from the join table
+            .select('id', { count: 'exact', head: true })
             .eq('category_id', category.id);
 
           if (mcqCountError) {
@@ -90,16 +87,46 @@ const ManageMcqsPage = () => {
       .from('mcqs')
       .select(`
         *,
-        categories (name),
-        subcategories (name)
+        mcq_category_links (
+          category_id,
+          subcategory_id,
+          categories (name),
+          subcategories (name)
+        )
       `);
 
+    // Filtering logic for multi-category system
     if (selectedFilterCategory) {
-      query = query.eq('category_id', selectedFilterCategory);
+      const { data: mcqLinksData, error: mcqLinksError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id')
+        .eq('category_id', selectedFilterCategory)
+        .filter('subcategory_id', selectedFilterSubcategory ? 'eq' : 'neq', selectedFilterSubcategory || 'null'); // Adjust for subcategory filter
+
+      if (mcqLinksError) {
+        console.error('Error fetching MCQ links for category filter:', mcqLinksError);
+        setMcqs([]);
+        setIsLoading(false);
+        return;
+      }
+      const mcqIds = mcqLinksData?.map(link => link.mcq_id) || [];
+      query = query.in('id', mcqIds);
+    } else if (selectedFilterSubcategory) { // If only subcategory is selected, filter by it
+      const { data: mcqLinksData, error: mcqLinksError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id')
+        .eq('subcategory_id', selectedFilterSubcategory);
+
+      if (mcqLinksError) {
+        console.error('Error fetching MCQ links for subcategory filter:', mcqLinksError);
+        setMcqs([]);
+        setIsLoading(false);
+        return;
+      }
+      const mcqIds = mcqLinksData?.map(link => link.mcq_id) || [];
+      query = query.in('id', mcqIds);
     }
-    if (selectedFilterSubcategory) {
-      query = query.eq('subcategory_id', selectedFilterSubcategory);
-    }
+
     if (searchTerm) { // Apply search filter
       query = query.ilike('question_text', `%${searchTerm}%`);
     }
@@ -117,8 +144,12 @@ const ManageMcqsPage = () => {
     } else {
       const displayMcqs: DisplayMCQ[] = data.map((mcq: any) => ({
         ...mcq,
-        category_name: mcq.categories?.name || null,
-        subcategory_name: mcq.subcategories?.name || null,
+        category_links: mcq.mcq_category_links.map((link: any) => ({
+          category_id: link.category_id,
+          category_name: link.categories?.name || null,
+          subcategory_id: link.subcategory_id,
+          subcategory_name: link.subcategories?.name || null,
+        })),
       }));
       setMcqs(displayMcqs || []);
     }
@@ -149,7 +180,18 @@ const ManageMcqsPage = () => {
     }
 
     try {
-      // Delete the MCQ first
+      // Delete associated links first
+      const { error: linksError } = await supabase
+        .from('mcq_category_links')
+        .delete()
+        .eq('mcq_id', mcqId);
+
+      if (linksError) {
+        console.warn("Could not delete associated category links:", linksError);
+        // Continue with MCQ deletion even if links fail
+      }
+
+      // Delete the MCQ
       const { error: mcqError } = await supabase
         .from('mcqs')
         .delete()
@@ -196,41 +238,64 @@ const ManageMcqsPage = () => {
 
     const categoryName = categories.find(cat => cat.id === selectedFilterCategory)?.name || 'Selected Category';
 
-    if (!window.confirm(`Are you absolutely sure you want to delete ALL MCQs and their explanations from the "${categoryName}" category? This action cannot be undone.`)) {
+    if (!window.confirm(`Are you absolutely sure you want to delete ALL MCQs and their explanations linked to the "${categoryName}" category? This action cannot be undone.`)) {
       return;
     }
 
     setIsLoading(true);
     try {
-      // Fetch all MCQs in the selected category to get their explanation_ids
-      const { data: mcqsToDelete, error: fetchError } = await supabase
-        .from('mcqs')
-        .select('id, explanation_id')
+      // Fetch all MCQ IDs and their explanation IDs linked to the selected category
+      const { data: linksToDelete, error: fetchLinksError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id')
         .eq('category_id', selectedFilterCategory);
 
-      if (fetchError) {
-        throw fetchError;
+      if (fetchLinksError) {
+        throw fetchLinksError;
       }
 
-      if (!mcqsToDelete || mcqsToDelete.length === 0) {
-        toast({ title: "Info", description: `No MCQs found in "${categoryName}" to delete.`, variant: "default" });
+      const mcqIdsToDelete = Array.from(new Set(linksToDelete?.map(link => link.mcq_id) || []));
+
+      if (mcqIdsToDelete.length === 0) {
+        toast({ title: "Info", description: `No MCQs found linked to "${categoryName}" to delete.`, variant: "default" });
         setIsLoading(false);
         return;
       }
 
-      const mcqIds = mcqsToDelete.map(mcq => mcq.id);
-      const explanationIds = mcqsToDelete.map(mcq => mcq.explanation_id).filter((id): id is string => id !== null);
+      // Fetch explanation IDs for these MCQs
+      const { data: mcqsWithExplanations, error: fetchMcqsError } = await supabase
+        .from('mcqs')
+        .select('id, explanation_id')
+        .in('id', mcqIdsToDelete);
 
-      // Delete explanations first
-      if (explanationIds.length > 0) {
+      if (fetchMcqsError) {
+        throw fetchMcqsError;
+      }
+
+      const explanationIdsToDelete = mcqsWithExplanations
+        .map(mcq => mcq.explanation_id)
+        .filter((id): id is string => id !== null);
+
+      // Delete category links first
+      const { error: deleteLinksError } = await supabase
+        .from('mcq_category_links')
+        .delete()
+        .in('mcq_id', mcqIdsToDelete)
+        .eq('category_id', selectedFilterCategory); // Ensure only links for this category are deleted
+
+      if (deleteLinksError) {
+        console.warn("Error deleting some category links:", deleteLinksError);
+      }
+
+      // Delete explanations
+      if (explanationIdsToDelete.length > 0) {
         const { error: deleteExplanationsError } = await supabase
           .from('mcq_explanations')
           .delete()
-          .in('id', explanationIds);
+          .in('id', explanationIdsToDelete);
 
         if (deleteExplanationsError) {
           console.warn("Error deleting some explanations:", deleteExplanationsError);
-          // Continue with MCQ deletion even if some explanations fail
         }
       }
 
@@ -238,7 +303,7 @@ const ManageMcqsPage = () => {
       const { error: deleteMcqsError } = await supabase
         .from('mcqs')
         .delete()
-        .in('id', mcqIds);
+        .in('id', mcqIdsToDelete);
 
       if (deleteMcqsError) {
         throw deleteMcqsError;
@@ -246,7 +311,7 @@ const ManageMcqsPage = () => {
 
       toast({
         title: "Success!",
-        description: `All ${mcqIds.length} MCQs and their explanations from "${categoryName}" have been deleted.`,
+        description: `All ${mcqIdsToDelete.length} MCQs and their explanations linked to "${categoryName}" have been deleted.`,
       });
       fetchMcqs(); // Refresh the list
       fetchCategoriesAndSubcategories(); // Refresh counts

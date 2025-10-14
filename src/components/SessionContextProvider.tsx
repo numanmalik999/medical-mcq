@@ -32,7 +32,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const navigate = useNavigate();
   const location = useLocation();
   const isMounted = useRef(true);
-  const processingAuthEvent = useRef(false); // New ref to prevent concurrent processing
+  // Removed processingAuthEvent ref to simplify state management
 
   // Memoize fetchUserProfile to prevent unnecessary re-creations and ensure it always returns AuthUser
   const fetchUserProfile = useCallback(async (supabaseUser: User): Promise<AuthUser> => {
@@ -80,12 +80,11 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
   // This function will be called on initial load and on auth state changes
   const handleAuthChange = useCallback(async (currentSession: Session | null, event: string) => {
-    if (!isMounted.current || processingAuthEvent.current) {
-      console.warn(`[handleAuthChange] Skipping event ${event} - component unmounted or already processing.`);
+    if (!isMounted.current) {
+      console.warn(`[handleAuthChange] Skipping event ${event} - component unmounted.`);
       return;
     }
 
-    processingAuthEvent.current = true; // Set flag to true
     console.log(`[handleAuthChange] START: Event: ${event}, Session present: ${!!currentSession}`);
     setIsLoading(true); // Always set loading to true at the start of initialization
 
@@ -118,7 +117,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.log('[handleAuthChange] END: Setting isLoading to false.');
         setIsLoading(false); // Always set loading to false when done processing
       }
-      processingAuthEvent.current = false; // Reset flag
     }
   }, [navigate, location.pathname, fetchUserProfile]);
 
@@ -139,26 +137,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) return;
       console.log('SessionContextProvider: onAuthStateChange: Event:', event, 'Session:', currentSession);
-      
-      // Special handling for SIGNED_OUT to ensure immediate state clear and navigation
-      if (event === 'SIGNED_OUT') {
-        console.log('SessionContextProvider: SIGNED_OUT event detected. Clearing session/user and navigating to /login.');
-        setSession(null);
-        setUser(null);
-        setIsLoading(false); // No loading needed after sign out
-        if (location.pathname !== '/login' && location.pathname !== '/signup') {
-          navigate('/login');
-        }
-      } else {
-        await handleAuthChange(currentSession, event);
-      }
+      // Now, all events go through handleAuthChange, which manages isLoading
+      await handleAuthChange(currentSession, event);
     });
 
     // Listen for tab visibility changes to re-check session
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && isMounted.current) {
         console.log('SessionContextProvider: Tab became visible, re-checking session...');
-        // Trigger a full re-initialization to ensure all states are fresh
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         await handleAuthChange(currentSession, 'TAB_FOCUS');
       }
@@ -172,7 +158,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [handleAuthChange, navigate, location.pathname]); // Added navigate and location.pathname to dependencies for SIGNED_OUT
+  }, [handleAuthChange, navigate, location.pathname]);
 
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {

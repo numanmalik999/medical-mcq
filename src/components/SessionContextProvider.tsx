@@ -78,6 +78,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   }, []);
 
   // This function will be called on initial load and on auth state changes
+  // It only updates session/user and handles redirection for unauthenticated states.
+  // It does NOT manage the global isLoading state.
   const updateSessionAndUser = useCallback(async (currentSession: Session | null, event: string) => {
     if (!isMounted.current) {
       console.warn(`[updateSessionAndUser] Skipping event ${event} - component unmounted.`);
@@ -111,8 +113,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setSession(null);
       setUser(null);
     }
-    // IMPORTANT: isLoading is NOT set to false here for every event.
-    // It will be set to false only after the *initial* load is complete.
   }, [navigate, location.pathname, fetchUserProfile]);
 
   // Main effect for setting up auth listener and initial session check

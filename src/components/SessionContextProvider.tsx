@@ -121,15 +121,16 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     console.log('SessionContextProvider: Main useEffect mounted.');
 
     // Initial session check
+    // setIsLoading(true) is already the initial state, no need to set it again here.
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (isMounted.current) {
         console.log('SessionContextProvider: Initial Session Check Result:', initialSession);
         await updateSessionAndUser(initialSession, 'INITIAL_LOAD');
-        // Set isLoading to false ONLY after the initial load is complete
-        if (isMounted.current) {
-          console.log('SessionContextProvider: Initial load complete, setting isLoading to FALSE.');
-          setIsLoading(false);
-        }
+      }
+    }).finally(() => { // Use finally to ensure isLoading is set to false after the initial check
+      if (isMounted.current) { // Still check isMounted to avoid React warnings, but this is the critical point
+        console.log('SessionContextProvider: Initial load complete, setting isLoading to FALSE.');
+        setIsLoading(false);
       }
     });
 

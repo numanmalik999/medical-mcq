@@ -32,7 +32,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const navigate = useNavigate();
   const location = useLocation();
   const isMounted = useRef(true);
-  // Removed processingAuthEvent ref to simplify state management
 
   // Memoize fetchUserProfile to prevent unnecessary re-creations and ensure it always returns AuthUser
   const fetchUserProfile = useCallback(async (supabaseUser: User): Promise<AuthUser> => {
@@ -61,7 +60,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } as AuthUser;
     }
 
-    const profileData = profileDataArray && profileDataArray.length > 0 ? profileDataArray[0] : null;
+    const profileData = profileDataArray && profileDataArray[0] ? profileDataArray[0] : null;
     console.log('[fetchUserProfile] Profile data fetched:', profileData);
 
     const hydratedUser: AuthUser = {
@@ -85,7 +84,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       return;
     }
 
-    console.log(`[handleAuthChange] START: Event: ${event}, Session present: ${!!currentSession}`);
+    console.log(`[handleAuthChange] START: Event: ${event}, Session present: ${!!currentSession}. Setting isLoading to TRUE.`);
     setIsLoading(true); // Always set loading to true at the start of initialization
 
     try {
@@ -101,7 +100,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } else {
         console.log('[handleAuthChange] Session exists, fetching user profile.');
         const authUser = await fetchUserProfile(currentSession.user);
-        if (isMounted.current) {
+        if (isMounted.current) { // Only update state if component is still mounted
           setSession(currentSession);
           setUser(authUser);
           console.log('[handleAuthChange] User state updated:', authUser);
@@ -113,10 +112,10 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setSession(null);
       setUser(null);
     } finally {
-      if (isMounted.current) {
-        console.log('[handleAuthChange] END: Setting isLoading to false.');
-        setIsLoading(false); // Always set loading to false when done processing
-      }
+      // IMPORTANT: Always set isLoading to false, even if component unmounted.
+      // React will warn, but this prevents global loading state from getting stuck.
+      console.log('[handleAuthChange] END: Setting isLoading to FALSE.');
+      setIsLoading(false);
     }
   }, [navigate, location.pathname, fetchUserProfile]);
 
@@ -137,7 +136,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) return;
       console.log('SessionContextProvider: onAuthStateChange: Event:', event, 'Session:', currentSession);
-      // Now, all events go through handleAuthChange, which manages isLoading
       await handleAuthChange(currentSession, event);
     });
 

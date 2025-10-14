@@ -47,7 +47,7 @@ interface PerformanceSummary {
 }
 
 const UserDashboardPage = () => {
-  const { user, isLoading: isSessionLoading } = useSession();
+  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
   const { toast } = useToast();
   const [quizPerformance, setQuizPerformance] = useState<QuizPerformance | null>(null);
   const [recentAttempts, setRecentAttempts] = useState<RecentAttempt[]>([]);
@@ -61,16 +61,16 @@ const UserDashboardPage = () => {
   const [suggestedPractice, setSuggestedPractice] = useState<PerformanceSummary[]>([]);
 
   useEffect(() => {
-    if (user && !isSessionLoading) {
+    if (user && hasCheckedInitialSession) { // Only fetch if user is present and initial check is done
       fetchQuizPerformance();
       fetchRecentAttempts();
       fetchAllCategoriesAndSubcategories();
-    } else if (!user && !isSessionLoading) {
+    } else if (!user && hasCheckedInitialSession) { // If no user after initial check, stop loading
       setIsLoadingPerformance(false);
       setIsLoadingRecentAttempts(false);
       setIsLoadingRecommendations(false);
     }
-  }, [user, isSessionLoading]);
+  }, [user, hasCheckedInitialSession]);
 
   const fetchAllCategoriesAndSubcategories = async () => {
     setIsLoadingRecommendations(true);
@@ -255,7 +255,7 @@ const UserDashboardPage = () => {
     setIsLoadingRecentAttempts(false);
   };
 
-  if (isSessionLoading || isLoadingPerformance || isLoadingRecentAttempts || isLoadingRecommendations) {
+  if (!hasCheckedInitialSession || isLoadingPerformance || isLoadingRecentAttempts || isLoadingRecommendations) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading user dashboard...</p>

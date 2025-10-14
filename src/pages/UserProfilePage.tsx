@@ -13,27 +13,27 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User as UserIcon } from 'lucide-react';
 
 const UserProfilePage = () => {
-  const { user, isLoading: isSessionLoading } = useSession();
+  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
   const { toast } = useToast();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true); // Renamed to avoid conflict
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (user && !isSessionLoading) {
+    if (user && hasCheckedInitialSession) { // Only fetch if user is present and initial check is done
       fetchProfile();
-    } else if (!user && !isSessionLoading) {
-      setIsLoading(false); // No user, so no profile to load
+    } else if (!user && hasCheckedInitialSession) { // If no user after initial check, stop loading
+      setIsLoadingProfile(false);
     }
-  }, [user, isSessionLoading]);
+  }, [user, hasCheckedInitialSession]);
 
   const fetchProfile = async () => {
     if (!user) return;
-    setIsLoading(true);
+    setIsLoadingProfile(true);
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -50,7 +50,7 @@ const UserProfilePage = () => {
       setPhoneNumber(data.phone_number || '');
       setWhatsappNumber(data.whatsapp_number || '');
     }
-    setIsLoading(false);
+    setIsLoadingProfile(false);
   };
 
   const handleSaveProfile = async () => {
@@ -81,7 +81,7 @@ const UserProfilePage = () => {
     setIsSaving(false);
   };
 
-  if (isLoading || isSessionLoading) {
+  if (!hasCheckedInitialSession || isLoadingProfile) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading profile...</p>

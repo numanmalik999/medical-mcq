@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { useSession } from "@/components/SessionContextProvider"; // Import useSession
 
 const Index = () => {
-  const { user, isLoading } = useSession(); // Use session context
+  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
 
-  if (isLoading) {
+  if (!hasCheckedInitialSession) { // Show loading only until initial session check is done
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading user session...</p>

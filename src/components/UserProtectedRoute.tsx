@@ -4,9 +4,9 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useSession } from './SessionContextProvider';
 
 const UserProtectedRoute = () => {
-  const { user, isLoading } = useSession();
+  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
 
-  if (isLoading) {
+  if (!hasCheckedInitialSession) { // Show loading only until initial session check is done
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading user session...</p>
@@ -14,8 +14,8 @@ const UserProtectedRoute = () => {
     );
   }
 
+  // If initial check is done and no user, redirect to login
   if (!user) {
-    // Redirect unauthenticated users to the login page
     return <Navigate to="/login" replace />;
   }
 

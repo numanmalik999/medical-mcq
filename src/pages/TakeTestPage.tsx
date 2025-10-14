@@ -42,7 +42,7 @@ interface Category {
 const DEFAULT_TEST_DURATION_SECONDS = 3 * 60 * 60; // 3 hours
 
 const TakeTestPage = () => {
-  const { user, isLoading: isSessionLoading } = useSession();
+  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -57,7 +57,7 @@ const TakeTestPage = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Map<string, string | null>>(new Map());
   const [isTestSubmitted, setIsTestSubmitted] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingPage, setIsLoadingPage] = useState(true); // Renamed to avoid conflict
   const [timer, setTimer] = useState(DEFAULT_TEST_DURATION_SECONDS);
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
@@ -149,34 +149,37 @@ const TakeTestPage = () => {
 
   // Initial load: Fetch all categories
   useEffect(() => {
-    if (!isSessionLoading) {
-      if (user && user.has_active_subscription) {
-        const fetchCategories = async () => {
-          setIsLoading(true);
-          const { data, error } = await supabase
-            .from('categories')
-            .select('*');
-
-          if (error) {
-            console.error('Error fetching categories:', error);
-            toast({ title: "Error", description: "Failed to load categories for test configuration.", variant: "destructive" });
-          } else {
-            setAllCategories(data || []);
-          }
-          setIsLoading(false);
-        };
-        fetchCategories();
-      } else if (user && !user.has_active_subscription) {
-        setIsLoading(false); // User is logged in but not subscribed
-      } else {
-        navigate('/login'); // Redirect if not logged in
-      }
+    if (!hasCheckedInitialSession) {
+      // Still waiting for initial session check, keep loading state true
+      return;
     }
-  }, [user, isSessionLoading, navigate, toast]);
+
+    if (user && user.has_active_subscription) {
+      const fetchCategories = async () => {
+        setIsLoadingPage(true);
+        const { data, error } = await supabase
+          .from('categories')
+          .select('*');
+
+        if (error) {
+          console.error('Error fetching categories:', error);
+          toast({ title: "Error", description: "Failed to load categories for test configuration.", variant: "destructive" });
+        } else {
+          setAllCategories(data || []);
+        }
+        setIsLoadingPage(false);
+      };
+      fetchCategories();
+    } else if (user && !user.has_active_subscription) {
+      setIsLoadingPage(false); // User is logged in but not subscribed
+    } else {
+      navigate('/login'); // Redirect if not logged in
+    }
+  }, [user, hasCheckedInitialSession, navigate, toast]);
 
   // Timer effect
   useEffect(() => {
-    if (isLoading || isTestSubmitted || showResults || showConfiguration || showInstructions || mcqs.length === 0) return;
+    if (isLoadingPage || isTestSubmitted || showResults || showConfiguration || showInstructions || mcqs.length === 0) return;
 
     const interval = setInterval(() => {
       setTimer((prevTimer) => {
@@ -190,7 +193,7 @@ const TakeTestPage = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isLoading, isTestSubmitted, showResults, showConfiguration, showInstructions, mcqs.length, handleSubmitTest]);
+  }, [isLoadingPage, isTestSubmitted, showResults, showConfiguration, showInstructions, mcqs.length, handleSubmitTest]);
 
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategoryIds((prev) =>
@@ -206,7 +209,7 @@ const TakeTestPage = () => {
       return;
     }
 
-    setIsLoading(true);
+    setIsLoadingPage(true);
     let query = supabase.from('mcqs').select('*');
 
     if (selectedCategoryIds.length > 0) {
@@ -221,13 +224,13 @@ const TakeTestPage = () => {
     if (error) {
       console.error('Error fetching MCQs:', error);
       toast({ title: "Error", description: "Failed to load test questions.", variant: "destructive" });
-      setIsLoading(false);
+      setIsLoadingPage(false);
       return;
     }
 
     if (!data || data.length === 0) {
       toast({ title: "No MCQs", description: "No MCQs available for the selected criteria.", variant: "default" });
-      setIsLoading(false);
+      setIsLoadingPage(false);
       return;
     }
 
@@ -243,7 +246,7 @@ const TakeTestPage = () => {
 
     if (selectedMcqs.length === 0) {
       toast({ title: "No MCQs", description: "No MCQs could be selected based on your criteria. Please adjust.", variant: "default" });
-      setIsLoading(false);
+      setIsLoadingPage(false);
       return;
     }
 
@@ -258,7 +261,7 @@ const TakeTestPage = () => {
 
     setShowConfiguration(false);
     setShowInstructions(true); // Show instructions before starting
-    setIsLoading(false);
+    setIsLoadingPage(false);
   };
 
   const beginTest = () => {
@@ -293,7 +296,7 @@ const TakeTestPage = () => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  if (isLoading || isSessionLoading) {
+  if (!hasCheckedInitialSession || isLoadingPage) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading...</p>
@@ -400,8 +403,8 @@ const TakeTestPage = () => {
             </div>
           </CardContent>
           <CardFooter className="flex justify-center">
-            <Button onClick={startTestPreparation} disabled={isLoading}>
-              {isLoading ? "Preparing Test..." : "Start Test"}
+            <Button onClick={startTestPreparation} disabled={isLoadingPage}>
+              {isLoadingPage ? "Preparing Test..." : "Start Test"}
             </Button>
           </CardFooter>
         </Card>
@@ -442,7 +445,7 @@ const TakeTestPage = () => {
     );
   }
 
-  if (mcqs.length === 0 && !isLoading && !showConfiguration && !showInstructions) {
+  if (mcqs.length === 0 && !isLoadingPage && !showConfiguration && !showInstructions) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
         <Card className="w-full max-w-2xl">

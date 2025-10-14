@@ -20,7 +20,8 @@ interface AuthUser extends User {
 interface SessionContextType {
   session: Session | null;
   user: AuthUser | null;
-  isLoading: boolean;
+  isLoading: boolean; // This will only be true during the very first check
+  hasCheckedInitialSession: boolean; // New flag to indicate if the initial check is complete
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -29,6 +30,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true); // Start as true for initial load
+  const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false); // New state
   const navigate = useNavigate();
   const location = useLocation();
   const isMounted = useRef(true);
@@ -121,16 +123,16 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     console.log('SessionContextProvider: Main useEffect mounted.');
 
     // Initial session check
-    // setIsLoading(true) is already the initial state, no need to set it again here.
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (isMounted.current) {
         console.log('SessionContextProvider: Initial Session Check Result:', initialSession);
         await updateSessionAndUser(initialSession, 'INITIAL_LOAD');
       }
-    }).finally(() => { // Use finally to ensure isLoading is set to false after the initial check
-      if (isMounted.current) { // Still check isMounted to avoid React warnings, but this is the critical point
-        console.log('SessionContextProvider: Initial load complete, setting isLoading to FALSE.');
+    }).finally(() => { // Use finally to ensure isLoading and hasCheckedInitialSession are set after the initial check
+      if (isMounted.current) {
+        console.log('SessionContextProvider: Initial load complete, setting isLoading to FALSE and hasCheckedInitialSession to TRUE.');
         setIsLoading(false);
+        setHasCheckedInitialSession(true);
       }
     });
 
@@ -165,7 +167,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {
     console.log('Redirection useEffect: Current state - isLoading:', isLoading, 'user:', user ? `(ID: ${user.id}, Admin: ${user.is_admin}, Subscribed: ${user.has_active_subscription})` : 'null', 'pathname:', location.pathname);
-    if (!isLoading && user && (location.pathname === '/login' || location.pathname === '/signup')) {
+    if (hasCheckedInitialSession && user && (location.pathname === '/login' || location.pathname === '/signup')) {
       console.log('Redirection triggered. User is_admin:', user.is_admin, 'User has_active_subscription:', user.has_active_subscription);
       if (user.is_admin) {
         navigate('/admin/dashboard');
@@ -173,10 +175,10 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         navigate('/user/dashboard');
       }
     }
-  }, [user, isLoading, navigate, location.pathname]);
+  }, [user, hasCheckedInitialSession, navigate, location.pathname]);
 
   return (
-    <SessionContext.Provider value={{ session, user, isLoading }}>
+    <SessionContext.Provider value={{ session, user, isLoading, hasCheckedInitialSession }}>
       {children}
     </SessionContext.Provider>
   );

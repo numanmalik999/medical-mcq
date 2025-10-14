@@ -16,6 +16,7 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, Wand2 } from 'lucide-react'; // Import Wand2 icon
+import MultiSelect from '@/components/MultiSelect'; // Import MultiSelect
 
 interface Category {
   id: string;
@@ -28,36 +29,46 @@ interface Subcategory {
   name: string;
 }
 
-const formSchema = z.object({
-  question_text: z.string().min(1, "Question text is required."),
-  option_a: z.string().min(1, "Option A is required."),
-  option_b: z.string().min(1, "Option B is required."),
-  option_c: z.string().min(1, "Option C is required."),
-  option_d: z.string().min(1, "Option D is required."),
-  correct_answer: z.enum(['A', 'B', 'C', 'D'], { message: "Correct answer is required." }),
-  explanation_text: z.string().min(1, "Explanation text is required."),
-  image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
-  category_id: z.string().uuid("Invalid category ID.").optional().or(z.literal('')),
-  subcategory_id: z.string().uuid("Invalid subcategory ID.").optional().or(z.literal('')),
-  difficulty: z.string().optional().or(z.literal('')),
-  is_trial_mcq: z.boolean().optional(),
-}).refine((data) => {
-  if (data.subcategory_id && !data.category_id) {
-    return false;
-  }
-  return true;
-}, {
-  message: "A category must be selected if a subcategory is chosen.",
-  path: ["category_id"],
-});
-
 const AddMcqPage = () => {
-  const { toast, dismiss } = useToast(); // Destructure dismiss from useToast
+  const { toast, dismiss } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGeneratingAI, setIsGeneratingAI] = useState(false); // New state for AI generation
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
+  const [availableSubcategories, setAvailableSubcategories] = useState<Subcategory[]>([]);
+
+  // Define formSchema inside the component to access `subcategories` state
+  const formSchema = z.object({
+    question_text: z.string().min(1, "Question text is required."),
+    option_a: z.string().min(1, "Option A is required."),
+    option_b: z.string().min(1, "Option B is required."),
+    option_c: z.string().min(1, "Option C is required."),
+    option_d: z.string().min(1, "Option D is required."),
+    correct_answer: z.enum(['A', 'B', 'C', 'D'], { message: "Correct answer is required." }),
+    explanation_text: z.string().min(1, "Explanation text is required."),
+    image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
+    category_ids: z.array(z.string().uuid("Invalid category ID.")).optional(),
+    subcategory_ids: z.array(z.string().uuid("Invalid subcategory ID.")).optional(),
+    difficulty: z.string().optional().or(z.literal('')),
+    is_trial_mcq: z.boolean().optional(),
+  }).refine((data) => {
+    // If subcategories are selected, at least one category must be selected
+    if (data.subcategory_ids && data.subcategory_ids.length > 0 && (!data.category_ids || data.category_ids.length === 0)) {
+      return false;
+    }
+    // Also, ensure selected subcategories belong to selected categories
+    if (data.subcategory_ids && data.subcategory_ids.length > 0 && data.category_ids && data.category_ids.length > 0) {
+      const selectedSubcategoryObjects = subcategories.filter((sub: Subcategory) => data.subcategory_ids?.includes(sub.id));
+      const allSelectedSubcategoriesBelongToSelectedCategories = selectedSubcategoryObjects.every((sub: Subcategory) => data.category_ids?.includes(sub.category_id));
+      if (!allSelectedSubcategoriesBelongToSelectedCategories) {
+        return false;
+      }
+    }
+    return true;
+  }, {
+    message: "Selected subcategories must belong to selected categories, and a category must be selected if a subcategory is chosen.",
+    path: ["subcategory_ids"],
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -70,14 +81,14 @@ const AddMcqPage = () => {
       correct_answer: 'A',
       explanation_text: "",
       image_url: "",
-      category_id: "",
-      subcategory_id: "",
+      category_ids: [],
+      subcategory_ids: [],
       difficulty: "",
       is_trial_mcq: false,
     },
   });
 
-  const selectedCategoryId = form.watch("category_id");
+  const selectedCategoryIds = form.watch("category_ids");
 
   useEffect(() => {
     const fetchCategoriesAndSubcategories = async () => {
@@ -105,13 +116,23 @@ const AddMcqPage = () => {
   }, [toast]);
 
   useEffect(() => {
-    if (selectedCategoryId) {
-      setFilteredSubcategories(subcategories.filter(sub => sub.category_id === selectedCategoryId));
+    if (selectedCategoryIds && selectedCategoryIds.length > 0) {
+      const filtered = subcategories.filter(sub => selectedCategoryIds.includes(sub.category_id));
+      setAvailableSubcategories(filtered);
+
+      // Also, remove any selected subcategories that no longer belong to the selected categories
+      const currentSelectedSubcategories = form.getValues("subcategory_ids") || [];
+      const validSelectedSubcategories = currentSelectedSubcategories.filter(subId =>
+        filtered.some(fSub => fSub.id === subId)
+      );
+      if (validSelectedSubcategories.length !== currentSelectedSubcategories.length) {
+        form.setValue("subcategory_ids", validSelectedSubcategories);
+      }
     } else {
-      setFilteredSubcategories([]);
-      form.setValue("subcategory_id", "");
+      setAvailableSubcategories([]);
+      form.setValue("subcategory_ids", []); // Clear subcategories if no category is selected
     }
-  }, [selectedCategoryId, subcategories, form]);
+  }, [selectedCategoryIds, subcategories, form]);
 
   const handleGenerateWithAI = async () => {
     const { question_text, option_a, option_b, option_c, option_d, correct_answer } = form.getValues();
@@ -151,12 +172,17 @@ const AddMcqPage = () => {
 
       // NEW LOGIC: Handle suggested subcategory
       if (data.suggested_subcategory_name) {
-        if (selectedCategoryId) {
-          const matchedSubcategory = filteredSubcategories.find(
-            (sub) => sub.name.toLowerCase() === data.suggested_subcategory_name.toLowerCase()
+        const currentSelectedCategoryIds = form.getValues("category_ids") || [];
+        if (currentSelectedCategoryIds.length > 0) {
+          const matchedSubcategory = availableSubcategories.find(
+            (sub) => sub.name.toLowerCase() === data.suggested_subcategory_name.toLowerCase() &&
+                     currentSelectedCategoryIds.includes(sub.category_id)
           );
           if (matchedSubcategory) {
-            form.setValue("subcategory_id", matchedSubcategory.id);
+            const currentSubcategoryIds = form.getValues("subcategory_ids") || [];
+            if (!currentSubcategoryIds.includes(matchedSubcategory.id)) {
+              form.setValue("subcategory_ids", [...currentSubcategoryIds, matchedSubcategory.id]);
+            }
             toast({
               title: "Subcategory Suggested",
               description: `AI suggested and matched subcategory: "${matchedSubcategory.name}".`,
@@ -165,10 +191,9 @@ const AddMcqPage = () => {
           } else {
             toast({
               title: "Subcategory Suggested",
-              description: `AI suggested subcategory "${data.suggested_subcategory_name}", but no match found in selected category. Please select manually.`,
+              description: `AI suggested subcategory "${data.suggested_subcategory_name}", but no match found in selected categories. Please select manually.`,
               variant: "default",
             });
-            form.setValue("subcategory_id", ""); // Clear if no match
           }
         } else {
           toast({
@@ -176,10 +201,7 @@ const AddMcqPage = () => {
             description: `AI suggested subcategory "${data.suggested_subcategory_name}", but a category must be selected first. Please select manually.`,
             variant: "default",
           });
-          form.setValue("subcategory_id", ""); // Clear if no category selected
         }
-      } else {
-        form.setValue("subcategory_id", ""); // Clear if AI didn't suggest one
       }
 
       dismiss(loadingToastId.id);
@@ -218,8 +240,8 @@ const AddMcqPage = () => {
         throw explanationError;
       }
 
-      // Then, insert the MCQ with the explanation_id, category_id, subcategory_id, and is_trial_mcq
-      const { error: mcqError } = await supabase
+      // Then, insert the MCQ
+      const { data: mcqData, error: mcqError } = await supabase
         .from('mcqs')
         .insert({
           question_text: values.question_text,
@@ -229,14 +251,51 @@ const AddMcqPage = () => {
           option_d: values.option_d,
           correct_answer: values.correct_answer,
           explanation_id: explanationData.id,
-          category_id: values.category_id || null,
-          subcategory_id: values.subcategory_id || null,
           difficulty: values.difficulty || null,
           is_trial_mcq: values.is_trial_mcq,
-        });
+        })
+        .select('id')
+        .single();
 
       if (mcqError) {
         throw mcqError;
+      }
+
+      // Handle mcq_category_links
+      if (values.category_ids && values.category_ids.length > 0) {
+        const linksToInsert = values.category_ids.map(catId => {
+          // Find subcategories that belong to this category and are selected
+          const selectedSubcategoriesForThisCategory = (values.subcategory_ids || []).filter(subId =>
+            subcategories.some(sub => sub.id === subId && sub.category_id === catId)
+          );
+
+          if (selectedSubcategoriesForThisCategory.length > 0) {
+            // Create a link for each selected subcategory within this category
+            return selectedSubcategoriesForThisCategory.map(subId => ({
+              mcq_id: mcqData.id,
+              category_id: catId,
+              subcategory_id: subId,
+            }));
+          } else {
+            // If no subcategories are selected for this category, create a link with null subcategory
+            return [{
+              mcq_id: mcqData.id,
+              category_id: catId,
+              subcategory_id: null,
+            }];
+          }
+        }).flat(); // Flatten the array of arrays
+
+        if (linksToInsert.length > 0) {
+          const { error: insertLinkError } = await supabase
+            .from('mcq_category_links')
+            .insert(linksToInsert);
+
+          if (insertLinkError) {
+            console.error("Error inserting new category links:", insertLinkError);
+            throw insertLinkError;
+          }
+        }
       }
 
       toast({
@@ -371,22 +430,18 @@ const AddMcqPage = () => {
 
               <FormField
                 control={form.control}
-                name="category_id"
+                name="category_ids"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Category (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Categories (Optional)</FormLabel>
+                    <FormControl>
+                      <MultiSelect
+                        options={categories.map(cat => ({ value: cat.id, label: cat.name }))}
+                        selectedValues={field.value || []}
+                        onValueChange={field.onChange}
+                        placeholder="Select categories"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -394,22 +449,19 @@ const AddMcqPage = () => {
 
               <FormField
                 control={form.control}
-                name="subcategory_id"
+                name="subcategory_ids"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Subcategory (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''} disabled={!selectedCategoryId || filteredSubcategories.length === 0}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a subcategory" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {filteredSubcategories.map((subcat) => (
-                          <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Subcategories (Optional)</FormLabel>
+                    <FormControl>
+                      <MultiSelect
+                        options={availableSubcategories.map(sub => ({ value: sub.id, label: sub.name }))}
+                        selectedValues={field.value || []}
+                        onValueChange={field.onChange}
+                        placeholder="Select subcategories"
+                        disabled={!selectedCategoryIds || selectedCategoryIds.length === 0}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -426,17 +478,17 @@ const AddMcqPage = () => {
                         <SelectTrigger>
                           <SelectValue placeholder="Select difficulty" />
                         </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Easy">Easy</SelectItem>
-                        <SelectItem value="Medium">Medium</SelectItem>
-                        <SelectItem value="Hard">Hard</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Easy">Easy</SelectItem>
+                      <SelectItem value="Medium">Medium</SelectItem>
+                      <SelectItem value="Hard">Hard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
               <FormField
                 control={form.control}

@@ -46,15 +46,19 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     }
     console.log(`[fetchUserProfile] START: Fetching profile for user ID: ${supabaseUser.id}`);
     let profileData = null;
+    let profileError = null; // Initialize profileError to capture it
+
     try {
-      console.log('[fetchUserProfile] Before Supabase profile select call.'); // NEW LOG
-      const { data: profileDataArray, error: profileError } = await supabase
+      console.log('[fetchUserProfile] Attempting Supabase profile select call...');
+      const { data: profileDataArray, error: fetchError } = await supabase
         .from('profiles')
         .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
         .eq('id', supabaseUser.id);
-      console.log('[fetchUserProfile] After Supabase profile select call.'); // NEW LOG
-      console.log('[fetchUserProfile] Supabase profile data:', profileDataArray); // NEW LOG
-      console.log('[fetchUserProfile] Supabase profile error:', profileError); // NEW LOG
+      
+      profileError = fetchError; // Assign the error if any
+      console.log('[fetchUserProfile] Supabase profile select call completed.');
+      console.log('[fetchUserProfile] Supabase profile data:', profileDataArray);
+      console.log('[fetchUserProfile] Supabase profile error:', profileError);
 
       if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows found
         console.error(`[fetchUserProfile] ERROR: fetching profile (code: ${profileError.code}):`, profileError);
@@ -63,11 +67,11 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         profileData = profileDataArray[0];
       }
     } catch (e) {
-      console.error(`[fetchUserProfile] UNEXPECTED ERROR during Supabase profile fetch:`, e);
+      console.error(`[fetchUserProfile] UNEXPECTED EXCEPTION during Supabase profile fetch:`, e);
       // Ensure we still return a hydrated user even if fetch fails
     }
     
-    console.log('[fetchUserProfile] Profile data processed:', profileData); // Changed log message
+    console.log('[fetchUserProfile] Profile data processed:', profileData);
     const hydratedUser: AuthUser = {
       ...supabaseUser,
       is_admin: profileData?.is_admin || false,
@@ -105,12 +109,12 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.log('[updateSessionAndUser] Session exists, fetching user profile.');
         const authUser = await fetchUserProfile(currentSession.user);
         if (isMounted.current) {
-          console.log('[updateSessionAndUser] Setting session and user states.'); // NEW LOG
+          console.log('[updateSessionAndUser] Setting session and user states.');
           setSession(currentSession);
           setUser(authUser);
-          console.log('[updateSessionAndUser] User and Session states updated.'); // Added log
+          console.log('[updateSessionAndUser] User and Session states updated.');
         } else {
-          console.warn('[updateSessionAndUser] Component unmounted before setting session and user states.'); // NEW LOG
+          console.warn('[updateSessionAndUser] Component unmounted before setting session and user states.');
         }
       }
     } catch (error) {
@@ -135,14 +139,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.log('SessionContextProvider: Initial load complete, setting hasCheckedInitialSession to TRUE.');
         setHasCheckedInitialSession(true);
       } else {
-        console.warn('SessionContextProvider: Component unmounted before setting hasCheckedInitialSession in finally block.'); // NEW LOG
+        console.warn('SessionContextProvider: Component unmounted before setting hasCheckedInitialSession in finally block.');
       }
     });
 
     // Listen for auth state changes (these will update session/user but not toggle global isLoading)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) {
-        console.warn(`SessionContextProvider: onAuthStateChange: Skipping event ${event} - component unmounted.`); // NEW LOG
+        console.warn(`SessionContextProvider: onAuthStateChange: Skipping event ${event} - component unmounted.`);
         return;
       }
       console.log('SessionContextProvider: onAuthStateChange: Event:', event, 'Session:', currentSession);
@@ -156,7 +160,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         await updateSessionAndUser(currentSession, 'TAB_FOCUS');
       } else if (!isMounted.current) {
-        console.warn('SessionContextProvider: handleVisibilityChange: Skipping - component unmounted.'); // NEW LOG
+        console.warn('SessionContextProvider: handleVisibilityChange: Skipping - component unmounted.');
       }
     };
 

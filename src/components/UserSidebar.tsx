@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom'; // Import useNavigate
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -49,6 +49,7 @@ const UserSidebar = () => {
   const [isOpen, setIsOpen] = React.useState(false);
   const { toast } = useToast();
   const { user } = useSession();
+  const navigate = useNavigate(); // Initialize useNavigate
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -69,6 +70,7 @@ const UserSidebar = () => {
     if (isMobile) {
       setIsOpen(false);
     }
+    navigate('/login'); // Redirect to login page after logout
   };
 
   const navItems = [

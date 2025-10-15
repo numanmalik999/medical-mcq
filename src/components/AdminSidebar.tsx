@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom'; // Removed useNavigate
+import { Link, useLocation, useNavigate } from 'react-router-dom'; // Import useNavigate
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -43,6 +43,7 @@ const NavLink = ({ to, icon, label, isMobile, onLinkClick }: NavLinkProps) => {
 const AdminSidebar = () => {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
+  const navigate = useNavigate(); // Initialize useNavigate
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -52,10 +53,10 @@ const AdminSidebar = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    // The SessionContextProvider will handle the navigation to /login
     if (isMobile) {
       setIsOpen(false);
     }
+    navigate('/login'); // Redirect to login page after logout
   };
 
   const navItems = [

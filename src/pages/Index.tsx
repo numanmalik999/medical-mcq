@@ -61,7 +61,7 @@ const Index = () => {
               <Link to="/user/subscriptions"> {/* Changed from /signup to /user/subscriptions */}
                 <Button size="lg" variant="outline">Sign Up & Subscribe</Button>
               </Link>
-              <Link to="/quiz">
+              <Link to="/user/dashboard"> {/* Corrected link for guest mode */}
                 <Button size="lg" variant="ghost">Continue as Guest</Button>
               </Link>
             </>

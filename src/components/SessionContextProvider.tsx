@@ -54,17 +54,11 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       console.log('[fetchUserProfile] Attempting Supabase profile select call...');
       console.trace('[fetchUserProfile] Call stack before select');
 
-      const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('Supabase profile fetch timed out after 10 seconds')), 10000)
-      );
-
-      const { data: profileDataArray, error: selectError } = await Promise.race([
-        supabase
-          .from('profiles')
-          .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
-          .eq('id', supabaseUser.id),
-        timeoutPromise
-      ]);
+      // Removed the Promise.race with timeout, as it confirmed the query is just slow.
+      const { data: profileDataArray, error: selectError } = await supabase
+        .from('profiles')
+        .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
+        .eq('id', supabaseUser.id);
       
       fetchError = selectError;
       console.log('[fetchUserProfile] Supabase profile select call completed.');
@@ -76,9 +70,10 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } else if (profileDataArray && profileDataArray[0]) {
         profileData = profileDataArray[0];
       }
-    } catch (e: any) { // Catch the timeout error or any other unexpected exceptions
+    } catch (e: any) { // Catch any unexpected exceptions
       console.error(`[fetchUserProfile] UNEXPECTED EXCEPTION during Supabase profile fetch:`, e.message || e);
-      fetchError = { message: e.message || 'Unknown error during fetch', code: 'CLIENT_TIMEOUT' }; // Assign a custom error for timeout
+      // Assign a generic error if an unexpected exception occurs
+      fetchError = { message: e.message || 'Unknown error during fetch', code: 'UNEXPECTED_EXCEPTION' }; 
     }
     
     console.log('[fetchUserProfile] Profile data processed:', profileData);

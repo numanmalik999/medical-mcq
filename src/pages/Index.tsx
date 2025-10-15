@@ -58,8 +58,11 @@ const Index = () => {
               <Link to="/login">
                 <Button size="lg">Login</Button>
               </Link>
-              <Link to="/signup">
-                <Button size="lg" variant="outline">Sign Up</Button>
+              <Link to="/user/subscriptions"> {/* Changed from /signup to /user/subscriptions */}
+                <Button size="lg" variant="outline">Sign Up & Subscribe</Button>
+              </Link>
+              <Link to="/quiz">
+                <Button size="lg" variant="ghost">Continue as Guest</Button>
               </Link>
             </>
           )}

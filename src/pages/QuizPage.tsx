@@ -81,7 +81,7 @@ const QuizPage = () => {
   const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
 
   const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
-  const [isTrialActiveSession, setIsTrialActiveSession] = useState(false);
+  const [isTrialActiveSession, setIsTrialActiveSession] = useState(false); // True if user is in trial mode (either actual trial or guest)
 
   // State for feedback dialog
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
@@ -115,19 +115,21 @@ const QuizPage = () => {
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      if (user) {
-        fetchQuizOverview();
+      // If user is null (guest), force trial mode
+      if (!user) {
+        setIsTrialActiveSession(true);
+        fetchQuizOverview(); // Fetch overview for guests
+      } else {
+        // If user is logged in, determine trial status
         if (!user.has_active_subscription && !user.trial_taken) {
           setIsTrialActiveSession(true);
         } else {
           setIsTrialActiveSession(false);
         }
-      } else {
-        setIsPageLoading(false); // Not logged in, stop loading
-        navigate('/login'); // Redirect if not logged in after initial check
+        fetchQuizOverview(); // Fetch overview for logged-in users
       }
     }
-  }, [user, hasCheckedInitialSession, navigate]); // Dependencies changed
+  }, [user, hasCheckedInitialSession]); // Dependencies changed
 
   const fetchQuizOverview = async () => {
     setIsPageLoading(true); // Set loading for this specific fetch
@@ -177,7 +179,7 @@ const QuizPage = () => {
       let totalAttempts = 0;
       let correctAttempts = 0;
 
-      if (user) { // Ensure user is available
+      if (user) { // Only fetch user attempts if logged in
         const { data: userAttemptsData, error: userAttemptsError } = await supabase
           .from('user_quiz_attempts')
           .select('is_correct, mcq_id')
@@ -211,23 +213,26 @@ const QuizPage = () => {
   };
 
   const startQuizSession = async (categoryId: string, subcategoryId: string | null, mode: 'random' | 'incorrect') => {
-    if (!user) {
-      toast({ title: "Error", description: "You must be logged in to start a quiz.", variant: "destructive" });
-      navigate('/login');
+    const isSubscribed = user?.has_active_subscription;
+    const hasTakenTrial = user?.trial_taken;
+
+    // If not subscribed and trial is taken, show prompt
+    if (!isSubscribed && hasTakenTrial) {
+      setShowSubscriptionPrompt(true);
       return;
     }
 
-    const isSubscribed = user.has_active_subscription;
-    const hasTakenTrial = user.trial_taken;
-
-    if (!isSubscribed) {
-      if (hasTakenTrial) {
-        setShowSubscriptionPrompt(true);
-        return;
-      }
+    // If user is a guest, or logged in but not subscribed and hasn't taken trial, activate trial session
+    if (!user || (!isSubscribed && !hasTakenTrial)) {
       setIsTrialActiveSession(true);
     } else {
       setIsTrialActiveSession(false);
+    }
+
+    // If guest or trial user tries to attempt incorrect questions, disallow
+    if ((!user || isTrialActiveSession) && mode === 'incorrect') {
+      toast({ title: "Feature Restricted", description: "This feature is only available for subscribed users.", variant: "default" });
+      return;
     }
 
     setIsPageLoading(true); // Set loading for this specific fetch
@@ -251,7 +256,7 @@ const QuizPage = () => {
       query = query.eq('subcategory_id', subcategoryId);
     }
 
-    if (isTrialActiveSession) {
+    if (!isSubscribed) { // If not subscribed (includes guests and trial users)
       query = query.eq('is_trial_mcq', true);
     }
 
@@ -270,18 +275,13 @@ const QuizPage = () => {
         setIsPageLoading(false);
         return;
       }
-      mcqsToLoad = data.sort(() => 0.5 - Math.random()).slice(0, Math.min(data.length, isTrialActiveSession ? TRIAL_MCQ_LIMIT : data.length));
+      mcqsToLoad = data.sort(() => 0.5 - Math.random()).slice(0, Math.min(data.length, (!isSubscribed) ? TRIAL_MCQ_LIMIT : data.length));
     } else if (mode === 'incorrect') {
-      if (isTrialActiveSession) {
-        toast({ title: "Trial Mode", description: "You can only attempt random trial questions during your free trial.", variant: "default" });
-        setIsPageLoading(false);
-        return;
-      }
-
+      // This block should only be reachable by subscribed users due to earlier check
       const { data: incorrectAttempts, error: attemptsError } = await supabase
         .from('user_quiz_attempts')
         .select('mcq_id')
-        .eq('user_id', user.id)
+        .eq('user_id', user!.id) // user is guaranteed to exist here
         .eq('category_id', categoryId)
         .eq('is_correct', false);
 
@@ -324,7 +324,8 @@ const QuizPage = () => {
       setSelectedAnswer(userAnswers.get(mcqsToLoad[0].id) || null);
     }
 
-    if (isTrialActiveSession && !hasTakenTrial) {
+    // Mark trial_taken only if a logged-in user starts a trial
+    if (user && isTrialActiveSession && !hasTakenTrial) {
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ trial_taken: true })
@@ -333,7 +334,8 @@ const QuizPage = () => {
         console.error('Error marking trial_taken:', updateError);
         toast({ title: "Error", description: "Failed to update trial status.", variant: "destructive" });
       } else {
-        if (user) user.trial_taken = true;
+        // Update the user object in session context if possible, or trigger a re-fetch
+        // For now, we'll rely on the next session refresh to pick this up.
         toast({ title: "Trial Started!", description: `You have started your free trial. Enjoy ${TRIAL_MCQ_LIMIT} trial questions!`, variant: "default" });
       }
     }
@@ -377,7 +379,7 @@ const QuizPage = () => {
   }, [currentMcq]);
 
   const handleSubmitAnswer = async () => {
-    if (!selectedAnswer || !currentMcq || !user) return;
+    if (!selectedAnswer || !currentMcq) return;
 
     setIsSubmittingAnswer(true);
     const isCorrect = selectedAnswer === currentMcq.correct_answer;
@@ -388,36 +390,42 @@ const QuizPage = () => {
     }
     setShowExplanation(true);
 
-    try {
-      const { error } = await supabase.from('user_quiz_attempts').insert({
-        user_id: user.id,
-        mcq_id: currentMcq.id,
-        category_id: currentMcq.category_id,
-        subcategory_id: currentMcq.subcategory_id,
-        selected_option: selectedAnswer,
-        is_correct: isCorrect,
-      });
+    if (user) { // Only record attempts if user is logged in
+      try {
+        const { error } = await supabase.from('user_quiz_attempts').insert({
+          user_id: user.id,
+          mcq_id: currentMcq.id,
+          category_id: currentMcq.category_id,
+          subcategory_id: currentMcq.subcategory_id,
+          selected_option: selectedAnswer,
+          is_correct: isCorrect,
+        });
 
-      if (error) {
-        console.error('Error recording quiz attempt:', error);
+        if (error) {
+          console.error('Error recording quiz attempt:', error);
+          toast({
+            title: "Error",
+            description: `Failed to record quiz attempt: ${error.message}`,
+            variant: "destructive",
+          });
+        }
+      } catch (error: any) {
+        console.error('Unhandled error recording quiz attempt:', error);
         toast({
           title: "Error",
-          description: `Failed to record quiz attempt: ${error.message}`,
+          description: `An unexpected error occurred while recording your attempt: ${error.message}`,
           variant: "destructive",
         });
       }
-    } catch (error: any) {
-      console.error('Unhandled error recording quiz attempt:', error);
-      toast({
-        title: "Error",
-        description: `An unexpected error occurred while recording your attempt: ${error.message}`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmittingAnswer(false);
-      if (currentMcq.explanation_id) {
-        fetchExplanation(currentMcq.explanation_id);
-      }
+    } else {
+      console.log("Guest user, not recording quiz attempt.");
+    }
+    
+    // This block was previously a standalone 'finally' and caused the error.
+    // Its contents are now correctly placed to execute unconditionally.
+    setIsSubmittingAnswer(false);
+    if (currentMcq.explanation_id) {
+      fetchExplanation(currentMcq.explanation_id);
     }
   };
 
@@ -442,7 +450,7 @@ const QuizPage = () => {
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
       const prevQuestion = quizQuestions[currentQuestionIndex - 1];
-      setCurrentQuestionIndex((prev) => prev - 1);
+      setCurrentQuestionIndex((prev) => prev - 1); // Corrected to go to previous
       setSelectedAnswer(userAnswers.get(prevQuestion?.id || '') || null);
       setFeedback(null);
       setShowExplanation(false);
@@ -460,9 +468,6 @@ const QuizPage = () => {
   }, [quizQuestions, userAnswers]);
 
   const submitFullQuiz = async () => {
-    if (!user) return;
-
-    setIsPageLoading(true); // Set loading for this specific fetch
     let correctCount = 0;
     const explanationPromises: Promise<MCQExplanation | null>[] = [];
     const mcqExplanationIds = new Set<string>();
@@ -544,10 +549,6 @@ const QuizPage = () => {
     );
   }
 
-  if (!user) {
-    return null; // Redirection is handled by SessionContextProvider
-  }
-
   if (showSubscriptionPrompt) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
@@ -599,14 +600,18 @@ const QuizPage = () => {
                     <CardHeader>
                       <CardTitle className="text-lg">{cat.name}</CardTitle>
                       <CardDescription>
-                        {user.has_active_subscription ? `${cat.total_mcqs} MCQs available` : `${cat.total_trial_mcqs} Trial MCQs available`}
+                        {user?.has_active_subscription ? `${cat.total_mcqs} MCQs available` : `${cat.total_trial_mcqs} Trial MCQs available`}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow space-y-2 text-sm">
-                      <p>Attempts: {cat.user_attempts}</p>
-                      <p>Correct: {cat.user_correct}</p>
-                      <p>Incorrect: {cat.user_incorrect}</p>
-                      <p>Accuracy: {cat.user_accuracy}</p>
+                      {user && ( // Only show performance stats if logged in
+                        <>
+                          <p>Attempts: {cat.user_attempts}</p>
+                          <p>Correct: {cat.user_correct}</p>
+                          <p>Incorrect: {cat.user_incorrect}</p>
+                          <p>Accuracy: {cat.user_accuracy}</p>
+                        </>
+                      )}
                       <div className="space-y-2 mt-4">
                         <Label htmlFor={`subcategory-select-${cat.id}`}>Subcategory (Optional)</Label>
                         <Select
@@ -633,29 +638,31 @@ const QuizPage = () => {
                         onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'random')}
                         className="w-full"
                         disabled={
-                          (user.has_active_subscription && cat.total_mcqs === 0) ||
-                          (!user.has_active_subscription && cat.total_trial_mcqs === 0) ||
-                          (!user.has_active_subscription && user.trial_taken)
+                          (user?.has_active_subscription && cat.total_mcqs === 0) ||
+                          (!user?.has_active_subscription && cat.total_trial_mcqs === 0) ||
+                          (!user?.has_active_subscription && user?.trial_taken)
                         }
                       >
-                        {user.has_active_subscription ? "Start Quiz" : (user.trial_taken ? "Subscribe to Start" : "Start Trial Quiz")}
+                        {user?.has_active_subscription ? "Start Quiz" : (user?.trial_taken ? "Subscribe to Start" : "Start Trial Quiz")}
                       </Button>
                       <Button
                         onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'incorrect')}
                         className="w-full"
                         variant="secondary"
-                        disabled={cat.user_incorrect === 0 || !user.has_active_subscription}
+                        disabled={cat.user_incorrect === 0 || !user?.has_active_subscription}
                       >
                         Attempt Incorrect ({cat.user_incorrect})
                       </Button>
-                      <Button
-                        onClick={() => handleResetProgress(cat.id)}
-                        className="w-full"
-                        variant="destructive"
-                        disabled={cat.user_attempts === 0}
-                      >
-                        <RotateCcw className="h-4 w-4 mr-2" /> Reset Progress
-                      </Button>
+                      {user && ( // Only show reset progress if logged in
+                        <Button
+                          onClick={() => handleResetProgress(cat.id)}
+                          className="w-full"
+                          variant="destructive"
+                          disabled={cat.user_attempts === 0}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" /> Reset Progress
+                        </Button>
+                      )}
                     </CardFooter>
                   </Card>
                 ))}
@@ -841,13 +848,15 @@ const QuizPage = () => {
                 {explanations.get(currentMcq.explanation_id || '')?.image_url && (
                   <img src={explanations.get(currentMcq.explanation_id || '')?.image_url || ''} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
                 )}
-                <Button
-                  variant="outline"
-                  className="mt-4 w-full"
-                  onClick={() => setIsFeedbackDialogOpen(true)}
-                >
-                  <MessageSquareText className="h-4 w-4 mr-2" /> Add Notes or Feedback
-                </Button>
+                {user && ( // Only allow feedback if logged in
+                  <Button
+                    variant="outline"
+                    className="mt-4 w-full"
+                    onClick={() => setIsFeedbackDialogOpen(true)}
+                  >
+                    <MessageSquareText className="h-4 w-4 mr-2" /> Add Notes or Feedback
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>

@@ -25,6 +25,9 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
+// Define routes that are accessible to unauthenticated users (guests)
+const guestAllowedRoutes = ['/', '/login', '/signup', '/quiz', '/user/subscriptions'];
+
 export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -116,9 +119,12 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.log('[updateSessionAndUser] No session, clearing user and session states.');
         setSession(null);
         setUser(null);
-        if (location.pathname !== '/login' && location.pathname !== '/signup') {
-          console.log('[updateSessionAndUser] Navigating to /login due to no session.');
+        // Only redirect to login if the current path is NOT a guest-allowed route
+        if (!guestAllowedRoutes.includes(location.pathname)) {
+          console.log('[updateSessionAndUser] Navigating to /login due to no session and non-guest route.');
           navigate('/login');
+        } else {
+          console.log('[updateSessionAndUser] No session, but on a guest-allowed route. Not redirecting.');
         }
       } else {
         console.log('[updateSessionAndUser] Session exists, fetching user profile.');

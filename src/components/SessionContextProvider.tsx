@@ -52,13 +52,13 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
     const timeoutPromise = new Promise<null>((resolve) =>
       setTimeout(() => {
-        console.warn(`[fetchUserProfile] WARNING: Supabase profile fetch timed out after 3 seconds for user ID: ${supabaseUser.id}.`);
+        console.warn(`[fetchUserProfile] WARNING: Supabase profile fetch timed out after 5 seconds for user ID: ${supabaseUser.id}.`);
         resolve(null); // Resolve with null to indicate timeout
-      }, 3000) // Increased to 3-second timeout
+      }, 5000) // Increased to 5-second timeout
     );
 
     try {
-      console.log('[fetchUserProfile] Attempting Supabase profile select call with 3-second timeout...');
+      console.log('[fetchUserProfile] Attempting Supabase profile select call with 5-second timeout...');
       console.trace('[fetchUserProfile] Call stack before select');
 
       const { data: profileDataArray, error: selectError } = await Promise.race([
@@ -180,24 +180,23 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       await updateSessionAndUser(currentSession, event);
     });
 
-    // Listen for tab visibility changes to re-check session
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && isMounted.current) {
-        console.log('SessionContextProvider: Tab became visible, re-checking session...');
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        await updateSessionAndUser(currentSession, 'TAB_FOCUS');
-      } else if (!isMounted.current) {
-        console.warn('SessionContextProvider: handleVisibilityChange: Skipping - component unmounted.');
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Removed the visibilitychange event listener to stop app refreshing on tab switch.
+    // const handleVisibilityChange = async () => {
+    //   if (document.visibilityState === 'visible' && isMounted.current) {
+    //     console.log('SessionContextProvider: Tab became visible, re-checking session...');
+    //     const { data: { session: currentSession } } = await supabase.auth.getSession();
+    //     await updateSessionAndUser(currentSession, 'TAB_FOCUS');
+    //   } else if (!isMounted.current) {
+    //     console.warn('SessionContextProvider: handleVisibilityChange: Skipping - component unmounted.');
+    //   }
+    // };
+    // document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       isMounted.current = false;
-      console.log('SessionContextProvider: Main useEffect cleanup, unsubscribing from auth state changes and visibilitychange.');
+      console.log('SessionContextProvider: Main useEffect cleanup, unsubscribing from auth state changes.');
       subscription.unsubscribe();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // document.removeEventListener('visibilitychange', handleVisibilityChange); // Removed cleanup for visibilitychange
     };
   }, [updateSessionAndUser]); // Removed navigate, location.pathname from dependencies
 

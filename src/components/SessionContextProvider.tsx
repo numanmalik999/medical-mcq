@@ -25,9 +25,6 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-// Define routes that are accessible to unauthenticated users (guests)
-const guestAllowedRoutes = ['/', '/login', '/signup', '/quiz', '/user/subscriptions'];
-
 export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -55,13 +52,13 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
     const timeoutPromise = new Promise<null>((resolve) =>
       setTimeout(() => {
-        console.warn(`[fetchUserProfile] WARNING: Supabase profile fetch timed out after 1 second for user ID: ${supabaseUser.id}.`);
+        console.warn(`[fetchUserProfile] WARNING: Supabase profile fetch timed out after 3 seconds for user ID: ${supabaseUser.id}.`);
         resolve(null); // Resolve with null to indicate timeout
-      }, 1000) // 1-second timeout
+      }, 3000) // Increased to 3-second timeout
     );
 
     try {
-      console.log('[fetchUserProfile] Attempting Supabase profile select call with 1-second timeout...');
+      console.log('[fetchUserProfile] Attempting Supabase profile select call with 3-second timeout...');
       console.trace('[fetchUserProfile] Call stack before select');
 
       const { data: profileDataArray, error: selectError } = await Promise.race([
@@ -119,13 +116,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.log('[updateSessionAndUser] No session, clearing user and session states.');
         setSession(null);
         setUser(null);
-        // Only redirect to login if the current path is NOT a guest-allowed route
-        if (!guestAllowedRoutes.includes(location.pathname)) {
-          console.log('[updateSessionAndUser] Navigating to /login due to no session and non-guest route.');
-          navigate('/login');
-        } else {
-          console.log('[updateSessionAndUser] No session, but on a guest-allowed route. Not redirecting.');
-        }
+        // Removed internal redirection for unauthenticated users.
+        // Route protection (e.g., UserProtectedRoute) will now handle redirects.
       } else {
         console.log('[updateSessionAndUser] Session exists, fetching user profile.');
         const authUser = await fetchUserProfile(currentSession.user);
@@ -143,7 +135,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setSession(null);
       setUser(null);
     }
-  }, [navigate, location.pathname, fetchUserProfile]);
+  }, [fetchUserProfile]); // Removed navigate, location.pathname from dependencies
 
   // Main effect for setting up auth listener and initial session check
   useEffect(() => {
@@ -207,7 +199,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [updateSessionAndUser, navigate, location.pathname]);
+  }, [updateSessionAndUser]); // Removed navigate, location.pathname from dependencies
 
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {

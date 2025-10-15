@@ -4,7 +4,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useSession } from './SessionContextProvider';
 
 // Define user routes that are accessible to unauthenticated users (guests)
-const guestAllowedUserRoutes = ['/user/dashboard', '/user/profile'];
+const guestAllowedUserRoutes = ['/user/dashboard', '/user/profile', '/user/subscriptions'];
 
 const UserProtectedRoute = () => {
   const { user, hasCheckedInitialSession } = useSession();

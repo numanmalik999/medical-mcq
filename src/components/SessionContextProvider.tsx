@@ -45,29 +45,33 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } as AuthUser;
     }
     console.log(`[fetchUserProfile] START: Fetching profile for user ID: ${supabaseUser.id}`);
+    console.log(`[fetchUserProfile] User ID type: ${typeof supabaseUser.id}, value: ${supabaseUser.id}`); // Added log for user ID
+
     let profileData = null;
-    let profileError = null; // Initialize profileError to capture it
+    let fetchError = null; // Renamed to fetchError for clarity
 
     try {
       console.log('[fetchUserProfile] Attempting Supabase profile select call...');
-      const { data: profileDataArray, error: fetchError } = await supabase
+      console.trace('[fetchUserProfile] Call stack before select'); // Added trace
+
+      const { data: profileDataArray, error: selectError } = await supabase
         .from('profiles')
         .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
         .eq('id', supabaseUser.id);
       
-      profileError = fetchError; // Assign the error if any
+      fetchError = selectError; // Assign the error if any
       console.log('[fetchUserProfile] Supabase profile select call completed.');
       console.log('[fetchUserProfile] Supabase profile data:', profileDataArray);
-      console.log('[fetchUserProfile] Supabase profile error:', profileError);
+      console.log('[fetchUserProfile] Supabase profile error:', fetchError);
 
-      if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows found
-        console.error(`[fetchUserProfile] ERROR: fetching profile (code: ${profileError.code}):`, profileError);
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error(`[fetchUserProfile] ERROR: fetching profile (code: ${fetchError.code}):`, fetchError);
         // Don't re-throw, just log and proceed with default values
       } else if (profileDataArray && profileDataArray[0]) {
         profileData = profileDataArray[0];
       }
     } catch (e) {
-      console.error(`[fetchUserProfile] UNEXPECTED EXCEPTION during Supabase profile fetch:`, e);
+      console.error(`[fetchUserProfile] UNEXPECTED EXCEPTION during Supabase profile select:`, e);
       // Ensure we still return a hydrated user even if fetch fails
     }
     

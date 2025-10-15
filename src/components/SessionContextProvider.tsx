@@ -50,21 +50,32 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     let profileData = null;
     let fetchError = null;
 
+    const timeoutPromise = new Promise<null>((resolve) =>
+      setTimeout(() => {
+        console.warn(`[fetchUserProfile] WARNING: Supabase profile fetch timed out after 5 seconds for user ID: ${supabaseUser.id}.`);
+        resolve(null); // Resolve with null to indicate timeout
+      }, 5000) // 5-second timeout
+    );
+
     try {
-      console.log('[fetchUserProfile] Attempting Supabase profile select call...');
+      console.log('[fetchUserProfile] Attempting Supabase profile select call with 5-second timeout...');
       console.trace('[fetchUserProfile] Call stack before select');
 
-      const { data: profileDataArray, error: selectError } = await supabase
-        .from('profiles')
-        .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
-        .eq('id', supabaseUser.id);
+      const { data: profileDataArray, error: selectError } = await Promise.race([
+        supabase
+          .from('profiles')
+          .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
+          .eq('id', supabaseUser.id)
+          .then(res => ({ data: res.data, error: res.error })), // Ensure consistent return type for Promise.race
+        timeoutPromise.then(() => ({ data: null, error: { message: 'Profile fetch timed out', code: 'TIMEOUT' } }))
+      ]);
       
       fetchError = selectError;
-      console.log('[fetchUserProfile] Supabase profile select call completed.');
+      console.log('[fetchUserProfile] Supabase profile select call completed (or timed out).');
       console.log('[fetchUserProfile] Supabase profile data:', profileDataArray);
       console.log('[fetchUserProfile] Supabase profile error:', fetchError);
 
-      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means no rows found
+      if (fetchError && fetchError.code !== 'PGRST116' && fetchError.code !== 'TIMEOUT') { // PGRST116 means no rows found
         console.error(`[fetchUserProfile] ERROR: fetching profile (code: ${fetchError.code}):`, fetchError);
       } else if (profileDataArray && profileDataArray[0]) {
         profileData = profileDataArray[0];

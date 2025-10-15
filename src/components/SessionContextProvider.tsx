@@ -52,13 +52,13 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
     const timeoutPromise = new Promise<null>((resolve) =>
       setTimeout(() => {
-        console.warn(`[fetchUserProfile] WARNING: Supabase profile fetch timed out after 5 seconds for user ID: ${supabaseUser.id}.`);
+        console.warn(`[fetchUserProfile] WARNING: Supabase profile fetch timed out after 1 second for user ID: ${supabaseUser.id}.`);
         resolve(null); // Resolve with null to indicate timeout
-      }, 5000) // 5-second timeout
+      }, 1000) // 1-second timeout
     );
 
     try {
-      console.log('[fetchUserProfile] Attempting Supabase profile select call with 5-second timeout...');
+      console.log('[fetchUserProfile] Attempting Supabase profile select call with 1-second timeout...');
       console.trace('[fetchUserProfile] Call stack before select');
 
       const { data: profileDataArray, error: selectError } = await Promise.race([

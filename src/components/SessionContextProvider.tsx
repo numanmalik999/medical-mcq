@@ -45,34 +45,40 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } as AuthUser;
     }
     console.log(`[fetchUserProfile] START: Fetching profile for user ID: ${supabaseUser.id}`);
-    console.log(`[fetchUserProfile] User ID type: ${typeof supabaseUser.id}, value: ${supabaseUser.id}`); // Added log for user ID
+    console.log(`[fetchUserProfile] User ID type: ${typeof supabaseUser.id}, value: ${supabaseUser.id}`);
 
     let profileData = null;
-    let fetchError = null; // Renamed to fetchError for clarity
+    let fetchError = null;
 
     try {
       console.log('[fetchUserProfile] Attempting Supabase profile select call...');
-      console.trace('[fetchUserProfile] Call stack before select'); // Added trace
+      console.trace('[fetchUserProfile] Call stack before select');
 
-      const { data: profileDataArray, error: selectError } = await supabase
-        .from('profiles')
-        .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
-        .eq('id', supabaseUser.id);
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('Supabase profile fetch timed out after 10 seconds')), 10000)
+      );
+
+      const { data: profileDataArray, error: selectError } = await Promise.race([
+        supabase
+          .from('profiles')
+          .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
+          .eq('id', supabaseUser.id),
+        timeoutPromise
+      ]);
       
-      fetchError = selectError; // Assign the error if any
+      fetchError = selectError;
       console.log('[fetchUserProfile] Supabase profile select call completed.');
       console.log('[fetchUserProfile] Supabase profile data:', profileDataArray);
       console.log('[fetchUserProfile] Supabase profile error:', fetchError);
 
       if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means no rows found
         console.error(`[fetchUserProfile] ERROR: fetching profile (code: ${fetchError.code}):`, fetchError);
-        // Don't re-throw, just log and proceed with default values
       } else if (profileDataArray && profileDataArray[0]) {
         profileData = profileDataArray[0];
       }
-    } catch (e) {
-      console.error(`[fetchUserProfile] UNEXPECTED EXCEPTION during Supabase profile select:`, e);
-      // Ensure we still return a hydrated user even if fetch fails
+    } catch (e: any) { // Catch the timeout error or any other unexpected exceptions
+      console.error(`[fetchUserProfile] UNEXPECTED EXCEPTION during Supabase profile fetch:`, e.message || e);
+      fetchError = { message: e.message || 'Unknown error during fetch', code: 'CLIENT_TIMEOUT' }; // Assign a custom error for timeout
     }
     
     console.log('[fetchUserProfile] Profile data processed:', profileData);

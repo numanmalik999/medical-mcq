@@ -15,8 +15,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Wand2 } from 'lucide-react'; // Import Wand2 icon
-import MultiSelect from '@/components/MultiSelect'; // Import MultiSelect
+import { Loader2, Wand2 } from 'lucide-react';
+import MultiSelect from '@/components/MultiSelect';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 interface Category {
   id: string;
@@ -36,6 +37,9 @@ const AddMcqPage = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [availableSubcategories, setAvailableSubcategories] = useState<Subcategory[]>([]);
+  const [isPageLoading, setIsPageLoading] = useState(true); // New loading state for initial data fetch
+
+  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
 
   // Define formSchema inside the component to access `subcategories` state
   const formSchema = z.object({
@@ -91,36 +95,39 @@ const AddMcqPage = () => {
   const selectedCategoryIds = form.watch("category_ids");
 
   useEffect(() => {
-    const fetchCategoriesAndSubcategories = async () => {
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('*');
-      if (categoriesError) {
-        console.error('Error fetching categories:', categoriesError);
-        toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
-      } else {
-        setCategories(categoriesData || []);
-      }
+    if (hasCheckedInitialSession) { // Only fetch if initial session check is done
+      const fetchCategoriesAndSubcategories = async () => {
+        setIsPageLoading(true); // Set loading for this specific fetch
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('categories')
+          .select('*');
+        if (categoriesError) {
+          console.error('Error fetching categories:', categoriesError);
+          toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
+        } else {
+          setCategories(categoriesData || []);
+        }
 
-      const { data: subcategoriesData, error: subcategoriesError } = await supabase
-        .from('subcategories')
-        .select('*');
-      if (subcategoriesError) {
-        console.error('Error fetching subcategories:', subcategoriesError);
-        toast({ title: "Error", description: "Failed to load subcategories.", variant: "destructive" });
-      } else {
-        setSubcategories(subcategoriesData || []);
-      }
-    };
-    fetchCategoriesAndSubcategories();
-  }, [toast]);
+        const { data: subcategoriesData, error: subcategoriesError } = await supabase
+          .from('subcategories')
+          .select('*');
+        if (subcategoriesError) {
+          console.error('Error fetching subcategories:', subcategoriesError);
+          toast({ title: "Error", description: "Failed to load subcategories.", variant: "destructive" });
+        } else {
+          setSubcategories(subcategoriesData || []);
+        }
+        setIsPageLoading(false); // Clear loading for this specific fetch
+      };
+      fetchCategoriesAndSubcategories();
+    }
+  }, [hasCheckedInitialSession, toast]); // Dependencies changed
 
   useEffect(() => {
     if (selectedCategoryIds && selectedCategoryIds.length > 0) {
       const filtered = subcategories.filter(sub => selectedCategoryIds.includes(sub.category_id));
       setAvailableSubcategories(filtered);
 
-      // Also, remove any selected subcategories that no longer belong to the selected categories
       const currentSelectedSubcategories = form.getValues("subcategory_ids") || [];
       const validSelectedSubcategories = currentSelectedSubcategories.filter(subId =>
         filtered.some(fSub => fSub.id === subId)
@@ -130,7 +137,7 @@ const AddMcqPage = () => {
       }
     } else {
       setAvailableSubcategories([]);
-      form.setValue("subcategory_ids", []); // Clear subcategories if no category is selected
+      form.setValue("subcategory_ids", []);
     }
   }, [selectedCategoryIds, subcategories, form]);
 
@@ -170,7 +177,6 @@ const AddMcqPage = () => {
       form.setValue("explanation_text", data.explanation_text);
       form.setValue("difficulty", data.difficulty);
 
-      // NEW LOGIC: Handle suggested subcategory
       if (data.suggested_subcategory_name) {
         const currentSelectedCategoryIds = form.getValues("category_ids") || [];
         if (currentSelectedCategoryIds.length > 0) {
@@ -264,27 +270,24 @@ const AddMcqPage = () => {
       // Handle mcq_category_links
       if (values.category_ids && values.category_ids.length > 0) {
         const linksToInsert = values.category_ids.map(catId => {
-          // Find subcategories that belong to this category and are selected
           const selectedSubcategoriesForThisCategory = (values.subcategory_ids || []).filter(subId =>
             subcategories.some(sub => sub.id === subId && sub.category_id === catId)
           );
 
           if (selectedSubcategoriesForThisCategory.length > 0) {
-            // Create a link for each selected subcategory within this category
             return selectedSubcategoriesForThisCategory.map(subId => ({
               mcq_id: mcqData.id,
               category_id: catId,
               subcategory_id: subId,
             }));
           } else {
-            // If no subcategories are selected for this category, create a link with null subcategory
             return [{
               mcq_id: mcqData.id,
               category_id: catId,
               subcategory_id: null,
             }];
           }
-        }).flat(); // Flatten the array of arrays
+        }).flat();
 
         if (linksToInsert.length > 0) {
           const { error: insertLinkError } = await supabase
@@ -314,6 +317,14 @@ const AddMcqPage = () => {
       setIsSubmitting(false);
     }
   };
+
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-gray-700 dark:text-gray-300">Loading categories and subcategories...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">

@@ -15,11 +15,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 interface Category {
   id: string;
@@ -37,7 +37,7 @@ const ManageCategoriesPage = () => {
   const { toast } = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state
 
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
@@ -48,12 +48,16 @@ const ManageCategoriesPage = () => {
   const [subcategoryName, setSubcategoryName] = useState('');
   const [selectedCategoryIdForSub, setSelectedCategoryIdForSub] = useState<string | null>(null);
 
+  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+
   useEffect(() => {
-    fetchCategoriesAndSubcategories();
-  }, []);
+    if (hasCheckedInitialSession) { // Only fetch if initial session check is done
+      fetchCategoriesAndSubcategories();
+    }
+  }, [hasCheckedInitialSession]); // Dependency changed
 
   const fetchCategoriesAndSubcategories = async () => {
-    setIsLoading(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*');
@@ -66,7 +70,6 @@ const ManageCategoriesPage = () => {
       console.error('Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
     } else {
-      // Fetch MCQ counts for each category
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
           const { count, error: mcqCountError } = await supabase
@@ -89,7 +92,7 @@ const ManageCategoriesPage = () => {
     } else {
       setSubcategories(subcategoriesData || []);
     }
-    setIsLoading(false);
+    setIsPageLoading(false); // Clear loading for this specific fetch
   };
 
   // Category Management
@@ -249,7 +252,6 @@ const ManageCategoriesPage = () => {
             <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => openCategoryDialog(row.original)}>Edit</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleDeleteCategory(row.original.id)} className="text-red-600">Delete</DropdownMenuItem>
           </DropdownMenuContent>
@@ -279,7 +281,6 @@ const ManageCategoriesPage = () => {
             <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => openSubcategoryDialog(row.original)}>Edit</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleDeleteSubcategory(row.original.id)} className="text-red-600">Delete</DropdownMenuItem>
           </DropdownMenuContent>
@@ -288,7 +289,7 @@ const ManageCategoriesPage = () => {
     },
   ];
 
-  if (isLoading) {
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading categories...</p>

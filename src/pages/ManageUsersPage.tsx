@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad }
- from '@/components/made-with-dyad';
+import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -18,9 +17,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { User } from '@supabase/supabase-js'; // Import User type
-import EditUserDialog from '@/components/EditUserDialog'; // Import the new dialog
-import { Badge } from '@/components/ui/badge'; // Import Badge
+import { User } from '@supabase/supabase-js';
+import EditUserDialog from '@/components/EditUserDialog';
+import { Badge } from '@/components/ui/badge';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 interface UserProfile {
   id: string;
@@ -32,23 +32,27 @@ interface UserProfile {
   is_admin: boolean;
   phone_number: string | null;
   whatsapp_number: string | null;
-  has_active_subscription: boolean; // Added subscription status
+  has_active_subscription: boolean;
 }
 
 const ManageUsersPage = () => {
   const { toast } = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserProfile | null>(null);
 
+  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (hasCheckedInitialSession) { // Only fetch if initial session check is done
+      fetchUsers();
+    }
+  }, [hasCheckedInitialSession]); // Dependency changed
 
   const fetchUsers = async () => {
-    setIsLoading(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
 
     // 1. Fetch all users from Supabase Auth via Edge Function
     const { data: authUsersResponse, error: edgeFunctionError } = await supabase.functions.invoke('list-users');
@@ -57,7 +61,7 @@ const ManageUsersPage = () => {
     if (edgeFunctionError) {
       console.error('Error fetching auth users from Edge Function:', edgeFunctionError);
       toast({ title: "Error", description: "Failed to load user authentication data from server.", variant: "destructive" });
-      setIsLoading(false);
+      setIsPageLoading(false);
       return;
     } else if (authUsersResponse) {
       authUsersData = authUsersResponse as User[];
@@ -86,15 +90,15 @@ const ManageUsersPage = () => {
         first_name: profile?.first_name || null,
         last_name: profile?.last_name || null,
         avatar_url: profile?.avatar_url || null,
-        is_admin: profile?.is_admin || false, // Default to false if no profile or not set
+        is_admin: profile?.is_admin || false,
         phone_number: profile?.phone_number || null,
         whatsapp_number: profile?.whatsapp_number || null,
-        has_active_subscription: profile?.has_active_subscription || false, // Added
+        has_active_subscription: profile?.has_active_subscription || false,
       };
     });
 
     setUsers(combinedUsers);
-    setIsLoading(false);
+    setIsPageLoading(false); // Clear loading for this specific fetch
   };
 
   const handleEditClick = (userProfile: UserProfile) => {
@@ -141,7 +145,7 @@ const ManageUsersPage = () => {
       cell: ({ row }) => (row.original.is_admin ? 'Yes' : 'No'),
     },
     {
-      accessorKey: 'has_active_subscription', // New column for subscription status
+      accessorKey: 'has_active_subscription',
       header: 'Subscription',
       cell: ({ row }) => (
         <Badge variant={row.original.has_active_subscription ? "default" : "secondary"}>
@@ -174,7 +178,7 @@ const ManageUsersPage = () => {
     },
   ];
 
-  if (isLoading) {
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading users...</p>

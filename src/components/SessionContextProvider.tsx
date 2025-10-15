@@ -45,22 +45,24 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } as AuthUser;
     }
     console.log(`[fetchUserProfile] START: Fetching profile for user ID: ${supabaseUser.id}`);
-    const { data: profileDataArray, error: profileError } = await supabase
-      .from('profiles')
-      .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
-      .eq('id', supabaseUser.id);
+    let profileData = null;
+    try {
+      const { data: profileDataArray, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
+        .eq('id', supabaseUser.id);
 
-    if (profileError && profileError.code !== 'PGRST116') {
-      console.error(`[fetchUserProfile] ERROR: fetching profile (code: ${profileError.code}):`, profileError);
-      return {
-        ...supabaseUser,
-        is_admin: false,
-        has_active_subscription: false,
-        trial_taken: false,
-      } as AuthUser;
+      if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error(`[fetchUserProfile] ERROR: fetching profile (code: ${profileError.code}):`, profileError);
+        // Don't re-throw, just log and proceed with default values
+      } else if (profileDataArray && profileDataArray[0]) {
+        profileData = profileDataArray[0];
+      }
+    } catch (e) {
+      console.error(`[fetchUserProfile] UNEXPECTED ERROR during Supabase profile fetch:`, e);
+      // Ensure we still return a hydrated user even if fetch fails
     }
-
-    const profileData = profileDataArray && profileDataArray[0] ? profileDataArray[0] : null;
+    
     console.log('[fetchUserProfile] Profile data fetched:', profileData);
 
     const hydratedUser: AuthUser = {
@@ -92,7 +94,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.log('[updateSessionAndUser] No session, clearing user and session states.');
         setSession(null);
         setUser(null);
-        // Only navigate to login if not already on login/signup
         if (location.pathname !== '/login' && location.pathname !== '/signup') {
           console.log('[updateSessionAndUser] Navigating to /login due to no session.');
           navigate('/login');
@@ -100,15 +101,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } else {
         console.log('[updateSessionAndUser] Session exists, fetching user profile.');
         const authUser = await fetchUserProfile(currentSession.user);
-        if (isMounted.current) { // Only update state if component is still mounted
+        if (isMounted.current) {
           setSession(currentSession);
           setUser(authUser);
-          console.log('[updateSessionAndUser] User state updated:', authUser);
+          console.log('[updateSessionAndUser] User and Session states updated.'); // Added log
         }
       }
     } catch (error) {
       console.error("[updateSessionAndUser] ERROR: processing auth event:", error);
-      // On error, ensure session and user are cleared
       setSession(null);
       setUser(null);
     }
@@ -119,7 +119,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     isMounted.current = true;
     console.log('SessionContextProvider: Main useEffect mounted.');
 
-    // Initial session check
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (isMounted.current) {
         console.log('SessionContextProvider: Initial Session Check Result:', initialSession);
@@ -136,7 +135,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) return;
       console.log('SessionContextProvider: onAuthStateChange: Event:', event, 'Session:', currentSession);
-      // For subsequent events, we just update the session/user.
       await updateSessionAndUser(currentSession, event);
     });
 

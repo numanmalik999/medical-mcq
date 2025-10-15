@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
+import { useSession } from '@/components/SessionContextProvider';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
@@ -21,17 +22,21 @@ import EditSubscriptionTierDialog, { SubscriptionTier } from '@/components/EditS
 const ManageSubscriptionsPage = () => {
   const { toast } = useToast();
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTierForEdit, setSelectedTierForEdit] = useState<SubscriptionTier | null>(null);
 
+  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+
   useEffect(() => {
-    fetchSubscriptionTiers();
-  }, []);
+    if (hasCheckedInitialSession) { // Only fetch if initial session check is done
+      fetchSubscriptionTiers();
+    }
+  }, [hasCheckedInitialSession]); // Dependency changed
 
   const fetchSubscriptionTiers = async () => {
-    setIsLoading(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
     const { data, error } = await supabase
       .from('subscription_tiers')
       .select('*');
@@ -43,7 +48,7 @@ const ManageSubscriptionsPage = () => {
     } else {
       setTiers(data || []);
     }
-    setIsLoading(false);
+    setIsPageLoading(false); // Clear loading for this specific fetch
   };
 
   const handleDeleteTier = async (id: string) => {
@@ -113,7 +118,7 @@ const ManageSubscriptionsPage = () => {
     },
   ];
 
-  if (isLoading) {
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading subscription tiers...</p>

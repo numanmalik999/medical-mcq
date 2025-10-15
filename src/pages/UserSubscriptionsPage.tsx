@@ -30,31 +30,28 @@ interface UserSubscription {
 }
 
 const UserSubscriptionsPage = () => {
-  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
+  const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
   const [userActiveSubscription, setUserActiveSubscription] = useState<UserSubscription | null>(null);
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
-  const [isLoadingPage, setIsLoadingPage] = useState(true); // Renamed to avoid conflict
+  const [isFetchingData, setIsFetchingData] = useState(true); // New combined loading state
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null); // Stores tierId being processed
 
   useEffect(() => {
     console.log('UserSubscriptionsPage: useEffect mounted. Current user has_active_subscription from session:', user?.has_active_subscription);
-    if (!hasCheckedInitialSession) {
-      // Still waiting for initial session check, keep loading state true
-      return;
+    if (hasCheckedInitialSession) {
+      if (user) {
+        fetchSubscriptionData();
+      } else {
+        setIsFetchingData(false); // Not logged in, stop loading
+        console.log('UserSubscriptionsPage: Not logged in, setting isFetchingData to false.');
+      }
     }
-
-    if (user) {
-      fetchSubscriptionData();
-    } else {
-      setIsLoadingPage(false); // Not logged in, no tiers to show
-      console.log('UserSubscriptionsPage: Not logged in, setting isLoadingPage to false.');
-    }
-  }, [user, hasCheckedInitialSession]);
+  }, [user, hasCheckedInitialSession]); // Dependencies changed
 
   const fetchSubscriptionData = async () => {
-    setIsLoadingPage(true);
+    setIsFetchingData(true); // Set loading for this specific fetch
     console.log('UserSubscriptionsPage: fetchSubscriptionData started.');
 
     // Fetch all subscription tiers
@@ -111,8 +108,8 @@ const UserSubscriptionsPage = () => {
         console.log('UserSubscriptionsPage: No subscriptions found for user.');
       }
     }
-    setIsLoadingPage(false);
-    console.log('UserSubscriptionsPage: fetchSubscriptionData finished, isLoadingPage set to false.');
+    setIsFetchingData(false); // Clear loading for this specific fetch
+    console.log('UserSubscriptionsPage: fetchSubscriptionData finished, isFetchingData set to false.');
   };
 
   const handleSubscribe = async (tier: SubscriptionTier) => {
@@ -202,7 +199,7 @@ const UserSubscriptionsPage = () => {
     }
   };
 
-  if (!hasCheckedInitialSession || isLoadingPage) { // Use hasCheckedInitialSession for initial loading
+  if (!hasCheckedInitialSession || isFetchingData) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading subscription plans...</p>

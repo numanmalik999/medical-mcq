@@ -15,7 +15,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSession } from '@/components/SessionContextProvider';
-import { Loader2, Trash2 } from 'lucide-react'; // Removed Save icon
+import { Loader2, Trash2 } from 'lucide-react';
 
 const formSchema = z.object({
   question_text: z.string().min(1, "Question text is required."),
@@ -34,9 +34,10 @@ const formSchema = z.object({
 const LOCAL_STORAGE_KEY = 'submit_mcq_draft';
 
 const SubmitMcqPage = () => {
-  const { user } = useSession();
+  const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(true); // New loading state for initial check
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -55,26 +56,27 @@ const SubmitMcqPage = () => {
     },
   });
 
-  // Load draft from localStorage on component mount
   useEffect(() => {
-    const savedDraft = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedDraft) {
-      try {
-        const draft = JSON.parse(savedDraft);
-        form.reset(draft);
-        toast({
-          title: "Draft Loaded",
-          description: "Your previous draft has been loaded.",
-          duration: 3000,
-        });
-      } catch (e) {
-        console.error("Failed to parse saved draft:", e);
-        localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear corrupted draft
+    if (hasCheckedInitialSession) {
+      setIsPageLoading(false); // Once initial session check is done, stop page loading
+      const savedDraft = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft);
+          form.reset(draft);
+          toast({
+            title: "Draft Loaded",
+            description: "Your previous draft has been loaded.",
+            duration: 3000,
+          });
+        } catch (e) {
+          console.error("Failed to parse saved draft:", e);
+          localStorage.removeItem(LOCAL_STORAGE_KEY);
+        }
       }
     }
-  }, [form, toast]);
+  }, [hasCheckedInitialSession, form, toast]); // Dependencies changed
 
-  // Save form data to localStorage on changes
   useEffect(() => {
     const subscription = form.watch((value) => {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(value));
@@ -85,7 +87,7 @@ const SubmitMcqPage = () => {
   const clearDraft = () => {
     if (window.confirm("Are you sure you want to clear your saved draft? This action cannot be undone.")) {
       localStorage.removeItem(LOCAL_STORAGE_KEY);
-      form.reset(); // Reset form to default values
+      form.reset();
       toast({
         title: "Draft Cleared",
         description: "Your saved draft has been removed.",
@@ -124,10 +126,9 @@ const SubmitMcqPage = () => {
         throw insertError;
       }
 
-      // Send email notification to admin
       const { error: emailError } = await supabase.functions.invoke('send-email', {
         body: {
-          to: 'ADMIN_EMAIL', // This will be replaced by the actual ADMIN_EMAIL from env in the Edge Function
+          to: 'ADMIN_EMAIL',
           subject: `New MCQ Submission from ${user.email}`,
           body: `User ${user.email} (${user.id}) submitted a new MCQ for review.<br/><br/>
                  Question: ${values.question_text}<br/>
@@ -150,7 +151,7 @@ const SubmitMcqPage = () => {
         });
       }
       form.reset();
-      localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear draft after successful submission
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
     } catch (error: any) {
       console.error("Error submitting MCQ:", error);
       toast({
@@ -162,6 +163,14 @@ const SubmitMcqPage = () => {
       setIsSubmitting(false);
     }
   };
+
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-gray-700 dark:text-gray-300">Loading submission page...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
@@ -299,16 +308,16 @@ const SubmitMcqPage = () => {
                           <SelectValue placeholder="Select difficulty" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Easy">Easy</SelectItem>
-                        <SelectItem value="Medium">Medium</SelectItem>
-                        <SelectItem value="Hard">Hard</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    <SelectContent>
+                      <SelectItem value="Easy">Easy</SelectItem>
+                      <SelectItem value="Medium">Medium</SelectItem>
+                      <SelectItem value="Hard">Hard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button type="submit" className="w-full sm:flex-1" disabled={isSubmitting}>

@@ -17,7 +17,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import ReviewFeedbackDialog from '@/components/ReviewFeedbackDialog'; // Import the new dialog
+import ReviewFeedbackDialog from '@/components/ReviewFeedbackDialog';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 export interface McqFeedback {
   id: string;
@@ -33,17 +34,21 @@ export interface McqFeedback {
 const ManageMcqFeedbackPage = () => {
   const { toast } = useToast();
   const [feedbackItems, setFeedbackItems] = useState<McqFeedback[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state
 
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [selectedFeedbackForReview, setSelectedFeedbackForReview] = useState<McqFeedback | null>(null);
 
+  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+
   useEffect(() => {
-    fetchFeedbackItems();
-  }, []);
+    if (hasCheckedInitialSession) { // Only fetch if initial session check is done
+      fetchFeedbackItems();
+    }
+  }, [hasCheckedInitialSession]); // Dependency changed
 
   const fetchFeedbackItems = async () => {
-    setIsLoading(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
     const { data, error } = await supabase
       .from('mcq_feedback')
       .select('*')
@@ -56,14 +61,14 @@ const ManageMcqFeedbackPage = () => {
     } else {
       const feedbackWithDetails = await Promise.all(data.map(async (feedback) => {
         // Fetch user email
-        const { data: userData } = await supabase // Removed unused 'error: userError'
+        const { data: userData } = await supabase
           .from('profiles')
           .select('email')
           .eq('id', feedback.user_id)
           .single();
         
         // Fetch MCQ question text
-        const { data: mcqData } = await supabase // Removed unused 'error: mcqError'
+        const { data: mcqData } = await supabase
           .from('mcqs')
           .select('question_text')
           .eq('id', feedback.mcq_id)
@@ -77,7 +82,7 @@ const ManageMcqFeedbackPage = () => {
       }));
       setFeedbackItems(feedbackWithDetails || []);
     }
-    setIsLoading(false);
+    setIsPageLoading(false); // Clear loading for this specific fetch
   };
 
   const handleReviewClick = (feedback: McqFeedback) => {
@@ -133,7 +138,7 @@ const ManageMcqFeedbackPage = () => {
     },
   ];
 
-  if (isLoading) {
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading MCQ feedback...</p>

@@ -58,7 +58,7 @@ interface Subcategory {
 const TRIAL_MCQ_LIMIT = 10;
 
 const QuizPage = () => {
-  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
+  const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -68,7 +68,7 @@ const QuizPage = () => {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
-  const [isLoadingPage, setIsLoadingPage] = useState(true); // Renamed to avoid conflict
+  const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state for initial data
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
 
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
@@ -114,26 +114,23 @@ const QuizPage = () => {
   }, [explanations, toast]);
 
   useEffect(() => {
-    if (!hasCheckedInitialSession) {
-      // Still waiting for initial session check, keep loading state true
-      return;
-    }
-
-    if (user) {
-      fetchQuizOverview();
-      if (!user.has_active_subscription && !user.trial_taken) {
-        setIsTrialActiveSession(true);
+    if (hasCheckedInitialSession) {
+      if (user) {
+        fetchQuizOverview();
+        if (!user.has_active_subscription && !user.trial_taken) {
+          setIsTrialActiveSession(true);
+        } else {
+          setIsTrialActiveSession(false);
+        }
       } else {
-        setIsTrialActiveSession(false);
+        setIsPageLoading(false); // Not logged in, stop loading
+        navigate('/login'); // Redirect if not logged in after initial check
       }
-    } else {
-      setIsLoadingPage(false);
-      navigate('/login'); // Redirect if not logged in after initial check
     }
-  }, [user, hasCheckedInitialSession]);
+  }, [user, hasCheckedInitialSession, navigate]); // Dependencies changed
 
   const fetchQuizOverview = async () => {
-    setIsLoadingPage(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*');
@@ -145,7 +142,7 @@ const QuizPage = () => {
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
-      setIsLoadingPage(false);
+      setIsPageLoading(false);
       return;
     }
     if (subcategoriesError) {
@@ -180,7 +177,7 @@ const QuizPage = () => {
       let totalAttempts = 0;
       let correctAttempts = 0;
 
-      if (user) {
+      if (user) { // Ensure user is available
         const { data: userAttemptsData, error: userAttemptsError } = await supabase
           .from('user_quiz_attempts')
           .select('is_correct, mcq_id')
@@ -210,7 +207,7 @@ const QuizPage = () => {
     }
 
     setCategoryStats(categoriesWithStats);
-    setIsLoadingPage(false);
+    setIsPageLoading(false); // Clear loading for this specific fetch
   };
 
   const startQuizSession = async (categoryId: string, subcategoryId: string | null, mode: 'random' | 'incorrect') => {
@@ -233,7 +230,7 @@ const QuizPage = () => {
       setIsTrialActiveSession(false);
     }
 
-    setIsLoadingPage(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
     setQuizQuestions([]);
     setCurrentQuestionIndex(0);
     setUserAnswers(new Map());
@@ -265,19 +262,19 @@ const QuizPage = () => {
       if (error) {
         console.error('Error fetching random MCQs:', error);
         toast({ title: "Error", description: "Failed to load quiz questions.", variant: "destructive" });
-        setIsLoadingPage(false);
+        setIsPageLoading(false);
         return;
       }
       if (!data || data.length === 0) {
         toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
-        setIsLoadingPage(false);
+        setIsPageLoading(false);
         return;
       }
       mcqsToLoad = data.sort(() => 0.5 - Math.random()).slice(0, Math.min(data.length, isTrialActiveSession ? TRIAL_MCQ_LIMIT : data.length));
     } else if (mode === 'incorrect') {
       if (isTrialActiveSession) {
         toast({ title: "Trial Mode", description: "You can only attempt random trial questions during your free trial.", variant: "default" });
-        setIsLoadingPage(false);
+        setIsPageLoading(false);
         return;
       }
 
@@ -291,7 +288,7 @@ const QuizPage = () => {
       if (attemptsError) {
         console.error('Error fetching incorrect attempts:', attemptsError);
         toast({ title: "Error", description: "Failed to load incorrect questions.", variant: "destructive" });
-        setIsLoadingPage(false);
+        setIsPageLoading(false);
         return;
       }
 
@@ -299,7 +296,7 @@ const QuizPage = () => {
       
       if (incorrectMcqIds.length === 0) {
         toast({ title: "No Incorrect MCQs", description: "You have no incorrect answers in this category to re-attempt.", variant: "default" });
-        setIsLoadingPage(false);
+        setIsPageLoading(false);
         return;
       }
 
@@ -307,7 +304,7 @@ const QuizPage = () => {
       if (mcqsError) {
         console.error('Error fetching incorrect MCQs data:', mcqsError);
         toast({ title: "Error", description: "Failed to load incorrect questions data.", variant: "destructive" });
-        setIsLoadingPage(false);
+        setIsPageLoading(false);
         return;
       }
       mcqsToLoad = mcqsData || [];
@@ -315,14 +312,14 @@ const QuizPage = () => {
 
     if (mcqsToLoad.length === 0) {
       toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
-      setIsLoadingPage(false);
+      setIsPageLoading(false);
       return;
     }
 
     setQuizQuestions(mcqsToLoad);
     setCurrentQuizSubcategoryId(subcategoryId);
     setShowCategorySelection(false);
-    setIsLoadingPage(false);
+    setIsPageLoading(false); // Clear loading for this specific fetch
     if (mcqsToLoad.length > 0) {
       setSelectedAnswer(userAnswers.get(mcqsToLoad[0].id) || null);
     }
@@ -351,7 +348,7 @@ const QuizPage = () => {
       return;
     }
 
-    setIsLoadingPage(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
     const { error } = await supabase
       .from('user_quiz_attempts')
       .delete()
@@ -365,7 +362,7 @@ const QuizPage = () => {
       toast({ title: "Success", description: "Quiz progress reset successfully." });
       fetchQuizOverview();
     }
-    setIsLoadingPage(false);
+    setIsPageLoading(false); // Clear loading for this specific fetch
   };
 
   const currentMcq = quizQuestions[currentQuestionIndex];
@@ -465,7 +462,7 @@ const QuizPage = () => {
   const submitFullQuiz = async () => {
     if (!user) return;
 
-    setIsLoadingPage(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
     let correctCount = 0;
     const explanationPromises: Promise<MCQExplanation | null>[] = [];
     const mcqExplanationIds = new Set<string>();
@@ -485,7 +482,7 @@ const QuizPage = () => {
     setScore(correctCount);
     await Promise.all(explanationPromises);
     setShowResults(true);
-    setIsLoadingPage(false);
+    setIsPageLoading(false); // Clear loading for this specific fetch
   };
 
   const handleSubmitFeedback = async () => {
@@ -539,7 +536,7 @@ const QuizPage = () => {
     cat.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (!hasCheckedInitialSession || isLoadingPage) { // Use hasCheckedInitialSession for initial loading
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading quiz overview...</p>
@@ -548,9 +545,7 @@ const QuizPage = () => {
   }
 
   if (!user) {
-    // Redirection is handled by SessionContextProvider, so this block might not be reached
-    // but kept as a fallback for clarity.
-    return null;
+    return null; // Redirection is handled by SessionContextProvider
   }
 
   if (showSubscriptionPrompt) {
@@ -673,7 +668,7 @@ const QuizPage = () => {
     );
   }
 
-  if (quizQuestions.length === 0 && !isLoadingPage && !showCategorySelection && !showResults) {
+  if (quizQuestions.length === 0 && !isPageLoading && !showCategorySelection && !showResults) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
         <Card className="w-full max-w-2xl">

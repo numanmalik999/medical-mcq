@@ -5,8 +5,19 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Link } from 'react-router-dom';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 const Login = () => {
+  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+
+  if (!hasCheckedInitialSession) { // Show loading only until initial session check is done
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-gray-700 dark:text-gray-300">Loading login page...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
       <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
@@ -31,16 +42,14 @@ const Login = () => {
           localization={{
             variables: {
               sign_in: {
-                link_text: '', // Hide the "Don't have an account? Sign up" link in sign_in view
+                link_text: '',
               },
               sign_up: {
-                link_text: '', // Hide any potential "Sign in" link in sign_up view (if it were rendered)
-                // Removed button_text as it's not a valid property here
+                link_text: '',
               },
             },
           }}
         />
-        {/* Custom link to our SignUp page */}
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Don't have an account?{" "}
           <Link to="/signup" className="text-primary hover:underline">

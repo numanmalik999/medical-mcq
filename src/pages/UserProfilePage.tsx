@@ -13,27 +13,29 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User as UserIcon } from 'lucide-react';
 
 const UserProfilePage = () => {
-  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
+  const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true); // Renamed to avoid conflict
+  const [isFetchingProfile, setIsFetchingProfile] = useState(true); // New combined loading state
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (user && hasCheckedInitialSession) { // Only fetch if user is present and initial check is done
-      fetchProfile();
-    } else if (!user && hasCheckedInitialSession) { // If no user after initial check, stop loading
-      setIsLoadingProfile(false);
+    if (hasCheckedInitialSession) {
+      if (user) {
+        fetchProfile();
+      } else {
+        setIsFetchingProfile(false); // Not logged in, stop loading
+      }
     }
-  }, [user, hasCheckedInitialSession]);
+  }, [user, hasCheckedInitialSession]); // Dependencies changed
 
   const fetchProfile = async () => {
-    if (!user) return;
-    setIsLoadingProfile(true);
+    if (!user) return; // Ensure user is available
+    setIsFetchingProfile(true); // Set loading for this specific fetch
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -50,7 +52,7 @@ const UserProfilePage = () => {
       setPhoneNumber(data.phone_number || '');
       setWhatsappNumber(data.whatsapp_number || '');
     }
-    setIsLoadingProfile(false);
+    setIsFetchingProfile(false); // Clear loading for this specific fetch
   };
 
   const handleSaveProfile = async () => {
@@ -81,7 +83,7 @@ const UserProfilePage = () => {
     setIsSaving(false);
   };
 
-  if (!hasCheckedInitialSession || isLoadingProfile) { // Use hasCheckedInitialSession for initial loading
+  if (!hasCheckedInitialSession || isFetchingProfile) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading profile...</p>

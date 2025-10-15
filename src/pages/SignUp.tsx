@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Link, useNavigate } from 'react-router-dom';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address.").min(1, "Email is required."),
@@ -26,6 +27,15 @@ const SignUp = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(true); // New loading state for initial check
+
+  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+
+  useEffect(() => {
+    if (hasCheckedInitialSession) {
+      setIsPageLoading(false); // Once initial session check is done, stop page loading
+    }
+  }, [hasCheckedInitialSession]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -64,13 +74,12 @@ const SignUp = () => {
           title: "Sign Up Successful!",
           description: "You have successfully created an account. Redirecting to dashboard...",
         });
-        // SessionContextProvider will handle the redirection based on user role
       } else if (data.user && !data.session) {
         toast({
           title: "Check your email",
           description: "Please check your email for a confirmation link to activate your account.",
         });
-        navigate('/login'); // Redirect to login to await email confirmation
+        navigate('/login');
       }
     } catch (error: any) {
       console.error("Sign Up Error:", error);
@@ -83,6 +92,14 @@ const SignUp = () => {
       setIsSubmitting(false);
     }
   };
+
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-gray-700 dark:text-gray-300">Loading signup page...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">

@@ -47,33 +47,40 @@ interface PerformanceSummary {
 }
 
 const UserDashboardPage = () => {
-  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
+  const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
+  const [isFetchingData, setIsFetchingData] = useState(true); // New combined loading state for data fetches
+
   const [quizPerformance, setQuizPerformance] = useState<QuizPerformance | null>(null);
   const [recentAttempts, setRecentAttempts] = useState<RecentAttempt[]>([]);
-  const [isLoadingPerformance, setIsLoadingPerformance] = useState(true);
-  const [isLoadingRecentAttempts, setIsLoadingRecentAttempts] = useState(true);
-  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(true);
-
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
   const [areasForImprovement, setAreasForImprovement] = useState<PerformanceSummary[]>([]);
   const [suggestedPractice, setSuggestedPractice] = useState<PerformanceSummary[]>([]);
 
   useEffect(() => {
-    if (user && hasCheckedInitialSession) { // Only fetch if user is present and initial check is done
-      fetchQuizPerformance();
-      fetchRecentAttempts();
-      fetchAllCategoriesAndSubcategories();
-    } else if (!user && hasCheckedInitialSession) { // If no user after initial check, stop loading
-      setIsLoadingPerformance(false);
-      setIsLoadingRecentAttempts(false);
-      setIsLoadingRecommendations(false);
+    if (hasCheckedInitialSession) {
+      if (user) {
+        // Only fetch data if user is present and initial session check is complete
+        const fetchData = async () => {
+          setIsFetchingData(true);
+          await Promise.all([
+            fetchAllCategoriesAndSubcategories(),
+            fetchQuizPerformance(),
+            fetchRecentAttempts(),
+          ]);
+          setIsFetchingData(false);
+        };
+        fetchData();
+      } else {
+        // If no user after initial check, stop loading
+        setIsFetchingData(false);
+      }
     }
-  }, [user, hasCheckedInitialSession]);
+  }, [user, hasCheckedInitialSession]); // Dependencies changed
 
   const fetchAllCategoriesAndSubcategories = async () => {
-    setIsLoadingRecommendations(true);
+    // No local loading state here, handled by parent isFetchingData
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*');
@@ -93,12 +100,11 @@ const UserDashboardPage = () => {
     } else {
       setAllSubcategories(subcategoriesData || []);
     }
-    setIsLoadingRecommendations(false);
   };
 
   const fetchQuizPerformance = async () => {
-    if (!user) return;
-    setIsLoadingPerformance(true);
+    if (!user) return; // Ensure user is available
+    // No local loading state here, handled by parent isFetchingData
 
     const { data: attemptsData, error: attemptsError } = await supabase
       .from('user_quiz_attempts')
@@ -109,7 +115,6 @@ const UserDashboardPage = () => {
       console.error('Error fetching quiz performance:', attemptsError);
       toast({ title: "Error", description: "Failed to load quiz performance.", variant: "destructive" });
       setQuizPerformance(null);
-      setIsLoadingPerformance(false);
       return;
     }
 
@@ -125,7 +130,6 @@ const UserDashboardPage = () => {
 
     // Process data for recommendations
     generateRecommendations(attemptsData);
-    setIsLoadingPerformance(false);
   };
 
   const generateRecommendations = (attemptsData: any[]) => {
@@ -220,8 +224,8 @@ const UserDashboardPage = () => {
   };
 
   const fetchRecentAttempts = async () => {
-    if (!user) return;
-    setIsLoadingRecentAttempts(true);
+    if (!user) return; // Ensure user is available
+    // No local loading state here, handled by parent isFetchingData
 
     const { data, error } = await supabase
       .from('user_quiz_attempts')
@@ -252,10 +256,9 @@ const UserDashboardPage = () => {
       }));
       setRecentAttempts(formattedAttempts);
     }
-    setIsLoadingRecentAttempts(false);
   };
 
-  if (!hasCheckedInitialSession || isLoadingPerformance || isLoadingRecentAttempts || isLoadingRecommendations) {
+  if (!hasCheckedInitialSession || isFetchingData) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading user dashboard...</p>

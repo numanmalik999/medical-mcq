@@ -5,19 +5,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
-import { createMcqColumns, MCQ } from '@/components/mcq-columns'; // Removed McqCategoryLink import
+import { createMcqColumns, MCQ } from '@/components/mcq-columns';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input'; // Import Input component
-import { Trash2 } from 'lucide-react'; // Import Trash2 icon
+import { Input } from '@/components/ui/input';
+import { Trash2 } from 'lucide-react';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 interface Category {
   id: string;
   name: string;
-  mcq_count?: number; // Added mcq_count
+  mcq_count?: number;
 }
 
 interface Subcategory {
@@ -26,12 +27,11 @@ interface Subcategory {
   name: string;
 }
 
-// DisplayMCQ is now the same as MCQ as category_links contains display names
 type DisplayMCQ = MCQ;
 
 const ManageMcqsPage = () => {
   const [mcqs, setMcqs] = useState<DisplayMCQ[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state
   const { toast } = useToast();
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -42,10 +42,12 @@ const ManageMcqsPage = () => {
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<string | null>(null);
   const [selectedFilterSubcategory, setSelectedFilterSubcategory] = useState<string | null>(null);
   const [filteredSubcategoriesForFilter, setFilteredSubcategoriesForFilter] = useState<Subcategory[]>([]);
-  const [searchTerm, setSearchTerm] = useState(''); // New state for search term
+  const [searchTerm, setSearchTerm] = useState('');
 
+  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
 
   const fetchCategoriesAndSubcategories = async () => {
+    // No local loading state here, handled by parent isPageLoading
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*');
@@ -53,11 +55,10 @@ const ManageMcqsPage = () => {
       console.error('Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories for filter.", variant: "destructive" });
     } else {
-      // Fetch MCQ counts for each category
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
           const { count, error: mcqCountError } = await supabase
-            .from('mcq_category_links') // Count from the join table
+            .from('mcq_category_links')
             .select('id', { count: 'exact', head: true })
             .eq('category_id', category.id);
 
@@ -82,7 +83,7 @@ const ManageMcqsPage = () => {
   };
 
   const fetchMcqs = async () => {
-    setIsLoading(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
     let query = supabase
       .from('mcqs')
       .select(`
@@ -101,12 +102,12 @@ const ManageMcqsPage = () => {
         .from('mcq_category_links')
         .select('mcq_id')
         .eq('category_id', selectedFilterCategory)
-        .filter('subcategory_id', selectedFilterSubcategory ? 'eq' : 'neq', selectedFilterSubcategory || 'null'); // Adjust for subcategory filter
+        .filter('subcategory_id', selectedFilterSubcategory ? 'eq' : 'neq', selectedFilterSubcategory || 'null');
 
       if (mcqLinksError) {
         console.error('Error fetching MCQ links for category filter:', mcqLinksError);
         setMcqs([]);
-        setIsLoading(false);
+        setIsPageLoading(false);
         return;
       }
       const mcqIds = mcqLinksData?.map(link => link.mcq_id) || [];
@@ -120,7 +121,7 @@ const ManageMcqsPage = () => {
       if (mcqLinksError) {
         console.error('Error fetching MCQ links for subcategory filter:', mcqLinksError);
         setMcqs([]);
-        setIsLoading(false);
+        setIsPageLoading(false);
         return;
       }
       const mcqIds = mcqLinksData?.map(link => link.mcq_id) || [];
@@ -153,16 +154,20 @@ const ManageMcqsPage = () => {
       }));
       setMcqs(displayMcqs || []);
     }
-    setIsLoading(false);
+    setIsPageLoading(false); // Clear loading for this specific fetch
   };
 
   useEffect(() => {
-    fetchCategoriesAndSubcategories();
-  }, []);
+    if (hasCheckedInitialSession) { // Only fetch if initial session check is done
+      fetchCategoriesAndSubcategories();
+    }
+  }, [hasCheckedInitialSession]); // Dependency changed
 
   useEffect(() => {
-    fetchMcqs();
-  }, [selectedFilterCategory, selectedFilterSubcategory, searchTerm]); // Refetch when filters or search term change
+    if (hasCheckedInitialSession) { // Only fetch if initial session check is done
+      fetchMcqs();
+    }
+  }, [selectedFilterCategory, selectedFilterSubcategory, searchTerm, hasCheckedInitialSession]); // Refetch when filters or search term change
 
   useEffect(() => {
     if (selectedFilterCategory) {
@@ -242,7 +247,7 @@ const ManageMcqsPage = () => {
       return;
     }
 
-    setIsLoading(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
     try {
       // Fetch all MCQ IDs and their explanation IDs linked to the selected category
       const { data: linksToDelete, error: fetchLinksError } = await supabase
@@ -258,7 +263,7 @@ const ManageMcqsPage = () => {
 
       if (mcqIdsToDelete.length === 0) {
         toast({ title: "Info", description: `No MCQs found linked to "${categoryName}" to delete.`, variant: "default" });
-        setIsLoading(false);
+        setIsPageLoading(false);
         return;
       }
 
@@ -324,7 +329,7 @@ const ManageMcqsPage = () => {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsPageLoading(false); // Clear loading for this specific fetch
     }
   };
 
@@ -334,6 +339,14 @@ const ManageMcqsPage = () => {
   };
 
   const columns = createMcqColumns({ onDelete: handleDeleteMcq, onEdit: handleEditClick });
+
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-gray-700 dark:text-gray-300">Loading MCQs...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -389,7 +402,7 @@ const ManageMcqsPage = () => {
             <Button
               onClick={handleDeleteAllMcqsInCategory}
               variant="destructive"
-              disabled={!selectedFilterCategory || isLoading}
+              disabled={!selectedFilterCategory || isPageLoading}
               className="flex items-center gap-1"
             >
               <Trash2 className="h-4 w-4" /> Delete All in Category
@@ -404,12 +417,12 @@ const ManageMcqsPage = () => {
           <CardDescription>View, edit, and delete MCQs from your database.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isPageLoading ? (
             <p className="text-center text-gray-600 dark:text-gray-400">Loading MCQs...</p>
           ) : (
             <DataTable columns={columns} data={mcqs} />
           )}
-          {!isLoading && mcqs.length === 0 && (
+          {!isPageLoading && mcqs.length === 0 && (
             <div className="mt-4 text-center">
               <p className="text-gray-600 dark:text-gray-400 mb-2">No MCQs found. Add some using the "Add MCQ" link in the sidebar.</p>
               <Button onClick={fetchMcqs}>Refresh List</Button>

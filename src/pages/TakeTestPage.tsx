@@ -42,14 +42,14 @@ interface Category {
 const DEFAULT_TEST_DURATION_SECONDS = 3 * 60 * 60; // 3 hours
 
 const TakeTestPage = () => {
-  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
+  const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
-  const [selectedPercentage, setSelectedPercentage] = useState<string>('100'); // '10', '25', '50', '100', 'all'
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null); // New state for difficulty filter
+  const [selectedPercentage, setSelectedPercentage] = useState<string>('100');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
   const [showConfiguration, setShowConfiguration] = useState(true);
   const [showInstructions, setShowInstructions] = useState(false);
 
@@ -57,7 +57,7 @@ const TakeTestPage = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Map<string, string | null>>(new Map());
   const [isTestSubmitted, setIsTestSubmitted] = useState(false);
-  const [isLoadingPage, setIsLoadingPage] = useState(true); // Renamed to avoid conflict
+  const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state for initial data
   const [timer, setTimer] = useState(DEFAULT_TEST_DURATION_SECONDS);
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
@@ -149,37 +149,34 @@ const TakeTestPage = () => {
 
   // Initial load: Fetch all categories
   useEffect(() => {
-    if (!hasCheckedInitialSession) {
-      // Still waiting for initial session check, keep loading state true
-      return;
-    }
+    if (hasCheckedInitialSession) {
+      if (user && user.has_active_subscription) {
+        const fetchCategories = async () => {
+          setIsPageLoading(true); // Set loading for this specific fetch
+          const { data, error } = await supabase
+            .from('categories')
+            .select('*');
 
-    if (user && user.has_active_subscription) {
-      const fetchCategories = async () => {
-        setIsLoadingPage(true);
-        const { data, error } = await supabase
-          .from('categories')
-          .select('*');
-
-        if (error) {
-          console.error('Error fetching categories:', error);
-          toast({ title: "Error", description: "Failed to load categories for test configuration.", variant: "destructive" });
-        } else {
-          setAllCategories(data || []);
-        }
-        setIsLoadingPage(false);
-      };
-      fetchCategories();
-    } else if (user && !user.has_active_subscription) {
-      setIsLoadingPage(false); // User is logged in but not subscribed
-    } else {
-      navigate('/login'); // Redirect if not logged in
+          if (error) {
+            console.error('Error fetching categories:', error);
+            toast({ title: "Error", description: "Failed to load categories for test configuration.", variant: "destructive" });
+          } else {
+            setAllCategories(data || []);
+          }
+          setIsPageLoading(false); // Clear loading for this specific fetch
+        };
+        fetchCategories();
+      } else if (user && !user.has_active_subscription) {
+        setIsPageLoading(false); // User is logged in but not subscribed, stop loading
+      } else {
+        navigate('/login'); // Redirect if not logged in
+      }
     }
-  }, [user, hasCheckedInitialSession, navigate, toast]);
+  }, [user, hasCheckedInitialSession, navigate, toast]); // Dependencies changed
 
   // Timer effect
   useEffect(() => {
-    if (isLoadingPage || isTestSubmitted || showResults || showConfiguration || showInstructions || mcqs.length === 0) return;
+    if (isPageLoading || isTestSubmitted || showResults || showConfiguration || showInstructions || mcqs.length === 0) return;
 
     const interval = setInterval(() => {
       setTimer((prevTimer) => {
@@ -193,7 +190,7 @@ const TakeTestPage = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isLoadingPage, isTestSubmitted, showResults, showConfiguration, showInstructions, mcqs.length, handleSubmitTest]);
+  }, [isPageLoading, isTestSubmitted, showResults, showConfiguration, showInstructions, mcqs.length, handleSubmitTest]); // Dependencies changed
 
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategoryIds((prev) =>
@@ -209,7 +206,7 @@ const TakeTestPage = () => {
       return;
     }
 
-    setIsLoadingPage(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
     let query = supabase.from('mcqs').select('*');
 
     if (selectedCategoryIds.length > 0) {
@@ -224,13 +221,13 @@ const TakeTestPage = () => {
     if (error) {
       console.error('Error fetching MCQs:', error);
       toast({ title: "Error", description: "Failed to load test questions.", variant: "destructive" });
-      setIsLoadingPage(false);
+      setIsPageLoading(false);
       return;
     }
 
     if (!data || data.length === 0) {
       toast({ title: "No MCQs", description: "No MCQs available for the selected criteria.", variant: "default" });
-      setIsLoadingPage(false);
+      setIsPageLoading(false);
       return;
     }
 
@@ -246,7 +243,7 @@ const TakeTestPage = () => {
 
     if (selectedMcqs.length === 0) {
       toast({ title: "No MCQs", description: "No MCQs could be selected based on your criteria. Please adjust.", variant: "default" });
-      setIsLoadingPage(false);
+      setIsPageLoading(false);
       return;
     }
 
@@ -260,8 +257,8 @@ const TakeTestPage = () => {
     setExplanations(new Map());
 
     setShowConfiguration(false);
-    setShowInstructions(true); // Show instructions before starting
-    setIsLoadingPage(false);
+    setShowInstructions(true);
+    setIsPageLoading(false); // Clear loading for this specific fetch
   };
 
   const beginTest = () => {
@@ -296,7 +293,7 @@ const TakeTestPage = () => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  if (!hasCheckedInitialSession || isLoadingPage) { // Use hasCheckedInitialSession for initial loading
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading...</p>
@@ -305,7 +302,7 @@ const TakeTestPage = () => {
   }
 
   if (!user) {
-    return null; // Redirect handled by useEffect
+    return null; // Redirection handled by useEffect
   }
 
   // New check for active subscription
@@ -403,8 +400,8 @@ const TakeTestPage = () => {
             </div>
           </CardContent>
           <CardFooter className="flex justify-center">
-            <Button onClick={startTestPreparation} disabled={isLoadingPage}>
-              {isLoadingPage ? "Preparing Test..." : "Start Test"}
+            <Button onClick={startTestPreparation} disabled={isPageLoading}>
+              {isPageLoading ? "Preparing Test..." : "Start Test"}
             </Button>
           </CardFooter>
         </Card>
@@ -445,7 +442,7 @@ const TakeTestPage = () => {
     );
   }
 
-  if (mcqs.length === 0 && !isLoadingPage && !showConfiguration && !showInstructions) {
+  if (mcqs.length === 0 && !isPageLoading && !showConfiguration && !showInstructions) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
         <Card className="w-full max-w-2xl">

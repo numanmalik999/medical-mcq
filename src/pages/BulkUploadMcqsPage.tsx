@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { showLoading, dismissToast, showError, showSuccess } from '@/utils/toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Loader2, Upload, Download } from 'lucide-react'; // Import Download icon
+import { Loader2, Upload, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import * as XLSX from 'xlsx';
 import { Separator } from '@/components/ui/separator';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 // Define the expected structure of an incoming MCQ object
 interface IncomingMcq {
@@ -22,7 +23,7 @@ interface IncomingMcq {
     D: string;
   };
   correct_answer: 'A' | 'B' | 'C' | 'D';
-  explanation: string; // Still required as a string, will default if empty
+  explanation: string;
   image_url?: string;
   category_name?: string;
   subcategory_name?: string;
@@ -34,11 +35,20 @@ const BulkUploadMcqsPage = () => {
   const [jsonData, setJsonData] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(true); // New loading state for initial check
+
+  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+
+  useEffect(() => {
+    if (hasCheckedInitialSession) {
+      setIsPageLoading(false); // Once initial session check is done, stop page loading
+    }
+  }, [hasCheckedInitialSession]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       setSelectedFile(event.target.files[0]);
-      setJsonData(''); // Clear JSON data if a file is selected
+      setJsonData('');
     } else {
       setSelectedFile(null);
     }
@@ -60,7 +70,7 @@ const BulkUploadMcqsPage = () => {
           }
 
           const mcqs: IncomingMcq[] = json.map((row, index) => {
-            const rowIndex = index + 2; // Account for 0-indexed array and 1-indexed spreadsheet + header row
+            const rowIndex = index + 2;
 
             const question = row['Question'];
             const option_a = row['Option A'];
@@ -68,9 +78,8 @@ const BulkUploadMcqsPage = () => {
             const option_c = row['Option C'];
             const option_d = row['Option D'];
             const correct_answer_raw = row['Correct Answer'];
-            const explanation = row['Explanation']; // Now optional in spreadsheet
+            const explanation = row['Explanation'];
 
-            // Validate required fields (excluding explanation)
             if (!question) throw new Error(`Row ${rowIndex}: 'Question' is missing.`);
             if (!option_a) throw new Error(`Row ${rowIndex}: 'Option A' is missing.`);
             if (!option_b) throw new Error(`Row ${rowIndex}: 'Option B' is missing.`);
@@ -105,7 +114,7 @@ const BulkUploadMcqsPage = () => {
                 D: String(option_d),
               },
               correct_answer: correct_answer as 'A' | 'B' | 'C' | 'D',
-              explanation: explanation ? String(explanation) : 'No explanation provided.', // Default if empty
+              explanation: explanation ? String(explanation) : 'No explanation provided.',
               image_url: row['Image URL'] ? String(row['Image URL']) : undefined,
               category_name: row['Category Name'] ? String(row['Category Name']) : undefined,
               subcategory_name: row['Subcategory Name'] ? String(row['Subcategory Name']) : undefined,
@@ -176,8 +185,8 @@ const BulkUploadMcqsPage = () => {
       } else {
         showSuccess(`Successfully uploaded ${data.successCount} MCQs.`);
       }
-      setJsonData(''); // Clear textarea on success
-      setSelectedFile(null); // Clear selected file
+      setJsonData('');
+      setSelectedFile(null);
     } catch (error: any) {
       if (loadingToastId) dismissToast(loadingToastId);
       console.error("Error invoking bulk-upload-mcqs function:", error);
@@ -186,6 +195,14 @@ const BulkUploadMcqsPage = () => {
       setIsUploading(false);
     }
   };
+
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-gray-700 dark:text-gray-300">Loading bulk upload page...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
@@ -257,7 +274,7 @@ const BulkUploadMcqsPage = () => {
                 value={jsonData}
                 onChange={(e) => setJsonData(e.target.value)}
                 className="font-mono"
-                disabled={isUploading || !!selectedFile} // Disable if file is selected
+                disabled={isUploading || !!selectedFile}
               />
             </div>
           </div>

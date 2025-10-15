@@ -17,7 +17,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import ReviewSubmittedMcqDialog from '@/components/ReviewSubmittedMcqDialog'; // Import the new dialog
+import ReviewSubmittedMcqDialog from '@/components/ReviewSubmittedMcqDialog';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 export interface UserSubmittedMcq {
   id: string;
@@ -42,21 +43,25 @@ export interface UserSubmittedMcq {
 const ManageSubmittedMcqsPage = () => {
   const { toast } = useToast();
   const [submittedMcqs, setSubmittedMcqs] = useState<UserSubmittedMcq[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state
 
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [selectedMcqForReview, setSelectedMcqForReview] = useState<UserSubmittedMcq | null>(null);
 
+  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+
   useEffect(() => {
-    fetchSubmittedMcqs();
-  }, []);
+    if (hasCheckedInitialSession) { // Only fetch if initial session check is done
+      fetchSubmittedMcqs();
+    }
+  }, [hasCheckedInitialSession]); // Dependency changed
 
   const fetchSubmittedMcqs = async () => {
-    setIsLoading(true);
+    setIsPageLoading(true); // Set loading for this specific fetch
     const { data, error } = await supabase
       .from('user_submitted_mcqs')
       .select('*')
-      .eq('status', 'pending') // Only fetch MCQs with 'pending' status
+      .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -64,11 +69,10 @@ const ManageSubmittedMcqsPage = () => {
       toast({ title: "Error", description: "Failed to load submitted MCQs.", variant: "destructive" });
       setSubmittedMcqs([]);
     } else {
-      // Fetch user emails for display
       const mcqsWithEmails = await Promise.all(data.map(async (mcq) => {
-        const { data: userData } = await supabase // Removed unused 'error: userError'
+        const { data: userData } = await supabase
           .from('profiles')
-          .select('email') // Assuming email is stored in profiles or can be joined from auth.users
+          .select('email')
           .eq('id', mcq.user_id)
           .single();
         
@@ -79,7 +83,7 @@ const ManageSubmittedMcqsPage = () => {
       }));
       setSubmittedMcqs(mcqsWithEmails || []);
     }
-    setIsLoading(false);
+    setIsPageLoading(false); // Clear loading for this specific fetch
   };
 
   const handleReviewClick = (mcq: UserSubmittedMcq) => {
@@ -142,7 +146,7 @@ const ManageSubmittedMcqsPage = () => {
     },
   ];
 
-  if (isLoading) {
+  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading submitted MCQs...</p>

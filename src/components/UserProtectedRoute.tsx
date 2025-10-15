@@ -1,10 +1,14 @@
 "use client";
 
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useSession } from './SessionContextProvider';
+
+// Define user routes that are accessible to unauthenticated users (guests)
+const guestAllowedUserRoutes = ['/user/dashboard', '/user/profile'];
 
 const UserProtectedRoute = () => {
   const { user, hasCheckedInitialSession } = useSession();
+  const location = useLocation();
 
   if (!hasCheckedInitialSession) { // Show loading only until initial session check is done
     return (
@@ -14,11 +18,17 @@ const UserProtectedRoute = () => {
     );
   }
 
-  // If initial check is done and no user, redirect to login
+  // If no user, check if the current route is guest-allowed
   if (!user) {
+    if (guestAllowedUserRoutes.includes(location.pathname)) {
+      // Allow access for guests on specified routes
+      return <Outlet />;
+    }
+    // Otherwise, redirect to login
     return <Navigate to="/login" replace />;
   }
 
+  // If user is logged in, allow access
   return <Outlet />;
 };
 

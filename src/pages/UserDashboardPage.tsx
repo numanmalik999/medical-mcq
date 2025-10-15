@@ -58,6 +58,8 @@ const UserDashboardPage = () => {
   const [areasForImprovement, setAreasForImprovement] = useState<PerformanceSummary[]>([]);
   const [suggestedPractice, setSuggestedPractice] = useState<PerformanceSummary[]>([]);
 
+  const isGuestMode = !user; // Determine if in guest mode
+
   useEffect(() => {
     if (hasCheckedInitialSession) {
       if (user) {
@@ -73,8 +75,18 @@ const UserDashboardPage = () => {
         };
         fetchData();
       } else {
-        // If no user after initial check, stop loading
-        setIsFetchingData(false);
+        // If no user (guest mode), still fetch categories for recommendations, but no personal data
+        const fetchDataForGuest = async () => {
+          setIsFetchingData(true);
+          await fetchAllCategoriesAndSubcategories();
+          // No personal quiz performance or attempts for guests
+          setQuizPerformance({ totalAttempts: 0, correctAttempts: 0, accuracy: '0.00%' });
+          setRecentAttempts([]);
+          setAreasForImprovement([]);
+          setSuggestedPractice([]); // Guests don't have personalized suggestions yet
+          setIsFetchingData(false);
+        };
+        fetchDataForGuest();
       }
     }
   }, [user, hasCheckedInitialSession]); // Dependencies changed
@@ -266,7 +278,8 @@ const UserDashboardPage = () => {
     );
   }
 
-  if (!user) {
+  // If user is null and not in guest mode (shouldn't happen with UserProtectedRoute, but as a fallback)
+  if (!user && !isGuestMode) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-red-500">You must be logged in to view your dashboard.</p>
@@ -274,13 +287,30 @@ const UserDashboardPage = () => {
     );
   }
 
-  const userEmail = user?.email || 'Guest';
+  const userEmail = user?.email || 'Guest User';
   const hasActiveSubscription = user?.has_active_subscription;
   const trialTaken = user?.trial_taken;
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Welcome, {userEmail}!</h1>
+
+      {isGuestMode && (
+        <Card className="border-blue-500 bg-blue-50 dark:bg-blue-950">
+          <CardHeader>
+            <CardTitle className="text-blue-700 dark:text-blue-300">Guest Mode Active</CardTitle>
+            <CardDescription className="text-blue-600 dark:text-blue-400">
+              You are currently browsing as a guest. Some features are limited.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-blue-800 dark:text-blue-200">
+              <Link to="/user/subscriptions" className="font-semibold underline">Sign up and subscribe</Link> to unlock full access, track your progress, and personalize your learning experience.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Your Dashboard</CardTitle>
@@ -302,7 +332,20 @@ const UserDashboardPage = () => {
           <CardDescription>Your current access level to premium content.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {hasActiveSubscription ? (
+          {isGuestMode ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-blue-600 font-semibold">
+                <AlertCircle className="h-5 w-5" />
+                <span>Trial Mode (Guest)</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                You can take a limited number of trial quizzes. <Link to="/user/subscriptions" className="font-semibold underline">Sign up and subscribe</Link> for full access.
+              </p>
+              <Link to="/user/subscriptions">
+                <Button className="mt-2">View Subscription Plans</Button>
+              </Link>
+            </div>
+          ) : hasActiveSubscription ? (
             <div className="flex items-center gap-2 text-green-600 font-semibold">
               <CheckCircle2 className="h-5 w-5" />
               <span>You have an active subscription!</span>
@@ -341,13 +384,18 @@ const UserDashboardPage = () => {
             <Button>Take a Quiz</Button>
           </Link>
           <Link to="/user/take-test">
-            <Button disabled={!hasActiveSubscription} variant="secondary">
+            <Button disabled={isGuestMode || !hasActiveSubscription} variant="secondary">
               Take a Test
             </Button>
           </Link>
-          {!hasActiveSubscription && (
+          {!hasActiveSubscription && !isGuestMode && (
             <Link to="/user/subscriptions">
               <Button variant="outline">Subscribe Now</Button>
+            </Link>
+          )}
+          {isGuestMode && (
+            <Link to="/user/subscriptions">
+              <Button variant="outline">Sign Up & Subscribe</Button>
             </Link>
           )}
         </CardContent>
@@ -381,7 +429,11 @@ const UserDashboardPage = () => {
           <CardDescription>Based on your quiz performance, these areas might need more practice.</CardDescription>
         </CardHeader>
         <CardContent>
-          {areasForImprovement.length > 0 ? (
+          {isGuestMode ? (
+            <p className="text-center text-gray-600 dark:text-gray-400">
+              <Link to="/user/subscriptions" className="font-semibold underline">Sign up</Link> to track your performance and get personalized recommendations here!
+            </p>
+          ) : areasForImprovement.length > 0 ? (
             <div className="space-y-3">
               {areasForImprovement.map((area) => (
                 <div key={area.id} className="flex items-center justify-between p-2 border rounded-md">
@@ -407,7 +459,11 @@ const UserDashboardPage = () => {
           <CardDescription>Explore new topics or revisit areas with fewer attempts.</CardDescription>
         </CardHeader>
         <CardContent>
-          {suggestedPractice.length > 0 ? (
+          {isGuestMode ? (
+            <p className="text-center text-gray-600 dark:text-gray-400">
+              <Link to="/user/subscriptions" className="font-semibold underline">Sign up</Link> to get personalized practice suggestions here!
+            </p>
+          ) : suggestedPractice.length > 0 ? (
             <div className="space-y-3">
               {suggestedPractice.map((suggestion) => (
                 <div key={suggestion.id} className="flex items-center justify-between p-2 border rounded-md">
@@ -433,7 +489,11 @@ const UserDashboardPage = () => {
           <CardDescription>Your last 5 quiz attempts.</CardDescription>
         </CardHeader>
         <CardContent>
-          {recentAttempts.length > 0 ? (
+          {isGuestMode ? (
+            <p className="text-center text-gray-600 dark:text-gray-400">
+              <Link to="/user/subscriptions" className="font-semibold underline">Sign up</Link> to see your quiz activity here!
+            </p>
+          ) : recentAttempts.length > 0 ? (
             <div className="space-y-4">
               {recentAttempts.map((attempt) => (
                 <div key={attempt.id} className="border-b pb-3 last:border-b-0 last:pb-0">

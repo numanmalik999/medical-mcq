@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User as UserIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const UserProfilePage = () => {
   const { user, hasCheckedInitialSession } = useSession();
@@ -23,11 +24,19 @@ const UserProfilePage = () => {
   const [isFetchingProfile, setIsFetchingProfile] = useState(true); // New combined loading state
   const [isSaving, setIsSaving] = useState(false);
 
+  const isGuestMode = !user; // Determine if in guest mode
+
   useEffect(() => {
     if (hasCheckedInitialSession) {
       if (user) {
         fetchProfile();
       } else {
+        // If in guest mode, no profile to fetch, set default values
+        setFirstName('');
+        setLastName('');
+        setAvatarUrl('');
+        setPhoneNumber('');
+        setWhatsappNumber('');
         setIsFetchingProfile(false); // Not logged in, stop loading
       }
     }
@@ -91,17 +100,25 @@ const UserProfilePage = () => {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-red-500">You must be logged in to view your profile.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Your Profile</h1>
+
+      {isGuestMode && (
+        <Card className="border-blue-500 bg-blue-50 dark:bg-blue-950">
+          <CardHeader>
+            <CardTitle className="text-blue-700 dark:text-blue-300">Guest Mode Active</CardTitle>
+            <CardDescription className="text-blue-600 dark:text-blue-400">
+              You are currently browsing as a guest. Profile editing is disabled.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-blue-800 dark:text-blue-200">
+              <Link to="/user/subscriptions" className="font-semibold underline">Sign up and subscribe</Link> to create your personal profile and unlock all features.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="w-full max-w-2xl mx-auto">
         <CardHeader>
@@ -124,6 +141,7 @@ const UserProfilePage = () => {
                 value={avatarUrl}
                 onChange={(e) => setAvatarUrl(e.target.value)}
                 placeholder="Enter URL for your avatar image"
+                disabled={isGuestMode}
               />
             </div>
           </div>
@@ -138,6 +156,7 @@ const UserProfilePage = () => {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="Your first name"
+                  disabled={isGuestMode}
                 />
               </div>
               <div className="space-y-2">
@@ -148,12 +167,13 @@ const UserProfilePage = () => {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Your last name"
+                  disabled={isGuestMode}
                 />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={user.email || ''} disabled />
+              <Input id="email" type="email" value={user?.email || 'Guest'} disabled />
               <p className="text-sm text-muted-foreground">Email cannot be changed here.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -165,6 +185,7 @@ const UserProfilePage = () => {
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="e.g., +1234567890"
+                  disabled={isGuestMode}
                 />
               </div>
               <div className="space-y-2">
@@ -175,11 +196,12 @@ const UserProfilePage = () => {
                   value={whatsappNumber}
                   onChange={(e) => setWhatsappNumber(e.target.value)}
                   placeholder="e.g., +1234567890"
+                  disabled={isGuestMode}
                 />
               </div>
             </div>
           </div>
-          <Button onClick={handleSaveProfile} disabled={isSaving}>
+          <Button onClick={handleSaveProfile} disabled={isSaving || isGuestMode}>
             {isSaving ? "Saving..." : "Save Profile"}
           </Button>
         </CardContent>

@@ -4,7 +4,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useSession } from './SessionContextProvider';
 
 const AdminProtectedRoute = () => {
-  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
+  const { user, hasCheckedInitialSession } = useSession();
 
   if (!hasCheckedInitialSession) { // Show loading only until initial session check is done
     return (

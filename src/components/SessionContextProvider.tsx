@@ -20,8 +20,7 @@ interface AuthUser extends User {
 interface SessionContextType {
   session: Session | null;
   user: AuthUser | null;
-  isLoading: boolean; // This will only be true during the very first check
-  hasCheckedInitialSession: boolean; // New flag to indicate if the initial check is complete
+  hasCheckedInitialSession: boolean; // Flag to indicate if the initial check is complete
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -29,7 +28,6 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start as true for initial load
   const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false); // New state
   const navigate = useNavigate();
   const location = useLocation();
@@ -81,7 +79,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
   // This function will be called on initial load and on auth state changes
   // It only updates session/user and handles redirection for unauthenticated states.
-  // It does NOT manage the global isLoading state.
   const updateSessionAndUser = useCallback(async (currentSession: Session | null, event: string) => {
     if (!isMounted.current) {
       console.warn(`[updateSessionAndUser] Skipping event ${event} - component unmounted.`);
@@ -128,10 +125,9 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.log('SessionContextProvider: Initial Session Check Result:', initialSession);
         await updateSessionAndUser(initialSession, 'INITIAL_LOAD');
       }
-    }).finally(() => { // Use finally to ensure isLoading and hasCheckedInitialSession are set after the initial check
+    }).finally(() => { // Use finally to ensure hasCheckedInitialSession is set after the initial check
       if (isMounted.current) {
-        console.log('SessionContextProvider: Initial load complete, setting isLoading to FALSE and hasCheckedInitialSession to TRUE.');
-        setIsLoading(false);
+        console.log('SessionContextProvider: Initial load complete, setting hasCheckedInitialSession to TRUE.');
         setHasCheckedInitialSession(true);
       }
     });
@@ -140,8 +136,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) return;
       console.log('SessionContextProvider: onAuthStateChange: Event:', event, 'Session:', currentSession);
-      // For subsequent events, we just update the session/user, not the global isLoading
-      // The UI will react to changes in `user` and `session` directly.
+      // For subsequent events, we just update the session/user.
       await updateSessionAndUser(currentSession, event);
     });
 
@@ -166,7 +161,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {
-    console.log('Redirection useEffect: Current state - isLoading:', isLoading, 'user:', user ? `(ID: ${user.id}, Admin: ${user.is_admin}, Subscribed: ${user.has_active_subscription})` : 'null', 'pathname:', location.pathname);
+    console.log('Redirection useEffect: Current state - hasCheckedInitialSession:', hasCheckedInitialSession, 'user:', user ? `(ID: ${user.id}, Admin: ${user.is_admin}, Subscribed: ${user.has_active_subscription})` : 'null', 'pathname:', location.pathname);
     if (hasCheckedInitialSession && user && (location.pathname === '/login' || location.pathname === '/signup')) {
       console.log('Redirection triggered. User is_admin:', user.is_admin, 'User has_active_subscription:', user.has_active_subscription);
       if (user.is_admin) {
@@ -178,7 +173,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   }, [user, hasCheckedInitialSession, navigate, location.pathname]);
 
   return (
-    <SessionContext.Provider value={{ session, user, isLoading, hasCheckedInitialSession }}>
+    <SessionContext.Provider value={{ session, user, hasCheckedInitialSession }}>
       {children}
     </SessionContext.Provider>
   );

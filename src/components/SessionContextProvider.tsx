@@ -54,7 +54,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       console.log('[fetchUserProfile] Attempting Supabase profile select call...');
       console.trace('[fetchUserProfile] Call stack before select');
 
-      // Removed the Promise.race with timeout, as it confirmed the query is just slow.
       const { data: profileDataArray, error: selectError } = await supabase
         .from('profiles')
         .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
@@ -134,19 +133,33 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     isMounted.current = true;
     console.log('SessionContextProvider: Main useEffect mounted.');
 
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      if (isMounted.current) {
-        console.log('SessionContextProvider: Initial Session Check Result:', initialSession);
-        await updateSessionAndUser(initialSession, 'INITIAL_LOAD');
+    const performInitialSessionCheck = async () => {
+      try {
+        console.log('SessionContextProvider: Starting initial session fetch...');
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('SessionContextProvider: Error during initial getSession:', error);
+          // Even if error, try to update session and user, then mark as checked
+          await updateSessionAndUser(null, 'INITIAL_LOAD_ERROR');
+        } else if (isMounted.current) {
+          console.log('SessionContextProvider: Initial Session Check Result:', initialSession ? 'Session found' : 'No session');
+          await updateSessionAndUser(initialSession, 'INITIAL_LOAD');
+        }
+      } catch (e) {
+        console.error('SessionContextProvider: UNEXPECTED ERROR during initial session check:', e);
+        // Ensure we still attempt to update state even on unexpected errors
+        await updateSessionAndUser(null, 'INITIAL_LOAD_UNEXPECTED_ERROR');
+      } finally {
+        if (isMounted.current) {
+          console.log('SessionContextProvider: Initial load process finished, setting hasCheckedInitialSession to TRUE.');
+          setHasCheckedInitialSession(true);
+        } else {
+          console.warn('SessionContextProvider: Component unmounted before setting hasCheckedInitialSession in finally block of initial check.');
+        }
       }
-    }).finally(() => { // Use finally to ensure hasCheckedInitialSession is set after the initial check
-      if (isMounted.current) {
-        console.log('SessionContextProvider: Initial load complete, setting hasCheckedInitialSession to TRUE.');
-        setHasCheckedInitialSession(true);
-      } else {
-        console.warn('SessionContextProvider: Component unmounted before setting hasCheckedInitialSession in finally block.');
-      }
-    });
+    };
+
+    performInitialSessionCheck();
 
     // Listen for auth state changes (these will update session/user but not toggle global isLoading)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
@@ -154,7 +167,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.warn(`SessionContextProvider: onAuthStateChange: Skipping event ${event} - component unmounted.`);
         return;
       }
-      console.log('SessionContextProvider: onAuthStateChange: Event:', event, 'Session:', currentSession);
+      console.log('SessionContextProvider: onAuthStateChange: Event:', event, 'Session:', currentSession ? 'present' : 'null');
       await updateSessionAndUser(currentSession, event);
     });
 

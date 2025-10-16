@@ -140,22 +140,24 @@ const QuizPage = () => {
     const categoriesWithStats: CategoryStat[] = [];
 
     for (const category of categoriesData || []) {
-      // Count total MCQs for the category using filter on related table
+      // Count total MCQs for the category by querying mcq_category_links table directly
       const { count: mcqCount, error: mcqCountError } = await supabase
-        .from('mcqs')
-        .select('id', { count: 'exact', head: true })
-        .filter('mcq_category_links.category_id', 'eq', category.id);
+        .from('mcq_category_links')
+        .select('mcq_id', { count: 'exact', head: true })
+        .eq('category_id', category.id);
 
       if (mcqCountError) {
-        console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
+        console.error(`Error fetching total MCQ count for category ${category.name}:`, mcqCountError);
       }
 
-      // Count trial MCQs for the category using filter on related table
+      // Count trial MCQs for the category by joining mcq_category_links with mcqs
       const { count: trialMcqCount, error: trialMcqCountError } = await supabase
-        .from('mcqs')
-        .select('id', { count: 'exact', head: true })
-        .filter('mcq_category_links.category_id', 'eq', category.id)
-        .eq('is_trial_mcq', true);
+        .from('mcq_category_links')
+        .select(`
+          mcq_id!inner(is_trial_mcq)
+        `, { count: 'exact', head: true })
+        .eq('category_id', category.id)
+        .eq('mcq_id.is_trial_mcq', true); // Filter on the joined table's column
 
       if (trialMcqCountError) {
         console.error(`Error fetching trial MCQ count for category ${category.name}:`, trialMcqCountError);

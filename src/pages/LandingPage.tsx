@@ -96,7 +96,7 @@ const LandingPage = () => {
                   </Button>
                 </Link>
                 <Link to="/quiz">
-                  <Button size="lg" variant="outline" className="border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10">
+                  <Button size="lg" variant="secondary" className="text-primary hover:bg-secondary/80">
                     Try a Free Quiz
                   </Button>
                 </Link>

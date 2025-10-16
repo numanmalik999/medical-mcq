@@ -17,8 +17,8 @@ import ManageUsersPage from "./pages/ManageUsersPage";
 import UserSubscriptionsPage from "./pages/UserSubscriptionsPage";
 import BulkUploadMcqsPage from "./pages/BulkUploadMcqsPage";
 import SubmitMcqPage from "./pages/SubmitMcqPage";
-import ManageSubmittedMcqsPage from "./pages/ManageSubmittedMcqsPage"; // Import new page
-import ManageMcqFeedbackPage from "./pages/ManageMcqFeedbackPage"; // Import new page
+import ManageSubmittedMcqsPage from "./pages/ManageSubmittedMcqsPage";
+import ManageMcqFeedbackPage from "./pages/ManageMcqFeedbackPage";
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import AdminLayout from "./components/AdminLayout";
 import UserLayout from "./components/UserLayout";
@@ -27,6 +27,7 @@ import UserProfilePage from "./pages/UserProfilePage";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import UserProtectedRoute from "./components/UserProtectedRoute";
 import TakeTestPage from "./pages/TakeTestPage";
+import SubscriptionPage from "./pages/SubscriptionPage"; // Import the new SubscriptionPage
 
 const queryClient = new QueryClient();
 
@@ -39,10 +40,10 @@ const App = () => (
         <SessionContextProvider>
           <Routes>
             <Route path="/" element={<Index />} />
-
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/quiz" element={<QuizPage />} />
+            <Route path="/subscription" element={<SubscriptionPage />} /> {/* New public route */}
             
             {/* Admin Routes - Protected */}
             <Route path="/admin" element={<AdminProtectedRoute />}>
@@ -52,11 +53,11 @@ const App = () => (
                 <Route path="add-mcq" element={<AddMcqPage />} />
                 <Route path="bulk-upload-mcqs" element={<BulkUploadMcqsPage />} />
                 <Route path="manage-mcqs" element={<ManageMcqsPage />} />
-                <Route path="manage-submitted-mcqs" element={<ManageSubmittedMcqsPage />} /> {/* New route */}
+                <Route path="manage-submitted-mcqs" element={<ManageSubmittedMcqsPage />} />
                 <Route path="manage-categories" element={<ManageCategoriesPage />} />
                 <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
                 <Route path="manage-users" element={<ManageUsersPage />} />
-                <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} /> {/* New route */}
+                <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />
               </Route>
             </Route>
 

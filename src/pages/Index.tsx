@@ -3,12 +3,12 @@
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useSession } from "@/components/SessionContextProvider"; // Import useSession
+import { useSession } from "@/components/SessionContextProvider";
 
 const Index = () => {
-  const { user, hasCheckedInitialSession } = useSession(); // Use hasCheckedInitialSession
+  const { user, hasCheckedInitialSession } = useSession();
 
-  if (!hasCheckedInitialSession) { // Show loading only until initial session check is done
+  if (!hasCheckedInitialSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading user session...</p>
@@ -24,7 +24,7 @@ const Index = () => {
           Start building your amazing project here!
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-          {user ? ( // Conditionally render dashboard links if logged in
+          {user ? (
             <>
               {user.is_admin ? (
                 <Link to="/admin/dashboard">
@@ -58,10 +58,10 @@ const Index = () => {
               <Link to="/login">
                 <Button size="lg">Login</Button>
               </Link>
-              <Link to="/user/subscriptions"> {/* Changed from /signup to /user/subscriptions */}
+              <Link to="/subscription"> {/* Redirect to new public subscription page */}
                 <Button size="lg" variant="outline">Sign Up & Subscribe</Button>
               </Link>
-              <Link to="/user/dashboard"> {/* Corrected link for guest mode */}
+              <Link to="/user/dashboard">
                 <Button size="lg" variant="ghost">Continue as Guest</Button>
               </Link>
             </>

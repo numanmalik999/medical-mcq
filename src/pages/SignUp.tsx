@@ -11,8 +11,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Link, useNavigate } from 'react-router-dom';
-import { useSession } from '@/components/SessionContextProvider'; // Import useSession
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'; // Import useSearchParams
+import { useSession } from '@/components/SessionContextProvider';
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address.").min(1, "Email is required."),
@@ -27,13 +27,14 @@ const SignUp = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isPageLoading, setIsPageLoading] = useState(true); // New loading state for initial check
+  const [isPageLoading, setIsPageLoading] = useState(true);
 
-  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+  const { hasCheckedInitialSession } = useSession();
+  const [searchParams] = useSearchParams(); // Get search params
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      setIsPageLoading(false); // Once initial session check is done, stop page loading
+      setIsPageLoading(false);
     }
   }, [hasCheckedInitialSession]);
 
@@ -72,8 +73,14 @@ const SignUp = () => {
       if (data.user && data.session) {
         toast({
           title: "Sign Up Successful!",
-          description: "You have successfully created an account. Redirecting to dashboard...",
+          description: "You have successfully created an account. Redirecting...",
         });
+        const tierId = searchParams.get('tierId');
+        if (tierId) {
+          navigate(`/subscription?tierId=${tierId}`); // Redirect back to subscription page with tierId
+        } else {
+          navigate('/user/dashboard'); // Default redirect
+        }
       } else if (data.user && !data.session) {
         toast({
           title: "Check your email",
@@ -93,7 +100,7 @@ const SignUp = () => {
     }
   };
 
-  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
+  if (!hasCheckedInitialSession || isPageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading signup page...</p>

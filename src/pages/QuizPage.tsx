@@ -60,7 +60,7 @@ interface SavedQuizState {
 }
 
 const TRIAL_MCQ_LIMIT = 10;
-const LOCAL_STORAGE_QUIZ_KEY_PREFIX = 'quiz_session_state_';
+const LOCAL_STORAGE_QUIZ_KEY_PREFIX = 'quiz_session_state'; // Base prefix
 
 const QuizPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
@@ -78,7 +78,8 @@ const QuizPage = () => {
 
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
   const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
-  const [currentQuizSubcategoryId, setCurrentQuizSubcategoryId] = useState<string | null>(null);
+  const [currentQuizCategoryId, setCurrentQuizCategoryId] = useState<string | null>(null); // Track the category of the current quiz
+  const [currentQuizSubcategoryId, setCurrentQuizSubcategoryId] = useState<string | null>(null); // Track the subcategory of the current quiz
   const [showCategorySelection, setShowCategorySelection] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
@@ -92,11 +93,11 @@ const QuizPage = () => {
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
-  const [savedQuizState, setSavedQuizState] = useState<SavedQuizState | null>(null);
+  const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<Map<string, SavedQuizState>>(new Map()); // Map to store all active saved quizzes
 
-  const getLocalStorageKey = useCallback(() => {
-    return `${LOCAL_STORAGE_QUIZ_KEY_PREFIX}${user?.id || 'guest'}`;
-  }, [user]);
+  const getQuizSessionKey = useCallback((userId: string | null, categoryId: string, subcategoryId: string | null) => {
+    return `${LOCAL_STORAGE_QUIZ_KEY_PREFIX}_${userId || 'guest'}_${categoryId}_${subcategoryId || 'no-sub'}`;
+  }, []);
 
   const saveQuizState = useCallback((
     categoryId: string,
@@ -116,13 +117,19 @@ const QuizPage = () => {
       isTrialActiveSession: isTrial,
       userId: currentUserId,
     };
-    localStorage.setItem(getLocalStorageKey(), JSON.stringify(stateToSave));
-  }, [getLocalStorageKey]);
+    const key = getQuizSessionKey(currentUserId, categoryId, subcategoryId);
+    localStorage.setItem(key, JSON.stringify(stateToSave));
+  }, [getQuizSessionKey]);
 
-  const clearSavedQuizState = useCallback(() => {
-    localStorage.removeItem(getLocalStorageKey());
-    setSavedQuizState(null);
-  }, [getLocalStorageKey]);
+  const clearSpecificQuizState = useCallback((categoryId: string, subcategoryId: string | null) => {
+    const key = getQuizSessionKey(user?.id || null, categoryId, subcategoryId);
+    localStorage.removeItem(key);
+    setActiveSavedQuizzes(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(key); // Use the full key for deletion
+      return newMap;
+    });
+  }, [getQuizSessionKey, user]);
 
   const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
     if (explanations.has(explanationId)) {
@@ -149,50 +156,21 @@ const QuizPage = () => {
     return null;
   }, [explanations, toast]);
 
-  // Effect to load saved quiz state on component mount
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      const storedState = localStorage.getItem(getLocalStorageKey());
-      if (storedState) {
-        try {
-          const parsedState: SavedQuizState = JSON.parse(storedState);
-          // Validate if the saved state belongs to the current user or is a guest state
-          if (parsedState.userId === (user?.id || null)) {
-            setSavedQuizState(parsedState);
-            toast({
-              title: "Quiz Progress Found",
-              description: "You have an unfinished quiz. Click 'Continue Quiz' to resume.",
-              duration: 5000,
-            });
-          } else {
-            // Clear state if it belongs to a different user
-            clearSavedQuizState();
-          }
-        } catch (e) {
-          console.error("Failed to parse saved quiz state:", e);
-          clearSavedQuizState();
+      if (!user) {
+        setIsTrialActiveSession(true);
+        fetchQuizOverview();
+      } else {
+        if (!user.has_active_subscription && !user.trial_taken) {
+          setIsTrialActiveSession(true);
+        } else {
+          setIsTrialActiveSession(false);
         }
+        fetchQuizOverview();
       }
-      // Proceed with fetching quiz overview regardless of saved state
-      fetchQuizOverview();
     }
-  }, [user, hasCheckedInitialSession, getLocalStorageKey, clearSavedQuizState]);
-
-  // Effect to update local storage whenever quiz state changes
-  useEffect(() => {
-    if (!showCategorySelection && quizQuestions.length > 0 && !showResults) {
-      saveQuizState(
-        categoryStats.find(cat => cat.id === quizQuestions[0].category_links?.[0]?.category_id)?.id || '', // Assuming first MCQ's category
-        currentQuizSubcategoryId,
-        quizQuestions,
-        userAnswers,
-        currentQuestionIndex,
-        isTrialActiveSession,
-        user?.id || null
-      );
-    }
-  }, [quizQuestions, userAnswers, currentQuestionIndex, isTrialActiveSession, showCategorySelection, showResults, saveQuizState, user, currentQuizSubcategoryId, categoryStats]);
-
+  }, [user, hasCheckedInitialSession]);
 
   const fetchQuizOverview = async () => {
     setIsPageLoading(true);
@@ -216,6 +194,33 @@ const QuizPage = () => {
     } else {
       setAllSubcategories(subcategoriesData || []);
     }
+
+    // --- New: Load all saved quiz sessions for the current user ---
+    const currentUserId = user?.id || 'guest';
+    const loadedSavedQuizzes = new Map<string, SavedQuizState>();
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`${LOCAL_STORAGE_QUIZ_KEY_PREFIX}_${currentUserId}_`)) {
+        try {
+          const storedState = localStorage.getItem(key);
+          if (storedState) {
+            const parsedState: SavedQuizState = JSON.parse(storedState);
+            // Ensure the parsed state is valid and belongs to the current user/guest
+            if (parsedState.userId === currentUserId) {
+              loadedSavedQuizzes.set(key, parsedState); // Store with the full key
+            } else {
+              // If it's a stale key from a different user, remove it
+              localStorage.removeItem(key);
+            }
+          }
+        } catch (e) {
+          console.error(`Failed to parse saved quiz state for key ${key}:`, e);
+          localStorage.removeItem(key); // Remove corrupted state
+        }
+      }
+    }
+    setActiveSavedQuizzes(loadedSavedQuizzes);
+    // --- End New ---
 
     const categoriesWithStats: CategoryStat[] = [];
 
@@ -309,7 +314,7 @@ const QuizPage = () => {
     setScore(0);
     setExplanations(new Map());
     setShowResults(false);
-    clearSavedQuizState(); // Clear any existing saved state when starting a new quiz
+    clearSpecificQuizState(categoryId, subcategoryId); // Clear any existing saved state for this specific category/subcategory when starting a new quiz
 
     let mcqIdsToFetch: string[] = [];
 
@@ -426,6 +431,7 @@ const QuizPage = () => {
     }
 
     setQuizQuestions(mcqsToLoad);
+    setCurrentQuizCategoryId(categoryId); // Set the category for the current quiz
     setCurrentQuizSubcategoryId(subcategoryId);
     setShowCategorySelection(false);
     setIsPageLoading(false);
@@ -453,33 +459,48 @@ const QuizPage = () => {
     }
   };
 
-  const continueQuizSession = useCallback(() => {
-    if (savedQuizState) {
-      setQuizQuestions(savedQuizState.mcqs);
-      setUserAnswers(new Map(savedQuizState.userAnswers));
-      setCurrentQuestionIndex(savedQuizState.currentQuestionIndex);
-      setIsTrialActiveSession(savedQuizState.isTrialActiveSession);
-      setCurrentQuizSubcategoryId(savedQuizState.subcategoryId);
+  const continueQuizSession = useCallback((savedState: SavedQuizState) => {
+    setQuizQuestions(savedState.mcqs);
+    setUserAnswers(new Map(savedState.userAnswers));
+    setCurrentQuestionIndex(savedState.currentQuestionIndex);
+    setIsTrialActiveSession(savedState.isTrialActiveSession);
+    setCurrentQuizCategoryId(savedState.categoryId); // Set current category
+    setCurrentQuizSubcategoryId(savedState.subcategoryId); // Set current subcategory
 
-      // Set selectedAnswer, feedback, and showExplanation for the current question
-      const currentMcqFromSaved = savedQuizState.mcqs[savedQuizState.currentQuestionIndex];
-      const currentAnswerDataFromSaved = new Map(savedQuizState.userAnswers).get(currentMcqFromSaved.id);
-      setSelectedAnswer(currentAnswerDataFromSaved?.selectedOption || null);
-      setFeedback(currentAnswerDataFromSaved?.submitted ? (currentAnswerDataFromSaved.isCorrect ? 'Correct!' : `Incorrect. The correct answer was ${currentMcqFromSaved.correct_answer}.`) : null);
-      setShowExplanation(currentAnswerDataFromSaved?.submitted || false);
-      if (currentAnswerDataFromSaved?.submitted && currentMcqFromSaved.explanation_id) {
-        fetchExplanation(currentMcqFromSaved.explanation_id);
-      }
-
-      setShowCategorySelection(false);
-      setIsPageLoading(false);
-      toast({
-        title: "Quiz Resumed",
-        description: "Continuing from where you left off.",
-        duration: 3000,
-      });
+    // Set selectedAnswer, feedback, and showExplanation for the current question
+    const currentMcqFromSaved = savedState.mcqs[savedState.currentQuestionIndex];
+    const currentAnswerDataFromSaved = new Map(savedState.userAnswers).get(currentMcqFromSaved.id);
+    setSelectedAnswer(currentAnswerDataFromSaved?.selectedOption || null);
+    setFeedback(currentAnswerDataFromSaved?.submitted ? (currentAnswerDataFromSaved.isCorrect ? 'Correct!' : `Incorrect. The correct answer was ${currentMcqFromSaved.correct_answer}.`) : null);
+    setShowExplanation(currentAnswerDataFromSaved?.submitted || false);
+    if (currentAnswerDataFromSaved?.submitted && currentMcqFromSaved.explanation_id) {
+      fetchExplanation(currentMcqFromSaved.explanation_id);
     }
-  }, [savedQuizState, fetchExplanation]);
+
+    setShowCategorySelection(false);
+    setIsPageLoading(false);
+    toast({
+      title: "Quiz Resumed",
+      description: "Continuing from where you left off.",
+      duration: 3000,
+    });
+  }, [fetchExplanation, toast]);
+
+  // Effect to update local storage whenever quiz state changes
+  useEffect(() => {
+    if (!showCategorySelection && quizQuestions.length > 0 && !showResults && currentQuizCategoryId) {
+      saveQuizState(
+        currentQuizCategoryId,
+        currentQuizSubcategoryId,
+        quizQuestions,
+        userAnswers,
+        currentQuestionIndex,
+        isTrialActiveSession,
+        user?.id || null
+      );
+    }
+  }, [quizQuestions, userAnswers, currentQuestionIndex, isTrialActiveSession, showCategorySelection, showResults, saveQuizState, user, currentQuizCategoryId, currentQuizSubcategoryId]);
+
 
   const handleResetProgress = async (categoryId: string) => {
     if (!user) {
@@ -652,7 +673,9 @@ const QuizPage = () => {
     await Promise.all(explanationPromises);
     setShowResults(true);
     setIsPageLoading(false);
-    clearSavedQuizState(); // Clear saved state after quiz submission
+    if (currentQuizCategoryId) {
+      clearSpecificQuizState(currentQuizCategoryId, currentQuizSubcategoryId); // Clear saved state after quiz submission
+    }
   };
 
   const handleSubmitFeedback = async () => {
@@ -713,8 +736,11 @@ const QuizPage = () => {
       setExplanations(new Map());
       setShowResults(false);
       setShowCategorySelection(true);
+      setCurrentQuizCategoryId(null); // Reset current quiz category
       setCurrentQuizSubcategoryId(null); // Reset subcategory selection
-      clearSavedQuizState(); // Clear saved state
+      if (currentQuizCategoryId) {
+        clearSpecificQuizState(currentQuizCategoryId, currentQuizSubcategoryId); // Clear saved state
+      }
       fetchQuizOverview(); // Refresh overview data
     }
   };
@@ -765,14 +791,36 @@ const QuizPage = () => {
             <CardDescription>Choose a category and optionally a subcategory to start your quiz and view your performance.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {savedQuizState && (
-              <div className="flex flex-col sm:flex-row gap-2 mb-4 p-4 border rounded-md bg-blue-50 dark:bg-blue-950">
-                <p className="text-blue-800 dark:text-blue-200 flex-grow">
-                  You have an unfinished quiz session.
-                </p>
-                <Button onClick={continueQuizSession} className="flex-shrink-0">Continue Quiz</Button>
-                <Button onClick={clearSavedQuizState} variant="outline" className="flex-shrink-0">Start New Quiz</Button>
-              </div>
+            {activeSavedQuizzes.size > 0 && (
+              <Card className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-950">
+                <CardHeader>
+                  <CardTitle className="text-blue-700 dark:text-blue-300">Continue Your Quizzes</CardTitle>
+                  <CardDescription className="text-blue-600 dark:text-blue-400">
+                    Pick up where you left off in any of your saved quiz sessions.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {Array.from(activeSavedQuizzes.entries()).map(([key, savedState]) => {
+                    const categoryName = categoryStats.find(c => c.id === savedState.categoryId)?.name || 'Unknown Category';
+                    const subcategoryName = savedState.subcategoryId ? allSubcategories.find(s => s.id === savedState.subcategoryId)?.name : null;
+                    const progress = savedState.currentQuestionIndex + 1;
+                    const total = savedState.mcqs.length;
+
+                    return (
+                      <div key={key} className="flex flex-col sm:flex-row items-center justify-between p-3 border rounded-md bg-white dark:bg-gray-800">
+                        <div>
+                          <p className="font-semibold">{categoryName} {subcategoryName ? `(${subcategoryName})` : ''}</p>
+                          <p className="text-sm text-muted-foreground">Question {progress} of {total}</p>
+                        </div>
+                        <div className="flex gap-2 mt-2 sm:mt-0">
+                          <Button onClick={() => continueQuizSession(savedState)} size="sm">Continue</Button>
+                          <Button onClick={() => clearSpecificQuizState(savedState.categoryId, savedState.subcategoryId)} variant="outline" size="sm">Clear</Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
             )}
             <Input
               placeholder="Search categories..."

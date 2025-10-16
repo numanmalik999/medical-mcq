@@ -29,6 +29,8 @@ interface Subcategory {
 
 type DisplayMCQ = MCQ;
 
+const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id'; // Unique ID for the virtual uncategorized category
+
 const ManageMcqsPage = () => {
   const [mcqs, setMcqs] = useState<DisplayMCQ[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state
@@ -69,7 +71,7 @@ const ManageMcqsPage = () => {
           return { ...category, mcq_count: count || 0 };
         })
       );
-      setCategories(categoriesWithCounts);
+      setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: 0 }]); // Add virtual uncategorized
     }
 
     const { data: subcategoriesData, error: subcategoriesError } = await supabase
@@ -97,8 +99,29 @@ const ManageMcqsPage = () => {
         )
       `);
 
-    // Filtering logic for multi-category system
-    if (selectedFilterCategory) {
+    if (selectedFilterCategory === UNCATEGORIZED_ID) {
+      // Fetch MCQs that are NOT in mcq_category_links
+      const { data: categorizedMcqLinks, error: linksError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id');
+
+      if (linksError) {
+        console.error('Error fetching categorized MCQ links:', linksError);
+        toast({ title: "Error", description: "Failed to identify uncategorized questions.", variant: "destructive" });
+        setIsPageLoading(false);
+        return;
+      }
+
+      const categorizedMcqIds = Array.from(new Set(categorizedMcqLinks?.map(link => link.mcq_id) || []));
+
+      if (categorizedMcqIds.length > 0) {
+        query = query.not('id', 'in', `(${categorizedMcqIds.join(',')})`);
+      }
+      // If no categorized MCQs, then all MCQs are effectively uncategorized, so no 'not in' needed.
+      // The query will proceed to fetch all MCQs, and then we filter client-side if needed,
+      // but for uncategorized, this is the correct way to find those without links.
+    } else if (selectedFilterCategory) {
+      // Filter by category_id in the linking table
       query = query.filter('mcq_category_links.category_id', 'eq', selectedFilterCategory);
       if (selectedFilterSubcategory) {
         query = query.filter('mcq_category_links.subcategory_id', 'eq', selectedFilterSubcategory);
@@ -150,11 +173,11 @@ const ManageMcqsPage = () => {
   }, [selectedFilterCategory, selectedFilterSubcategory, searchTerm, hasCheckedInitialSession]); // Refetch when filters or search term change
 
   useEffect(() => {
-    if (selectedFilterCategory) {
+    if (selectedFilterCategory && selectedFilterCategory !== UNCATEGORIZED_ID) {
       setFilteredSubcategoriesForFilter(subcategories.filter(sub => sub.category_id === selectedFilterCategory));
     } else {
       setFilteredSubcategoriesForFilter([]);
-      setSelectedFilterSubcategory(null); // Clear subcategory filter if category is unselected
+      setSelectedFilterSubcategory(null); // Clear subcategory filter if category is unselected or uncategorized
     }
   }, [selectedFilterCategory, subcategories]);
 
@@ -229,16 +252,42 @@ const ManageMcqsPage = () => {
 
     setIsPageLoading(true); // Set loading for this specific fetch
     try {
-      // First, get all mcq_ids that are linked to this category
-      const { data: mcqLinksData, error: fetchLinksError } = await supabase
-        .from('mcq_category_links')
-        .select('mcq_id')
-        .eq('category_id', selectedFilterCategory);
+      let mcqIdsToDelete: string[] = [];
 
-      if (fetchLinksError) {
-        throw fetchLinksError;
+      if (selectedFilterCategory === UNCATEGORIZED_ID) {
+        // Get all categorized MCQ IDs
+        const { data: categorizedMcqLinks, error: linksError } = await supabase
+          .from('mcq_category_links')
+          .select('mcq_id');
+
+        if (linksError) {
+          throw linksError;
+        }
+        const categorizedMcqIds = Array.from(new Set(categorizedMcqLinks?.map(link => link.mcq_id) || []));
+
+        // Get all MCQs that are NOT in the categorized list
+        const { data: uncategorizedMcqs, error: uncategorizedError } = await supabase
+          .from('mcqs')
+          .select('id')
+          .not('id', 'in', `(${categorizedMcqIds.join(',')})`);
+
+        if (uncategorizedError) {
+          throw uncategorizedError;
+        }
+        mcqIdsToDelete = uncategorizedMcqs?.map(mcq => mcq.id) || [];
+
+      } else {
+        // First, get all mcq_ids that are linked to this category
+        const { data: mcqLinksData, error: fetchLinksError } = await supabase
+          .from('mcq_category_links')
+          .select('mcq_id')
+          .eq('category_id', selectedFilterCategory);
+
+        if (fetchLinksError) {
+          throw fetchLinksError;
+        }
+        mcqIdsToDelete = Array.from(new Set(mcqLinksData?.map(link => link.mcq_id) || []));
       }
-      const mcqIdsToDelete = Array.from(new Set(mcqLinksData?.map(link => link.mcq_id) || []));
 
       if (mcqIdsToDelete.length === 0) {
         toast({ title: "Info", description: `No MCQs found linked to "${categoryName}" to delete.`, variant: "default" });
@@ -260,15 +309,17 @@ const ManageMcqsPage = () => {
         .map(mcq => mcq.explanation_id)
         .filter((id): id is string => id !== null);
 
-      // Delete category links first
-      const { error: deleteLinksError } = await supabase
-        .from('mcq_category_links')
-        .delete()
-        .in('mcq_id', mcqIdsToDelete) // Delete all links for these MCQs
-        .eq('category_id', selectedFilterCategory); // And specifically for this category
+      // Delete category links first (only for actual categories)
+      if (selectedFilterCategory !== UNCATEGORIZED_ID) {
+        const { error: deleteLinksError } = await supabase
+          .from('mcq_category_links')
+          .delete()
+          .in('mcq_id', mcqIdsToDelete) // Delete all links for these MCQs
+          .eq('category_id', selectedFilterCategory); // And specifically for this category
 
-      if (deleteLinksError) {
-        console.warn("Error deleting some category links:", deleteLinksError);
+        if (deleteLinksError) {
+          console.warn("Error deleting some category links:", deleteLinksError);
+        }
       }
 
       // Delete explanations
@@ -363,7 +414,7 @@ const ManageMcqsPage = () => {
             </div>
             <div className="flex-1">
               <Label htmlFor="filterSubcategory">Subcategory</Label>
-              <Select onValueChange={(value) => setSelectedFilterSubcategory(value === "all" ? null : value)} value={selectedFilterSubcategory || "all"} disabled={!selectedFilterCategory || filteredSubcategoriesForFilter.length === 0}>
+              <Select onValueChange={(value) => setSelectedFilterSubcategory(value === "all" ? null : value)} value={selectedFilterSubcategory || "all"} disabled={!selectedFilterCategory || selectedFilterCategory === UNCATEGORIZED_ID || filteredSubcategoriesForFilter.length === 0}>
                 <SelectTrigger id="filterSubcategory">
                   <SelectValue placeholder="Select subcategory" />
                 </SelectTrigger>

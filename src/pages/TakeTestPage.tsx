@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,11 +10,12 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate, Link } from 'react-router-dom';
-import { TimerIcon } from 'lucide-react';
+import { TimerIcon, Pause, Play, SkipForward } from 'lucide-react'; // Removed RotateCcw
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { McqCategoryLink } from '@/components/mcq-columns'; // Import McqCategoryLink
 import { Input } from '@/components/ui/input'; // Import Input for number of MCQs and duration
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'; // Added DialogDescription
 
 interface MCQ {
   id: string;
@@ -64,6 +65,14 @@ const TakeTestPage = () => {
   const [showResults, setShowResults] = useState(false);
   const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
 
+  const [isPaused, setIsPaused] = useState(false); // New state for pause functionality
+  const [skippedMcqIds, setSkippedMcqIds] = useState<Set<string>>(new Set()); // Track skipped MCQs
+  const [showReviewSkippedDialog, setShowReviewSkippedDialog] = useState(false);
+  const [reviewSkippedQuestions, setReviewSkippedQuestions] = useState<MCQ[]>([]);
+  const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
+
+  const timerIntervalRef = useRef<number | null>(null);
+
   // Memoized function to fetch a single explanation
   const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
     if (explanations.has(explanationId)) {
@@ -96,7 +105,12 @@ const TakeTestPage = () => {
       return;
     }
 
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
     setIsTestSubmitted(true);
+    setIsPaused(true); // Ensure timer is paused on submission
+
     let correctCount = 0;
     const attemptsToRecord = [];
     const explanationPromises: Promise<MCQExplanation | null>[] = [];
@@ -180,21 +194,37 @@ const TakeTestPage = () => {
 
   // Timer effect
   useEffect(() => {
-    if (isPageLoading || isTestSubmitted || showResults || showConfiguration || showInstructions || mcqs.length === 0) return;
+    if (isPageLoading || isTestSubmitted || showResults || showConfiguration || showInstructions || mcqs.length === 0 || isPaused) {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      return;
+    }
 
-    const interval = setInterval(() => {
-      setTimer((prevTimer) => {
-        if (prevTimer <= 1) {
-          clearInterval(interval);
-          handleSubmitTest(); // Auto-submit when timer runs out
-          return 0;
-        }
-        return prevTimer - 1;
-      });
-    }, 1000);
+    if (!timerIntervalRef.current) {
+      timerIntervalRef.current = setInterval(() => {
+        setTimer((prevTimer) => {
+          if (prevTimer <= 1) {
+            if (timerIntervalRef.current) {
+              clearInterval(timerIntervalRef.current);
+              timerIntervalRef.current = null;
+            }
+            handleSubmitTest(); // Auto-submit when timer runs out
+            return 0;
+          }
+          return prevTimer - 1;
+        });
+      }, 1000) as unknown as number; // Cast to number for clearInterval
+    }
 
-    return () => clearInterval(interval);
-  }, [isPageLoading, isTestSubmitted, showResults, showConfiguration, showInstructions, mcqs.length, handleSubmitTest]); // Dependencies changed
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
+  }, [isPageLoading, isTestSubmitted, showResults, showConfiguration, showInstructions, mcqs.length, isPaused, handleSubmitTest]);
 
   // Update timer when testDurationMinutes changes
   useEffect(() => {
@@ -283,10 +313,12 @@ const TakeTestPage = () => {
     setTimer(testDurationMinutes * 60); // Reset timer for new test
     setCurrentQuestionIndex(0);
     setUserAnswers(new Map());
+    setSkippedMcqIds(new Set()); // Reset skipped MCQs
     setIsTestSubmitted(false);
     setScore(0);
     setShowResults(false);
     setExplanations(new Map());
+    setIsPaused(false); // Ensure not paused when starting new test
 
     setShowConfiguration(false);
     setShowInstructions(true);
@@ -303,20 +335,86 @@ const TakeTestPage = () => {
   const handleOptionSelect = useCallback((value: string) => {
     if (currentMcq) {
       setUserAnswers((prev) => new Map(prev).set(currentMcq.id, value));
+      // If an answer is selected, it's no longer skipped (if it was)
+      setSkippedMcqIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(currentMcq.id);
+        return newSet;
+      });
     }
   }, [currentMcq]);
 
   const handleNext = useCallback(() => {
     if (currentQuestionIndex < mcqs.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
+    } else {
+      // If it's the last question, check for skipped ones
+      if (skippedMcqIds.size > 0) {
+        prepareReviewSkipped();
+      } else {
+        handleSubmitTest();
+      }
     }
-  }, [currentQuestionIndex, mcqs.length]);
+  }, [currentQuestionIndex, mcqs.length, skippedMcqIds, handleSubmitTest]);
 
   const handlePrevious = useCallback(() => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex((prev) => prev - 1);
     }
   }, [currentQuestionIndex]);
+
+  const handleSkip = useCallback(() => {
+    if (currentMcq) {
+      setSkippedMcqIds((prev) => new Set(prev).add(currentMcq.id));
+      setUserAnswers((prev) => new Map(prev).set(currentMcq.id, null)); // Mark as unanswered
+    }
+    handleNext();
+  }, [currentMcq, handleNext]);
+
+  const togglePause = useCallback(() => {
+    setIsPaused((prev) => !prev);
+  }, []);
+
+  const prepareReviewSkipped = useCallback(() => {
+    const skippedQuestions = mcqs.filter(mcq => skippedMcqIds.has(mcq.id));
+    if (skippedQuestions.length > 0) {
+      setReviewSkippedQuestions(skippedQuestions);
+      setCurrentReviewIndex(0);
+      setShowReviewSkippedDialog(true);
+      setIsPaused(true); // Pause main timer during review
+    } else {
+      handleSubmitTest(); // No skipped questions, submit test
+    }
+  }, [mcqs, skippedMcqIds, handleSubmitTest]);
+
+  const handleReviewNext = useCallback(() => {
+    if (currentReviewIndex < reviewSkippedQuestions.length - 1) {
+      setCurrentReviewIndex((prev) => prev + 1);
+    } else {
+      // If last skipped question, close review and check if any are still skipped
+      setShowReviewSkippedDialog(false);
+      setIsPaused(false); // Resume main timer
+      if (skippedMcqIds.size > 0) {
+        // If still skipped after review, maybe prompt again or just submit
+        toast({ title: "Review Complete", description: "You still have skipped questions. You can review them again or submit the test.", variant: "default" });
+      }
+      // Go back to the main quiz flow, potentially to the next unanswered question or submit
+      const nextUnansweredIndex = mcqs.findIndex(mcq => !userAnswers.has(mcq.id) || userAnswers.get(mcq.id) === null);
+      if (nextUnansweredIndex !== -1) {
+        setCurrentQuestionIndex(nextUnansweredIndex);
+      } else {
+        handleSubmitTest();
+      }
+    }
+  }, [currentReviewIndex, reviewSkippedQuestions.length, skippedMcqIds, userAnswers, mcqs, handleSubmitTest]);
+
+  const handleReviewPrevious = useCallback(() => {
+    if (currentReviewIndex > 0) {
+      setCurrentReviewIndex((prev) => prev - 1);
+    }
+  }, [currentReviewIndex]);
+
+  const currentReviewMcq = reviewSkippedQuestions[currentReviewIndex];
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
@@ -472,6 +570,7 @@ const TakeTestPage = () => {
               <li>Your answers will be saved automatically as you select them.</li>
               <li>The test will automatically submit when the time runs out.</li>
               <li>You can submit the test manually at any time by clicking "Submit Test" on the last question.</li>
+              <li>You can also "Skip" questions and "Pause" the test.</li>
               <li>Once submitted, you will see your score and can review your answers with explanations.</li>
             </ul>
             <p className="font-semibold text-red-600">Good luck!</p>
@@ -598,6 +697,10 @@ const TakeTestPage = () => {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 text-lg font-medium">
+            <Button variant="ghost" size="icon" onClick={togglePause} className="h-8 w-8">
+              {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+              <span className="sr-only">{isPaused ? "Resume" : "Pause"}</span>
+            </Button>
             <TimerIcon className="h-5 w-5" />
             <span>{formatTime(timer)}</span>
           </div>
@@ -608,6 +711,7 @@ const TakeTestPage = () => {
             onValueChange={handleOptionSelect}
             value={userAnswers.get(currentMcq?.id || '') || ''}
             className="space-y-2"
+            disabled={isPaused}
           >
             {['A', 'B', 'C', 'D'].map((optionKey) => {
               const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
@@ -621,21 +725,87 @@ const TakeTestPage = () => {
           </RadioGroup>
         </CardContent>
         <CardFooter className="flex justify-between gap-2">
-          <Button onClick={handlePrevious} disabled={currentQuestionIndex === 0} variant="outline">
+          <Button onClick={handlePrevious} disabled={currentQuestionIndex === 0 || isPaused} variant="outline">
             Previous
           </Button>
-          {currentQuestionIndex === mcqs.length - 1 ? (
-            <Button onClick={handleSubmitTest} disabled={isTestSubmitted}>
-              Submit Test
+          <div className="flex gap-2">
+            <Button onClick={handleSkip} disabled={isPaused} variant="secondary">
+              <SkipForward className="h-4 w-4 mr-2" /> Skip
             </Button>
-          ) : (
-            <Button onClick={handleNext}>
-              Next
-            </Button>
-          )}
+            {currentQuestionIndex === mcqs.length - 1 ? (
+              <Button onClick={skippedMcqIds.size > 0 ? prepareReviewSkipped : handleSubmitTest} disabled={isPaused}>
+                {skippedMcqIds.size > 0 ? `Review Skipped (${skippedMcqIds.size})` : "Submit Test"}
+              </Button>
+            ) : (
+              <Button onClick={handleNext} disabled={isPaused}>
+                Next
+              </Button>
+            )}
+          </div>
         </CardFooter>
       </Card>
       <MadeWithDyad />
+
+      {/* Review Skipped Questions Dialog */}
+      <Dialog open={showReviewSkippedDialog} onOpenChange={setShowReviewSkippedDialog}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Review Skipped Questions ({skippedMcqIds.size} remaining)</DialogTitle>
+            <DialogDescription>
+              You can answer these questions now or skip them again.
+            </DialogDescription>
+          </DialogHeader>
+          {currentReviewMcq && (
+            <div className="py-4">
+              <p className="text-lg font-semibold mb-4">
+                Question {currentReviewIndex + 1} / {reviewSkippedQuestions.length}: {currentReviewMcq.question_text}
+              </p>
+              <RadioGroup
+                onValueChange={(value) => {
+                  handleOptionSelect(value); // This will also remove from skippedMcqIds
+                  // Update userAnswers for the current review MCQ
+                  setUserAnswers((prev) => new Map(prev).set(currentReviewMcq.id, value));
+                }}
+                value={userAnswers.get(currentReviewMcq.id) || ""}
+                className="space-y-2"
+              >
+                {['A', 'B', 'C', 'D'].map((optionKey) => {
+                  const optionText = currentReviewMcq[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
+                  return (
+                    <div key={optionKey} className="flex items-center space-x-2">
+                      <RadioGroupItem value={optionKey} id={`review-option-${optionKey}`} />
+                      <Label htmlFor={`review-option-${optionKey}`}>{`${optionKey}. ${optionText}`}</Label>
+                    </div>
+                  );
+                })}
+              </RadioGroup>
+            </div>
+          )}
+          <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">
+            <Button variant="outline" onClick={() => {
+              setShowReviewSkippedDialog(false);
+              setIsPaused(false); // Resume timer if user exits review
+              // Go back to the main quiz flow, potentially to the next unanswered question or submit
+              const nextUnansweredIndex = mcqs.findIndex(mcq => !userAnswers.has(mcq.id) || userAnswers.get(mcq.id) === null);
+              if (nextUnansweredIndex !== -1) {
+                setCurrentQuestionIndex(nextUnansweredIndex);
+              } else {
+                handleSubmitTest();
+              }
+            }}>
+              Back to Test
+            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleReviewPrevious} disabled={currentReviewIndex === 0} variant="outline">
+                Previous
+              </Button>
+              <Button onClick={handleReviewNext}>
+                {currentReviewIndex === reviewSkippedQuestions.length - 1 ? "Finish Review" : "Next"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

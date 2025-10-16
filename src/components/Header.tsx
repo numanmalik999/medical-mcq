@@ -15,8 +15,17 @@ const Header = () => {
       // Still loading session, do nothing or show a loading indicator
       return;
     }
-    // Always navigate to the redirector, which will then handle admin/user/landing page logic
-    navigate('/redirect');
+    if (user) {
+      // If logged in, go directly to the appropriate dashboard
+      if (user.is_admin) {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/user/dashboard');
+      }
+    } else {
+      // If not logged in, go to the landing page
+      navigate('/');
+    }
   };
 
   return (

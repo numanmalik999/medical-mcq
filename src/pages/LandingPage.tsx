@@ -96,7 +96,7 @@ const LandingPage = () => {
                   </Button>
                 </Link>
                 <Link to="/user/dashboard"> {/* Redirect to user dashboard for guest mode */}
-                  <Button size="lg" variant="outline" className="border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10">
+                  <Button size="lg" variant="secondary">
                     Try a Free Quiz
                   </Button>
                 </Link>

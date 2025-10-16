@@ -1294,19 +1294,19 @@ const QuizPage = () => {
                   <div
                     key={optionKey}
                     className={cn(
-                      "flex items-center space-x-2 p-2 rounded-md cursor-pointer transition-colors duration-200", // Added transition
-                      isSubmitted && userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect && "bg-green-100 dark:bg-green-900",
-                      isSubmitted && userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect && "bg-red-100 dark:bg-red-900",
-                      isSubmitted && !userSelectedThisOptionWhenSubmitted && isCorrectOption && "bg-green-100 dark:bg-green-900",
-                      !isSubmitted && selectedAnswer === optionKey && "bg-accent dark:bg-accent" // Highlight selected option before submission
+                      "flex items-center space-x-2 p-2 rounded-md cursor-pointer transition-colors duration-200",
+                      isSubmitted && userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect && "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+                      isSubmitted && userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect && "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+                      isSubmitted && !userSelectedThisOptionWhenSubmitted && isCorrectOption && "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+                      !isSubmitted && selectedAnswer === optionKey && "bg-accent text-accent-foreground dark:bg-accent dark:text-accent-foreground"
                     )}
-                    onClick={() => !isSubmitted && handleOptionSelect(optionKey)} // Make the whole div clickable
+                    onClick={() => !isSubmitted && handleOptionSelect(optionKey)}
                   >
                     <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
                     <Label
                       htmlFor={`option-${optionKey}`}
                       className={cn(
-                        "cursor-pointer flex-grow", // Added flex-grow to make label take available space
+                        "cursor-pointer flex-grow",
                         isSubmitted && userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect && "text-green-700 dark:text-green-300",
                         isSubmitted && userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect && "text-red-700 dark:text-red-300",
                         isSubmitted && !userSelectedThisOptionWhenSubmitted && isCorrectOption && "text-green-700 dark:text-green-300",
@@ -1359,46 +1359,46 @@ const QuizPage = () => {
               <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0 || isSubmittingAnswer} variant="outline">
                 Previous
               </Button>
-              {!isSubmitted ? ( // Show submit button if not yet submitted
+              {!isSubmitted ? (
                 <Button onClick={handleSubmitAnswer} disabled={!isAnswered || isSubmittingAnswer}>
                   {isSubmittingAnswer ? "Submitting..." : "Submit Answer"}
                 </Button>
-              ) : ( // Show next button if already submitted
+              ) : (
                 <Button onClick={handleNextQuestion} disabled={isSubmittingAnswer}>
                   {isLastQuestion ? "Submit Quiz" : "Next Question"}
                 </Button>
               )}
             </div>
           </CardFooter>
+
+          <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Notes or Feedback for this MCQ</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <p className="text-sm text-muted-foreground">
+                  Your feedback helps us improve the questions and explanations.
+                </p>
+                <Textarea
+                  placeholder="Write your notes or feedback here..."
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  rows={5}
+                  disabled={isSubmittingFeedback}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)} disabled={isSubmittingFeedback}>Cancel</Button>
+                <Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()}>
+                  {isSubmittingFeedback ? "Submitting..." : "Submit Feedback"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </Card>
       </div>
       <MadeWithDyad />
-
-      <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Notes or Feedback for this MCQ</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              Your feedback helps us improve the questions and explanations.
-            </p>
-            <Textarea
-              placeholder="Write your notes or feedback here..."
-              value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
-              rows={5}
-              disabled={isSubmittingFeedback}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)} disabled={isSubmittingFeedback}>Cancel</Button>
-            <Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()}>
-              {isSubmittingFeedback ? "Submitting..." : "Submit Feedback"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

@@ -7,7 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
-import QuizLayout from "./components/QuizLayout"; // Import the new QuizLayout
+import QuizPage from "./pages/QuizPage"; // Reverted to QuizPage
 import AddMcqPage from "./pages/AddMcqPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ManageMcqsPage from "./pages/ManageMcqsPage";
@@ -42,7 +42,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
-            <Route path="/quiz" element={<QuizLayout />} /> {/* Use QuizLayout for the /quiz route */}
+            <Route path="/quiz" element={<QuizPage />} /> {/* Reverted to QuizPage */}
             <Route path="/subscription" element={<SubscriptionPage />} />
             
             {/* Admin Routes - Protected */}

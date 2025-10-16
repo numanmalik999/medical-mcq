@@ -28,12 +28,13 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false); // New state
+  const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const isMounted = useRef(true);
+  const lastFetchedUserId = useRef<string | null>(null); // To track the last user whose profile was fetched
 
-  // Memoize fetchUserProfile to prevent unnecessary re-creations and ensure it always returns AuthUser
+  // Memoized function to fetch a single user profile from the database
   const fetchUserProfile = useCallback(async (supabaseUser: User): Promise<AuthUser> => {
     if (!isMounted.current) {
       console.warn('[fetchUserProfile] Component unmounted during profile fetch, returning default AuthUser.');
@@ -45,7 +46,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } as AuthUser;
     }
     console.log(`[fetchUserProfile] START: Fetching profile for user ID: ${supabaseUser.id}`);
-    console.log(`[fetchUserProfile] User ID type: ${typeof supabaseUser.id}, value: ${supabaseUser.id}`);
 
     let profileData = null;
     let fetchError = null;
@@ -53,40 +53,31 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const timeoutPromise = new Promise<null>((resolve) =>
       setTimeout(() => {
         console.warn(`[fetchUserProfile] WARNING: Supabase profile fetch timed out after 5 seconds for user ID: ${supabaseUser.id}.`);
-        resolve(null); // Resolve with null to indicate timeout
-      }, 5000) // Increased to 5-second timeout
+        resolve(null);
+      }, 5000)
     );
 
     try {
-      console.log('[fetchUserProfile] Attempting Supabase profile select call with 5-second timeout...');
-      console.trace('[fetchUserProfile] Call stack before select');
-
       const { data: profileDataArray, error: selectError } = await Promise.race([
         supabase
           .from('profiles')
           .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
           .eq('id', supabaseUser.id)
-          .then(res => ({ data: res.data, error: res.error })), // Ensure consistent return type for Promise.race
+          .then(res => ({ data: res.data, error: res.error })),
         timeoutPromise.then(() => ({ data: null, error: { message: 'Profile fetch timed out', code: 'TIMEOUT' } }))
       ]);
       
       fetchError = selectError;
-      console.log('[fetchUserProfile] Supabase profile select call completed (or timed out).');
-      console.log('[fetchUserProfile] Supabase profile data:', profileDataArray);
-      console.log('[fetchUserProfile] Supabase profile error:', fetchError);
-
-      if (fetchError && fetchError.code !== 'PGRST116' && fetchError.code !== 'TIMEOUT') { // PGRST116 means no rows found
+      if (fetchError && fetchError.code !== 'PGRST116' && fetchError.code !== 'TIMEOUT') {
         console.error(`[fetchUserProfile] ERROR: fetching profile (code: ${fetchError.code}):`, fetchError);
       } else if (profileDataArray && profileDataArray[0]) {
         profileData = profileDataArray[0];
       }
-    } catch (e: any) { // Catch any unexpected exceptions
+    } catch (e: any) {
       console.error(`[fetchUserProfile] UNEXPECTED EXCEPTION during Supabase profile fetch:`, e.message || e);
-      // Assign a generic error if an unexpected exception occurs
       fetchError = { message: e.message || 'Unknown error during fetch', code: 'UNEXPECTED_EXCEPTION' }; 
     }
     
-    console.log('[fetchUserProfile] Profile data processed:', profileData);
     const hydratedUser: AuthUser = {
       ...supabaseUser,
       is_admin: profileData?.is_admin || false,
@@ -102,7 +93,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   }, []);
 
   // This function will be called on initial load and on auth state changes
-  // It only updates session/user and handles redirection for unauthenticated states.
   const updateSessionAndUser = useCallback(async (currentSession: Session | null, event: string) => {
     if (!isMounted.current) {
       console.warn(`[updateSessionAndUser] Skipping event ${event} - component unmounted.`);
@@ -116,15 +106,32 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         console.log('[updateSessionAndUser] No session, clearing user and session states.');
         setSession(null);
         setUser(null);
-        // Removed internal redirection for unauthenticated users.
-        // Route protection (e.g., UserProtectedRoute) will now handle redirects.
+        lastFetchedUserId.current = null; // Clear last fetched user on logout
       } else {
-        console.log('[updateSessionAndUser] Session exists, fetching user profile.');
-        const authUser = await fetchUserProfile(currentSession.user);
+        // Determine if we need to fetch the profile from the database
+        const shouldFetchProfile = 
+          !user || // No user currently in state
+          user.id !== currentSession.user.id || // Different user logged in
+          event === 'SIGNED_IN' || // Explicit sign-in event
+          event === 'USER_UPDATED' || // User profile updated event
+          lastFetchedUserId.current !== currentSession.user.id; // Profile not fetched for this user yet
+
+        let hydratedUser: AuthUser;
+
+        if (shouldFetchProfile) {
+          console.log(`[updateSessionAndUser] Fetching profile for user ID: ${currentSession.user.id} due to event: ${event}`);
+          hydratedUser = await fetchUserProfile(currentSession.user);
+          lastFetchedUserId.current = currentSession.user.id; // Mark as fetched
+        } else {
+          console.log(`[updateSessionAndUser] Reusing existing profile for user ID: ${currentSession.user.id} (event: ${event}).`);
+          // If we don't need to fetch, use the existing user object from state
+          // We still need to ensure the session is updated, as tokens might refresh
+          hydratedUser = user!; // Assert user is not null because shouldFetchProfile would be true otherwise
+        }
+
         if (isMounted.current) {
-          console.log('[updateSessionAndUser] Setting session and user states.');
           setSession(currentSession);
-          setUser(authUser);
+          setUser(hydratedUser);
           console.log('[updateSessionAndUser] User and Session states updated.');
         } else {
           console.warn('[updateSessionAndUser] Component unmounted before setting session and user states.');
@@ -134,8 +141,9 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       console.error("[updateSessionAndUser] ERROR: processing auth event:", error);
       setSession(null);
       setUser(null);
+      lastFetchedUserId.current = null;
     }
-  }, [fetchUserProfile]); // Removed navigate, location.pathname from dependencies
+  }, [fetchUserProfile, user]); // Added 'user' to dependencies to correctly check 'user.id'
 
   // Main effect for setting up auth listener and initial session check
   useEffect(() => {
@@ -148,7 +156,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         if (error) {
           console.error('SessionContextProvider: Error during initial getSession:', error);
-          // Even if error, try to update session and user, then mark as checked
           await updateSessionAndUser(null, 'INITIAL_LOAD_ERROR');
         } else if (isMounted.current) {
           console.log('SessionContextProvider: Initial Session Check Result:', initialSession ? 'Session found' : 'No session');
@@ -156,7 +163,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         }
       } catch (e) {
         console.error('SessionContextProvider: UNEXPECTED ERROR during initial session check:', e);
-        // Ensure we still attempt to update state even on unexpected errors
         await updateSessionAndUser(null, 'INITIAL_LOAD_UNEXPECTED_ERROR');
       } finally {
         if (isMounted.current) {
@@ -170,7 +176,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
     performInitialSessionCheck();
 
-    // Listen for auth state changes (these will update session/user but not toggle global isLoading)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) {
         console.warn(`SessionContextProvider: onAuthStateChange: Skipping event ${event} - component unmounted.`);
@@ -180,25 +185,12 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       await updateSessionAndUser(currentSession, event);
     });
 
-    // Removed the visibilitychange event listener to stop app refreshing on tab switch.
-    // const handleVisibilityChange = async () => {
-    //   if (document.visibilityState === 'visible' && isMounted.current) {
-    //     console.log('SessionContextProvider: Tab became visible, re-checking session...');
-    //     const { data: { session: currentSession } } = await supabase.auth.getSession();
-    //     await updateSessionAndUser(currentSession, 'TAB_FOCUS');
-    //   } else if (!isMounted.current) {
-    //     console.warn('SessionContextProvider: handleVisibilityChange: Skipping - component unmounted.');
-    //   }
-    // };
-    // document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
       isMounted.current = false;
       console.log('SessionContextProvider: Main useEffect cleanup, unsubscribing from auth state changes.');
       subscription.unsubscribe();
-      // document.removeEventListener('visibilitychange', handleVisibilityChange); // Removed cleanup for visibilitychange
     };
-  }, [updateSessionAndUser]); // Removed navigate, location.pathname from dependencies
+  }, [updateSessionAndUser]);
 
   // Dedicated useEffect for redirection after login/signup
   useEffect(() => {

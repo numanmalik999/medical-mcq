@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save } from 'lucide-react'; // Import Save icon
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -678,6 +678,32 @@ const QuizPage = () => {
     }
   };
 
+  const handleSaveProgress = () => {
+    if (currentQuizCategoryId && quizQuestions.length > 0) {
+      saveQuizState(
+        currentQuizCategoryId,
+        currentQuizSubcategoryId,
+        quizQuestions,
+        userAnswers,
+        currentQuestionIndex,
+        isTrialActiveSession,
+        user?.id || null
+      );
+      toast({
+        title: "Progress Saved!",
+        description: "Your quiz progress has been saved.",
+        duration: 3000,
+      });
+    } else {
+      toast({
+        title: "Cannot Save",
+        description: "No active quiz session to save.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+
   const handleSubmitFeedback = async () => {
     if (!user || !currentMcq || !feedbackText.trim()) {
       toast({ title: "Error", description: "Feedback cannot be empty.", variant: "destructive" });
@@ -1119,9 +1145,14 @@ const QuizPage = () => {
             )}
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row justify-between gap-2">
-            <Button onClick={handleBackToSelection} variant="outline" disabled={isSubmittingAnswer}>
-              Back to Selection
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleBackToSelection} variant="outline" disabled={isSubmittingAnswer}>
+                Back to Selection
+              </Button>
+              <Button onClick={handleSaveProgress} variant="secondary" disabled={isSubmittingAnswer || !currentQuizCategoryId}>
+                <Save className="h-4 w-4 mr-2" /> Save Progress
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0 || isSubmittingAnswer} variant="outline">
                 Previous

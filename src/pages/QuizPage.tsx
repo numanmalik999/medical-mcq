@@ -175,10 +175,10 @@ const QuizPage = () => {
     index: number,
     isTrial: boolean,
     currentUserId: string
-  ) => {
+  ): Promise<{ id: string; sessionData: DbQuizSession } | null> => {
     if (!currentUserId) {
       console.warn("Cannot save quiz state: User not logged in.");
-      return;
+      return null;
     }
 
     const mcqIdsOrder = mcqs.map(m => m.id);
@@ -197,24 +197,28 @@ const QuizPage = () => {
     try {
       if (dbSessionId) {
         // Update existing session
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('user_quiz_sessions')
           .update({ ...sessionData, updated_at: new Date().toISOString() })
-          .eq('id', dbSessionId);
+          .eq('id', dbSessionId)
+          .select('id')
+          .single();
 
         if (error) throw error;
         console.log(`Quiz session ${dbSessionId} updated in DB.`);
+        return { id: data.id, sessionData: { ...sessionData, id: data.id, created_at: '', updated_at: new Date().toISOString() } as DbQuizSession };
       } else {
         // Insert new session
         const { data, error } = await supabase
           .from('user_quiz_sessions')
           .insert(sessionData)
-          .select('id')
+          .select('id, created_at, updated_at')
           .single();
 
         if (error) throw error;
         setCurrentDbSessionId(data.id); // Store the new session ID
         console.log(`New quiz session ${data.id} created in DB.`);
+        return { id: data.id, sessionData: { ...sessionData, id: data.id, created_at: data.created_at, updated_at: data.updated_at } as DbQuizSession };
       }
     } catch (error: any) {
       console.error("Error saving quiz state to DB:", error);
@@ -223,6 +227,7 @@ const QuizPage = () => {
         description: `Failed to save quiz progress: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
+      return null;
     }
   }, [toast]);
 
@@ -554,7 +559,7 @@ const QuizPage = () => {
 
     // Create a new session in the database (only if user is logged in)
     if (user) {
-      await saveQuizState(
+      const savedSessionResult = await saveQuizState(
         null, // No existing session ID
         categoryId,
         subcategoryId,
@@ -564,6 +569,25 @@ const QuizPage = () => {
         isTrialActiveSession,
         user.id
       );
+      if (savedSessionResult) {
+        const categoryName = categoryStats.find(c => c.id === categoryId)?.name || 'Unknown Category';
+        const subcategoryName = allSubcategories.find(s => s.id === subcategoryId)?.name || null;
+        setActiveSavedQuizzes(prev => [
+          {
+            dbSessionId: savedSessionResult.id,
+            categoryId: categoryId,
+            subcategory_id: subcategoryId,
+            mcqs: mcqsToLoad, // Store full MCQs for display in saved quizzes list
+            userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
+            currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
+            isTrialActiveSession: isTrialActiveSession,
+            userId: user.id,
+            categoryName: categoryName,
+            subcategoryName: subcategoryName,
+          },
+          ...prev,
+        ]);
+      }
     }
 
     // Mark trial_taken only if a logged-in user starts a trial
@@ -858,7 +882,7 @@ const QuizPage = () => {
     }
   };
 
-  const handleSaveProgress = () => {
+  const handleSaveProgress = async () => {
     if (!user) {
       toast({
         title: "Cannot Save",
@@ -869,7 +893,7 @@ const QuizPage = () => {
       return;
     }
     if (currentQuizCategoryId && quizQuestions.length > 0) {
-      saveQuizState(
+      const savedSessionResult = await saveQuizState(
         currentDbSessionId,
         currentQuizCategoryId,
         currentQuizSubcategoryId,
@@ -879,11 +903,55 @@ const QuizPage = () => {
         isTrialActiveSession,
         user.id
       );
-      toast({
-        title: "Progress Saved!",
-        description: "Your quiz progress has been saved.",
-        duration: 3000,
-      });
+
+      if (savedSessionResult) {
+        const categoryName = categoryStats.find(c => c.id === currentQuizCategoryId)?.name || 'Unknown Category';
+        const subcategoryName = allSubcategories.find(s => s.id === currentQuizSubcategoryId)?.name || null;
+
+        setActiveSavedQuizzes(prev => {
+          const existingIndex = prev.findIndex(session => session.dbSessionId === savedSessionResult.id);
+          if (existingIndex > -1) {
+            // Update existing session in the list
+            const updatedPrev = [...prev];
+            updatedPrev[existingIndex] = {
+              dbSessionId: savedSessionResult.id,
+              categoryId: currentQuizCategoryId,
+              subcategory_id: currentQuizSubcategoryId,
+              mcqs: quizQuestions,
+              userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
+              currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
+              isTrialActiveSession: isTrialActiveSession,
+              userId: user.id,
+              categoryName: categoryName,
+              subcategoryName: subcategoryName,
+            };
+            return updatedPrev;
+          } else {
+            // Add new session to the list (should ideally not happen if currentDbSessionId is set)
+            return [
+              {
+                dbSessionId: savedSessionResult.id,
+                categoryId: currentQuizCategoryId,
+                subcategory_id: currentQuizSubcategoryId,
+                mcqs: quizQuestions,
+                userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
+                currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
+                isTrialActiveSession: isTrialActiveSession,
+                userId: user.id,
+                categoryName: categoryName,
+                subcategoryName: subcategoryName,
+              },
+              ...prev,
+            ];
+          }
+        });
+
+        toast({
+          title: "Progress Saved!",
+          description: "Your quiz progress has been saved.",
+          duration: 3000,
+        });
+      }
     } else {
       toast({
         title: "Cannot Save",

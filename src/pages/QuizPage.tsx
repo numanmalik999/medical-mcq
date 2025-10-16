@@ -222,10 +222,10 @@ const QuizPage = () => {
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      if (!user) {
+      if (!user) { // Guest mode
         setIsTrialActiveSession(true);
         fetchQuizOverview();
-      } else {
+      } else { // Logged-in user
         if (!user.has_active_subscription && !user.trial_taken) {
           setIsTrialActiveSession(true);
         } else {
@@ -261,7 +261,7 @@ const QuizPage = () => {
 
     // --- Load all saved quiz sessions for the current user from DB ---
     let loadedSavedQuizzes: LoadedQuizSession[] = [];
-    if (user) {
+    if (user) { // Only fetch saved quizzes if a user is logged in
       const { data: dbSessions, error: dbSessionsError } = await supabase
         .from('user_quiz_sessions')
         .select('*')
@@ -335,7 +335,7 @@ const QuizPage = () => {
       let totalAttempts = 0;
       let correctAttempts = 0;
 
-      if (user) {
+      if (user) { // Only fetch user attempts if a user is logged in
         const { data: userAttemptsData, error: userAttemptsError } = await supabase
           .from('user_quiz_attempts')
           .select('is_correct, mcq_id')
@@ -371,24 +371,16 @@ const QuizPage = () => {
   const startQuizSession = async (categoryId: string, subcategoryId: string | null, mode: 'random' | 'incorrect') => {
     const isSubscribed = user?.has_active_subscription;
     const hasTakenTrial = user?.trial_taken;
+    const isGuest = !user;
 
-    if (!isSubscribed && hasTakenTrial) {
+    // If logged in, not subscribed, and already took trial, show prompt
+    if (!isGuest && !isSubscribed && hasTakenTrial) {
       setShowSubscriptionPrompt(true);
       return;
     }
 
-    if (!user) {
-      toast({ title: "Error", description: "You must be logged in to start a quiz.", variant: "destructive" });
-      return;
-    }
-
-    if ((!isSubscribed && !hasTakenTrial)) {
-      setIsTrialActiveSession(true);
-    } else {
-      setIsTrialActiveSession(false);
-    }
-
-    if ((!user || isTrialActiveSession) && mode === 'incorrect') {
+    // If it's a guest or a logged-in trial user, and mode is 'incorrect', restrict it.
+    if ((isGuest || (!isSubscribed && !hasTakenTrial)) && mode === 'incorrect') {
       toast({ title: "Feature Restricted", description: "This feature is only available for subscribed users.", variant: "default" });
       return;
     }
@@ -434,7 +426,7 @@ const QuizPage = () => {
       return;
     }
 
-    // Step 2: Filter by trial status if not subscribed
+    // Step 2: Filter by trial status if not subscribed (this covers guests too)
     let mcqQuery = supabase
       .from('mcqs')
       .select(`
@@ -449,12 +441,12 @@ const QuizPage = () => {
       .in('id', mcqIdsToFetch)
       .order('created_at', { ascending: true }); // Ensure sequential order
 
-    if (!isSubscribed) {
+    if (!isSubscribed) { // This condition is true for guests and non-subscribed users
       mcqQuery = mcqQuery.eq('is_trial_mcq', true);
     }
 
     // Step 3: Filter by incorrect attempts if mode is 'incorrect'
-    if (mode === 'incorrect' && user) {
+    if (mode === 'incorrect' && user) { // Only applies to logged-in users
       const { data: incorrectAttempts, error: attemptsError } = await supabase
         .from('user_quiz_attempts')
         .select('mcq_id')
@@ -533,7 +525,7 @@ const QuizPage = () => {
     setUserAnswers(initialUserAnswers);
     setSelectedAnswer(null); // No answer selected initially for the first question
 
-    // Create a new session in the database
+    // Create a new session in the database (only if user is logged in)
     if (user) {
       await saveQuizState(
         null, // No existing session ID
@@ -723,7 +715,7 @@ const QuizPage = () => {
       return newMap;
     });
 
-    if (user) {
+    if (user) { // Only record attempts if user is logged in
       try {
         // For recording attempts, we need a single category_id and subcategory_id.
         // We'll use the first one from category_links if available.
@@ -986,6 +978,7 @@ const QuizPage = () => {
   }
 
   if (showCategorySelection) {
+    const isGuest = !user;
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
         <Card className="w-full max-w-4xl">
@@ -994,7 +987,7 @@ const QuizPage = () => {
             <CardDescription>Choose a category and optionally a subcategory to start your quiz and view your performance.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {activeSavedQuizzes.length > 0 && (
+            {activeSavedQuizzes.length > 0 && !isGuest && ( // Only show saved quizzes for logged-in users
               <Card className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-950">
                 <CardHeader>
                   <CardTitle className="text-blue-700 dark:text-blue-300">Continue Your Quizzes</CardTitle>
@@ -1043,6 +1036,10 @@ const QuizPage = () => {
                       session.subcategory_id === currentQuizSubcategoryId
                   );
 
+                  const canStartRegularQuiz = user?.has_active_subscription && cat.total_mcqs > 0;
+                  const canStartTrialQuiz = (isGuest || (!user?.has_active_subscription && !user?.trial_taken)) && cat.total_trial_mcqs > 0;
+                  const hasAlreadyTakenTrial = !isGuest && !user?.has_active_subscription && user?.trial_taken;
+
                   return (
                     <Card key={cat.id} className="flex flex-col">
                       <CardHeader>
@@ -1052,7 +1049,7 @@ const QuizPage = () => {
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="flex-grow space-y-2 text-sm">
-                        {user && (
+                        {!isGuest && ( // Only show user stats for logged-in users
                           <>
                             <p>Attempts: {cat.user_attempts}</p>
                             <p>Correct: {cat.user_correct}</p>
@@ -1093,25 +1090,20 @@ const QuizPage = () => {
                           <Button
                             onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'random')}
                             className="w-full"
-                            disabled={
-                              !user || // Disable if not logged in
-                              (user?.has_active_subscription && cat.total_mcqs === 0) ||
-                              (!user?.has_active_subscription && cat.total_trial_mcqs === 0) ||
-                              (!user?.has_active_subscription && user?.trial_taken)
-                            }
+                            disabled={!canStartRegularQuiz && !canStartTrialQuiz && !hasAlreadyTakenTrial}
                           >
-                            {user?.has_active_subscription ? "Start Quiz" : (user?.trial_taken ? "Subscribe to Start" : "Start Trial Quiz")}
+                            {canStartRegularQuiz ? "Start Quiz" : (canStartTrialQuiz ? "Start Trial Quiz" : (hasAlreadyTakenTrial ? "Subscribe to Start" : "No MCQs Available"))}
                           </Button>
                         )}
                         <Button
                           onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'incorrect')}
                           className="w-full"
                           variant="secondary"
-                          disabled={cat.user_incorrect === 0 || !user?.has_active_subscription}
+                          disabled={cat.user_incorrect === 0 || !user?.has_active_subscription} // Only subscribed users can attempt incorrect
                         >
                           Attempt Incorrect ({cat.user_incorrect})
                         </Button>
-                        {user && (
+                        {!isGuest && ( // Only show reset progress for logged-in users
                           <Button
                             onClick={() => handleResetProgress(cat.id)}
                             className="w-full"
@@ -1334,7 +1326,7 @@ const QuizPage = () => {
                 {explanations.get(currentMcq.explanation_id || '')?.image_url && (
                   <img src={explanations.get(currentMcq.explanation_id || '')?.image_url || ''} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
                 )}
-                {user && (
+                {user && ( // Only show feedback button for logged-in users
                   <Button
                     variant="outline"
                     className="mt-4 w-full"

@@ -1294,16 +1294,25 @@ const QuizPage = () => {
                   <div
                     key={optionKey}
                     className={cn(
-                      "flex items-center space-x-2 p-2 rounded-md cursor-pointer",
-                      isSubmitted && userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect && "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-                      isSubmitted && userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect && "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-                      isSubmitted && !userSelectedThisOptionWhenSubmitted && isCorrectOption && "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-                      !isSubmitted && selectedAnswer === optionKey && "bg-accent text-accent-foreground" // Highlight selected option before submission
+                      "flex items-center space-x-2 p-2 rounded-md cursor-pointer transition-colors duration-200", // Added transition
+                      isSubmitted && userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect && "bg-green-100 dark:bg-green-900",
+                      isSubmitted && userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect && "bg-red-100 dark:bg-red-900",
+                      isSubmitted && !userSelectedThisOptionWhenSubmitted && isCorrectOption && "bg-green-100 dark:bg-green-900",
+                      !isSubmitted && selectedAnswer === optionKey && "bg-accent dark:bg-accent" // Highlight selected option before submission
                     )}
                     onClick={() => !isSubmitted && handleOptionSelect(optionKey)} // Make the whole div clickable
                   >
                     <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
-                    <Label htmlFor={`option-${optionKey}`} className="cursor-pointer">
+                    <Label
+                      htmlFor={`option-${optionKey}`}
+                      className={cn(
+                        "cursor-pointer flex-grow", // Added flex-grow to make label take available space
+                        isSubmitted && userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect && "text-green-700 dark:text-green-300",
+                        isSubmitted && userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect && "text-red-700 dark:text-red-300",
+                        isSubmitted && !userSelectedThisOptionWhenSubmitted && isCorrectOption && "text-green-700 dark:text-green-300",
+                        !isSubmitted && selectedAnswer === optionKey && "text-accent-foreground dark:text-accent-foreground"
+                      )}
+                    >
                       {`${optionKey}. ${optionText as string}`}
                     </Label>
                   </div>

@@ -7,7 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
-import QuizPage from "./pages/QuizPage";
+import QuizLayout from "./components/QuizLayout"; // Import the new QuizLayout
 import AddMcqPage from "./pages/AddMcqPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ManageMcqsPage from "./pages/ManageMcqsPage";
@@ -27,7 +27,7 @@ import UserProfilePage from "./pages/UserProfilePage";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import UserProtectedRoute from "./components/UserProtectedRoute";
 import TakeTestPage from "./pages/TakeTestPage";
-import SubscriptionPage from "./pages/SubscriptionPage"; // Import the new SubscriptionPage
+import SubscriptionPage from "./pages/SubscriptionPage";
 
 const queryClient = new QueryClient();
 
@@ -42,8 +42,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
-            <Route path="/quiz" element={<QuizPage />} />
-            <Route path="/subscription" element={<SubscriptionPage />} /> {/* New public route */}
+            <Route path="/quiz" element={<QuizLayout />} /> {/* Use QuizLayout for the /quiz route */}
+            <Route path="/subscription" element={<SubscriptionPage />} />
             
             {/* Admin Routes - Protected */}
             <Route path="/admin" element={<AdminProtectedRoute />}>

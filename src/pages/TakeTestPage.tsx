@@ -14,6 +14,7 @@ import { TimerIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { McqCategoryLink } from '@/components/mcq-columns'; // Import McqCategoryLink
+import { Input } from '@/components/ui/input'; // Import Input for number of MCQs and duration
 
 interface MCQ {
   id: string;
@@ -40,8 +41,6 @@ interface Category {
   name: string;
 }
 
-const DEFAULT_TEST_DURATION_SECONDS = 3 * 60 * 60; // 3 hours
-
 const TakeTestPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
@@ -49,8 +48,9 @@ const TakeTestPage = () => {
 
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
-  const [selectedPercentage, setSelectedPercentage] = useState<string>('100');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
+  const [numMcqsToSelect, setNumMcqsToSelect] = useState<number>(10); // New state for number of MCQs
+  const [testDurationMinutes, setTestDurationMinutes] = useState<number>(60); // New state for test duration in minutes
   const [showConfiguration, setShowConfiguration] = useState(true);
   const [showInstructions, setShowInstructions] = useState(false);
 
@@ -59,7 +59,7 @@ const TakeTestPage = () => {
   const [userAnswers, setUserAnswers] = useState<Map<string, string | null>>(new Map());
   const [isTestSubmitted, setIsTestSubmitted] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state for initial data
-  const [timer, setTimer] = useState(DEFAULT_TEST_DURATION_SECONDS);
+  const [timer, setTimer] = useState(testDurationMinutes * 60); // Initialize timer with selected duration
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
@@ -196,6 +196,11 @@ const TakeTestPage = () => {
     return () => clearInterval(interval);
   }, [isPageLoading, isTestSubmitted, showResults, showConfiguration, showInstructions, mcqs.length, handleSubmitTest]); // Dependencies changed
 
+  // Update timer when testDurationMinutes changes
+  useEffect(() => {
+    setTimer(testDurationMinutes * 60);
+  }, [testDurationMinutes]);
+
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategoryIds((prev) =>
       prev.includes(categoryId)
@@ -207,6 +212,14 @@ const TakeTestPage = () => {
   const startTestPreparation = async () => {
     if (!user || !user.has_active_subscription) {
       toast({ title: "Error", description: "You must have an active subscription to start a test.", variant: "destructive" });
+      return;
+    }
+    if (numMcqsToSelect <= 0) {
+      toast({ title: "Error", description: "Number of MCQs must be greater than 0.", variant: "destructive" });
+      return;
+    }
+    if (testDurationMinutes <= 0) {
+      toast({ title: "Error", description: "Test duration must be greater than 0 minutes.", variant: "destructive" });
       return;
     }
 
@@ -257,15 +270,8 @@ const TakeTestPage = () => {
       })),
     }));
 
-    let selectedMcqs: MCQ[] = [];
-    if (selectedPercentage === 'all') {
-      selectedMcqs = formattedMcqs;
-    } else {
-      const percentageValue = parseInt(selectedPercentage, 10) / 100;
-      const numToSelect = Math.max(1, Math.floor(formattedMcqs.length * percentageValue)); // Ensure at least 1 MCQ if available
-      const shuffledMcqs = formattedMcqs.sort(() => 0.5 - Math.random());
-      selectedMcqs = shuffledMcqs.slice(0, numToSelect);
-    }
+    const shuffledMcqs = formattedMcqs.sort(() => 0.5 - Math.random());
+    const selectedMcqs = shuffledMcqs.slice(0, Math.min(numMcqsToSelect, shuffledMcqs.length));
 
     if (selectedMcqs.length === 0) {
       toast({ title: "No MCQs", description: "No MCQs could be selected based on your criteria. Please adjust.", variant: "default" });
@@ -274,7 +280,7 @@ const TakeTestPage = () => {
     }
 
     setMcqs(selectedMcqs);
-    setTimer(DEFAULT_TEST_DURATION_SECONDS); // Reset timer for new test
+    setTimer(testDurationMinutes * 60); // Reset timer for new test
     setCurrentQuestionIndex(0);
     setUserAnswers(new Map());
     setIsTestSubmitted(false);
@@ -362,7 +368,7 @@ const TakeTestPage = () => {
         <Card className="w-full max-w-2xl">
           <CardHeader>
             <CardTitle className="text-2xl">Configure Your Test</CardTitle>
-            <CardDescription>Select categories, difficulty, and the percentage of questions you'd like to include.</CardDescription>
+            <CardDescription>Select categories, difficulty, number of questions, and test duration.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -407,21 +413,32 @@ const TakeTestPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="percentage-select" className="text-lg font-semibold">Percentage of MCQs</Label>
-              <Select onValueChange={setSelectedPercentage} value={selectedPercentage}>
-                <SelectTrigger id="percentage-select" className="w-full">
-                  <SelectValue placeholder="Select percentage" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10%</SelectItem>
-                  <SelectItem value="25">25%</SelectItem>
-                  <SelectItem value="50">50%</SelectItem>
-                  <SelectItem value="100">100%</SelectItem>
-                  <SelectItem value="all">All Available</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="num-mcqs-input" className="text-lg font-semibold">Number of Questions</Label>
+              <Input
+                id="num-mcqs-input"
+                type="number"
+                min="1"
+                value={numMcqsToSelect}
+                onChange={(e) => setNumMcqsToSelect(Math.max(1, parseInt(e.target.value) || 1))}
+                placeholder="e.g., 10, 50, 100"
+              />
               <p className="text-sm text-muted-foreground">
-                Select how many questions (by percentage) you want from the chosen categories.
+                Specify the exact number of MCQs you want in your test.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="duration-input" className="text-lg font-semibold">Test Duration (minutes)</Label>
+              <Input
+                id="duration-input"
+                type="number"
+                min="1"
+                value={testDurationMinutes}
+                onChange={(e) => setTestDurationMinutes(Math.max(1, parseInt(e.target.value) || 1))}
+                placeholder="e.g., 30, 60, 180"
+              />
+              <p className="text-sm text-muted-foreground">
+                Set the time limit for your test in minutes.
               </p>
             </div>
           </CardContent>
@@ -446,10 +463,10 @@ const TakeTestPage = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p><strong>Number of Questions:</strong> {mcqs.length}</p>
-            <p><strong>Time Limit:</strong> {formatTime(DEFAULT_TEST_DURATION_SECONDS)}</p>
+            <p><strong>Time Limit:</strong> {formatTime(testDurationMinutes * 60)}</p>
             <ul className="list-disc list-inside space-y-1">
               <li>You will be presented with {mcqs.length} multiple-choice questions.</li>
-              <li>You have {formatTime(DEFAULT_TEST_DURATION_SECONDS)} to complete the test.</li>
+              <li>You have {formatTime(testDurationMinutes * 60)} to complete the test.</li>
               <li>Select one option for each question.</li>
               <li>You can navigate between questions using the "Previous" and "Next" buttons.</li>
               <li>Your answers will be saved automatically as you select them.</li>

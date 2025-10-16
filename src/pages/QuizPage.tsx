@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import QuizNavigator from '@/components/QuizNavigator';
-import { MCQ } from '@/components/mcq-columns'; // Only import MCQ, McqCategoryLink is not directly used here
+import { MCQ } from '@/components/mcq-columns';
 
 interface MCQExplanation {
   id: string;
@@ -41,26 +41,42 @@ interface Subcategory {
   name: string;
 }
 
-// New interface for userAnswers map value
 interface UserAnswerData {
   selectedOption: string | null;
   isCorrect: boolean | null;
   submitted: boolean;
 }
 
-// Interface for saved quiz state
-interface SavedQuizState {
+// Interface for data stored in the database (used internally for typing fetched data)
+interface DbQuizSession {
+  id: string;
+  user_id: string;
+  category_id: string | null;
+  subcategory_id: string | null;
+  mcq_ids_order: string[]; // Array of MCQ IDs
+  current_question_index: number;
+  user_answers_json: { [mcqId: string]: UserAnswerData }; // JSONB object
+  is_trial_session: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Client-side representation of a loaded session, including full MCQ objects
+interface LoadedQuizSession {
+  dbSessionId: string; // The ID from the database
   categoryId: string;
-  subcategoryId: string | null;
-  mcqs: MCQ[];
-  userAnswers: [string, UserAnswerData][]; // Stored as array for JSON serialization
+  subcategory_id: string | null;
+  mcqs: MCQ[]; // Full MCQ objects
+  userAnswers: Map<string, UserAnswerData>;
   currentQuestionIndex: number;
   isTrialActiveSession: boolean;
-  userId: string | null; // To tie saved state to a specific user
+  userId: string;
+  categoryName: string; // Added for display
+  subcategoryName: string | null; // Added for display
 }
 
 const TRIAL_MCQ_LIMIT = 10;
-const LOCAL_STORAGE_QUIZ_KEY_PREFIX = 'quiz_session_state'; // Base prefix
+// LOCAL_STORAGE_QUIZ_KEY_PREFIX is no longer used for saving, but kept for potential migration or debugging.
 
 const QuizPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
@@ -80,6 +96,7 @@ const QuizPage = () => {
   const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
   const [currentQuizCategoryId, setCurrentQuizCategoryId] = useState<string | null>(null); // Track the category of the current quiz
   const [currentQuizSubcategoryId, setCurrentQuizSubcategoryId] = useState<string | null>(null); // Track the subcategory of the current quiz
+  const [currentDbSessionId, setCurrentDbSessionId] = useState<string | null>(null); // New: Track the DB session ID
   const [showCategorySelection, setShowCategorySelection] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
@@ -93,45 +110,7 @@ const QuizPage = () => {
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
-  const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<Map<string, SavedQuizState>>(new Map()); // Map to store all active saved quizzes
-
-  const getQuizSessionKey = useCallback((userId: string | null, categoryId: string, subcategoryId: string | null) => {
-    return `${LOCAL_STORAGE_QUIZ_KEY_PREFIX}_${userId || 'guest'}_${categoryId}_${subcategoryId || 'no-sub'}`;
-  }, []);
-
-  const saveQuizState = useCallback((
-    categoryId: string,
-    subcategoryId: string | null,
-    mcqs: MCQ[],
-    answers: Map<string, UserAnswerData>,
-    index: number,
-    isTrial: boolean,
-    currentUserId: string | null
-  ) => {
-    const stateToSave: SavedQuizState = {
-      categoryId,
-      subcategoryId,
-      mcqs,
-      userAnswers: Array.from(answers.entries()),
-      currentQuestionIndex: index,
-      isTrialActiveSession: isTrial,
-      userId: currentUserId,
-    };
-    const key = getQuizSessionKey(currentUserId, categoryId, subcategoryId);
-    localStorage.setItem(key, JSON.stringify(stateToSave));
-    // Update activeSavedQuizzes immediately after saving
-    setActiveSavedQuizzes(prev => new Map(prev).set(key, stateToSave));
-  }, [getQuizSessionKey]);
-
-  const clearSpecificQuizState = useCallback((categoryId: string, subcategoryId: string | null) => {
-    const key = getQuizSessionKey(user?.id || null, categoryId, subcategoryId);
-    localStorage.removeItem(key);
-    setActiveSavedQuizzes(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(key); // Use the full key for deletion
-      return newMap;
-    });
-  }, [getQuizSessionKey, user]);
+  const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<LoadedQuizSession[]>([]); // Changed to array of LoadedQuizSession
 
   const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
     if (explanations.has(explanationId)) {
@@ -157,6 +136,88 @@ const QuizPage = () => {
     }
     return null;
   }, [explanations, toast]);
+
+  // Function to save quiz state to the database
+  const saveQuizState = useCallback(async (
+    dbSessionId: string | null,
+    categoryId: string,
+    subcategoryId: string | null,
+    mcqs: MCQ[],
+    answers: Map<string, UserAnswerData>,
+    index: number,
+    isTrial: boolean,
+    currentUserId: string
+  ) => {
+    if (!currentUserId) {
+      console.warn("Cannot save quiz state: User not logged in.");
+      return;
+    }
+
+    const mcqIdsOrder = mcqs.map(m => m.id);
+    const userAnswersJson = Object.fromEntries(answers);
+
+    const sessionData = {
+      user_id: currentUserId,
+      category_id: categoryId,
+      subcategory_id: subcategoryId,
+      mcq_ids_order: mcqIdsOrder,
+      current_question_index: index,
+      user_answers_json: userAnswersJson,
+      is_trial_session: isTrial,
+    };
+
+    try {
+      if (dbSessionId) {
+        // Update existing session
+        const { error } = await supabase
+          .from('user_quiz_sessions')
+          .update({ ...sessionData, updated_at: new Date().toISOString() })
+          .eq('id', dbSessionId);
+
+        if (error) throw error;
+        console.log(`Quiz session ${dbSessionId} updated in DB.`);
+      } else {
+        // Insert new session
+        const { data, error } = await supabase
+          .from('user_quiz_sessions')
+          .insert(sessionData)
+          .select('id')
+          .single();
+
+        if (error) throw error;
+        setCurrentDbSessionId(data.id); // Store the new session ID
+        console.log(`New quiz session ${data.id} created in DB.`);
+      }
+    } catch (error: any) {
+      console.error("Error saving quiz state to DB:", error);
+      toast({
+        title: "Error",
+        description: `Failed to save quiz progress: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  // Function to clear a specific quiz session from the database
+  const clearSpecificQuizState = useCallback(async (dbSessionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_quiz_sessions')
+        .delete()
+        .eq('id', dbSessionId);
+
+      if (error) throw error;
+      console.log(`Quiz session ${dbSessionId} deleted from DB.`);
+      setActiveSavedQuizzes(prev => prev.filter(session => session.dbSessionId !== dbSessionId));
+    } catch (error: any) {
+      console.error("Error clearing quiz state from DB:", error);
+      toast({
+        title: "Error",
+        description: `Failed to clear quiz progress: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
@@ -197,28 +258,48 @@ const QuizPage = () => {
       setAllSubcategories(subcategoriesData || []);
     }
 
-    // --- New: Load all saved quiz sessions for the current user ---
-    const currentUserId = user?.id || 'guest';
-    const loadedSavedQuizzes = new Map<string, SavedQuizState>();
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(`${LOCAL_STORAGE_QUIZ_KEY_PREFIX}_${currentUserId}_`)) {
-        try {
-          const storedState = localStorage.getItem(key);
-          if (storedState) {
-            const parsedState: SavedQuizState = JSON.parse(storedState);
-            // Ensure the parsed state is valid and belongs to the current user/guest
-            if (parsedState.userId === currentUserId) {
-              loadedSavedQuizzes.set(key, parsedState); // Store with the full key
-            } else {
-              // If it's a stale key from a different user, remove it
-              localStorage.removeItem(key);
-            }
-          }
-        } catch (e) {
-          console.error(`Failed to parse saved quiz state for key ${key}:`, e);
-          localStorage.removeItem(key); // Remove corrupted state
-        }
+    // --- Load all saved quiz sessions for the current user from DB ---
+    let loadedSavedQuizzes: LoadedQuizSession[] = [];
+    if (user) {
+      const { data: dbSessions, error: dbSessionsError } = await supabase
+        .from('user_quiz_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+
+      if (dbSessionsError) {
+        console.error('Error fetching saved quiz sessions from DB:', dbSessionsError);
+        toast({ title: "Error", description: "Failed to load saved quiz sessions.", variant: "destructive" });
+      } else {
+        // For each DB session, create a LoadedQuizSession stub for display
+        loadedSavedQuizzes = dbSessions.map((dbSession: DbQuizSession) => {
+          const categoryName = categoriesData?.find(c => c.id === dbSession.category_id)?.name || 'Unknown Category';
+          const subcategoryName = subcategoriesData?.find(s => s.id === dbSession.subcategory_id)?.name || null;
+          return {
+            dbSessionId: dbSession.id,
+            categoryId: dbSession.category_id || '', // Should always have a category_id
+            subcategory_id: dbSession.subcategory_id,
+            mcqs: dbSession.mcq_ids_order.map((id: string) => ({
+              id,
+              question_text: 'Loading...',
+              option_a: '', // Placeholder
+              option_b: '', // Placeholder
+              option_c: '', // Placeholder
+              option_d: '', // Placeholder
+              correct_answer: 'A', // Placeholder
+              explanation_id: null,
+              difficulty: null,
+              is_trial_mcq: null,
+              category_links: [],
+            })), // Placeholder MCQs
+            userAnswers: new Map(Object.entries(dbSession.user_answers_json)),
+            currentQuestionIndex: dbSession.current_question_index,
+            isTrialActiveSession: dbSession.is_trial_session,
+            userId: dbSession.user_id,
+            categoryName: categoryName, // Add for display
+            subcategoryName: subcategoryName, // Add for display
+          } as LoadedQuizSession;
+        });
       }
     }
     setActiveSavedQuizzes(loadedSavedQuizzes);
@@ -295,7 +376,12 @@ const QuizPage = () => {
       return;
     }
 
-    if (!user || (!isSubscribed && !hasTakenTrial)) {
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in to start a quiz.", variant: "destructive" });
+      return;
+    }
+
+    if ((!isSubscribed && !hasTakenTrial)) {
       setIsTrialActiveSession(true);
     } else {
       setIsTrialActiveSession(false);
@@ -316,7 +402,7 @@ const QuizPage = () => {
     setScore(0);
     setExplanations(new Map());
     setShowResults(false);
-    clearSpecificQuizState(categoryId, subcategoryId); // Clear any existing saved state for this specific category/subcategory when starting a new quiz
+    setCurrentDbSessionId(null); // Reset current DB session ID for a new quiz
 
     let mcqIdsToFetch: string[] = [];
 
@@ -446,6 +532,20 @@ const QuizPage = () => {
     setUserAnswers(initialUserAnswers);
     setSelectedAnswer(null); // No answer selected initially for the first question
 
+    // Create a new session in the database
+    if (user) {
+      await saveQuizState(
+        null, // No existing session ID
+        categoryId,
+        subcategoryId,
+        mcqsToLoad,
+        initialUserAnswers,
+        0, // currentQuestionIndex
+        isTrialActiveSession,
+        user.id
+      );
+    }
+
     // Mark trial_taken only if a logged-in user starts a trial
     if (user && isTrialActiveSession && !hasTakenTrial) {
       const { error: updateError } = await supabase
@@ -461,17 +561,57 @@ const QuizPage = () => {
     }
   };
 
-  const continueQuizSession = useCallback((savedState: SavedQuizState) => {
-    setQuizQuestions(savedState.mcqs);
-    setUserAnswers(new Map(savedState.userAnswers));
-    setCurrentQuestionIndex(savedState.currentQuestionIndex);
-    setIsTrialActiveSession(savedState.isTrialActiveSession);
-    setCurrentQuizCategoryId(savedState.categoryId); // Set current category
-    setCurrentQuizSubcategoryId(savedState.subcategoryId); // Set current subcategory
+  const continueQuizSession = useCallback(async (loadedSession: LoadedQuizSession) => {
+    setIsPageLoading(true);
+    setCurrentDbSessionId(loadedSession.dbSessionId);
+    setCurrentQuizCategoryId(loadedSession.categoryId);
+    setCurrentQuizSubcategoryId(loadedSession.subcategory_id);
+    setIsTrialActiveSession(loadedSession.isTrialActiveSession);
+
+    // Fetch full MCQ objects based on mcq_ids_order from the loaded session
+    const { data: mcqsData, error: mcqsError } = await supabase
+      .from('mcqs')
+      .select(`
+        *,
+        mcq_category_links (
+          category_id,
+          subcategory_id,
+          categories (name),
+          subcategories (name)
+        )
+      `)
+      .in('id', loadedSession.mcqs.map(m => m.id)) // Use the IDs from the placeholder MCQs
+      .order('created_at', { ascending: true }); // Maintain original order if possible
+
+    if (mcqsError) {
+      console.error('Error fetching MCQs for resumed session:', mcqsError);
+      toast({ title: "Error", description: "Failed to load quiz questions for your saved session.", variant: "destructive" });
+      setIsPageLoading(false);
+      return;
+    }
+
+    const formattedMcqs: MCQ[] = mcqsData.map((mcq: any) => ({
+      ...mcq,
+      category_links: mcq.mcq_category_links.map((link: any) => ({
+        category_id: link.category_id,
+        category_name: link.categories?.name || null,
+        subcategory_id: link.subcategory_id,
+        subcategory_name: link.subcategories?.name || null,
+      })),
+    }));
+
+    // Reorder fetched MCQs to match mcq_ids_order
+    const orderedMcqs = loadedSession.mcqs.map(loadedMcq => 
+      formattedMcqs.find(fetchedMcq => fetchedMcq.id === loadedMcq.id)
+    ).filter((mcq): mcq is MCQ => mcq !== undefined);
+
+    setQuizQuestions(orderedMcqs);
+    setUserAnswers(loadedSession.userAnswers);
+    setCurrentQuestionIndex(loadedSession.currentQuestionIndex);
 
     // Set selectedAnswer, feedback, and showExplanation for the current question
-    const currentMcqFromSaved = savedState.mcqs[savedState.currentQuestionIndex];
-    const currentAnswerDataFromSaved = new Map(savedState.userAnswers).get(currentMcqFromSaved.id);
+    const currentMcqFromSaved = orderedMcqs[loadedSession.currentQuestionIndex];
+    const currentAnswerDataFromSaved = loadedSession.userAnswers.get(currentMcqFromSaved.id);
     setSelectedAnswer(currentAnswerDataFromSaved?.selectedOption || null);
     setFeedback(currentAnswerDataFromSaved?.submitted ? (currentAnswerDataFromSaved.isCorrect ? 'Correct!' : `Incorrect. The correct answer was ${currentMcqFromSaved.correct_answer}.`) : null);
     setShowExplanation(currentAnswerDataFromSaved?.submitted || false);
@@ -488,20 +628,21 @@ const QuizPage = () => {
     });
   }, [fetchExplanation, toast]);
 
-  // Effect to update local storage whenever quiz state changes
+  // Effect to update database whenever quiz state changes
   useEffect(() => {
-    if (!showCategorySelection && quizQuestions.length > 0 && !showResults && currentQuizCategoryId) {
+    if (user && currentDbSessionId && !showCategorySelection && quizQuestions.length > 0 && !showResults && currentQuizCategoryId) {
       saveQuizState(
+        currentDbSessionId,
         currentQuizCategoryId,
         currentQuizSubcategoryId,
         quizQuestions,
         userAnswers,
         currentQuestionIndex,
         isTrialActiveSession,
-        user?.id || null
+        user.id
       );
     }
-  }, [quizQuestions, userAnswers, currentQuestionIndex, isTrialActiveSession, showCategorySelection, showResults, saveQuizState, user, currentQuizCategoryId, currentQuizSubcategoryId]);
+  }, [quizQuestions, userAnswers, currentQuestionIndex, isTrialActiveSession, showCategorySelection, showResults, saveQuizState, user, currentQuizCategoryId, currentQuizSubcategoryId, currentDbSessionId]);
 
 
   const handleResetProgress = async (categoryId: string) => {
@@ -526,28 +667,19 @@ const QuizPage = () => {
         throw dbError;
       }
 
-      // 2. Clear all associated saved quiz sessions from local storage
-      // Iterate over a copy of activeSavedQuizzes to avoid issues during deletion
-      const keysToDelete: string[] = [];
-      activeSavedQuizzes.forEach((savedState, key) => {
-        if (savedState.categoryId === categoryId) {
-          keysToDelete.push(key);
-        }
-      });
+      // 2. Clear all associated saved quiz sessions from the database
+      const { error: deleteSessionsError } = await supabase
+        .from('user_quiz_sessions')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('category_id', categoryId);
 
-      keysToDelete.forEach(key => {
-        localStorage.removeItem(key);
-      });
-
-      // Update the state to reflect removed items
-      setActiveSavedQuizzes(prev => {
-        const newMap = new Map(prev);
-        keysToDelete.forEach(key => newMap.delete(key));
-        return newMap;
-      });
+      if (deleteSessionsError) {
+        throw deleteSessionsError;
+      }
 
       toast({ title: "Success", description: "Quiz progress reset successfully." });
-      fetchQuizOverview(); // Refresh overview data including category stats
+      fetchQuizOverview(); // Refresh overview data including category stats and saved sessions
     } catch (error: any) {
       console.error('Error resetting progress:', error);
       toast({ title: "Error", description: `Failed to reset progress: ${error.message}`, variant: "destructive" });
@@ -701,21 +833,31 @@ const QuizPage = () => {
     await Promise.all(explanationPromises);
     setShowResults(true);
     setIsPageLoading(false);
-    if (currentQuizCategoryId) {
-      clearSpecificQuizState(currentQuizCategoryId, currentQuizSubcategoryId); // Clear saved state after quiz submission
+    if (currentDbSessionId) {
+      clearSpecificQuizState(currentDbSessionId); // Clear saved state after quiz submission
     }
   };
 
   const handleSaveProgress = () => {
+    if (!user) {
+      toast({
+        title: "Cannot Save",
+        description: "You must be logged in to save quiz progress.",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
     if (currentQuizCategoryId && quizQuestions.length > 0) {
       saveQuizState(
+        currentDbSessionId,
         currentQuizCategoryId,
         currentQuizSubcategoryId,
         quizQuestions,
         userAnswers,
         currentQuestionIndex,
         isTrialActiveSession,
-        user?.id || null
+        user.id
       );
       toast({
         title: "Progress Saved!",
@@ -779,8 +921,8 @@ const QuizPage = () => {
   };
 
   const handleBackToSelection = () => {
-    const currentQuizKey = currentQuizCategoryId ? getQuizSessionKey(user?.id || null, currentQuizCategoryId, currentQuizSubcategoryId) : null;
-    const isCurrentQuizSaved = currentQuizKey && activeSavedQuizzes.has(currentQuizKey);
+    // Check if the current quiz session is saved in the database
+    const isCurrentQuizSaved = currentDbSessionId && activeSavedQuizzes.some(session => session.dbSessionId === currentDbSessionId);
 
     if (!isCurrentQuizSaved) { // Only show warning if not explicitly saved
       if (!window.confirm("Are you sure you want to end this quiz session and go back to category selection? Your current progress will be lost.")) {
@@ -801,8 +943,7 @@ const QuizPage = () => {
     setShowCategorySelection(true);
     setCurrentQuizCategoryId(null); // Reset current quiz category
     setCurrentQuizSubcategoryId(null); // Reset subcategory selection
-    // No need to clearSpecificQuizState here, as it's either already saved or user confirmed to lose it.
-    // The next fetchQuizOverview will correctly update activeSavedQuizzes.
+    setCurrentDbSessionId(null); // Reset DB session ID
     fetchQuizOverview(); // Refresh overview data
   };
 
@@ -852,7 +993,7 @@ const QuizPage = () => {
             <CardDescription>Choose a category and optionally a subcategory to start your quiz and view your performance.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {activeSavedQuizzes.size > 0 && (
+            {activeSavedQuizzes.length > 0 && (
               <Card className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-950">
                 <CardHeader>
                   <CardTitle className="text-blue-700 dark:text-blue-300">Continue Your Quizzes</CardTitle>
@@ -861,21 +1002,19 @@ const QuizPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {Array.from(activeSavedQuizzes.entries()).map(([key, savedState]) => {
-                    const categoryName = categoryStats.find(c => c.id === savedState.categoryId)?.name || 'Unknown Category';
-                    const subcategoryName = savedState.subcategoryId ? allSubcategories.find(s => s.id === savedState.subcategoryId)?.name : null;
+                  {activeSavedQuizzes.map((savedState) => {
                     const progress = savedState.currentQuestionIndex + 1;
                     const total = savedState.mcqs.length;
 
                     return (
-                      <div key={key} className="flex flex-col sm:flex-row items-center justify-between p-3 border rounded-md bg-white dark:bg-gray-800">
+                      <div key={savedState.dbSessionId} className="flex flex-col sm:flex-row items-center justify-between p-3 border rounded-md bg-white dark:bg-gray-800">
                         <div>
-                          <p className="font-semibold">{categoryName} {subcategoryName ? `(${subcategoryName})` : ''}</p>
+                          <p className="font-semibold">{savedState.categoryName} {savedState.subcategoryName ? `(${savedState.subcategoryName})` : ''}</p>
                           <p className="text-sm text-muted-foreground">Question {progress} of {total}</p>
                         </div>
                         <div className="flex gap-2 mt-2 sm:mt-0">
                           <Button onClick={() => continueQuizSession(savedState)} size="sm">Continue</Button>
-                          <Button onClick={() => clearSpecificQuizState(savedState.categoryId, savedState.subcategoryId)} variant="outline" size="sm">Clear</Button>
+                          <Button onClick={() => clearSpecificQuizState(savedState.dbSessionId)} variant="outline" size="sm">Clear</Button>
                         </div>
                       </div>
                     );
@@ -938,6 +1077,7 @@ const QuizPage = () => {
                         onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'random')}
                         className="w-full"
                         disabled={
+                          !user || // Disable if not logged in
                           (user?.has_active_subscription && cat.total_mcqs === 0) ||
                           (!user?.has_active_subscription && cat.total_trial_mcqs === 0) ||
                           (!user?.has_active_subscription && user?.trial_taken)
@@ -1184,7 +1324,7 @@ const QuizPage = () => {
               <Button onClick={handleBackToSelection} variant="outline" disabled={isSubmittingAnswer}>
                 Back to Selection
               </Button>
-              <Button onClick={handleSaveProgress} variant="secondary" disabled={isSubmittingAnswer || !currentQuizCategoryId}>
+              <Button onClick={handleSaveProgress} variant="secondary" disabled={isSubmittingAnswer || !currentQuizCategoryId || !user}>
                 <Save className="h-4 w-4 mr-2" /> Save Progress
               </Button>
             </div>

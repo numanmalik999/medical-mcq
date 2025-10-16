@@ -464,7 +464,7 @@ const QuizPage = () => {
 
       if (attemptsError) {
         console.error('Error fetching incorrect attempts:', attemptsError);
-        toast({ title: "Error", description: "Failed to load incorrect questions.", variant: "destructive" });
+        toast({ title: "Feature Restricted", description: "Failed to load incorrect questions.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
@@ -954,7 +954,7 @@ const QuizPage = () => {
 
   if (!hasCheckedInitialSession || isPageLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
         <p className="text-gray-700 dark:text-gray-300">Loading quiz overview...</p>
       </div>
     );
@@ -962,7 +962,7 @@ const QuizPage = () => {
 
   if (showSubscriptionPrompt) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
         <Card className="w-full max-w-2xl text-center">
           <CardHeader>
             <CardTitle className="text-2xl">Trial Completed!</CardTitle>
@@ -987,7 +987,7 @@ const QuizPage = () => {
 
   if (showCategorySelection) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
         <Card className="w-full max-w-4xl">
           <CardHeader>
             <CardTitle>Select a Quiz Category</CardTitle>
@@ -1136,7 +1136,7 @@ const QuizPage = () => {
 
   if (quizQuestions.length === 0 && !isPageLoading && !showCategorySelection && !showResults) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
         <Card className="w-full max-w-2xl">
           <CardHeader>
             <CardTitle>No MCQs Found</CardTitle>
@@ -1160,7 +1160,7 @@ const QuizPage = () => {
 
   if (showResults) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
         <div className="flex w-full max-w-6xl">
           <QuizNavigator
             mcqs={quizQuestions}
@@ -1241,7 +1241,7 @@ const QuizPage = () => {
 
   if (!currentMcq) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
         <p className="text-gray-700 dark:text-gray-300">Loading current question...</p>
       </div>
     );
@@ -1253,7 +1253,7 @@ const QuizPage = () => {
   const isLastQuestion = currentQuestionIndex === quizQuestions.length - 1;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
       <div className="flex w-full max-w-6xl">
         <QuizNavigator
           mcqs={quizQuestions}

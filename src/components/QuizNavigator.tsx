@@ -35,15 +35,17 @@ const QuizNavigator = ({ mcqs, userAnswers, currentQuestionIndex, goToQuestion, 
             if (isCorrect) {
               buttonClass += " bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
               icon = <CheckCircle2 className="h-4 w-4" />;
-            } else if (isAnswered) {
+            } else if (isAnswered) { // Answered but incorrect
               buttonClass += " bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
               icon = <XCircle className="h-4 w-4" />;
-            } else {
+            } else { // Not answered
               buttonClass += " bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
             }
-          } else if (isAnswered) {
+          } else if (isAnswered) { // Quiz in progress, answered
             buttonClass += " bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
-          } else {
+            // Add a small dot for answered questions in progress
+            icon = <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-blue-500" />;
+          } else { // Quiz in progress, not answered
             buttonClass += " bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
           }
 
@@ -55,7 +57,7 @@ const QuizNavigator = ({ mcqs, userAnswers, currentQuestionIndex, goToQuestion, 
             <Button
               key={mcq.id}
               variant="ghost"
-              className={cn(buttonClass, "p-0")}
+              className={cn(buttonClass, "p-0 relative")} // Add 'relative' for absolute positioning of icon
               onClick={() => goToQuestion(index)}
               title={`Question ${index + 1}`}
             >

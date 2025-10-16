@@ -50,7 +50,7 @@ const QuizPage = () => {
 
   const [quizQuestions, setQuizQuestions] = useState<MCQ[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<Map<string, string | null>>(new Map()); // Corrected initialization
+  const [userAnswers, setUserAnswers] = useState<Map<string, string | null>>(new Map());
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
@@ -221,7 +221,7 @@ const QuizPage = () => {
 
     setIsPageLoading(true);
     setQuizQuestions([]);
-    setUserAnswers(new Map()); // Corrected initialization
+    setUserAnswers(new Map());
     setCurrentQuestionIndex(0);
     setSelectedAnswer(null);
     setFeedback(null);
@@ -817,10 +817,26 @@ const QuizPage = () => {
             >
               {['A', 'B', 'C', 'D'].map((optionKey) => {
                 const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
+                const isSelected = selectedAnswer === optionKey;
+                const isCorrectOption = currentMcq.correct_answer === optionKey;
+
+                let labelClassName = "";
+                if (showExplanation) {
+                  if (isSelected && isCorrectOption) {
+                    labelClassName = "text-green-600 font-medium";
+                  } else if (isSelected && !isCorrectOption) {
+                    labelClassName = "text-red-600 font-medium";
+                  } else if (isCorrectOption) {
+                    labelClassName = "text-green-600 font-medium";
+                  }
+                }
+
                 return (
                   <div key={optionKey} className="flex items-center space-x-2">
                     <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
-                    <Label htmlFor={`option-${optionKey}`}>{`${optionKey}. ${optionText as string}`}</Label>
+                    <Label htmlFor={`option-${optionKey}`} className={labelClassName}>
+                      {`${optionKey}. ${optionText as string}`}
+                    </Label>
                   </div>
                 );
               })}

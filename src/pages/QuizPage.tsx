@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save } from 'lucide-react'; // Import Save icon
+import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -119,6 +119,8 @@ const QuizPage = () => {
     };
     const key = getQuizSessionKey(currentUserId, categoryId, subcategoryId);
     localStorage.setItem(key, JSON.stringify(stateToSave));
+    // Update activeSavedQuizzes immediately after saving
+    setActiveSavedQuizzes(prev => new Map(prev).set(key, stateToSave));
   }, [getQuizSessionKey]);
 
   const clearSpecificQuizState = useCallback((categoryId: string, subcategoryId: string | null) => {
@@ -751,24 +753,31 @@ const QuizPage = () => {
   };
 
   const handleBackToSelection = () => {
-    if (window.confirm("Are you sure you want to end this quiz session and go back to category selection? Your current progress will be lost.")) {
-      setQuizQuestions([]);
-      setUserAnswers(new Map());
-      setCurrentQuestionIndex(0);
-      setSelectedAnswer(null);
-      setFeedback(null);
-      setShowExplanation(false);
-      setScore(0);
-      setExplanations(new Map());
-      setShowResults(false);
-      setShowCategorySelection(true);
-      setCurrentQuizCategoryId(null); // Reset current quiz category
-      setCurrentQuizSubcategoryId(null); // Reset subcategory selection
-      if (currentQuizCategoryId) {
-        clearSpecificQuizState(currentQuizCategoryId, currentQuizSubcategoryId); // Clear saved state
+    const currentQuizKey = currentQuizCategoryId ? getQuizSessionKey(user?.id || null, currentQuizCategoryId, currentQuizSubcategoryId) : null;
+    const isCurrentQuizSaved = currentQuizKey && activeSavedQuizzes.has(currentQuizKey);
+
+    if (!isCurrentQuizSaved) { // Only show warning if not explicitly saved
+      if (!window.confirm("Are you sure you want to end this quiz session and go back to category selection? Your current progress will be lost.")) {
+        return; // User cancelled
       }
-      fetchQuizOverview(); // Refresh overview data
     }
+
+    // If we reach here, either it was saved, or the user confirmed to lose unsaved progress
+    setQuizQuestions([]);
+    setUserAnswers(new Map());
+    setCurrentQuestionIndex(0);
+    setSelectedAnswer(null);
+    setFeedback(null);
+    setShowExplanation(false);
+    setScore(0);
+    setExplanations(new Map());
+    setShowResults(false);
+    setShowCategorySelection(true);
+    setCurrentQuizCategoryId(null); // Reset current quiz category
+    setCurrentQuizSubcategoryId(null); // Reset subcategory selection
+    // No need to clearSpecificQuizState here, as it's either already saved or user confirmed to lose it.
+    // The next fetchQuizOverview will correctly update activeSavedQuizzes.
+    fetchQuizOverview(); // Refresh overview data
   };
 
   const filteredCategories = categoryStats.filter(cat =>

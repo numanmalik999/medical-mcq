@@ -1,13 +1,12 @@
 "use client";
 
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const Header = () => {
-  const { user, hasCheckedInitialSession } = useSession();
+  const { hasCheckedInitialSession } = useSession();
   const navigate = useNavigate();
 
   const handleAppTitleClick = () => {
@@ -15,15 +14,8 @@ const Header = () => {
       // Still loading session, do nothing or show a loading indicator
       return;
     }
-    if (user) {
-      if (user.is_admin) {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/user/dashboard');
-      }
-    } else {
-      navigate('/'); // Redirect unauthenticated users to the home page
-    }
+    // Always navigate to the redirector, which will then handle admin/user/landing page logic
+    navigate('/redirect');
   };
 
   return (

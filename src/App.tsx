@@ -3,7 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import LandingPage from "./pages/LandingPage"; // New Landing Page
+import DashboardRedirect from "./pages/DashboardRedirect"; // Renamed Index to DashboardRedirect
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
@@ -28,7 +29,16 @@ import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import UserProtectedRoute from "./components/UserProtectedRoute";
 import TakeTestPage from "./pages/TakeTestPage";
 import SubscriptionPage from "./pages/SubscriptionPage";
-import Header from "./components/Header"; // Import the new Header component
+import Header from "./components/Header";
+import Footer from "./components/Footer"; // Import the new Footer component
+
+// New static pages
+import AboutUsPage from "./pages/AboutUsPage";
+import ContactPage from "./pages/ContactPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsOfServicePage from "./pages/TermsOfServicePage";
+import FAQPage from "./pages/FAQPage";
+
 
 const queryClient = new QueryClient();
 
@@ -39,45 +49,58 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <SessionContextProvider>
-          <Header /> {/* Render the Header component here */}
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/quiz" element={<QuizPage />} />
-            <Route path="/subscription" element={<SubscriptionPage />} />
-            
-            {/* Admin Routes - Protected */}
-            <Route path="/admin" element={<AdminProtectedRoute />}>
-              <Route element={<AdminLayout />}>
-                <Route index element={<AdminDashboardPage />} />
-                <Route path="dashboard" element={<AdminDashboardPage />} />
-                <Route path="add-mcq" element={<AddMcqPage />} />
-                <Route path="bulk-upload-mcqs" element={<BulkUploadMcqsPage />} />
-                <Route path="manage-mcqs" element={<ManageMcqsPage />} />
-                <Route path="manage-submitted-mcqs" element={<ManageSubmittedMcqsPage />} />
-                <Route path="manage-categories" element={<ManageCategoriesPage />} />
-                <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
-                <Route path="manage-users" element={<ManageUsersPage />} />
-                <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />
-              </Route>
-            </Route>
+          <Header />
+          <div className="flex flex-col min-h-screen"> {/* Added flex container for sticky footer */}
+            <div className="flex-grow"> {/* Main content area */}
+              <Routes>
+                <Route path="/" element={<LandingPage />} /> {/* New Landing Page as root */}
+                <Route path="/redirect" element={<DashboardRedirect />} /> {/* Old Index page, now a redirector */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/quiz" element={<QuizPage />} />
+                <Route path="/subscription" element={<SubscriptionPage />} />
+                
+                {/* New Static Pages */}
+                <Route path="/about" element={<AboutUsPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms" element={<TermsOfServicePage />} />
+                <Route path="/faq" element={<FAQPage />} />
 
-            {/* User Routes - Protected */}
-            <Route path="/user" element={<UserProtectedRoute />}>
-              <Route element={<UserLayout />}>
-                <Route index element={<UserDashboardPage />} />
-                <Route path="dashboard" element={<UserDashboardPage />} />
-                <Route path="profile" element={<UserProfilePage />} />
-                <Route path="take-test" element={<TakeTestPage />} />
-                <Route path="subscriptions" element={<UserSubscriptionsPage />} />
-                <Route path="submit-mcq" element={<SubmitMcqPage />} />
-              </Route>
-            </Route>
+                {/* Admin Routes - Protected */}
+                <Route path="/admin" element={<AdminProtectedRoute />}>
+                  <Route element={<AdminLayout />}>
+                    <Route index element={<AdminDashboardPage />} />
+                    <Route path="dashboard" element={<AdminDashboardPage />} />
+                    <Route path="add-mcq" element={<AddMcqPage />} />
+                    <Route path="bulk-upload-mcqs" element={<BulkUploadMcqsPage />} />
+                    <Route path="manage-mcqs" element={<ManageMcqsPage />} />
+                    <Route path="manage-submitted-mcqs" element={<ManageSubmittedMcqsPage />} />
+                    <Route path="manage-categories" element={<ManageCategoriesPage />} />
+                    <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
+                    <Route path="manage-users" element={<ManageUsersPage />} />
+                    <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />
+                  </Route>
+                </Route>
 
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+                {/* User Routes - Protected */}
+                <Route path="/user" element={<UserProtectedRoute />}>
+                  <Route element={<UserLayout />}>
+                    <Route index element={<UserDashboardPage />} />
+                    <Route path="dashboard" element={<UserDashboardPage />} />
+                    <Route path="profile" element={<UserProfilePage />} />
+                    <Route path="take-test" element={<TakeTestPage />} />
+                    <Route path="subscriptions" element={<UserSubscriptionsPage />} />
+                    <Route path="submit-mcq" element={<SubmitMcqPage />} />
+                  </Route>
+                </Route>
+
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </div>
+            <Footer /> {/* Render the Footer component here */}
+          </div>
         </SessionContextProvider>
       </BrowserRouter>
     </TooltipProvider>

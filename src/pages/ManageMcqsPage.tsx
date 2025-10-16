@@ -49,7 +49,6 @@ const ManageMcqsPage = () => {
   const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
 
   const fetchCategoriesAndSubcategories = async () => {
-    // No local loading state here, handled by parent isPageLoading
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*');
@@ -59,7 +58,6 @@ const ManageMcqsPage = () => {
     } else {
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
-          // Count MCQs by querying mcq_category_links table directly
           const { count, error: mcqCountError } = await supabase
             .from('mcq_category_links')
             .select('mcq_id', { count: 'exact', head: true })
@@ -71,7 +69,28 @@ const ManageMcqsPage = () => {
           return { ...category, mcq_count: count || 0 };
         })
       );
-      setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: 0 }]); // Add virtual uncategorized
+
+      // Calculate count for Uncategorized MCQs
+      const { data: allLinkedMcqIdsData, error: linkedMcqIdsError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id');
+
+      if (linkedMcqIdsError) {
+        console.error('Error fetching all linked MCQ IDs for uncategorized count:', linkedMcqIdsError);
+      }
+      const uniqueLinkedMcqIds = new Set(allLinkedMcqIdsData?.map(link => link.mcq_id) || []);
+
+      const { count: totalMcqCount, error: totalMcqCountError } = await supabase
+        .from('mcqs')
+        .select('id', { count: 'exact', head: true });
+
+      if (totalMcqCountError) {
+        console.error('Error fetching total MCQ count for uncategorized:', totalMcqCountError);
+      }
+
+      const uncategorizedMcqCount = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
+
+      setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: Math.max(0, uncategorizedMcqCount) }]);
     }
 
     const { data: subcategoriesData, error: subcategoriesError } = await supabase
@@ -91,7 +110,7 @@ const ManageMcqsPage = () => {
       .from('mcqs')
       .select(`
         *,
-        mcq_category_links (
+        mcq_category_links!mcq_category_links_mcq_id_fkey (
           category_id,
           subcategory_id,
           categories (name),
@@ -117,18 +136,15 @@ const ManageMcqsPage = () => {
       if (categorizedMcqIds.length > 0) {
         query = query.not('id', 'in', `(${categorizedMcqIds.join(',')})`);
       }
-      // If no categorized MCQs, then all MCQs are effectively uncategorized, so no 'not in' needed.
-      // The query will proceed to fetch all MCQs, and then we filter client-side if needed,
-      // but for uncategorized, this is the correct way to find those without links.
     } else if (selectedFilterCategory) {
-      // Filter by category_id in the linking table
-      query = query.filter('mcq_category_links.category_id', 'eq', selectedFilterCategory);
+      // Filter by category_id in the linking table using the explicit foreign key relationship
+      query = query.eq('mcq_category_links.category_id', selectedFilterCategory);
       if (selectedFilterSubcategory) {
-        query = query.filter('mcq_category_links.subcategory_id', 'eq', selectedFilterSubcategory);
+        query = query.eq('mcq_category_links.subcategory_id', selectedFilterSubcategory);
       }
     } else if (selectedFilterSubcategory) {
       // If only subcategory is selected, filter by it directly
-      query = query.filter('mcq_category_links.subcategory_id', 'eq', selectedFilterSubcategory);
+      query = query.eq('mcq_category_links.subcategory_id', selectedFilterSubcategory);
     }
 
     if (searchTerm) { // Apply search filter

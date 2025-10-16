@@ -409,7 +409,7 @@ const QuizPage = () => {
     }
 
     if (!mcqsData || mcqsData.length === 0) {
-      toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
+      toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
       setIsPageLoading(false);
       return;
     }
@@ -514,20 +514,46 @@ const QuizPage = () => {
     }
 
     setIsPageLoading(true);
-    const { error } = await supabase
-      .from('user_quiz_attempts')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('category_id', categoryId);
+    try {
+      // 1. Delete user quiz attempts from the database
+      const { error: dbError } = await supabase
+        .from('user_quiz_attempts')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('category_id', categoryId);
 
-    if (error) {
+      if (dbError) {
+        throw dbError;
+      }
+
+      // 2. Clear all associated saved quiz sessions from local storage
+      // Iterate over a copy of activeSavedQuizzes to avoid issues during deletion
+      const keysToDelete: string[] = [];
+      activeSavedQuizzes.forEach((savedState, key) => {
+        if (savedState.categoryId === categoryId) {
+          keysToDelete.push(key);
+        }
+      });
+
+      keysToDelete.forEach(key => {
+        localStorage.removeItem(key);
+      });
+
+      // Update the state to reflect removed items
+      setActiveSavedQuizzes(prev => {
+        const newMap = new Map(prev);
+        keysToDelete.forEach(key => newMap.delete(key));
+        return newMap;
+      });
+
+      toast({ title: "Success", description: "Quiz progress reset successfully." });
+      fetchQuizOverview(); // Refresh overview data including category stats
+    } catch (error: any) {
       console.error('Error resetting progress:', error);
       toast({ title: "Error", description: `Failed to reset progress: ${error.message}`, variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Quiz progress reset successfully." });
-      fetchQuizOverview();
+    } finally {
+      setIsPageLoading(false);
     }
-    setIsPageLoading(false);
   };
 
   const currentMcq = quizQuestions[currentQuestionIndex];

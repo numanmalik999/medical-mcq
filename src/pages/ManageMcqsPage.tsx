@@ -105,8 +105,60 @@ const ManageMcqsPage = () => {
   };
 
   const fetchMcqs = async () => {
-    setIsPageLoading(true); // Set loading for this specific fetch
-    let query = supabase
+    setIsPageLoading(true);
+
+    let mcqIdsToFilter: string[] | null = null;
+
+    if (selectedFilterCategory === UNCATEGORIZED_ID) {
+      const { data: categorizedMcqLinks, error: linksError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id');
+
+      if (linksError) {
+        console.error('Error fetching categorized MCQ links for uncategorized filter:', linksError);
+        toast({ title: "Error", description: "Failed to identify uncategorized questions.", variant: "destructive" });
+        setIsPageLoading(false);
+        return;
+      }
+      const categorizedMcqIds = Array.from(new Set(categorizedMcqLinks?.map(link => link.mcq_id) || []));
+
+      const { data: allMcqIds, error: allMcqIdsError } = await supabase
+        .from('mcqs')
+        .select('id');
+
+      if (allMcqIdsError) {
+        console.error('Error fetching all MCQ IDs for uncategorized filter:', allMcqIdsError);
+        toast({ title: "Error", description: "Failed to fetch all MCQs for uncategorized filter.", variant: "destructive" });
+        setIsPageLoading(false);
+        return;
+      }
+      const allMcqIdsSet = new Set(allMcqIds?.map(mcq => mcq.id) || []);
+      mcqIdsToFilter = Array.from(allMcqIdsSet).filter(id => !categorizedMcqIds.includes(id));
+
+    } else if (selectedFilterCategory || selectedFilterSubcategory) {
+      let linksQuery = supabase
+        .from('mcq_category_links')
+        .select('mcq_id');
+
+      if (selectedFilterCategory) {
+        linksQuery = linksQuery.eq('category_id', selectedFilterCategory);
+      }
+      if (selectedFilterSubcategory) {
+        linksQuery = linksQuery.eq('subcategory_id', selectedFilterSubcategory);
+      }
+
+      const { data: filteredLinks, error: linksError } = await linksQuery;
+
+      if (linksError) {
+        console.error('Error fetching filtered MCQ links:', linksError);
+        toast({ title: "Error", description: "Failed to filter MCQs by category/subcategory.", variant: "destructive" });
+        setIsPageLoading(false);
+        return;
+      }
+      mcqIdsToFilter = Array.from(new Set(filteredLinks?.map(link => link.mcq_id) || []));
+    }
+
+    let mcqsQuery = supabase
       .from('mcqs')
       .select(`
         *,
@@ -118,40 +170,20 @@ const ManageMcqsPage = () => {
         )
       `);
 
-    if (selectedFilterCategory === UNCATEGORIZED_ID) {
-      // Fetch MCQs that are NOT in mcq_category_links
-      const { data: categorizedMcqLinks, error: linksError } = await supabase
-        .from('mcq_category_links')
-        .select('mcq_id');
-
-      if (linksError) {
-        console.error('Error fetching categorized MCQ links:', linksError);
-        toast({ title: "Error", description: "Failed to identify uncategorized questions.", variant: "destructive" });
+    if (mcqIdsToFilter !== null) {
+      if (mcqIdsToFilter.length === 0) {
+        setMcqs([]); // No MCQs match the filter
         setIsPageLoading(false);
         return;
       }
-
-      const categorizedMcqIds = Array.from(new Set(categorizedMcqLinks?.map(link => link.mcq_id) || []));
-
-      if (categorizedMcqIds.length > 0) {
-        query = query.not('id', 'in', `(${categorizedMcqIds.join(',')})`);
-      }
-    } else if (selectedFilterCategory) {
-      // Filter by category_id in the linking table using the explicit foreign key relationship
-      query = query.eq('mcq_category_links.category_id', selectedFilterCategory);
-      if (selectedFilterSubcategory) {
-        query = query.eq('mcq_category_links.subcategory_id', selectedFilterSubcategory);
-      }
-    } else if (selectedFilterSubcategory) {
-      // If only subcategory is selected, filter by it directly
-      query = query.eq('mcq_category_links.subcategory_id', selectedFilterSubcategory);
+      mcqsQuery = mcqsQuery.in('id', mcqIdsToFilter);
     }
 
-    if (searchTerm) { // Apply search filter
-      query = query.ilike('question_text', `%${searchTerm}%`);
+    if (searchTerm) {
+      mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
     }
 
-    const { data, error } = await query;
+    const { data, error } = await mcqsQuery;
 
     if (error) {
       console.error('Error fetching MCQs:', error);
@@ -173,20 +205,20 @@ const ManageMcqsPage = () => {
       }));
       setMcqs(displayMcqs || []);
     }
-    setIsPageLoading(false); // Clear loading for this specific fetch
+    setIsPageLoading(false);
   };
 
   useEffect(() => {
-    if (hasCheckedInitialSession) { // Only fetch if initial session check is done
+    if (hasCheckedInitialSession) {
       fetchCategoriesAndSubcategories();
     }
-  }, [hasCheckedInitialSession]); // Dependency changed
+  }, [hasCheckedInitialSession]);
 
   useEffect(() => {
-    if (hasCheckedInitialSession) { // Only fetch if initial session check is done
+    if (hasCheckedInitialSession) {
       fetchMcqs();
     }
-  }, [selectedFilterCategory, selectedFilterSubcategory, searchTerm, hasCheckedInitialSession]); // Refetch when filters or search term change
+  }, [selectedFilterCategory, selectedFilterSubcategory, searchTerm, hasCheckedInitialSession]);
 
   useEffect(() => {
     if (selectedFilterCategory && selectedFilterCategory !== UNCATEGORIZED_ID) {

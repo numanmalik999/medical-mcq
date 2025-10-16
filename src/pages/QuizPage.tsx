@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Textarea } from '@/components/ui/textarea';
 import QuizNavigator from '@/components/QuizNavigator';
 import { MCQ } from '@/components/mcq-columns';
+import { cn } from '@/lib/utils'; // Import cn utility for conditional class names
 
 interface MCQExplanation {
   id: string;
@@ -1289,21 +1290,20 @@ const QuizPage = () => {
                 const userSelectedThisOptionWhenSubmitted = currentAnswerData?.selectedOption === optionKey;
                 const isCorrectOption = currentMcq.correct_answer === optionKey;
 
-                let labelClassName = "";
-                if (isSubmitted) { // Apply coloring if submitted
-                  if (userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect) {
-                    labelClassName = "text-green-600 font-medium";
-                  } else if (userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect) {
-                    labelClassName = "text-red-600 font-medium";
-                  } else if (isCorrectOption) {
-                    labelClassName = "text-green-600 font-medium";
-                  }
-                }
-
                 return (
-                  <div key={optionKey} className="flex items-center space-x-2">
+                  <div
+                    key={optionKey}
+                    className={cn(
+                      "flex items-center space-x-2 p-2 rounded-md cursor-pointer",
+                      isSubmitted && userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect && "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+                      isSubmitted && userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect && "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+                      isSubmitted && !userSelectedThisOptionWhenSubmitted && isCorrectOption && "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+                      !isSubmitted && selectedAnswer === optionKey && "bg-accent text-accent-foreground" // Highlight selected option before submission
+                    )}
+                    onClick={() => !isSubmitted && handleOptionSelect(optionKey)} // Make the whole div clickable
+                  >
                     <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
-                    <Label htmlFor={`option-${optionKey}`} className={labelClassName}>
+                    <Label htmlFor={`option-${optionKey}`} className="cursor-pointer">
                       {`${optionKey}. ${optionText as string}`}
                     </Label>
                   </div>

@@ -113,6 +113,33 @@ const QuizPage = () => {
 
   const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<LoadedQuizSession[]>([]); // Changed to array of LoadedQuizSession
 
+  // New states for current quiz accuracy
+  const [currentCorrectCount, setCurrentCorrectCount] = useState(0);
+  const [currentCorrectnessPercentage, setCurrentCorrectnessPercentage] = useState('0.00%');
+
+  // Effect to calculate current quiz accuracy
+  useEffect(() => {
+    if (quizQuestions.length > 0) {
+      let correct = 0;
+      let answered = 0;
+      quizQuestions.forEach(mcq => {
+        const answerData = userAnswers.get(mcq.id);
+        if (answerData?.submitted) {
+          answered++;
+          if (answerData.isCorrect) {
+            correct++;
+          }
+        }
+      });
+      setCurrentCorrectCount(correct);
+      const percentage = answered > 0 ? ((correct / answered) * 100).toFixed(2) : '0.00';
+      setCurrentCorrectnessPercentage(`${percentage}%`);
+    } else {
+      setCurrentCorrectCount(0);
+      setCurrentCorrectnessPercentage('0.00%');
+    }
+  }, [userAnswers, quizQuestions]);
+
   const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
     if (explanations.has(explanationId)) {
       return explanations.get(explanationId)!;
@@ -1246,6 +1273,15 @@ const QuizPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
+      {quizQuestions.length > 0 && !showCategorySelection && !showResults && (
+        <div className="w-full max-w-6xl mb-4 text-center">
+          <Card className="p-4">
+            <p className="text-lg font-semibold">
+              Current Accuracy: {currentCorrectnessPercentage} ({currentCorrectCount} / {quizQuestions.length} Correct)
+            </p>
+          </Card>
+        </div>
+      )}
       <div className="flex w-full max-w-6xl">
         <QuizNavigator
           mcqs={quizQuestions}

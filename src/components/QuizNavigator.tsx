@@ -3,21 +3,7 @@
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle } from 'lucide-react';
-
-interface MCQ {
-  id: string;
-  question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct_answer: 'A' | 'B' | 'C' | 'D';
-  explanation_id: string | null;
-  category_id: string | null;
-  subcategory_id: string | null;
-  difficulty: string | null;
-  is_trial_mcq: boolean | null;
-}
+import { MCQ } from './mcq-columns'; // Import MCQ from mcq-columns
 
 interface QuizNavigatorProps {
   mcqs: MCQ[];

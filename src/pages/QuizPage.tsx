@@ -15,22 +15,8 @@ import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText } from 'lucide-
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import QuizNavigator from '@/components/QuizNavigator'; // Import QuizNavigator
-
-interface MCQ {
-  id: string;
-  question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct_answer: 'A' | 'B' | 'C' | 'D';
-  explanation_id: string | null;
-  category_id: string | null;
-  subcategory_id: string | null;
-  difficulty: string | null;
-  is_trial_mcq: boolean | null;
-}
+import QuizNavigator from '@/components/QuizNavigator';
+import { MCQ } from '@/components/mcq-columns'; // Only import MCQ, McqCategoryLink is not directly used here
 
 interface MCQExplanation {
   id: string;
@@ -64,11 +50,11 @@ const QuizPage = () => {
 
   const [quizQuestions, setQuizQuestions] = useState<MCQ[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<Map<string, string | null>>(new Map());
+  const [userAnswers, setUserAnswers] = useState<Map<string, string | null>>(new Map()); // Corrected initialization
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
-  const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state for initial data
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
 
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
@@ -81,9 +67,8 @@ const QuizPage = () => {
   const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
 
   const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
-  const [isTrialActiveSession, setIsTrialActiveSession] = useState(false); // True if user is in trial mode (either actual trial or guest)
+  const [isTrialActiveSession, setIsTrialActiveSession] = useState(false);
 
-  // State for feedback dialog
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
@@ -115,24 +100,22 @@ const QuizPage = () => {
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      // If user is null (guest), force trial mode
       if (!user) {
         setIsTrialActiveSession(true);
-        fetchQuizOverview(); // Fetch overview for guests
+        fetchQuizOverview();
       } else {
-        // If user is logged in, determine trial status
         if (!user.has_active_subscription && !user.trial_taken) {
           setIsTrialActiveSession(true);
         } else {
           setIsTrialActiveSession(false);
         }
-        fetchQuizOverview(); // Fetch overview for logged-in users
+        fetchQuizOverview();
       }
     }
-  }, [user, hasCheckedInitialSession]); // Dependencies changed
+  }, [user, hasCheckedInitialSession]);
 
   const fetchQuizOverview = async () => {
-    setIsPageLoading(true); // Set loading for this specific fetch
+    setIsPageLoading(true);
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*');
@@ -157,10 +140,21 @@ const QuizPage = () => {
     const categoriesWithStats: CategoryStat[] = [];
 
     for (const category of categoriesData || []) {
+      const { data: mcqLinks, error: linksError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id')
+        .eq('category_id', category.id);
+
+      if (linksError) {
+        console.error(`Error fetching MCQ links for category ${category.name}:`, linksError);
+        continue;
+      }
+      const mcqIds = mcqLinks?.map(link => link.mcq_id) || [];
+
       const { count: mcqCount, error: mcqCountError } = await supabase
         .from('mcqs')
-        .select('id', { count: 'exact' })
-        .eq('category_id', category.id);
+        .select('id', { count: 'exact', head: true })
+        .in('id', mcqIds);
 
       if (mcqCountError) {
         console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
@@ -168,8 +162,8 @@ const QuizPage = () => {
 
       const { count: trialMcqCount, error: trialMcqCountError } = await supabase
         .from('mcqs')
-        .select('id', { count: 'exact' })
-        .eq('category_id', category.id)
+        .select('id', { count: 'exact', head: true })
+        .in('id', mcqIds)
         .eq('is_trial_mcq', true);
 
       if (trialMcqCountError) {
@@ -179,7 +173,7 @@ const QuizPage = () => {
       let totalAttempts = 0;
       let correctAttempts = 0;
 
-      if (user) { // Only fetch user attempts if logged in
+      if (user) {
         const { data: userAttemptsData, error: userAttemptsError } = await supabase
           .from('user_quiz_attempts')
           .select('is_correct, mcq_id')
@@ -209,36 +203,33 @@ const QuizPage = () => {
     }
 
     setCategoryStats(categoriesWithStats);
-    setIsPageLoading(false); // Clear loading for this specific fetch
+    setIsPageLoading(false);
   };
 
   const startQuizSession = async (categoryId: string, subcategoryId: string | null, mode: 'random' | 'incorrect') => {
     const isSubscribed = user?.has_active_subscription;
     const hasTakenTrial = user?.trial_taken;
 
-    // If not subscribed and trial is taken, show prompt
     if (!isSubscribed && hasTakenTrial) {
       setShowSubscriptionPrompt(true);
       return;
     }
 
-    // If user is a guest, or logged in but not subscribed and hasn't taken trial, activate trial session
     if (!user || (!isSubscribed && !hasTakenTrial)) {
       setIsTrialActiveSession(true);
     } else {
       setIsTrialActiveSession(false);
     }
 
-    // If guest or trial user tries to attempt incorrect questions, disallow
     if ((!user || isTrialActiveSession) && mode === 'incorrect') {
       toast({ title: "Feature Restricted", description: "This feature is only available for subscribed users.", variant: "default" });
       return;
     }
 
-    setIsPageLoading(true); // Set loading for this specific fetch
+    setIsPageLoading(true);
     setQuizQuestions([]);
+    setUserAnswers(new Map()); // Corrected initialization
     setCurrentQuestionIndex(0);
-    setUserAnswers(new Map());
     setSelectedAnswer(null);
     setFeedback(null);
     setShowExplanation(false);
@@ -247,41 +238,42 @@ const QuizPage = () => {
     setShowResults(false);
 
 
-    let query = supabase
-      .from('mcqs')
-      .select('*')
+    let mcqsToLoad: MCQ[] = [];
+    let finalMcqIds: string[] = [];
+
+    let linksQuery = supabase
+      .from('mcq_category_links')
+      .select('mcq_id')
       .eq('category_id', categoryId);
 
     if (subcategoryId) {
-      query = query.eq('subcategory_id', subcategoryId);
+      linksQuery = linksQuery.eq('subcategory_id', subcategoryId);
     }
 
-    if (!isSubscribed) { // If not subscribed (includes guests and trial users)
-      query = query.eq('is_trial_mcq', true);
+    const { data: mcqLinksData, error: mcqLinksError } = await linksQuery;
+
+    if (mcqLinksError) {
+      console.error('Error fetching MCQ links for quiz session:', mcqLinksError);
+      toast({ title: "Error", description: "Failed to prepare quiz questions.", variant: "destructive" });
+      setIsPageLoading(false);
+      return;
     }
 
-    let mcqsToLoad: MCQ[] = [];
+    const linkedMcqIds = Array.from(new Set(mcqLinksData?.map(link => link.mcq_id) || []));
+
+    if (linkedMcqIds.length === 0) {
+      toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
+      setIsPageLoading(false);
+      return;
+    }
 
     if (mode === 'random') {
-      const { data, error } = await query;
-      if (error) {
-        console.error('Error fetching random MCQs:', error);
-        toast({ title: "Error", description: "Failed to load quiz questions.", variant: "destructive" });
-        setIsPageLoading(false);
-        return;
-      }
-      if (!data || data.length === 0) {
-        toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
-        setIsPageLoading(false);
-        return;
-      }
-      mcqsToLoad = data.sort(() => 0.5 - Math.random()).slice(0, Math.min(data.length, (!isSubscribed) ? TRIAL_MCQ_LIMIT : data.length));
+      finalMcqIds = linkedMcqIds;
     } else if (mode === 'incorrect') {
-      // This block should only be reachable by subscribed users due to earlier check
       const { data: incorrectAttempts, error: attemptsError } = await supabase
         .from('user_quiz_attempts')
         .select('mcq_id')
-        .eq('user_id', user!.id) // user is guaranteed to exist here
+        .eq('user_id', user!.id)
         .eq('category_id', categoryId)
         .eq('is_correct', false);
 
@@ -294,21 +286,67 @@ const QuizPage = () => {
 
       const incorrectMcqIds = Array.from(new Set(incorrectAttempts?.map(attempt => attempt.mcq_id) || []));
       
-      if (incorrectMcqIds.length === 0) {
+      finalMcqIds = linkedMcqIds.filter(id => incorrectMcqIds.includes(id));
+
+      if (finalMcqIds.length === 0) {
         toast({ title: "No Incorrect MCQs", description: "You have no incorrect answers in this category to re-attempt.", variant: "default" });
         setIsPageLoading(false);
         return;
       }
-
-      const { data: mcqsData, error: mcqsError } = await query.in('id', incorrectMcqIds);
-      if (mcqsError) {
-        console.error('Error fetching incorrect MCQs data:', mcqsError);
-        toast({ title: "Error", description: "Failed to load incorrect questions data.", variant: "destructive" });
-        setIsPageLoading(false);
-        return;
-      }
-      mcqsToLoad = mcqsData || [];
     }
+
+    let mcqQuery = supabase
+      .from('mcqs')
+      .select(`
+        id,
+        question_text,
+        option_a,
+        option_b,
+        option_c,
+        option_d,
+        correct_answer,
+        explanation_id,
+        difficulty,
+        is_trial_mcq,
+        mcq_category_links (
+          category_id,
+          subcategory_id,
+          categories (name),
+          subcategories (name)
+        )
+      `)
+      .in('id', finalMcqIds);
+
+    if (!isSubscribed) {
+      mcqQuery = mcqQuery.eq('is_trial_mcq', true);
+    }
+
+    const { data: mcqsData, error: mcqsError } = await mcqQuery;
+
+    if (mcqsError) {
+      console.error('Error fetching MCQs data for quiz session:', mcqsError);
+      toast({ title: "Error", description: "Failed to load quiz questions data.", variant: "destructive" });
+      setIsPageLoading(false);
+      return;
+    }
+
+    if (!mcqsData || mcqsData.length === 0) {
+      toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
+      setIsPageLoading(false);
+      return;
+    }
+
+    const formattedMcqs: MCQ[] = mcqsData.map((mcq: any) => ({
+      ...mcq,
+      category_links: mcq.mcq_category_links.map((link: any) => ({
+        category_id: link.category_id,
+        category_name: link.categories?.name || null,
+        subcategory_id: link.subcategory_id,
+        subcategory_name: link.subcategories?.name || null,
+      })),
+    }));
+
+    mcqsToLoad = formattedMcqs.sort(() => 0.5 - Math.random()).slice(0, Math.min(formattedMcqs.length, (!isSubscribed) ? TRIAL_MCQ_LIMIT : formattedMcqs.length));
 
     if (mcqsToLoad.length === 0) {
       toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
@@ -319,11 +357,11 @@ const QuizPage = () => {
     setQuizQuestions(mcqsToLoad);
     setCurrentQuizSubcategoryId(subcategoryId);
     setShowCategorySelection(false);
-    setIsPageLoading(false); // Clear loading for this specific fetch
+    setIsPageLoading(false);
     if (mcqsToLoad.length > 0) {
-      setSelectedAnswer(userAnswers.get(mcqsToLoad[0].id) || null);
+      setUserAnswers(prev => new Map(prev).set(mcqsToLoad[0].id, null)); // Initialize answer for first question
+      setSelectedAnswer(null);
     }
-
     // Mark trial_taken only if a logged-in user starts a trial
     if (user && isTrialActiveSession && !hasTakenTrial) {
       const { error: updateError } = await supabase
@@ -334,8 +372,6 @@ const QuizPage = () => {
         console.error('Error marking trial_taken:', updateError);
         toast({ title: "Error", description: "Failed to update trial status.", variant: "destructive" });
       } else {
-        // Update the user object in session context if possible, or trigger a re-fetch
-        // For now, we'll rely on the next session refresh to pick this up.
         toast({ title: "Trial Started!", description: `You have started your free trial. Enjoy ${TRIAL_MCQ_LIMIT} trial questions!`, variant: "default" });
       }
     }
@@ -350,7 +386,7 @@ const QuizPage = () => {
       return;
     }
 
-    setIsPageLoading(true); // Set loading for this specific fetch
+    setIsPageLoading(true);
     const { error } = await supabase
       .from('user_quiz_attempts')
       .delete()
@@ -364,7 +400,7 @@ const QuizPage = () => {
       toast({ title: "Success", description: "Quiz progress reset successfully." });
       fetchQuizOverview();
     }
-    setIsPageLoading(false); // Clear loading for this specific fetch
+    setIsPageLoading(false);
   };
 
   const currentMcq = quizQuestions[currentQuestionIndex];
@@ -372,11 +408,11 @@ const QuizPage = () => {
   const handleOptionSelect = useCallback((value: string) => {
     if (currentMcq) {
       setSelectedAnswer(value);
-      setUserAnswers((prev) => new Map(prev).set(currentMcq.id, value));
+      setUserAnswers((prev: Map<string, string | null>) => new Map(prev).set(currentMcq.id, value));
       setFeedback(null);
       setShowExplanation(false);
     }
-  }, [currentMcq]);
+  }, [currentMcq, setUserAnswers]);
 
   const handleSubmitAnswer = async () => {
     if (!selectedAnswer || !currentMcq) return;
@@ -390,13 +426,13 @@ const QuizPage = () => {
     }
     setShowExplanation(true);
 
-    if (user) { // Only record attempts if user is logged in
+    if (user) {
       try {
         const { error } = await supabase.from('user_quiz_attempts').insert({
           user_id: user.id,
           mcq_id: currentMcq.id,
-          category_id: currentMcq.category_id,
-          subcategory_id: currentMcq.subcategory_id,
+          category_id: currentMcq.category_links?.[0]?.category_id || null,
+          subcategory_id: currentMcq.category_links?.[0]?.subcategory_id || null,
           selected_option: selectedAnswer,
           is_correct: isCorrect,
         });
@@ -421,8 +457,6 @@ const QuizPage = () => {
       console.log("Guest user, not recording quiz attempt.");
     }
     
-    // This block was previously a standalone 'finally' and caused the error.
-    // Its contents are now correctly placed to execute unconditionally.
     setIsSubmittingAnswer(false);
     if (currentMcq.explanation_id) {
       fetchExplanation(currentMcq.explanation_id);
@@ -450,7 +484,7 @@ const QuizPage = () => {
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
       const prevQuestion = quizQuestions[currentQuestionIndex - 1];
-      setCurrentQuestionIndex((prev) => prev - 1); // Corrected to go to previous
+      setCurrentQuestionIndex((prev) => prev - 1);
       setSelectedAnswer(userAnswers.get(prevQuestion?.id || '') || null);
       setFeedback(null);
       setShowExplanation(false);
@@ -487,7 +521,7 @@ const QuizPage = () => {
     setScore(correctCount);
     await Promise.all(explanationPromises);
     setShowResults(true);
-    setIsPageLoading(false); // Clear loading for this specific fetch
+    setIsPageLoading(false);
   };
 
   const handleSubmitFeedback = async () => {
@@ -508,10 +542,9 @@ const QuizPage = () => {
         throw insertError;
       }
 
-      // Send email notification to admin
       const { error: emailError } = await supabase.functions.invoke('send-email', {
         body: {
-          to: 'ADMIN_EMAIL', // This will be replaced by the actual ADMIN_EMAIL from env in the Edge Function
+          to: 'ADMIN_EMAIL',
           subject: `New MCQ Feedback from ${user.email}`,
           body: `User ${user.email} (${user.id}) submitted feedback for MCQ ID: ${currentMcq.id}.<br/><br/>
                  Question: ${currentMcq.question_text}<br/><br/>
@@ -541,7 +574,7 @@ const QuizPage = () => {
     cat.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
+  if (!hasCheckedInitialSession || isPageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading quiz overview...</p>
@@ -604,7 +637,7 @@ const QuizPage = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow space-y-2 text-sm">
-                      {user && ( // Only show performance stats if logged in
+                      {user && (
                         <>
                           <p>Attempts: {cat.user_attempts}</p>
                           <p>Correct: {cat.user_correct}</p>
@@ -653,7 +686,7 @@ const QuizPage = () => {
                       >
                         Attempt Incorrect ({cat.user_incorrect})
                       </Button>
-                      {user && ( // Only show reset progress if logged in
+                      {user && (
                         <Button
                           onClick={() => handleResetProgress(cat.id)}
                           className="w-full"
@@ -702,7 +735,7 @@ const QuizPage = () => {
   if (showResults) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-        <div className="flex w-full max-w-6xl"> {/* Added flex container */}
+        <div className="flex w-full max-w-6xl">
           <QuizNavigator
             mcqs={quizQuestions}
             userAnswers={userAnswers}
@@ -733,7 +766,7 @@ const QuizPage = () => {
                       </p>
                       <ul className="list-disc list-inside ml-4 mt-2">
                         {['A', 'B', 'C', 'D'].map((optionKey) => {
-                          const optionText = mcq[`option_${optionKey.toLowerCase()}` as keyof MCQ];
+                          const optionText = mcq[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
                           const isSelected = userAnswer === optionKey;
                           const isCorrectOption = mcq.correct_answer === optionKey;
 
@@ -748,7 +781,7 @@ const QuizPage = () => {
 
                           return (
                             <li key={optionKey} className={className}>
-                              {optionKey}. {optionText}
+                              {optionKey}. {optionText as string}
                               {isSelected && !isCorrect && <span className="ml-2">(Your Answer)</span>}
                               {isCorrectOption && <span className="ml-2">(Correct Answer)</span>}
                             </li>
@@ -792,14 +825,14 @@ const QuizPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-      <div className="flex w-full max-w-6xl"> {/* Added flex container */}
+      <div className="flex w-full max-w-6xl">
         <QuizNavigator
           mcqs={quizQuestions}
           userAnswers={userAnswers}
           currentQuestionIndex={currentQuestionIndex}
           goToQuestion={goToQuestion}
-          showResults={false} // Results not shown during active quiz
-          score={0} // Score not relevant during active quiz
+          showResults={false}
+          score={0}
         />
         <Card className="flex-1">
           <CardHeader>
@@ -824,11 +857,11 @@ const QuizPage = () => {
               disabled={showExplanation}
             >
               {['A', 'B', 'C', 'D'].map((optionKey) => {
-                const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as keyof MCQ];
+                const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
                 return (
                   <div key={optionKey} className="flex items-center space-x-2">
                     <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
-                    <Label htmlFor={`option-${optionKey}`}>{`${optionKey}. ${optionText}`}</Label>
+                    <Label htmlFor={`option-${optionKey}`}>{`${optionKey}. ${optionText as string}`}</Label>
                   </div>
                 );
               })}
@@ -848,7 +881,7 @@ const QuizPage = () => {
                 {explanations.get(currentMcq.explanation_id || '')?.image_url && (
                   <img src={explanations.get(currentMcq.explanation_id || '')?.image_url || ''} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
                 )}
-                {user && ( // Only allow feedback if logged in
+                {user && (
                   <Button
                     variant="outline"
                     className="mt-4 w-full"
@@ -878,7 +911,6 @@ const QuizPage = () => {
       </div>
       <MadeWithDyad />
 
-      {/* Feedback Dialog */}
       <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
         <DialogContent>
           <DialogHeader>

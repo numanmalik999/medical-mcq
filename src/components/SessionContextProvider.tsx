@@ -101,49 +101,45 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
     console.log(`[updateSessionAndUser] Event: ${event}, Session present: ${!!currentSession}.`);
 
-    try {
-      if (!currentSession) {
-        console.log('[updateSessionAndUser] No session, clearing user and session states.');
-        setSession(null);
-        setUser(null);
-        lastFetchedUserId.current = null; // Clear last fetched user on logout
-      } else {
-        // Determine if we need to fetch the profile from the database
-        const shouldFetchProfile = 
-          !user || // No user currently in state
-          user.id !== currentSession.user.id || // Different user logged in
-          event === 'SIGNED_IN' || // Explicit sign-in event
-          event === 'USER_UPDATED' || // User profile updated event
-          lastFetchedUserId.current !== currentSession.user.id; // Profile not fetched for this user yet
-
-        let hydratedUser: AuthUser;
-
-        if (shouldFetchProfile) {
-          console.log(`[updateSessionAndUser] Fetching profile for user ID: ${currentSession.user.id} due to event: ${event}`);
-          hydratedUser = await fetchUserProfile(currentSession.user);
-          lastFetchedUserId.current = currentSession.user.id; // Mark as fetched
-        } else {
-          console.log(`[updateSessionAndUser] Reusing existing profile for user ID: ${currentSession.user.id} (event: ${event}).`);
-          // If we don't need to fetch, use the existing user object from state
-          // We still need to ensure the session is updated, as tokens might refresh
-          hydratedUser = user!; // Assert user is not null because shouldFetchProfile would be true otherwise
-        }
-
-        if (isMounted.current) {
-          setSession(currentSession);
-          setUser(hydratedUser);
-          console.log('[updateSessionAndUser] User and Session states updated.');
-        } else {
-          console.warn('[updateSessionAndUser] Component unmounted before setting session and user states.');
-        }
-      }
-    } catch (error) {
-      console.error("[updateSessionAndUser] ERROR: processing auth event:", error);
+    if (!currentSession) {
+      console.log('[updateSessionAndUser] No session, clearing user and session states.');
       setSession(null);
       setUser(null);
-      lastFetchedUserId.current = null;
+      lastFetchedUserId.current = null; // Clear last fetched user on logout
+    } else {
+      let hydratedUser: AuthUser | null = null;
+
+      // Condition to decide if we need to fetch profile from DB
+      // We fetch if:
+      // 1. There's no user object in our local state yet (first time loading for this session or after logout).
+      // 2. The user ID in the current session is different from the user ID in our local state.
+      // 3. The event explicitly indicates a user profile update.
+      // We *do not* fetch from DB for 'SIGNED_IN', 'TOKEN_REFRESHED', or 'INITIAL_SESSION'
+      // if the user is already in state and their ID matches.
+      const needsDbProfileFetch = 
+        !user || // No user in state (first load or after logout)
+        user.id !== currentSession.user.id || // Different user logged in
+        event === 'USER_UPDATED'; // Explicit user profile update
+
+      if (needsDbProfileFetch) {
+        console.log(`[updateSessionAndUser] Fetching profile for user ID: ${currentSession.user.id} due to event: ${event}`);
+        hydratedUser = await fetchUserProfile(currentSession.user);
+        lastFetchedUserId.current = currentSession.user.id; // Mark as fetched
+      } else {
+        console.log(`[updateSessionAndUser] Reusing existing profile for user ID: ${currentSession.user.id} (event: ${event}).`);
+        // If we don't need to fetch from DB, use the current user state
+        hydratedUser = user; // Reuse the existing user object
+      }
+
+      if (isMounted.current) {
+        setSession(currentSession);
+        setUser(hydratedUser); // Set the hydrated or reused user
+        console.log('[updateSessionAndUser] User and Session states updated.');
+      } else {
+        console.warn('[updateSessionAndUser] Component unmounted before setting session and user states.');
+      }
     }
-  }, [fetchUserProfile, user]); // Added 'user' to dependencies to correctly check 'user.id'
+  }, [fetchUserProfile, user]); // 'user' dependency is still important for '!user' and 'user.id !== currentSession.user.id'
 
   // Main effect for setting up auth listener and initial session check
   useEffect(() => {

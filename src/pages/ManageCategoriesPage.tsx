@@ -72,10 +72,11 @@ const ManageCategoriesPage = () => {
     } else {
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
+          // Count MCQs by filtering on the related mcq_category_links table
           const { count, error: mcqCountError } = await supabase
             .from('mcqs')
             .select('id', { count: 'exact', head: true })
-            .eq('category_id', category.id);
+            .filter('mcq_category_links.category_id', 'eq', category.id);
 
           if (mcqCountError) {
             console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);

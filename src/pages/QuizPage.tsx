@@ -140,30 +140,21 @@ const QuizPage = () => {
     const categoriesWithStats: CategoryStat[] = [];
 
     for (const category of categoriesData || []) {
-      const { data: mcqLinks, error: linksError } = await supabase
-        .from('mcq_category_links')
-        .select('mcq_id')
-        .eq('category_id', category.id);
-
-      if (linksError) {
-        console.error(`Error fetching MCQ links for category ${category.name}:`, linksError);
-        continue;
-      }
-      const mcqIds = mcqLinks?.map(link => link.mcq_id) || [];
-
+      // Count total MCQs for the category using filter on related table
       const { count: mcqCount, error: mcqCountError } = await supabase
         .from('mcqs')
         .select('id', { count: 'exact', head: true })
-        .in('id', mcqIds);
+        .filter('mcq_category_links.category_id', 'eq', category.id);
 
       if (mcqCountError) {
         console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
       }
 
+      // Count trial MCQs for the category using filter on related table
       const { count: trialMcqCount, error: trialMcqCountError } = await supabase
         .from('mcqs')
         .select('id', { count: 'exact', head: true })
-        .in('id', mcqIds)
+        .filter('mcq_category_links.category_id', 'eq', category.id)
         .eq('is_trial_mcq', true);
 
       if (trialMcqCountError) {
@@ -237,39 +228,29 @@ const QuizPage = () => {
     setExplanations(new Map());
     setShowResults(false);
 
+    let mcqQuery = supabase
+      .from('mcqs')
+      .select(`
+        *,
+        mcq_category_links (
+          category_id,
+          subcategory_id,
+          categories (name),
+          subcategories (name)
+        )
+      `);
 
-    let mcqsToLoad: MCQ[] = [];
-    let finalMcqIds: string[] = [];
-
-    let linksQuery = supabase
-      .from('mcq_category_links')
-      .select('mcq_id')
-      .eq('category_id', categoryId);
-
+    // Apply category and subcategory filters directly to the join
+    mcqQuery = mcqQuery.filter('mcq_category_links.category_id', 'eq', categoryId);
     if (subcategoryId) {
-      linksQuery = linksQuery.eq('subcategory_id', subcategoryId);
+      mcqQuery = mcqQuery.filter('mcq_category_links.subcategory_id', 'eq', subcategoryId);
     }
 
-    const { data: mcqLinksData, error: mcqLinksError } = await linksQuery;
-
-    if (mcqLinksError) {
-      console.error('Error fetching MCQ links for quiz session:', mcqLinksError);
-      toast({ title: "Error", description: "Failed to prepare quiz questions.", variant: "destructive" });
-      setIsPageLoading(false);
-      return;
+    if (!isSubscribed) {
+      mcqQuery = mcqQuery.eq('is_trial_mcq', true);
     }
 
-    const linkedMcqIds = Array.from(new Set(mcqLinksData?.map(link => link.mcq_id) || []));
-
-    if (linkedMcqIds.length === 0) {
-      toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
-      setIsPageLoading(false);
-      return;
-    }
-
-    if (mode === 'random') {
-      finalMcqIds = linkedMcqIds;
-    } else if (mode === 'incorrect') {
+    if (mode === 'incorrect' && user) {
       const { data: incorrectAttempts, error: attemptsError } = await supabase
         .from('user_quiz_attempts')
         .select('mcq_id')
@@ -286,39 +267,12 @@ const QuizPage = () => {
 
       const incorrectMcqIds = Array.from(new Set(incorrectAttempts?.map(attempt => attempt.mcq_id) || []));
       
-      finalMcqIds = linkedMcqIds.filter(id => incorrectMcqIds.includes(id));
-
-      if (finalMcqIds.length === 0) {
+      if (incorrectMcqIds.length === 0) {
         toast({ title: "No Incorrect MCQs", description: "You have no incorrect answers in this category to re-attempt.", variant: "default" });
         setIsPageLoading(false);
         return;
       }
-    }
-
-    let mcqQuery = supabase
-      .from('mcqs')
-      .select(`
-        id,
-        question_text,
-        option_a,
-        option_b,
-        option_c,
-        option_d,
-        correct_answer,
-        explanation_id,
-        difficulty,
-        is_trial_mcq,
-        mcq_category_links (
-          category_id,
-          subcategory_id,
-          categories (name),
-          subcategories (name)
-        )
-      `)
-      .in('id', finalMcqIds);
-
-    if (!isSubscribed) {
-      mcqQuery = mcqQuery.eq('is_trial_mcq', true);
+      mcqQuery = mcqQuery.in('id', incorrectMcqIds); // This 'in' clause will be on a potentially smaller list of incorrect MCQs
     }
 
     const { data: mcqsData, error: mcqsError } = await mcqQuery;
@@ -346,7 +300,7 @@ const QuizPage = () => {
       })),
     }));
 
-    mcqsToLoad = formattedMcqs.sort(() => 0.5 - Math.random()).slice(0, Math.min(formattedMcqs.length, (!isSubscribed) ? TRIAL_MCQ_LIMIT : formattedMcqs.length));
+    let mcqsToLoad: MCQ[] = formattedMcqs.sort(() => 0.5 - Math.random()).slice(0, Math.min(formattedMcqs.length, (!isSubscribed) ? TRIAL_MCQ_LIMIT : formattedMcqs.length));
 
     if (mcqsToLoad.length === 0) {
       toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
@@ -428,11 +382,14 @@ const QuizPage = () => {
 
     if (user) {
       try {
+        // For recording attempts, we need a single category_id and subcategory_id.
+        // We'll use the first one from category_links if available.
+        const firstCategoryLink = currentMcq.category_links?.[0];
         const { error } = await supabase.from('user_quiz_attempts').insert({
           user_id: user.id,
           mcq_id: currentMcq.id,
-          category_id: currentMcq.category_links?.[0]?.category_id || null,
-          subcategory_id: currentMcq.category_links?.[0]?.subcategory_id || null,
+          category_id: firstCategoryLink?.category_id || null,
+          subcategory_id: firstCategoryLink?.subcategory_id || null,
           selected_option: selectedAnswer,
           is_correct: isCorrect,
         });

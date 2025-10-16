@@ -57,10 +57,11 @@ const ManageMcqsPage = () => {
     } else {
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
+          // Count MCQs by filtering on the related mcq_category_links table
           const { count, error: mcqCountError } = await supabase
-            .from('mcq_category_links')
+            .from('mcqs')
             .select('id', { count: 'exact', head: true })
-            .eq('category_id', category.id);
+            .filter('mcq_category_links.category_id', 'eq', category.id);
 
           if (mcqCountError) {
             console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
@@ -98,34 +99,13 @@ const ManageMcqsPage = () => {
 
     // Filtering logic for multi-category system
     if (selectedFilterCategory) {
-      const { data: mcqLinksData, error: mcqLinksError } = await supabase
-        .from('mcq_category_links')
-        .select('mcq_id')
-        .eq('category_id', selectedFilterCategory)
-        .filter('subcategory_id', selectedFilterSubcategory ? 'eq' : 'neq', selectedFilterSubcategory || 'null');
-
-      if (mcqLinksError) {
-        console.error('Error fetching MCQ links for category filter:', mcqLinksError);
-        setMcqs([]);
-        setIsPageLoading(false);
-        return;
+      query = query.filter('mcq_category_links.category_id', 'eq', selectedFilterCategory);
+      if (selectedFilterSubcategory) {
+        query = query.filter('mcq_category_links.subcategory_id', 'eq', selectedFilterSubcategory);
       }
-      const mcqIds = mcqLinksData?.map(link => link.mcq_id) || [];
-      query = query.in('id', mcqIds);
-    } else if (selectedFilterSubcategory) { // If only subcategory is selected, filter by it
-      const { data: mcqLinksData, error: mcqLinksError } = await supabase
-        .from('mcq_category_links')
-        .select('mcq_id')
-        .eq('subcategory_id', selectedFilterSubcategory);
-
-      if (mcqLinksError) {
-        console.error('Error fetching MCQ links for subcategory filter:', mcqLinksError);
-        setMcqs([]);
-        setIsPageLoading(false);
-        return;
-      }
-      const mcqIds = mcqLinksData?.map(link => link.mcq_id) || [];
-      query = query.in('id', mcqIds);
+    } else if (selectedFilterSubcategory) {
+      // If only subcategory is selected, filter by it directly
+      query = query.filter('mcq_category_links.subcategory_id', 'eq', selectedFilterSubcategory);
     }
 
     if (searchTerm) { // Apply search filter
@@ -249,8 +229,8 @@ const ManageMcqsPage = () => {
 
     setIsPageLoading(true); // Set loading for this specific fetch
     try {
-      // Fetch all MCQ IDs and their explanation IDs linked to the selected category
-      const { data: linksToDelete, error: fetchLinksError } = await supabase
+      // First, get all mcq_ids that are linked to this category
+      const { data: mcqLinksData, error: fetchLinksError } = await supabase
         .from('mcq_category_links')
         .select('mcq_id')
         .eq('category_id', selectedFilterCategory);
@@ -258,8 +238,7 @@ const ManageMcqsPage = () => {
       if (fetchLinksError) {
         throw fetchLinksError;
       }
-
-      const mcqIdsToDelete = Array.from(new Set(linksToDelete?.map(link => link.mcq_id) || []));
+      const mcqIdsToDelete = Array.from(new Set(mcqLinksData?.map(link => link.mcq_id) || []));
 
       if (mcqIdsToDelete.length === 0) {
         toast({ title: "Info", description: `No MCQs found linked to "${categoryName}" to delete.`, variant: "default" });
@@ -285,8 +264,8 @@ const ManageMcqsPage = () => {
       const { error: deleteLinksError } = await supabase
         .from('mcq_category_links')
         .delete()
-        .in('mcq_id', mcqIdsToDelete)
-        .eq('category_id', selectedFilterCategory); // Ensure only links for this category are deleted
+        .in('mcq_id', mcqIdsToDelete) // Delete all links for these MCQs
+        .eq('category_id', selectedFilterCategory); // And specifically for this category
 
       if (deleteLinksError) {
         console.warn("Error deleting some category links:", deleteLinksError);

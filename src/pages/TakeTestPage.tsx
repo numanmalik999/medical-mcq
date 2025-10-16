@@ -13,6 +13,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { TimerIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { McqCategoryLink } from '@/components/mcq-columns'; // Import McqCategoryLink
 
 interface MCQ {
   id: string;
@@ -23,9 +24,9 @@ interface MCQ {
   option_d: string;
   correct_answer: 'A' | 'B' | 'C' | 'D';
   explanation_id: string | null;
-  category_id: string | null;
-  subcategory_id: string | null;
   difficulty: string | null; // Ensure difficulty is here
+  is_trial_mcq: boolean | null;
+  category_links: McqCategoryLink[]; // Add category_links to MCQ interface
 }
 
 interface MCQExplanation {
@@ -107,11 +108,14 @@ const TakeTestPage = () => {
       if (isCorrect) {
         correctCount++;
       }
+      // For recording attempts, we need a single category_id and subcategory_id.
+      // We'll use the first one from category_links if available.
+      const firstCategoryLink = mcq.category_links?.[0];
       attemptsToRecord.push({
         user_id: user.id,
         mcq_id: mcq.id,
-        category_id: mcq.category_id,
-        subcategory_id: mcq.subcategory_id,
+        category_id: firstCategoryLink?.category_id || null,
+        subcategory_id: firstCategoryLink?.subcategory_id || null,
         selected_option: userAnswer || 'N/A', // Store 'N/A' if not answered
         is_correct: isCorrect,
       });
@@ -207,10 +211,22 @@ const TakeTestPage = () => {
     }
 
     setIsPageLoading(true); // Set loading for this specific fetch
-    let query = supabase.from('mcqs').select('*');
+    
+    let query = supabase
+      .from('mcqs')
+      .select(`
+        *,
+        mcq_category_links (
+          category_id,
+          subcategory_id,
+          categories (name),
+          subcategories (name)
+        )
+      `);
 
     if (selectedCategoryIds.length > 0) {
-      query = query.in('category_id', selectedCategoryIds);
+      // Filter by category_id in the linking table
+      query = query.in('mcq_category_links.category_id', selectedCategoryIds);
     }
     if (selectedDifficulty) { // Apply difficulty filter
       query = query.eq('difficulty', selectedDifficulty);
@@ -231,13 +247,23 @@ const TakeTestPage = () => {
       return;
     }
 
+    const formattedMcqs: MCQ[] = data.map((mcq: any) => ({
+      ...mcq,
+      category_links: mcq.mcq_category_links.map((link: any) => ({
+        category_id: link.category_id,
+        category_name: link.categories?.name || null,
+        subcategory_id: link.subcategory_id,
+        subcategory_name: link.subcategories?.name || null,
+      })),
+    }));
+
     let selectedMcqs: MCQ[] = [];
     if (selectedPercentage === 'all') {
-      selectedMcqs = data;
+      selectedMcqs = formattedMcqs;
     } else {
       const percentageValue = parseInt(selectedPercentage, 10) / 100;
-      const numToSelect = Math.max(1, Math.floor(data.length * percentageValue)); // Ensure at least 1 MCQ if available
-      const shuffledMcqs = data.sort(() => 0.5 - Math.random());
+      const numToSelect = Math.max(1, Math.floor(formattedMcqs.length * percentageValue)); // Ensure at least 1 MCQ if available
+      const shuffledMcqs = formattedMcqs.sort(() => 0.5 - Math.random());
       selectedMcqs = shuffledMcqs.slice(0, numToSelect);
     }
 
@@ -452,6 +478,11 @@ const TakeTestPage = () => {
               There are no MCQs available to create a test based on your selections.
             </CardDescription>
           </CardHeader>
+          <CardContent>
+            <p className="text-center text-gray-600 dark:text-gray-400">
+              Please try a different selection or add more MCQs.
+            </p>
+          </CardContent>
           <CardFooter className="flex justify-center">
             <Button onClick={() => setShowConfiguration(true)}>Go Back to Configuration</Button>
           </CardFooter>
@@ -494,7 +525,7 @@ const TakeTestPage = () => {
                     </p>
                     <ul className="list-disc list-inside ml-4 mt-2">
                       {['A', 'B', 'C', 'D'].map((optionKey) => {
-                        const optionText = mcq[`option_${optionKey.toLowerCase()}` as keyof MCQ];
+                        const optionText = mcq[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
                         const isSelected = userAnswer === optionKey;
                         const isCorrectOption = mcq.correct_answer === optionKey;
 
@@ -562,7 +593,7 @@ const TakeTestPage = () => {
             className="space-y-2"
           >
             {['A', 'B', 'C', 'D'].map((optionKey) => {
-              const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as keyof MCQ];
+              const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
               return (
                 <div key={optionKey} className="flex items-center space-x-2">
                   <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />

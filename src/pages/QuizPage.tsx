@@ -1034,78 +1034,96 @@ const QuizPage = () => {
               </p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredCategories.map((cat) => (
-                  <Card key={cat.id} className="flex flex-col">
-                    <CardHeader>
-                      <CardTitle className="text-lg">{cat.name}</CardTitle>
-                      <CardDescription>
-                        {user?.has_active_subscription ? `${cat.total_mcqs} MCQs available` : `${cat.total_trial_mcqs} Trial MCQs available`}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-grow space-y-2 text-sm">
-                      {user && (
-                        <>
-                          <p>Attempts: {cat.user_attempts}</p>
-                          <p>Correct: {cat.user_correct}</p>
-                          <p>Incorrect: {cat.user_incorrect}</p>
-                          <p>Accuracy: {cat.user_accuracy}</p>
-                        </>
-                      )}
-                      <div className="space-y-2 mt-4">
-                        <Label htmlFor={`subcategory-select-${cat.id}`}>Subcategory (Optional)</Label>
-                        <Select
-                          onValueChange={(value) => setCurrentQuizSubcategoryId(value === "all" ? null : value)}
-                          value={currentQuizSubcategoryId || "all"}
-                          disabled={!cat.id || allSubcategories.filter(sub => sub.category_id === cat.id).length === 0}
-                        >
-                          <SelectTrigger id={`subcategory-select-${cat.id}`}>
-                            <SelectValue placeholder="Any Subcategory" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Any Subcategory</SelectItem>
-                            {allSubcategories
-                              .filter(sub => sub.category_id === cat.id)
-                              .map((subcat) => (
-                                <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex flex-col gap-2">
-                      <Button
-                        onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'random')}
-                        className="w-full"
-                        disabled={
-                          !user || // Disable if not logged in
-                          (user?.has_active_subscription && cat.total_mcqs === 0) ||
-                          (!user?.has_active_subscription && cat.total_trial_mcqs === 0) ||
-                          (!user?.has_active_subscription && user?.trial_taken)
-                        }
-                      >
-                        {user?.has_active_subscription ? "Start Quiz" : (user?.trial_taken ? "Subscribe to Start" : "Start Trial Quiz")}
-                      </Button>
-                      <Button
-                        onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'incorrect')}
-                        className="w-full"
-                        variant="secondary"
-                        disabled={cat.user_incorrect === 0 || !user?.has_active_subscription}
-                      >
-                        Attempt Incorrect ({cat.user_incorrect})
-                      </Button>
-                      {user && (
+                {filteredCategories.map((cat) => {
+                  // Check if there's a saved session for this category and the currently selected subcategory
+                  const savedSessionForCurrentSelection = activeSavedQuizzes.find(
+                    (session) =>
+                      session.categoryId === cat.id &&
+                      session.subcategory_id === currentQuizSubcategoryId
+                  );
+
+                  return (
+                    <Card key={cat.id} className="flex flex-col">
+                      <CardHeader>
+                        <CardTitle className="text-lg">{cat.name}</CardTitle>
+                        <CardDescription>
+                          {user?.has_active_subscription ? `${cat.total_mcqs} MCQs available` : `${cat.total_trial_mcqs} Trial MCQs available`}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex-grow space-y-2 text-sm">
+                        {user && (
+                          <>
+                            <p>Attempts: {cat.user_attempts}</p>
+                            <p>Correct: {cat.user_correct}</p>
+                            <p>Incorrect: {cat.user_incorrect}</p>
+                            <p>Accuracy: {cat.user_accuracy}</p>
+                          </>
+                        )}
+                        <div className="space-y-2 mt-4">
+                          <Label htmlFor={`subcategory-select-${cat.id}`}>Subcategory (Optional)</Label>
+                          <Select
+                            onValueChange={(value) => setCurrentQuizSubcategoryId(value === "all" ? null : value)}
+                            value={currentQuizSubcategoryId || "all"}
+                            disabled={!cat.id || allSubcategories.filter(sub => sub.category_id === cat.id).length === 0}
+                          >
+                            <SelectTrigger id={`subcategory-select-${cat.id}`}>
+                              <SelectValue placeholder="Any Subcategory" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Any Subcategory</SelectItem>
+                              {allSubcategories
+                                .filter(sub => sub.category_id === cat.id)
+                                .map((subcat) => (
+                                  <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="flex flex-col gap-2">
+                        {savedSessionForCurrentSelection ? (
+                          <Button
+                            onClick={() => continueQuizSession(savedSessionForCurrentSelection)}
+                            className="w-full"
+                          >
+                            Continue Quiz
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'random')}
+                            className="w-full"
+                            disabled={
+                              !user || // Disable if not logged in
+                              (user?.has_active_subscription && cat.total_mcqs === 0) ||
+                              (!user?.has_active_subscription && cat.total_trial_mcqs === 0) ||
+                              (!user?.has_active_subscription && user?.trial_taken)
+                            }
+                          >
+                            {user?.has_active_subscription ? "Start Quiz" : (user?.trial_taken ? "Subscribe to Start" : "Start Trial Quiz")}
+                          </Button>
+                        )}
                         <Button
-                          onClick={() => handleResetProgress(cat.id)}
+                          onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'incorrect')}
                           className="w-full"
-                          variant="destructive"
-                          disabled={cat.user_attempts === 0}
+                          variant="secondary"
+                          disabled={cat.user_incorrect === 0 || !user?.has_active_subscription}
                         >
-                          <RotateCcw className="h-4 w-4 mr-2" /> Reset Progress
+                          Attempt Incorrect ({cat.user_incorrect})
                         </Button>
-                      )}
-                    </CardFooter>
-                  </Card>
-                ))}
+                        {user && (
+                          <Button
+                            onClick={() => handleResetProgress(cat.id)}
+                            className="w-full"
+                            variant="destructive"
+                            disabled={cat.user_attempts === 0}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-2" /> Reset Progress
+                          </Button>
+                        )}
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </CardContent>

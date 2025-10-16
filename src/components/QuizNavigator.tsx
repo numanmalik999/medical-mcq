@@ -1,9 +1,8 @@
 "use client";
 
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle } from 'lucide-react';
-import { MCQ } from './mcq-columns'; // Import MCQ from mcq-columns
+import { Button } from "@/components/ui/button";
+import { CheckCircle2, XCircle } from "lucide-react";
+import { cn } from "@/lib/utils"; // Import cn utility
 
 // New interface for userAnswers map value, matching QuizPage
 interface UserAnswerData {
@@ -11,6 +10,28 @@ interface UserAnswerData {
   isCorrect: boolean | null;
   submitted: boolean;
 }
+
+export type McqCategoryLink = {
+  category_id: string;
+  category_name: string; // For display
+  subcategory_id: string | null;
+  subcategory_name: string | null; // For display
+};
+
+export type MCQ = {
+  id: string;
+  question_text: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_answer: 'A' | 'B' | 'C' | 'D';
+  explanation_id: string | null;
+  difficulty: string | null;
+  is_trial_mcq: boolean | null;
+  // New: Array of category links
+  category_links: McqCategoryLink[];
+};
 
 interface QuizNavigatorProps {
   mcqs: MCQ[];
@@ -41,16 +62,16 @@ const QuizNavigator = ({ mcqs, userAnswers, currentQuestionIndex, goToQuestion, 
 
           if (showResults) {
             if (isCorrect) {
-              buttonClass += " bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+              buttonClass += " !bg-green-100 !text-green-700 dark:!bg-green-900 dark:!text-green-300";
               icon = <CheckCircle2 className="h-4 w-4" />;
             } else if (isAnswered && !isCorrect) { // Answered but incorrect
-              buttonClass += " bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
+              buttonClass += " !bg-red-100 !text-red-700 dark:!bg-red-900 dark:!text-red-300";
               icon = <XCircle className="h-4 w-4" />;
             } else { // Not answered
               buttonClass += " bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
             }
           } else if (isSubmitted) { // Quiz in progress, submitted
-            buttonClass += " bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
+            buttonClass += " !bg-blue-100 !text-blue-700 dark:!bg-blue-900 dark:!text-blue-300";
             icon = <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-blue-500" />;
           } else { // Quiz in progress, not submitted
             buttonClass += " bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
@@ -63,8 +84,8 @@ const QuizNavigator = ({ mcqs, userAnswers, currentQuestionIndex, goToQuestion, 
           return (
             <Button
               key={mcq.id}
-              variant="ghost"
-              className={cn(buttonClass, "p-0 relative")} // Add 'relative' for absolute positioning of icon
+              variant="ghost" // Keep ghost variant for base styling, !bg- will override
+              className={cn(buttonClass, "p-0 relative")}
               onClick={() => goToQuestion(index)}
               title={`Question ${index + 1}`}
             >

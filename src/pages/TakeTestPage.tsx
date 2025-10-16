@@ -10,7 +10,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate, Link } from 'react-router-dom';
-import { TimerIcon, Pause, Play, SkipForward } from 'lucide-react'; // Removed RotateCcw
+import { TimerIcon, Pause, Play, SkipForward } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { McqCategoryLink } from '@/components/mcq-columns'; // Import McqCategoryLink
@@ -41,6 +41,8 @@ interface Category {
   id: string;
   name: string;
 }
+
+const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id'; // Unique ID for the virtual uncategorized category
 
 const TakeTestPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
@@ -179,7 +181,8 @@ const TakeTestPage = () => {
             console.error('Error fetching categories:', error);
             toast({ title: "Error", description: "Failed to load categories for test configuration.", variant: "destructive" });
           } else {
-            setAllCategories(data || []);
+            // Add the virtual "Uncategorized" category
+            setAllCategories([...(data || []), { id: UNCATEGORIZED_ID, name: 'Uncategorized' }]);
           }
           setIsPageLoading(false); // Clear loading for this specific fetch
         };
@@ -190,7 +193,7 @@ const TakeTestPage = () => {
         navigate('/login'); // Redirect if not logged in
       }
     }
-  }, [user, hasCheckedInitialSession, navigate, toast]); // Dependencies changed
+  }, [user, hasCheckedInitialSession, navigate, toast]);
 
   // Timer effect
   useEffect(() => {
@@ -232,11 +235,17 @@ const TakeTestPage = () => {
   }, [testDurationMinutes]);
 
   const handleCategoryToggle = (categoryId: string) => {
-    setSelectedCategoryIds((prev) =>
-      prev.includes(categoryId)
-        ? prev.filter((id) => id !== categoryId)
-        : [...prev, categoryId]
-    );
+    setSelectedCategoryIds((prev) => {
+      // If 'Uncategorized' is selected, it's exclusive
+      if (categoryId === UNCATEGORIZED_ID) {
+        return prev.includes(UNCATEGORIZED_ID) ? [] : [UNCATEGORIZED_ID];
+      }
+      // If another category is selected, remove 'Uncategorized' if present
+      const newSelection = prev.filter(id => id !== UNCATEGORIZED_ID);
+      return newSelection.includes(categoryId)
+        ? newSelection.filter((id) => id !== categoryId)
+        : [...newSelection, categoryId];
+    });
   };
 
   const startTestPreparation = async () => {
@@ -253,44 +262,93 @@ const TakeTestPage = () => {
       return;
     }
 
-    setIsPageLoading(true); // Set loading for this specific fetch
-    
-    let query = supabase
-      .from('mcqs')
-      .select(`
-        *,
-        mcq_category_links (
-          category_id,
-          subcategory_id,
-          categories (name),
-          subcategories (name)
-        )
-      `);
+    setIsPageLoading(true);
 
-    if (selectedCategoryIds.length > 0) {
-      // Filter by category_id in the linking table
-      query = query.in('mcq_category_links.category_id', selectedCategoryIds);
+    let mcqsData: any[] | null = null;
+    let mcqsError: any = null;
+
+    const isUncategorizedSelected = selectedCategoryIds.includes(UNCATEGORIZED_ID);
+    const regularCategoryIds = selectedCategoryIds.filter(id => id !== UNCATEGORIZED_ID);
+
+    if (isUncategorizedSelected && regularCategoryIds.length === 0) {
+      // Fetch MCQs that are NOT in mcq_category_links
+      const { data: categorizedMcqLinks, error: linksError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id');
+
+      if (linksError) {
+        console.error('Error fetching categorized MCQ links:', linksError);
+        toast({ title: "Error", description: "Failed to identify uncategorized questions.", variant: "destructive" });
+        setIsPageLoading(false);
+        return;
+      }
+
+      const categorizedMcqIds = Array.from(new Set(categorizedMcqLinks?.map(link => link.mcq_id) || []));
+
+      const { data, error } = await supabase
+        .from('mcqs')
+        .select(`
+          *,
+          mcq_category_links (
+            category_id,
+            subcategory_id,
+            categories (name),
+            subcategories (name)
+          )
+        `)
+        .not('id', 'in', `(${categorizedMcqIds.join(',')})`); // Filter for MCQs not in any category
+
+      mcqsData = data;
+      mcqsError = error;
+
+    } else if (regularCategoryIds.length > 0) {
+      // Fetch MCQs from selected categories
+      const { data, error } = await supabase
+        .from('mcqs')
+        .select(`
+          *,
+          mcq_category_links (
+            category_id,
+            subcategory_id,
+            categories (name),
+            subcategories (name)
+          )
+        `)
+        .in('mcq_category_links.category_id', regularCategoryIds);
+
+      mcqsData = data;
+      mcqsError = error;
+    } else {
+      // No categories selected, fetch all MCQs
+      const { data, error } = await supabase
+        .from('mcqs')
+        .select(`
+          *,
+          mcq_category_links (
+            category_id,
+            subcategory_id,
+            categories (name),
+            subcategories (name)
+          )
+        `);
+      mcqsData = data;
+      mcqsError = error;
     }
-    if (selectedDifficulty) { // Apply difficulty filter
-      query = query.eq('difficulty', selectedDifficulty);
-    }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching MCQs:', error);
+    if (mcqsError) {
+      console.error('Error fetching MCQs:', mcqsError);
       toast({ title: "Error", description: "Failed to load test questions.", variant: "destructive" });
       setIsPageLoading(false);
       return;
     }
 
-    if (!data || data.length === 0) {
+    if (!mcqsData || mcqsData.length === 0) {
       toast({ title: "No MCQs", description: "No MCQs available for the selected criteria.", variant: "default" });
       setIsPageLoading(false);
       return;
     }
 
-    const formattedMcqs: MCQ[] = data.map((mcq: any) => ({
+    const formattedMcqs: MCQ[] = mcqsData.map((mcq: any) => ({
       ...mcq,
       category_links: mcq.mcq_category_links.map((link: any) => ({
         category_id: link.category_id,
@@ -322,12 +380,11 @@ const TakeTestPage = () => {
 
     setShowConfiguration(false);
     setShowInstructions(true);
-    setIsPageLoading(false); // Clear loading for this specific fetch
+    setIsPageLoading(false);
   };
 
   const beginTest = () => {
     setShowInstructions(false);
-    // The timer useEffect will now start since showInstructions is false and mcqs.length > 0
   };
 
   const currentMcq = mcqs[currentQuestionIndex];
@@ -335,7 +392,6 @@ const TakeTestPage = () => {
   const handleOptionSelect = useCallback((value: string) => {
     if (currentMcq) {
       setUserAnswers((prev) => new Map(prev).set(currentMcq.id, value));
-      // If an answer is selected, it's no longer skipped (if it was)
       setSkippedMcqIds((prev) => {
         const newSet = new Set(prev);
         newSet.delete(currentMcq.id);
@@ -348,7 +404,6 @@ const TakeTestPage = () => {
     if (currentQuestionIndex < mcqs.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
     } else {
-      // If it's the last question, check for skipped ones
       if (skippedMcqIds.size > 0) {
         prepareReviewSkipped();
       } else {
@@ -391,14 +446,8 @@ const TakeTestPage = () => {
     if (currentReviewIndex < reviewSkippedQuestions.length - 1) {
       setCurrentReviewIndex((prev) => prev + 1);
     } else {
-      // If last skipped question, close review and check if any are still skipped
       setShowReviewSkippedDialog(false);
       setIsPaused(false); // Resume main timer
-      if (skippedMcqIds.size > 0) {
-        // If still skipped after review, maybe prompt again or just submit
-        toast({ title: "Review Complete", description: "You still have skipped questions. You can review them again or submit the test.", variant: "default" });
-      }
-      // Go back to the main quiz flow, potentially to the next unanswered question or submit
       const nextUnansweredIndex = mcqs.findIndex(mcq => !userAnswers.has(mcq.id) || userAnswers.get(mcq.id) === null);
       if (nextUnansweredIndex !== -1) {
         setCurrentQuestionIndex(nextUnansweredIndex);
@@ -423,7 +472,7 @@ const TakeTestPage = () => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
+  if (!hasCheckedInitialSession || isPageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading...</p>
@@ -435,7 +484,6 @@ const TakeTestPage = () => {
     return null; // Redirection handled by useEffect
   }
 
-  // New check for active subscription
   if (!user.has_active_subscription) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">

@@ -597,6 +597,23 @@ const QuizPage = () => {
     }
   };
 
+  const handleBackToSelection = () => {
+    if (window.confirm("Are you sure you want to end this quiz session and go back to category selection? Your current progress will be lost.")) {
+      setQuizQuestions([]);
+      setUserAnswers(new Map());
+      setCurrentQuestionIndex(0);
+      setSelectedAnswer(null);
+      setFeedback(null);
+      setShowExplanation(false);
+      setScore(0);
+      setExplanations(new Map());
+      setShowResults(false);
+      setShowCategorySelection(true);
+      setCurrentQuizSubcategoryId(null); // Reset subcategory selection
+      fetchQuizOverview(); // Refresh overview data
+    }
+  };
+
   const filteredCategories = categoryStats.filter(cat =>
     cat.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -888,14 +905,14 @@ const QuizPage = () => {
             >
               {['A', 'B', 'C', 'D'].map((optionKey) => {
                 const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
-                const isSelected = selectedAnswer === optionKey;
+                const userSelectedThisOptionWhenSubmitted = currentAnswerData?.selectedOption === optionKey;
                 const isCorrectOption = currentMcq.correct_answer === optionKey;
 
                 let labelClassName = "";
                 if (isSubmitted) { // Apply coloring if submitted
-                  if (isSelected && currentAnswerData?.isCorrect) {
+                  if (userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect) {
                     labelClassName = "text-green-600 font-medium";
-                  } else if (isSelected && !currentAnswerData?.isCorrect) {
+                  } else if (userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect) {
                     labelClassName = "text-red-600 font-medium";
                   } else if (isCorrectOption) {
                     labelClassName = "text-green-600 font-medium";
@@ -940,18 +957,23 @@ const QuizPage = () => {
             )}
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row justify-between gap-2">
-            <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0 || isSubmittingAnswer} variant="outline">
-              Previous
+            <Button onClick={handleBackToSelection} variant="outline" disabled={isSubmittingAnswer}>
+              Back to Selection
             </Button>
-            {!isSubmitted ? ( // Show submit button if not yet submitted
-              <Button onClick={handleSubmitAnswer} disabled={!isAnswered || isSubmittingAnswer}>
-                {isSubmittingAnswer ? "Submitting..." : "Submit Answer"}
+            <div className="flex gap-2">
+              <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0 || isSubmittingAnswer} variant="outline">
+                Previous
               </Button>
-            ) : ( // Show next button if already submitted
-              <Button onClick={handleNextQuestion} disabled={isSubmittingAnswer}>
-                {isLastQuestion ? "Submit Quiz" : "Next Question"}
-              </Button>
-            )}
+              {!isSubmitted ? ( // Show submit button if not yet submitted
+                <Button onClick={handleSubmitAnswer} disabled={!isAnswered || isSubmittingAnswer}>
+                  {isSubmittingAnswer ? "Submitting..." : "Submit Answer"}
+                </Button>
+              ) : ( // Show next button if already submitted
+                <Button onClick={handleNextQuestion} disabled={isSubmittingAnswer}>
+                  {isLastQuestion ? "Submit Quiz" : "Next Question"}
+                </Button>
+              )}
+            </div>
           </CardFooter>
         </Card>
       </div>

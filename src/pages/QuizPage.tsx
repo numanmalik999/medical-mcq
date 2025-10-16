@@ -48,7 +48,19 @@ interface UserAnswerData {
   submitted: boolean;
 }
 
+// Interface for saved quiz state
+interface SavedQuizState {
+  categoryId: string;
+  subcategoryId: string | null;
+  mcqs: MCQ[];
+  userAnswers: [string, UserAnswerData][]; // Stored as array for JSON serialization
+  currentQuestionIndex: number;
+  isTrialActiveSession: boolean;
+  userId: string | null; // To tie saved state to a specific user
+}
+
 const TRIAL_MCQ_LIMIT = 10;
+const LOCAL_STORAGE_QUIZ_KEY_PREFIX = 'quiz_session_state_';
 
 const QuizPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
@@ -80,6 +92,38 @@ const QuizPage = () => {
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
+  const [savedQuizState, setSavedQuizState] = useState<SavedQuizState | null>(null);
+
+  const getLocalStorageKey = useCallback(() => {
+    return `${LOCAL_STORAGE_QUIZ_KEY_PREFIX}${user?.id || 'guest'}`;
+  }, [user]);
+
+  const saveQuizState = useCallback((
+    categoryId: string,
+    subcategoryId: string | null,
+    mcqs: MCQ[],
+    answers: Map<string, UserAnswerData>,
+    index: number,
+    isTrial: boolean,
+    currentUserId: string | null
+  ) => {
+    const stateToSave: SavedQuizState = {
+      categoryId,
+      subcategoryId,
+      mcqs,
+      userAnswers: Array.from(answers.entries()),
+      currentQuestionIndex: index,
+      isTrialActiveSession: isTrial,
+      userId: currentUserId,
+    };
+    localStorage.setItem(getLocalStorageKey(), JSON.stringify(stateToSave));
+  }, [getLocalStorageKey]);
+
+  const clearSavedQuizState = useCallback(() => {
+    localStorage.removeItem(getLocalStorageKey());
+    setSavedQuizState(null);
+  }, [getLocalStorageKey]);
+
   const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
     if (explanations.has(explanationId)) {
       return explanations.get(explanationId)!;
@@ -105,21 +149,50 @@ const QuizPage = () => {
     return null;
   }, [explanations, toast]);
 
+  // Effect to load saved quiz state on component mount
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      if (!user) {
-        setIsTrialActiveSession(true);
-        fetchQuizOverview();
-      } else {
-        if (!user.has_active_subscription && !user.trial_taken) {
-          setIsTrialActiveSession(true);
-        } else {
-          setIsTrialActiveSession(false);
+      const storedState = localStorage.getItem(getLocalStorageKey());
+      if (storedState) {
+        try {
+          const parsedState: SavedQuizState = JSON.parse(storedState);
+          // Validate if the saved state belongs to the current user or is a guest state
+          if (parsedState.userId === (user?.id || null)) {
+            setSavedQuizState(parsedState);
+            toast({
+              title: "Quiz Progress Found",
+              description: "You have an unfinished quiz. Click 'Continue Quiz' to resume.",
+              duration: 5000,
+            });
+          } else {
+            // Clear state if it belongs to a different user
+            clearSavedQuizState();
+          }
+        } catch (e) {
+          console.error("Failed to parse saved quiz state:", e);
+          clearSavedQuizState();
         }
-        fetchQuizOverview();
       }
+      // Proceed with fetching quiz overview regardless of saved state
+      fetchQuizOverview();
     }
-  }, [user, hasCheckedInitialSession]);
+  }, [user, hasCheckedInitialSession, getLocalStorageKey, clearSavedQuizState]);
+
+  // Effect to update local storage whenever quiz state changes
+  useEffect(() => {
+    if (!showCategorySelection && quizQuestions.length > 0 && !showResults) {
+      saveQuizState(
+        categoryStats.find(cat => cat.id === quizQuestions[0].category_links?.[0]?.category_id)?.id || '', // Assuming first MCQ's category
+        currentQuizSubcategoryId,
+        quizQuestions,
+        userAnswers,
+        currentQuestionIndex,
+        isTrialActiveSession,
+        user?.id || null
+      );
+    }
+  }, [quizQuestions, userAnswers, currentQuestionIndex, isTrialActiveSession, showCategorySelection, showResults, saveQuizState, user, currentQuizSubcategoryId, categoryStats]);
+
 
   const fetchQuizOverview = async () => {
     setIsPageLoading(true);
@@ -236,6 +309,7 @@ const QuizPage = () => {
     setScore(0);
     setExplanations(new Map());
     setShowResults(false);
+    clearSavedQuizState(); // Clear any existing saved state when starting a new quiz
 
     let mcqIdsToFetch: string[] = [];
 
@@ -278,7 +352,8 @@ const QuizPage = () => {
           subcategories (name)
         )
       `)
-      .in('id', mcqIdsToFetch); // Use the fetched MCQ IDs
+      .in('id', mcqIdsToFetch)
+      .order('created_at', { ascending: true }); // Ensure sequential order
 
     if (!isSubscribed) {
       mcqQuery = mcqQuery.eq('is_trial_mcq', true);
@@ -342,7 +417,7 @@ const QuizPage = () => {
       })),
     }));
 
-    let mcqsToLoad: MCQ[] = formattedMcqs.sort(() => 0.5 - Math.random()).slice(0, Math.min(formattedMcqs.length, (!isSubscribed) ? TRIAL_MCQ_LIMIT : formattedMcqs.length));
+    let mcqsToLoad: MCQ[] = formattedMcqs.slice(0, Math.min(formattedMcqs.length, (!isSubscribed) ? TRIAL_MCQ_LIMIT : formattedMcqs.length));
 
     if (mcqsToLoad.length === 0) {
       toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
@@ -377,6 +452,34 @@ const QuizPage = () => {
       }
     }
   };
+
+  const continueQuizSession = useCallback(() => {
+    if (savedQuizState) {
+      setQuizQuestions(savedQuizState.mcqs);
+      setUserAnswers(new Map(savedQuizState.userAnswers));
+      setCurrentQuestionIndex(savedQuizState.currentQuestionIndex);
+      setIsTrialActiveSession(savedQuizState.isTrialActiveSession);
+      setCurrentQuizSubcategoryId(savedQuizState.subcategoryId);
+
+      // Set selectedAnswer, feedback, and showExplanation for the current question
+      const currentMcqFromSaved = savedQuizState.mcqs[savedQuizState.currentQuestionIndex];
+      const currentAnswerDataFromSaved = new Map(savedQuizState.userAnswers).get(currentMcqFromSaved.id);
+      setSelectedAnswer(currentAnswerDataFromSaved?.selectedOption || null);
+      setFeedback(currentAnswerDataFromSaved?.submitted ? (currentAnswerDataFromSaved.isCorrect ? 'Correct!' : `Incorrect. The correct answer was ${currentMcqFromSaved.correct_answer}.`) : null);
+      setShowExplanation(currentAnswerDataFromSaved?.submitted || false);
+      if (currentAnswerDataFromSaved?.submitted && currentMcqFromSaved.explanation_id) {
+        fetchExplanation(currentMcqFromSaved.explanation_id);
+      }
+
+      setShowCategorySelection(false);
+      setIsPageLoading(false);
+      toast({
+        title: "Quiz Resumed",
+        description: "Continuing from where you left off.",
+        duration: 3000,
+      });
+    }
+  }, [savedQuizState, fetchExplanation]);
 
   const handleResetProgress = async (categoryId: string) => {
     if (!user) {
@@ -549,6 +652,7 @@ const QuizPage = () => {
     await Promise.all(explanationPromises);
     setShowResults(true);
     setIsPageLoading(false);
+    clearSavedQuizState(); // Clear saved state after quiz submission
   };
 
   const handleSubmitFeedback = async () => {
@@ -610,6 +714,7 @@ const QuizPage = () => {
       setShowResults(false);
       setShowCategorySelection(true);
       setCurrentQuizSubcategoryId(null); // Reset subcategory selection
+      clearSavedQuizState(); // Clear saved state
       fetchQuizOverview(); // Refresh overview data
     }
   };
@@ -660,6 +765,15 @@ const QuizPage = () => {
             <CardDescription>Choose a category and optionally a subcategory to start your quiz and view your performance.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {savedQuizState && (
+              <div className="flex flex-col sm:flex-row gap-2 mb-4 p-4 border rounded-md bg-blue-50 dark:bg-blue-950">
+                <p className="text-blue-800 dark:text-blue-200 flex-grow">
+                  You have an unfinished quiz session.
+                </p>
+                <Button onClick={continueQuizSession} className="flex-shrink-0">Continue Quiz</Button>
+                <Button onClick={clearSavedQuizState} variant="outline" className="flex-shrink-0">Start New Quiz</Button>
+              </div>
+            )}
             <Input
               placeholder="Search categories..."
               value={searchTerm}
@@ -768,7 +882,7 @@ const QuizPage = () => {
             </p>
           </CardContent>
           <CardFooter className="flex justify-center">
-            <Button onClick={() => setShowCategorySelection(true)}>Go Back to Selection</Button>
+            <Button onClick={handleBackToSelection}>Go Back to Selection</Button>
           </CardFooter>
         </Card>
         <MadeWithDyad />

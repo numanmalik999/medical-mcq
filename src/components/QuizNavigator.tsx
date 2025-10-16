@@ -5,9 +5,16 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { MCQ } from './mcq-columns'; // Import MCQ from mcq-columns
 
+// New interface for userAnswers map value, matching QuizPage
+interface UserAnswerData {
+  selectedOption: string | null;
+  isCorrect: boolean | null;
+  submitted: boolean;
+}
+
 interface QuizNavigatorProps {
   mcqs: MCQ[];
-  userAnswers: Map<string, string | null>;
+  userAnswers: Map<string, UserAnswerData>; // Updated type
   currentQuestionIndex: number;
   goToQuestion: (index: number) => void;
   showResults: boolean;
@@ -23,9 +30,10 @@ const QuizNavigator = ({ mcqs, userAnswers, currentQuestionIndex, goToQuestion, 
       <h3 className="text-lg font-semibold mb-2">Quiz Progress</h3>
       <div className="grid grid-cols-5 gap-2 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
         {mcqs.map((mcq, index) => {
-          const userAnswer = userAnswers.get(mcq.id);
-          const isAnswered = userAnswer !== undefined && userAnswer !== null;
-          const isCorrect = isAnswered && userAnswer === mcq.correct_answer;
+          const userAnswerData = userAnswers.get(mcq.id);
+          const isAnswered = userAnswerData?.selectedOption !== null;
+          const isSubmitted = userAnswerData?.submitted;
+          const isCorrect = userAnswerData?.isCorrect;
           const isCurrent = index === currentQuestionIndex;
 
           let buttonClass = "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium";
@@ -35,17 +43,16 @@ const QuizNavigator = ({ mcqs, userAnswers, currentQuestionIndex, goToQuestion, 
             if (isCorrect) {
               buttonClass += " bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
               icon = <CheckCircle2 className="h-4 w-4" />;
-            } else if (isAnswered) { // Answered but incorrect
+            } else if (isAnswered && !isCorrect) { // Answered but incorrect
               buttonClass += " bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
               icon = <XCircle className="h-4 w-4" />;
             } else { // Not answered
               buttonClass += " bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
             }
-          } else if (isAnswered) { // Quiz in progress, answered
+          } else if (isSubmitted) { // Quiz in progress, submitted
             buttonClass += " bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
-            // Add a small dot for answered questions in progress
             icon = <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-blue-500" />;
-          } else { // Quiz in progress, not answered
+          } else { // Quiz in progress, not submitted
             buttonClass += " bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
           }
 

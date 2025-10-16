@@ -41,6 +41,13 @@ interface Subcategory {
   name: string;
 }
 
+// New interface for userAnswers map value
+interface UserAnswerData {
+  selectedOption: string | null;
+  isCorrect: boolean | null;
+  submitted: boolean;
+}
+
 const TRIAL_MCQ_LIMIT = 10;
 
 const QuizPage = () => {
@@ -50,7 +57,7 @@ const QuizPage = () => {
 
   const [quizQuestions, setQuizQuestions] = useState<MCQ[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<Map<string, string | null>>(new Map());
+  const [userAnswers, setUserAnswers] = useState<Map<string, UserAnswerData>>(new Map());
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
@@ -230,6 +237,36 @@ const QuizPage = () => {
     setExplanations(new Map());
     setShowResults(false);
 
+    let mcqIdsToFetch: string[] = [];
+
+    // Step 1: Get MCQ IDs from mcq_category_links based on category/subcategory
+    let linksQuery = supabase
+      .from('mcq_category_links')
+      .select('mcq_id')
+      .eq('category_id', categoryId);
+
+    if (subcategoryId) {
+      linksQuery = linksQuery.eq('subcategory_id', subcategoryId);
+    }
+
+    const { data: linkedMcqIdsData, error: linksError } = await linksQuery;
+
+    if (linksError) {
+      console.error('Error fetching linked MCQ IDs:', linksError);
+      toast({ title: "Error", description: "Failed to load quiz questions data.", variant: "destructive" });
+      setIsPageLoading(false);
+      return;
+    }
+
+    mcqIdsToFetch = linkedMcqIdsData?.map(link => link.mcq_id) || [];
+
+    if (mcqIdsToFetch.length === 0) {
+      toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
+      setIsPageLoading(false);
+      return;
+    }
+
+    // Step 2: Filter by trial status if not subscribed
     let mcqQuery = supabase
       .from('mcqs')
       .select(`
@@ -240,18 +277,14 @@ const QuizPage = () => {
           categories (name),
           subcategories (name)
         )
-      `);
-
-    // Apply category and subcategory filters directly to the join
-    mcqQuery = mcqQuery.filter('mcq_category_links.category_id', 'eq', categoryId);
-    if (subcategoryId) {
-      mcqQuery = mcqQuery.filter('mcq_category_links.subcategory_id', 'eq', subcategoryId);
-    }
+      `)
+      .in('id', mcqIdsToFetch); // Use the fetched MCQ IDs
 
     if (!isSubscribed) {
       mcqQuery = mcqQuery.eq('is_trial_mcq', true);
     }
 
+    // Step 3: Filter by incorrect attempts if mode is 'incorrect'
     if (mode === 'incorrect' && user) {
       const { data: incorrectAttempts, error: attemptsError } = await supabase
         .from('user_quiz_attempts')
@@ -274,7 +307,14 @@ const QuizPage = () => {
         setIsPageLoading(false);
         return;
       }
-      mcqQuery = mcqQuery.in('id', incorrectMcqIds); // This 'in' clause will be on a potentially smaller list of incorrect MCQs
+      // Intersect mcqIdsToFetch with incorrectMcqIds
+      mcqIdsToFetch = mcqIdsToFetch.filter(id => incorrectMcqIds.includes(id));
+      if (mcqIdsToFetch.length === 0) {
+        toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
+        setIsPageLoading(false);
+        return;
+      }
+      mcqQuery = mcqQuery.in('id', mcqIdsToFetch);
     }
 
     const { data: mcqsData, error: mcqsError } = await mcqQuery;
@@ -314,10 +354,15 @@ const QuizPage = () => {
     setCurrentQuizSubcategoryId(subcategoryId);
     setShowCategorySelection(false);
     setIsPageLoading(false);
-    if (mcqsToLoad.length > 0) {
-      setUserAnswers(prev => new Map(prev).set(mcqsToLoad[0].id, null)); // Initialize answer for first question
-      setSelectedAnswer(null);
-    }
+    
+    // Initialize userAnswers for all questions
+    const initialUserAnswers = new Map<string, UserAnswerData>();
+    mcqsToLoad.forEach(mcq => {
+      initialUserAnswers.set(mcq.id, { selectedOption: null, isCorrect: null, submitted: false });
+    });
+    setUserAnswers(initialUserAnswers);
+    setSelectedAnswer(null); // No answer selected initially for the first question
+
     // Mark trial_taken only if a logged-in user starts a trial
     if (user && isTrialActiveSession && !hasTakenTrial) {
       const { error: updateError } = await supabase
@@ -364,7 +409,11 @@ const QuizPage = () => {
   const handleOptionSelect = useCallback((value: string) => {
     if (currentMcq) {
       setSelectedAnswer(value);
-      setUserAnswers((prev: Map<string, string | null>) => new Map(prev).set(currentMcq.id, value));
+      setUserAnswers((prev: Map<string, UserAnswerData>) => {
+        const newMap = new Map(prev);
+        newMap.set(currentMcq.id, { selectedOption: value, isCorrect: null, submitted: false });
+        return newMap;
+      });
       setFeedback(null);
       setShowExplanation(false);
     }
@@ -381,6 +430,13 @@ const QuizPage = () => {
       setFeedback(`Incorrect. The correct answer was ${currentMcq.correct_answer}.`);
     }
     setShowExplanation(true);
+
+    // Update userAnswers with submission status and correctness
+    setUserAnswers((prev: Map<string, UserAnswerData>) => {
+      const newMap = new Map(prev);
+      newMap.set(currentMcq.id, { selectedOption: selectedAnswer, isCorrect: isCorrect, submitted: true });
+      return newMap;
+    });
 
     if (user) {
       try {
@@ -432,9 +488,13 @@ const QuizPage = () => {
     if (currentQuestionIndex < quizQuestions.length - 1) {
       const nextQuestion = quizQuestions[currentQuestionIndex + 1];
       setCurrentQuestionIndex((prev) => prev + 1);
-      setSelectedAnswer(userAnswers.get(nextQuestion?.id || '') || null);
-      setFeedback(null);
-      setShowExplanation(false);
+      const nextAnswerData = userAnswers.get(nextQuestion?.id || '');
+      setSelectedAnswer(nextAnswerData?.selectedOption || null);
+      setFeedback(nextAnswerData?.submitted ? (nextAnswerData.isCorrect ? 'Correct!' : `Incorrect. The correct answer was ${nextQuestion.correct_answer}.`) : null);
+      setShowExplanation(nextAnswerData?.submitted || false);
+      if (nextAnswerData?.submitted && nextQuestion.explanation_id) {
+        fetchExplanation(nextQuestion.explanation_id);
+      }
     } else {
       submitFullQuiz();
     }
@@ -444,9 +504,13 @@ const QuizPage = () => {
     if (currentQuestionIndex > 0) {
       const prevQuestion = quizQuestions[currentQuestionIndex - 1];
       setCurrentQuestionIndex((prev) => prev - 1);
-      setSelectedAnswer(userAnswers.get(prevQuestion?.id || '') || null);
-      setFeedback(null);
-      setShowExplanation(false);
+      const prevAnswerData = userAnswers.get(prevQuestion?.id || '');
+      setSelectedAnswer(prevAnswerData?.selectedOption || null);
+      setFeedback(prevAnswerData?.submitted ? (prevAnswerData.isCorrect ? 'Correct!' : `Incorrect. The correct answer was ${prevQuestion.correct_answer}.`) : null);
+      setShowExplanation(prevAnswerData?.submitted || false);
+      if (prevAnswerData?.submitted && prevQuestion.explanation_id) {
+        fetchExplanation(prevQuestion.explanation_id);
+      }
     }
   };
 
@@ -454,11 +518,15 @@ const QuizPage = () => {
     if (index >= 0 && index < quizQuestions.length) {
       setCurrentQuestionIndex(index);
       const targetMcq = quizQuestions[index];
-      setSelectedAnswer(userAnswers.get(targetMcq.id) || null);
-      setFeedback(null);
-      setShowExplanation(false);
+      const targetAnswerData = userAnswers.get(targetMcq.id);
+      setSelectedAnswer(targetAnswerData?.selectedOption || null);
+      setFeedback(targetAnswerData?.submitted ? (targetAnswerData.isCorrect ? 'Correct!' : `Incorrect. The correct answer was ${targetMcq.correct_answer}.`) : null);
+      setShowExplanation(targetAnswerData?.submitted || false);
+      if (targetAnswerData?.submitted && targetMcq.explanation_id) {
+        fetchExplanation(targetMcq.explanation_id);
+      }
     }
-  }, [quizQuestions, userAnswers]);
+  }, [quizQuestions, userAnswers, fetchExplanation]);
 
   const submitFullQuiz = async () => {
     let correctCount = 0;
@@ -466,8 +534,8 @@ const QuizPage = () => {
     const mcqExplanationIds = new Set<string>();
 
     for (const mcq of quizQuestions) {
-      const userAnswer = userAnswers.get(mcq.id);
-      const isCorrect = userAnswer === mcq.correct_answer;
+      const userAnswerData = userAnswers.get(mcq.id);
+      const isCorrect = userAnswerData?.isCorrect; // Use stored correctness
       if (isCorrect) {
         correctCount++;
       }
@@ -714,8 +782,9 @@ const QuizPage = () => {
               </div>
               <div className="space-y-4 max-h-[60vh] overflow-y-auto p-2 border rounded-md">
                 {quizQuestions.map((mcq, index) => {
-                  const userAnswer = userAnswers.get(mcq.id);
-                  const isCorrect = userAnswer === mcq.correct_answer;
+                  const userAnswerData = userAnswers.get(mcq.id);
+                  const userAnswer = userAnswerData?.selectedOption;
+                  const isCorrect = userAnswerData?.isCorrect;
                   const explanation = explanations.get(mcq.explanation_id || '');
 
                   return (
@@ -779,7 +848,9 @@ const QuizPage = () => {
     );
   }
 
-  const isAnswered = selectedAnswer !== null;
+  const currentAnswerData = userAnswers.get(currentMcq.id);
+  const isAnswered = currentAnswerData?.selectedOption !== null;
+  const isSubmitted = currentAnswerData?.submitted;
   const isLastQuestion = currentQuestionIndex === quizQuestions.length - 1;
 
   return (
@@ -813,7 +884,7 @@ const QuizPage = () => {
               onValueChange={handleOptionSelect}
               value={selectedAnswer || ""}
               className="space-y-2"
-              disabled={showExplanation}
+              disabled={isSubmitted} // Disable radio group if already submitted
             >
               {['A', 'B', 'C', 'D'].map((optionKey) => {
                 const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
@@ -821,10 +892,10 @@ const QuizPage = () => {
                 const isCorrectOption = currentMcq.correct_answer === optionKey;
 
                 let labelClassName = "";
-                if (showExplanation) {
-                  if (isSelected && isCorrectOption) {
+                if (isSubmitted) { // Apply coloring if submitted
+                  if (isSelected && currentAnswerData?.isCorrect) {
                     labelClassName = "text-green-600 font-medium";
-                  } else if (isSelected && !isCorrectOption) {
+                  } else if (isSelected && !currentAnswerData?.isCorrect) {
                     labelClassName = "text-red-600 font-medium";
                   } else if (isCorrectOption) {
                     labelClassName = "text-green-600 font-medium";
@@ -872,11 +943,11 @@ const QuizPage = () => {
             <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0 || isSubmittingAnswer} variant="outline">
               Previous
             </Button>
-            {!showExplanation ? (
+            {!isSubmitted ? ( // Show submit button if not yet submitted
               <Button onClick={handleSubmitAnswer} disabled={!isAnswered || isSubmittingAnswer}>
                 {isSubmittingAnswer ? "Submitting..." : "Submit Answer"}
               </Button>
-            ) : (
+            ) : ( // Show next button if already submitted
               <Button onClick={handleNextQuestion} disabled={isSubmittingAnswer}>
                 {isLastQuestion ? "Submit Quiz" : "Next Question"}
               </Button>

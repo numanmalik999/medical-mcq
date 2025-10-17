@@ -83,11 +83,12 @@ const AppContent = () => {
 
             {/* User Routes - Protected */}
             <Route path="/user" element={<UserProtectedRoute />}>
+              {/* TakeTestPage is now outside UserLayout for full width */}
+              <Route path="take-test" element={<TakeTestPage />} /> 
               <Route element={<UserLayout />}>
                 <Route index element={<UserDashboardPage />} />
                 <Route path="dashboard" element={<UserDashboardPage />} />
                 <Route path="profile" element={<UserProfilePage />} />
-                <Route path="take-test" element={<TakeTestPage />} />
                 <Route path="subscriptions" element={<UserSubscriptionsPage />} />
                 <Route path="submit-mcq" element={<SubmitMcqPage />} />
               </Route>

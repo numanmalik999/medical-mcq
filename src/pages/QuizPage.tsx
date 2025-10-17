@@ -8,7 +8,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
 import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save } from 'lucide-react';
@@ -302,7 +301,7 @@ const QuizPage = () => {
             })), // Placeholder MCQs
             userAnswers: new Map(Object.entries(dbSession.user_answers_json)),
             currentQuestionIndex: dbSession.current_question_index,
-            isTrialActiveSession: isTrialActiveSession,
+            isTrialActiveSession: dbSession.is_trial_session,
             userId: user.id,
             categoryName: categoryName, // Add for display
           } as LoadedQuizSession;

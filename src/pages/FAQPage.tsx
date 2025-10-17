@@ -1,10 +1,25 @@
 "use client";
 
+import { useEffect, useState } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-const faqItems = [
+// Define a type for FAQ items
+interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+// Define a type for FAQ categories
+interface FaqCategory {
+  category: string;
+  questions: FaqItem[];
+}
+
+const defaultFaqItems: FaqCategory[] = [
   {
     category: "General Questions",
     questions: [
@@ -88,10 +103,57 @@ const faqItems = [
 ];
 
 const FAQPage = () => {
+  const { toast } = useToast();
+  const [faqItems, setFaqItems] = useState<FaqCategory[]>(defaultFaqItems);
+  const [pageTitle, setPageTitle] = useState("Frequently Asked Questions");
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPageContent = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('static_pages')
+        .select('title, content')
+        .eq('slug', 'faq')
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error('Error fetching FAQ page content:', error);
+        toast({ title: "Error", description: "Failed to load FAQ content.", variant: "destructive" });
+      } else if (data) {
+        setPageTitle(data.title);
+        try {
+          // Assuming content is stored as a JSON string of FaqCategory[]
+          const parsedContent = JSON.parse(data.content || '[]');
+          if (Array.isArray(parsedContent) && parsedContent.every(item => 'category' in item && 'questions' in item)) {
+            setFaqItems(parsedContent);
+          } else {
+            console.warn("FAQ content from DB is not in expected format, using default.");
+            setFaqItems(defaultFaqItems);
+          }
+        } catch (parseError) {
+          console.error("Error parsing FAQ content from DB:", parseError);
+          setFaqItems(defaultFaqItems);
+        }
+      }
+      setIsLoading(false);
+    };
+
+    fetchPageContent();
+  }, [toast]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16 pb-12">
+        <p className="text-gray-700 dark:text-gray-300">Loading content...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background text-foreground pt-16 pb-12"> {/* Added pt-16 for fixed header */}
+    <div className="min-h-screen bg-background text-foreground pt-16 pb-12">
       <div className="container mx-auto px-4 max-w-4xl">
-        <h1 className="text-4xl font-bold text-center mb-12">Frequently Asked Questions</h1>
+        <h1 className="text-4xl font-bold text-center mb-12">{pageTitle}</h1>
 
         <div className="space-y-8">
           {faqItems.map((category, catIndex) => (

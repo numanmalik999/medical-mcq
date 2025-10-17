@@ -39,6 +39,7 @@ import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 import FAQPage from "./pages/FAQPage";
 import BookmarkedMcqsPage from "./pages/BookmarkedMcqsPage"; // Import new page
+import AdminSettingsPage from "./pages/AdminSettingsPage"; // Import new page
 
 import { ThemeProvider } from "@/components/theme-provider"; // Import ThemeProvider
 
@@ -81,6 +82,7 @@ const AppContent = () => {
                 <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
                 <Route path="manage-users" element={<ManageUsersPage />} />
                 <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />
+                <Route path="settings" element={<AdminSettingsPage />} /> {/* New route */}
               </Route>
             </Route>
 
@@ -94,7 +96,7 @@ const AppContent = () => {
                 <Route path="profile" element={<UserProfilePage />} />
                 <Route path="subscriptions" element={<UserSubscriptionsPage />} />
                 <Route path="submit-mcq" element={<SubmitMcqPage />} />
-                <Route path="bookmarked-mcqs" element={<BookmarkedMcqsPage />} /> {/* New route */}
+                <Route path="bookmarked-mcqs" element={<BookmarkedMcqsPage />} />
               </Route>
             </Route>
 
@@ -110,7 +112,7 @@ const AppContent = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme"> {/* Wrap with ThemeProvider */}
+    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
       <TooltipProvider>
         <Toaster />
         <Sonner />

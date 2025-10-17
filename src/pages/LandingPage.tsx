@@ -1,11 +1,26 @@
 "use client";
 
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { BookOpenText, ClipboardCheck, User, FilePlus, ShieldCheck, Brain } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
+import { supabase } from '@/integrations/supabase/client'; // Import supabase
+import { useToast } from '@/hooks/use-toast'; // Import useToast
+
+// Define a type for FAQ items
+interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+// Define a type for FAQ categories (simplified for landing page display)
+interface FaqCategory {
+  category: string;
+  questions: FaqItem[];
+}
 
 const features = [
   {
@@ -40,27 +55,69 @@ const features = [
   },
 ];
 
-const faqItems = [
+const defaultFaqItems: FaqCategory[] = [
   {
-    question: "What is Study Prometric MCQs?",
-    answer: "Study Prometric MCQs is an online platform designed to help medical students and professionals prepare for their exams through interactive quizzes, simulated tests, and AI-powered explanations.",
-  },
-  {
-    question: "How do I get started?",
-    answer: "You can start by signing up for a free trial to access a limited set of questions, or subscribe to one of our plans for full access to all features and our extensive question bank.",
-  },
-  {
-    question: "Is there a free trial?",
-    answer: "Yes, we offer a free trial that allows you to attempt a limited number of questions to experience our platform before committing to a subscription.",
-  },
-  {
-    question: "What payment methods do you accept?",
-    answer: "We currently accept payments via PayPal, ensuring a secure and convenient transaction process.",
+    category: "General Questions",
+    questions: [
+      {
+        question: "What is Study Prometric MCQs?",
+        answer: "Study Prometric MCQs is an online platform designed to help medical students and professionals prepare for their exams through interactive quizzes, simulated tests, and AI-powered explanations.",
+      },
+      {
+        question: "How do I get started?",
+        answer: "You can start by signing up for a free trial to access a limited set of questions, or subscribe to one of our plans for full access to all features and our extensive question bank.",
+      },
+      {
+        question: "Is there a free trial?",
+        answer: "Yes, we offer a free trial that allows you to attempt a limited number of questions to experience our platform before committing to a subscription.",
+      },
+      {
+        question: "What payment methods do you accept?",
+        answer: "We currently accept payments via PayPal, ensuring a secure and convenient transaction process.",
+      },
+    ],
   },
 ];
 
 const LandingPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
+  const { toast } = useToast();
+  const [faqItems, setFaqItems] = useState<FaqCategory[]>(defaultFaqItems);
+  const [isLoadingFaq, setIsLoadingFaq] = useState(true);
+
+  useEffect(() => {
+    const fetchFaqContent = async () => {
+      setIsLoadingFaq(true);
+      const { data, error } = await supabase
+        .from('static_pages')
+        .select('content')
+        .eq('slug', 'faq')
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error('Error fetching FAQ content for landing page:', error);
+        toast({ title: "Error", description: "Failed to load FAQ content for landing page.", variant: "destructive" });
+      } else if (data) {
+        try {
+          const parsedContent = JSON.parse(data.content || '[]');
+          if (Array.isArray(parsedContent) && parsedContent.every(item => 'category' in item && 'questions' in item)) {
+            // Take only the first category's questions for the landing page, or a limited number
+            const landingPageFaqs = parsedContent.slice(0, 1).flatMap(cat => cat.questions.slice(0, 4)); // Max 4 questions
+            setFaqItems([{ category: "Frequently Asked Questions", questions: landingPageFaqs }]);
+          } else {
+            console.warn("FAQ content from DB is not in expected format, using default for landing page.");
+            setFaqItems(defaultFaqItems);
+          }
+        } catch (parseError) {
+          console.error("Error parsing FAQ content from DB for landing page:", parseError);
+          setFaqItems(defaultFaqItems);
+        }
+      }
+      setIsLoadingFaq(false);
+    };
+
+    fetchFaqContent();
+  }, [toast]);
 
   if (!hasCheckedInitialSession) {
     return (
@@ -95,7 +152,7 @@ const LandingPage = () => {
                     Get Started
                   </Button>
                 </Link>
-                <Link to="/user/dashboard"> {/* Redirect to user dashboard for guest mode */}
+                <Link to="/quiz"> {/* Redirect to quiz for guest mode */}
                   <Button size="lg" variant="secondary">
                     Try a Free Quiz
                   </Button>
@@ -153,16 +210,22 @@ const LandingPage = () => {
         <div className="container mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Frequently Asked Questions</h2>
           <div className="max-w-3xl mx-auto">
-            <Accordion type="single" collapsible className="w-full">
-              {faqItems.map((item, index) => (
-                <AccordionItem key={index} value={`item-${index}`}>
-                  <AccordionTrigger className="text-left text-lg font-medium">{item.question}</AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground text-base">
-                    {item.answer}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+            {isLoadingFaq ? (
+              <p className="text-center text-gray-600 dark:text-gray-400">Loading FAQs...</p>
+            ) : (
+              <Accordion type="single" collapsible className="w-full">
+                {faqItems.flatMap((category, catIndex) =>
+                  category.questions.map((item, qIndex) => (
+                    <AccordionItem key={`${catIndex}-${qIndex}`} value={`item-${catIndex}-${qIndex}`}>
+                      <AccordionTrigger className="text-left text-lg font-medium">{item.question}</AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground text-base">
+                        {item.answer}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))
+                )}
+              </Accordion>
+            )}
             <p className="text-center text-muted-foreground mt-8">
               Have more questions? Visit our dedicated <Link to="/faq" className="text-primary hover:underline">FAQ Page</Link>.
             </p>

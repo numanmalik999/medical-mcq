@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'; // Import use
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users, LogOut, UploadCloud, MessageSquareWarning, FileQuestion } from 'lucide-react'; // Import LogOut, UploadCloud, MessageSquareWarning, FileQuestion icon
+import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users, LogOut, UploadCloud, MessageSquareWarning, FileQuestion, Settings } from 'lucide-react'; // Import Settings icon
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client'; // Import supabase client
 
@@ -64,18 +64,19 @@ const AdminSidebar = () => {
     { to: "/admin/add-mcq", icon: <PlusCircle className="h-4 w-4" />, label: "Add MCQ" },
     { to: "/admin/bulk-upload-mcqs", icon: <UploadCloud className="h-4 w-4" />, label: "Bulk Upload MCQs" },
     { to: "/admin/manage-mcqs", icon: <BookOpenText className="h-4 w-4" />, label: "Manage MCQs" },
-    { to: "/admin/manage-submitted-mcqs", icon: <FileQuestion className="h-4 w-4" />, label: "Submitted MCQs" }, // New link
+    { to: "/admin/manage-submitted-mcqs", icon: <FileQuestion className="h-4 w-4" />, label: "Submitted MCQs" },
     { to: "/admin/manage-categories", icon: <FolderKanban className="h-4 w-4" />, label: "Manage Categories" },
     { to: "/admin/manage-subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "Manage Subscriptions" },
     { to: "/admin/manage-users", icon: <Users className="h-4 w-4" />, label: "Manage Users" },
-    { to: "/admin/manage-feedback", icon: <MessageSquareWarning className="h-4 w-4" />, label: "Manage Feedback" }, // New link
+    { to: "/admin/manage-feedback", icon: <MessageSquareWarning className="h-4 w-4" />, label: "Manage Feedback" },
+    { to: "/admin/settings", icon: <Settings className="h-4 w-4" />, label: "Settings" }, // New link
   ];
 
   if (isMobile) {
     return (
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 text-primary-foreground hover:bg-primary/50"> {/* Updated styling */}
+          <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 text-primary-foreground hover:bg-primary/50">
             <MenuIcon className="h-6 w-6" />
             <span className="sr-only">Toggle navigation</span>
           </Button>

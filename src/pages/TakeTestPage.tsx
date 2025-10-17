@@ -54,7 +54,7 @@ interface DbQuizSession {
   id: string;
   user_id: string;
   category_id: string | null;
-  // Removed subcategory_id from DbQuizSession
+  subcategory_id: string | null;
   mcq_ids_order: string[]; // Array of MCQ IDs
   current_question_index: number;
   user_answers_json: { [mcqId: string]: UserAnswerData }; // JSONB object
@@ -170,7 +170,7 @@ const TakeTestPage = () => {
     const sessionData = {
       user_id: currentUserId,
       category_id: primaryCategoryId, // Store primary category for display/grouping
-      // Removed subcategory_id from sessionData
+      subcategory_id: null, // Not directly used for multi-category tests
       mcq_ids_order: mcqIdsOrder,
       current_question_index: index,
       user_answers_json: userAnswersJson,
@@ -273,14 +273,14 @@ const TakeTestPage = () => {
         submitted: true,
       });
 
-      // For recording attempts, we need a single category_id.
+      // For recording attempts, we need a single category_id and subcategory_id.
       // We'll use the first one from category_links if available.
       const firstCategoryLink = mcq.category_links?.[0];
       attemptsToRecord.push({
         user_id: user.id,
         mcq_id: mcq.id,
         category_id: firstCategoryLink?.category_id || null,
-        // Removed subcategory_id
+        subcategory_id: firstCategoryLink?.subcategory_id || null,
         selected_option: selectedOption || 'N/A', // Store 'N/A' if not answered
         is_correct: isCorrect,
       });
@@ -523,7 +523,9 @@ const TakeTestPage = () => {
           *,
           mcq_category_links (
             category_id,
-            categories (name)
+            subcategory_id,
+            categories (name),
+            subcategories (name)
           )
         `)
         .not('id', 'in', `(${categorizedMcqIds.join(',')})`); // Filter for MCQs not in any category
@@ -539,7 +541,9 @@ const TakeTestPage = () => {
           *,
           mcq_category_links (
             category_id,
-            categories (name)
+            subcategory_id,
+            categories (name),
+            subcategories (name)
           )
         `)
         .in('mcq_category_links.category_id', regularCategoryIds);
@@ -554,7 +558,9 @@ const TakeTestPage = () => {
           *,
           mcq_category_links (
             category_id,
-            categories (name)
+            subcategory_id,
+            categories (name),
+            subcategories (name)
           )
         `);
       mcqsData = data;
@@ -579,8 +585,8 @@ const TakeTestPage = () => {
       category_links: mcq.mcq_category_links.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
-        // Removed subcategory_id
-        // Removed subcategory_name
+        subcategory_id: link.subcategory_id,
+        subcategory_name: link.subcategories?.name || null,
       })),
     }));
 
@@ -662,7 +668,9 @@ const TakeTestPage = () => {
         *,
         mcq_category_links (
           category_id,
-          categories (name)
+          subcategory_id,
+          categories (name),
+          subcategories (name)
         )
       `)
       .in('id', loadedSession.mcqs.map(m => m.id)) // Use the IDs from the placeholder MCQs
@@ -680,8 +688,8 @@ const TakeTestPage = () => {
       category_links: mcq.mcq_category_links.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
-        // Removed subcategory_id
-        // Removed subcategory_name
+        subcategory_id: link.subcategory_id,
+        subcategory_name: link.subcategories?.name || null,
       })),
     }));
 
@@ -1147,8 +1155,8 @@ const TakeTestPage = () => {
   if (showResults) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-        <div className="flex flex-col md:flex-row w-full max-w-6xl">
-          <Card className="flex-1 order-first md:order-last">
+        <div className="flex flex-col md:flex-row w-full max-w-6xl"> {/* Added flex-col md:flex-row */}
+          <Card className="flex-1 order-first md:order-last"> {/* Added order-first md:order-last */}
             <CardHeader>
               <CardTitle className="text-3xl">Test Results</CardTitle>
               <CardDescription>Review your performance on the test.</CardDescription>
@@ -1228,8 +1236,8 @@ const TakeTestPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
-      <div className="flex flex-col md:flex-row w-full max-w-6xl">
-        <Card className="flex-1 order-first md:order-last">
+      <div className="flex flex-col md:flex-row w-full max-w-6xl"> {/* Added flex-col md:flex-row */}
+        <Card className="flex-1 order-first md:order-last"> {/* Added order-first md:order-last */}
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-xl">Question {currentQuestionIndex + 1} / {mcqs.length}</CardTitle>

@@ -18,7 +18,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-// Removed Select imports as subcategories are no longer managed
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 interface Category {
   id: string;
@@ -26,35 +27,44 @@ interface Category {
   mcq_count?: number; // Added mcq_count
 }
 
-// Removed Subcategory interface
+interface Subcategory {
+  id: string;
+  category_id: string;
+  name: string;
+}
 
 const ManageCategoriesPage = () => {
   const { toast } = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
-  // Removed subcategories state
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state
 
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState('');
 
-  // Removed subcategory dialog states
+  const [isSubcategoryDialogOpen, setIsSubcategoryDialogOpen] = useState(false);
+  const [currentSubcategory, setCurrentSubcategory] = useState<Subcategory | null>(null);
+  const [subcategoryName, setSubcategoryName] = useState('');
+  const [selectedCategoryIdForSub, setSelectedCategoryIdForSub] = useState<string | null>(null);
 
   const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
 
   useEffect(() => {
     if (hasCheckedInitialSession) { // Only fetch if initial session check is done
-      fetchCategories();
+      fetchCategoriesAndSubcategories();
     }
   }, [hasCheckedInitialSession]); // Dependency changed
 
-  const fetchCategories = async () => {
+  const fetchCategoriesAndSubcategories = async () => {
     setIsPageLoading(true); // Set loading for this specific fetch
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*');
 
-    // Removed subcategories fetch
+    const { data: subcategoriesData, error: subcategoriesError } = await supabase
+      .from('subcategories')
+      .select('*');
 
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
@@ -77,6 +87,12 @@ const ManageCategoriesPage = () => {
       setCategories(categoriesWithCounts || []);
     }
 
+    if (subcategoriesError) {
+      console.error('Error fetching subcategories:', subcategoriesError);
+      toast({ title: "Error", description: "Failed to load subcategories.", variant: "destructive" });
+    } else {
+      setSubcategories(subcategoriesData || []);
+    }
     setIsPageLoading(false); // Clear loading for this specific fetch
   };
 
@@ -93,7 +109,7 @@ const ManageCategoriesPage = () => {
 
       if (error) throw error;
       toast({ title: "Success", description: "Category added successfully." });
-      fetchCategories();
+      fetchCategoriesAndSubcategories();
       setIsCategoryDialogOpen(false);
       setCategoryName('');
     } catch (error: any) {
@@ -115,7 +131,7 @@ const ManageCategoriesPage = () => {
 
       if (error) throw error;
       toast({ title: "Success", description: "Category updated successfully." });
-      fetchCategories();
+      fetchCategoriesAndSubcategories();
       setIsCategoryDialogOpen(false);
       setCategoryName('');
       setCurrentCategory(null);
@@ -126,21 +142,10 @@ const ManageCategoriesPage = () => {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this category? All associated MCQs will become uncategorized.")) {
+    if (!window.confirm("Are you sure you want to delete this category? All associated subcategories will also be deleted.")) {
       return;
     }
     try {
-      // First, remove all links to this category from mcq_category_links
-      const { error: deleteLinksError } = await supabase
-        .from('mcq_category_links')
-        .delete()
-        .eq('category_id', id);
-
-      if (deleteLinksError) {
-        console.warn("Error deleting associated category links:", deleteLinksError);
-        // Don't throw, try to proceed with category deletion
-      }
-
       const { error } = await supabase
         .from('categories')
         .delete()
@@ -148,7 +153,7 @@ const ManageCategoriesPage = () => {
 
       if (error) throw error;
       toast({ title: "Success", description: "Category deleted successfully." });
-      fetchCategories();
+      fetchCategoriesAndSubcategories();
     } catch (error: any) {
       console.error("Error deleting category:", error);
       toast({ title: "Error", description: `Failed to delete category: ${error.message}`, variant: "destructive" });
@@ -161,7 +166,78 @@ const ManageCategoriesPage = () => {
     setIsCategoryDialogOpen(true);
   };
 
-  // Removed Subcategory Management functions
+  // Subcategory Management
+  const handleAddSubcategory = async () => {
+    if (!subcategoryName.trim() || !selectedCategoryIdForSub) {
+      toast({ title: "Error", description: "Subcategory name and category are required.", variant: "destructive" });
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('subcategories')
+        .insert({ name: subcategoryName.trim(), category_id: selectedCategoryIdForSub });
+
+      if (error) throw error;
+      toast({ title: "Success", description: "Subcategory added successfully." });
+      fetchCategoriesAndSubcategories();
+      setIsSubcategoryDialogOpen(false);
+      setSubcategoryName('');
+      setSelectedCategoryIdForSub(null);
+    } catch (error: any) {
+      console.error("Error adding subcategory:", error);
+      toast({ title: "Error", description: `Failed to add subcategory: ${error.message}`, variant: "destructive" });
+    }
+  };
+
+  const handleEditSubcategory = async () => {
+    if (!currentSubcategory || !subcategoryName.trim() || !selectedCategoryIdForSub) {
+      toast({ title: "Error", description: "Subcategory name and category are required.", variant: "destructive" });
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('subcategories')
+        .update({ name: subcategoryName.trim(), category_id: selectedCategoryIdForSub })
+        .eq('id', currentSubcategory.id);
+
+      if (error) throw error;
+      toast({ title: "Success", description: "Subcategory updated successfully." });
+      fetchCategoriesAndSubcategories();
+      setIsSubcategoryDialogOpen(false);
+      setSubcategoryName('');
+      setSelectedCategoryIdForSub(null);
+      setCurrentSubcategory(null);
+    } catch (error: any) {
+      console.error("Error updating subcategory:", error);
+      toast({ title: "Error", description: `Failed to update subcategory: ${error.message}`, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteSubcategory = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this subcategory?")) {
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('subcategories')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      toast({ title: "Success", description: "Subcategory deleted successfully." });
+      fetchCategoriesAndSubcategories();
+    } catch (error: any) {
+      console.error("Error deleting subcategory:", error);
+      toast({ title: "Error", description: `Failed to delete subcategory: ${error.message}`, variant: "destructive" });
+    }
+  };
+
+  const openSubcategoryDialog = (subcategory?: Subcategory) => {
+    setCurrentSubcategory(subcategory || null);
+    setSubcategoryName(subcategory ? subcategory.name : '');
+    setSelectedCategoryIdForSub(subcategory ? subcategory.category_id : null);
+    setIsSubcategoryDialogOpen(true);
+  };
 
   const categoryColumns: ColumnDef<Category>[] = [
     { 
@@ -185,7 +261,34 @@ const ManageCategoriesPage = () => {
     },
   ];
 
-  // Removed subcategoryColumns
+  const subcategoryColumns: ColumnDef<Subcategory>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Subcategory Name',
+    },
+    {
+      accessorKey: 'category_id',
+      header: 'Parent Category',
+      cell: ({ row }) => {
+        const category = categories.find(cat => cat.id === row.original.category_id);
+        return category ? category.name : 'N/A';
+      },
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openSubcategoryDialog(row.original)}>Edit</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleDeleteSubcategory(row.original.id)} className="text-red-600">Delete</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
 
   if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
     return (
@@ -197,7 +300,7 @@ const ManageCategoriesPage = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Manage Categories</h1>
+      <h1 className="text-3xl font-bold">Manage Categories & Subcategories</h1>
 
       {/* Categories Card */}
       <Card>
@@ -210,7 +313,22 @@ const ManageCategoriesPage = () => {
         </CardContent>
       </Card>
 
-      {/* Removed Subcategories Card */}
+      {/* Subcategories Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-xl">Subcategories</CardTitle>
+          <Button onClick={() => openSubcategoryDialog()} disabled={categories.length === 0}>Add Subcategory</Button>
+        </CardHeader>
+        <CardContent>
+          {categories.length === 0 ? (
+            <p className="text-center text-gray-600 dark:text-gray-400">
+              Please add at least one category before adding subcategories.
+            </p>
+          ) : (
+            <DataTable columns={subcategoryColumns} data={subcategories} />
+          )}
+        </CardContent>
+      </Card>
 
       <MadeWithDyad />
 
@@ -242,7 +360,48 @@ const ManageCategoriesPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Removed Subcategory Dialog */}
+      {/* Subcategory Dialog */}
+      <Dialog open={isSubcategoryDialogOpen} onOpenChange={setIsSubcategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{currentSubcategory ? 'Edit Subcategory' : 'Add New Subcategory'}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="subCategoryName" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="subCategoryName"
+                value={subcategoryName}
+                onChange={(e) => setSubcategoryName(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="parentCategory" className="text-right">
+                Parent Category
+              </Label>
+              <Select onValueChange={setSelectedCategoryIdForSub} value={selectedCategoryIdForSub || ''}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSubcategoryDialogOpen(false)}>Cancel</Button>
+            <Button onClick={currentSubcategory ? handleEditSubcategory : handleAddSubcategory}>
+              {currentSubcategory ? 'Save Changes' : 'Add Subcategory'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

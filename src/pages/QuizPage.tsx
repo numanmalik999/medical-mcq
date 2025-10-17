@@ -36,7 +36,11 @@ interface CategoryStat {
   user_accuracy: string;
 }
 
-// Removed Subcategory interface
+interface Subcategory {
+  id: string;
+  category_id: string;
+  name: string;
+}
 
 interface UserAnswerData {
   selectedOption: string | null;
@@ -49,7 +53,7 @@ interface DbQuizSession {
   id: string;
   user_id: string;
   category_id: string | null;
-  // Removed subcategory_id from DbQuizSession
+  subcategory_id: string | null;
   mcq_ids_order: string[]; // Array of MCQ IDs
   current_question_index: number;
   user_answers_json: { [mcqId: string]: UserAnswerData }; // JSONB object
@@ -62,14 +66,14 @@ interface DbQuizSession {
 interface LoadedQuizSession {
   dbSessionId: string; // The ID from the database
   categoryId: string;
-  // Removed subcategory_id from LoadedQuizSession
+  subcategory_id: string | null;
   mcqs: MCQ[]; // Full MCQ objects
   userAnswers: Map<string, UserAnswerData>;
   currentQuestionIndex: number;
   isTrialActiveSession: boolean;
   userId: string;
   categoryName: string; // Added for display
-  // Removed subcategoryName from LoadedQuizSession
+  subcategoryName: string | null; // Added for display
 }
 
 const TRIAL_MCQ_LIMIT = 10;
@@ -90,9 +94,9 @@ const QuizPage = () => {
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
 
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
-  // Removed allSubcategories state
+  const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
   const [currentQuizCategoryId, setCurrentQuizCategoryId] = useState<string | null>(null); // Track the category of the current quiz
-  // Removed currentQuizSubcategoryId state
+  const [currentQuizSubcategoryId, setCurrentQuizSubcategoryId] = useState<string | null>(null); // Track the subcategory of the current quiz
   const [currentDbSessionId, setCurrentDbSessionId] = useState<string | null>(null); // New: Track the DB session ID
   const [showCategorySelection, setShowCategorySelection] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -165,7 +169,7 @@ const QuizPage = () => {
   const saveQuizState = useCallback(async (
     dbSessionId: string | null,
     categoryId: string,
-    // Removed subcategoryId from params
+    subcategoryId: string | null,
     mcqs: MCQ[],
     answers: Map<string, UserAnswerData>,
     index: number,
@@ -183,7 +187,7 @@ const QuizPage = () => {
     const sessionData = {
       user_id: currentUserId,
       category_id: categoryId,
-      // Removed subcategory_id from sessionData
+      subcategory_id: subcategoryId,
       mcq_ids_order: mcqIdsOrder,
       current_question_index: index,
       user_answers_json: userAnswersJson,
@@ -270,7 +274,9 @@ const QuizPage = () => {
       .from('categories')
       .select('*');
 
-    // Removed subcategories fetch
+    const { data: subcategoriesData, error: subcategoriesError } = await supabase
+      .from('subcategories')
+      .select('*');
 
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
@@ -278,7 +284,12 @@ const QuizPage = () => {
       setIsPageLoading(false);
       return;
     }
-    // Removed subcategories state update
+    if (subcategoriesError) {
+      console.error('Error fetching subcategories:', subcategoriesError);
+      toast({ title: "Error", description: "Failed to load subcategories.", variant: "destructive" });
+    } else {
+      setAllSubcategories(subcategoriesData || []);
+    }
 
     // --- Load all saved quiz sessions for the current user from DB ---
     let loadedSavedQuizzes: LoadedQuizSession[] = [];
@@ -296,11 +307,11 @@ const QuizPage = () => {
         // For each DB session, create a LoadedQuizSession stub for display
         loadedSavedQuizzes = dbSessions.map((dbSession: DbQuizSession) => {
           const categoryName = categoriesData?.find(c => c.id === dbSession.category_id)?.name || 'Unknown Category';
-          // Removed subcategoryName
+          const subcategoryName = subcategoriesData?.find(s => s.id === dbSession.subcategory_id)?.name || null;
           return {
             dbSessionId: dbSession.id,
             categoryId: dbSession.category_id || '', // Should always have a category_id
-            // Removed subcategory_id
+            subcategory_id: dbSession.subcategory_id,
             mcqs: dbSession.mcq_ids_order.map((id: string) => ({
               id,
               question_text: 'Loading...',
@@ -319,7 +330,7 @@ const QuizPage = () => {
             isTrialActiveSession: dbSession.is_trial_session,
             userId: user.id,
             categoryName: categoryName, // Add for display
-            // Removed subcategoryName
+            subcategoryName: subcategoryName, // Add for display
           } as LoadedQuizSession;
         });
       }
@@ -389,7 +400,7 @@ const QuizPage = () => {
     setIsPageLoading(false);
   };
 
-  const startQuizSession = async (categoryId: string, mode: 'random' | 'incorrect') => { // Removed subcategoryId param
+  const startQuizSession = async (categoryId: string, subcategoryId: string | null, mode: 'random' | 'incorrect') => {
     const isSubscribed = user?.has_active_subscription;
     const hasTakenTrial = user?.trial_taken;
     const isGuest = !user;
@@ -420,13 +431,15 @@ const QuizPage = () => {
 
     let mcqIdsToFetch: string[] = [];
 
-    // Step 1: Get MCQ IDs from mcq_category_links based on category
+    // Step 1: Get MCQ IDs from mcq_category_links based on category/subcategory
     let linksQuery = supabase
       .from('mcq_category_links')
       .select('mcq_id')
       .eq('category_id', categoryId);
 
-    // Removed subcategoryId filter
+    if (subcategoryId) {
+      linksQuery = linksQuery.eq('subcategory_id', subcategoryId);
+    }
 
     const { data: linkedMcqIdsData, error: linksError } = await linksQuery;
 
@@ -452,7 +465,9 @@ const QuizPage = () => {
         *,
         mcq_category_links (
           category_id,
-          categories (name)
+          subcategory_id,
+          categories (name),
+          subcategories (name)
         )
       `)
       .in('id', mcqIdsToFetch)
@@ -515,8 +530,8 @@ const QuizPage = () => {
       category_links: mcq.mcq_category_links.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
-        // Removed subcategory_id
-        // Removed subcategory_name
+        subcategory_id: link.subcategory_id,
+        subcategory_name: link.subcategories?.name || null,
       })),
     }));
 
@@ -530,7 +545,7 @@ const QuizPage = () => {
 
     setQuizQuestions(mcqsToLoad);
     setCurrentQuizCategoryId(categoryId); // Set the category for the current quiz
-    // Removed subcategory ID setting
+    setCurrentQuizSubcategoryId(subcategoryId);
     setShowCategorySelection(false);
     setIsPageLoading(false);
     
@@ -547,7 +562,7 @@ const QuizPage = () => {
       const savedSessionResult = await saveQuizState(
         null, // No existing session ID
         categoryId,
-        // Removed subcategoryId
+        subcategoryId,
         mcqsToLoad,
         initialUserAnswers,
         0, // currentQuestionIndex
@@ -556,19 +571,19 @@ const QuizPage = () => {
       );
       if (savedSessionResult) {
         const categoryName = categoryStats.find(c => c.id === categoryId)?.name || 'Unknown Category';
-        // Removed subcategoryName
+        const subcategoryName = allSubcategories.find(s => s.id === subcategoryId)?.name || null;
         setActiveSavedQuizzes(prev => [
           {
             dbSessionId: savedSessionResult.id,
             categoryId: categoryId,
-            // Removed subcategory_id
+            subcategory_id: subcategoryId,
             mcqs: mcqsToLoad, // Store full MCQs for display in saved quizzes list
             userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
             currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
             isTrialActiveSession: isTrialActiveSession,
             userId: user.id,
             categoryName: categoryName,
-            // Removed subcategoryName
+            subcategoryName: subcategoryName,
           },
           ...prev,
         ]);
@@ -594,7 +609,7 @@ const QuizPage = () => {
     setIsPageLoading(true);
     setCurrentDbSessionId(loadedSession.dbSessionId);
     setCurrentQuizCategoryId(loadedSession.categoryId);
-    // Removed subcategory ID setting
+    setCurrentQuizSubcategoryId(loadedSession.subcategory_id);
     setIsTrialActiveSession(loadedSession.isTrialActiveSession);
 
     // Fetch full MCQ objects based on mcq_ids_order from the loaded session
@@ -604,7 +619,9 @@ const QuizPage = () => {
         *,
         mcq_category_links (
           category_id,
-          categories (name)
+          subcategory_id,
+          categories (name),
+          subcategories (name)
         )
       `)
       .in('id', loadedSession.mcqs.map(m => m.id)) // Use the IDs from the placeholder MCQs
@@ -622,8 +639,8 @@ const QuizPage = () => {
       category_links: mcq.mcq_category_links.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
-        // Removed subcategory_id
-        // Removed subcategory_name
+        subcategory_id: link.subcategory_id,
+        subcategory_name: link.subcategories?.name || null,
       })),
     }));
 
@@ -661,7 +678,7 @@ const QuizPage = () => {
       saveQuizState(
         currentDbSessionId,
         currentQuizCategoryId,
-        // Removed subcategory ID
+        currentQuizSubcategoryId,
         quizQuestions,
         userAnswers,
         currentQuestionIndex,
@@ -669,7 +686,7 @@ const QuizPage = () => {
         user.id
       );
     }
-  }, [quizQuestions, userAnswers, currentQuestionIndex, isTrialActiveSession, showCategorySelection, showResults, saveQuizState, user, currentQuizCategoryId, currentDbSessionId]);
+  }, [quizQuestions, userAnswers, currentQuestionIndex, isTrialActiveSession, showCategorySelection, showResults, saveQuizState, user, currentQuizCategoryId, currentQuizSubcategoryId, currentDbSessionId]);
 
 
   const handleResetProgress = async (categoryId: string) => {
@@ -751,14 +768,14 @@ const QuizPage = () => {
 
     if (user) { // Only record attempts if user is logged in
       try {
-        // For recording attempts, we need a single category_id.
+        // For recording attempts, we need a single category_id and subcategory_id.
         // We'll use the first one from category_links if available.
         const firstCategoryLink = currentMcq.category_links?.[0];
         const { error } = await supabase.from('user_quiz_attempts').insert({
           user_id: user.id,
           mcq_id: currentMcq.id,
           category_id: firstCategoryLink?.category_id || null,
-          // Removed subcategory_id
+          subcategory_id: firstCategoryLink?.subcategory_id || null,
           selected_option: selectedAnswer,
           is_correct: isCorrect,
         });
@@ -879,7 +896,7 @@ const QuizPage = () => {
       const savedSessionResult = await saveQuizState(
         currentDbSessionId,
         currentQuizCategoryId,
-        // Removed subcategory ID
+        currentQuizSubcategoryId,
         quizQuestions,
         userAnswers,
         currentQuestionIndex,
@@ -889,7 +906,7 @@ const QuizPage = () => {
 
       if (savedSessionResult) {
         const categoryName = categoryStats.find(c => c.id === currentQuizCategoryId)?.name || 'Unknown Category';
-        // Removed subcategoryName
+        const subcategoryName = allSubcategories.find(s => s.id === currentQuizSubcategoryId)?.name || null;
 
         setActiveSavedQuizzes(prev => {
           const existingIndex = prev.findIndex(session => session.dbSessionId === savedSessionResult.id);
@@ -899,14 +916,14 @@ const QuizPage = () => {
             updatedPrev[existingIndex] = {
               dbSessionId: savedSessionResult.id,
               categoryId: currentQuizCategoryId,
-              // Removed subcategory_id
+              subcategory_id: currentQuizSubcategoryId,
               mcqs: quizQuestions,
               userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
               currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
               isTrialActiveSession: isTrialActiveSession,
               userId: user.id,
               categoryName: categoryName,
-              // Removed subcategoryName
+              subcategoryName: subcategoryName,
             };
             return updatedPrev;
           } else {
@@ -915,14 +932,14 @@ const QuizPage = () => {
               {
                 dbSessionId: savedSessionResult.id,
                 categoryId: currentQuizCategoryId,
-                // Removed subcategory_id
+                subcategory_id: currentQuizSubcategoryId,
                 mcqs: quizQuestions,
                 userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
                 currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
                 isTrialActiveSession: isTrialActiveSession,
                 userId: user.id,
                 categoryName: categoryName,
-                // Removed subcategoryName
+                subcategoryName: subcategoryName,
               },
               ...prev,
             ];
@@ -1013,7 +1030,7 @@ const QuizPage = () => {
     setShowResults(false);
     setShowCategorySelection(true);
     setCurrentQuizCategoryId(null); // Reset current quiz category
-    // Removed subcategory ID reset
+    setCurrentQuizSubcategoryId(null); // Reset subcategory selection
     setCurrentDbSessionId(null); // Reset DB session ID
     fetchQuizOverview(); // Refresh overview data
   };
@@ -1062,7 +1079,7 @@ const QuizPage = () => {
         <Card className="w-full max-w-4xl">
           <CardHeader>
             <CardTitle>Select a Quiz Category</CardTitle>
-            <CardDescription>Choose a category to start your quiz and view your performance.</CardDescription>
+            <CardDescription>Choose a category and optionally a subcategory to start your quiz and view your performance.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {activeSavedQuizzes.length > 0 && !isGuest && ( // Only show saved quizzes for logged-in users
@@ -1081,7 +1098,7 @@ const QuizPage = () => {
                     return (
                       <div key={savedState.dbSessionId} className="flex flex-col sm:flex-row items-center justify-between p-3 border rounded-md bg-white dark:bg-gray-800">
                         <div>
-                          <p className="font-semibold">{savedState.categoryName}</p>
+                          <p className="font-semibold">{savedState.categoryName} {savedState.subcategoryName ? `(${savedState.subcategoryName})` : ''}</p>
                           <p className="text-sm text-muted-foreground">Question {progress} of {total}</p>
                         </div>
                         <div className="flex gap-2 mt-2 sm:mt-0">
@@ -1107,9 +1124,11 @@ const QuizPage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredCategories.map((cat) => {
-                  // Check if there's a saved session for this category
+                  // Check if there's a saved session for this category and the currently selected subcategory
                   const savedSessionForCurrentSelection = activeSavedQuizzes.find(
-                    (session) => session.categoryId === cat.id
+                    (session) =>
+                      session.categoryId === cat.id &&
+                      session.subcategory_id === currentQuizSubcategoryId
                   );
 
                   const canStartRegularQuiz = user?.has_active_subscription && cat.total_mcqs > 0;
@@ -1133,7 +1152,26 @@ const QuizPage = () => {
                             <p>Accuracy: {cat.user_accuracy}</p>
                           </>
                         )}
-                        {/* Removed Subcategory selection */}
+                        <div className="space-y-2 mt-4">
+                          <Label htmlFor={`subcategory-select-${cat.id}`}>Subcategory (Optional)</Label>
+                          <Select
+                            onValueChange={(value) => setCurrentQuizSubcategoryId(value === "all" ? null : value)}
+                            value={currentQuizSubcategoryId || "all"}
+                            disabled={!cat.id || allSubcategories.filter(sub => sub.category_id === cat.id).length === 0}
+                          >
+                            <SelectTrigger id={`subcategory-select-${cat.id}`}>
+                              <SelectValue placeholder="Any Subcategory" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Any Subcategory</SelectItem>
+                              {allSubcategories
+                                .filter(sub => sub.category_id === cat.id)
+                                .map((subcat) => (
+                                  <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </CardContent>
                       <CardFooter className="flex flex-col gap-2">
                         {savedSessionForCurrentSelection ? (
@@ -1145,7 +1183,7 @@ const QuizPage = () => {
                           </Button>
                         ) : (
                           <Button
-                            onClick={() => startQuizSession(cat.id, 'random')} // Removed subcategoryId
+                            onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'random')}
                             className="w-full"
                             disabled={!canStartRegularQuiz && !canStartTrialQuiz && !hasAlreadyTakenTrial}
                           >
@@ -1153,7 +1191,7 @@ const QuizPage = () => {
                           </Button>
                         )}
                         <Button
-                          onClick={() => startQuizSession(cat.id, 'incorrect')} // Removed subcategoryId
+                          onClick={() => startQuizSession(cat.id, currentQuizSubcategoryId, 'incorrect')}
                           className="w-full"
                           variant="secondary"
                           disabled={cat.user_incorrect === 0 || !user?.has_active_subscription} // Only subscribed users can attempt incorrect
@@ -1190,7 +1228,7 @@ const QuizPage = () => {
           <CardHeader>
             <CardTitle>No MCQs Found</CardTitle>
             <CardDescription>
-              It looks like there are no MCQs for the selected category.
+              It looks like there are no MCQs for the selected category and subcategory.
             </CardDescription>
           </CardHeader>
           <CardContent>

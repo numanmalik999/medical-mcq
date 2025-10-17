@@ -17,8 +17,8 @@ import { Badge } from "@/components/ui/badge"; // Import Badge
 export type McqCategoryLink = {
   category_id: string;
   category_name: string; // For display
-  // Removed subcategory_id
-  // Removed subcategory_name
+  subcategory_id: string | null;
+  subcategory_name: string | null; // For display
 };
 
 export type MCQ = {
@@ -71,7 +71,20 @@ export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnD
       );
     },
   },
-  // Removed subcategories column
+  {
+    id: "subcategories", // New ID for subcategories column
+    header: "Subcategories",
+    cell: ({ row }) => {
+      const subcategories = row.original.category_links.map(link => link.subcategory_name).filter(Boolean);
+      return (
+        <div className="w-[150px] flex flex-wrap gap-1">
+          {subcategories.length > 0 ? subcategories.map((name, index) => (
+            <Badge key={index} variant="outline">{name}</Badge>
+          )) : 'N/A'}
+        </div>
+      );
+    },
+  },
   {
     accessorKey: "difficulty",
     header: "Difficulty",

@@ -31,12 +31,16 @@ interface Category {
   name: string;
 }
 
-// Removed Subcategory interface
+interface Subcategory {
+  id: string;
+  category_id: string;
+  name: string;
+}
 
 interface PerformanceSummary {
   id: string;
   name: string;
-  type: 'category'; // Changed to only 'category'
+  type: 'category' | 'subcategory';
   totalAttempts: number;
   correctAttempts: number;
   accuracy: number; // Stored as a number for sorting
@@ -50,7 +54,7 @@ const UserDashboardPage = () => {
   const [quizPerformance, setQuizPerformance] = useState<QuizPerformance | null>(null);
   const [recentAttempts, setRecentAttempts] = useState<RecentAttempt[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
-  // Removed allSubcategories state
+  const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
   const [areasForImprovement, setAreasForImprovement] = useState<PerformanceSummary[]>([]);
   const [suggestedPractice, setSuggestedPractice] = useState<PerformanceSummary[]>([]);
 
@@ -63,7 +67,7 @@ const UserDashboardPage = () => {
         const fetchData = async () => {
           setIsFetchingData(true);
           await Promise.all([
-            fetchAllCategories(), // Changed to fetchAllCategories
+            fetchAllCategoriesAndSubcategories(),
             fetchQuizPerformance(),
             fetchRecentAttempts(),
           ]);
@@ -74,7 +78,7 @@ const UserDashboardPage = () => {
         // If no user (guest mode), still fetch categories for recommendations, but no personal data
         const fetchDataForGuest = async () => {
           setIsFetchingData(true);
-          await fetchAllCategories(); // Changed to fetchAllCategories
+          await fetchAllCategoriesAndSubcategories();
           // No personal quiz performance or attempts for guests
           setQuizPerformance({ totalAttempts: 0, correctAttempts: 0, accuracy: '0.00%' });
           setRecentAttempts([]);
@@ -87,7 +91,7 @@ const UserDashboardPage = () => {
     }
   }, [user, hasCheckedInitialSession]); // Dependencies changed
 
-  const fetchAllCategories = async () => { // Renamed from fetchAllCategoriesAndSubcategories
+  const fetchAllCategoriesAndSubcategories = async () => {
     // No local loading state here, handled by parent isFetchingData
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
@@ -99,7 +103,15 @@ const UserDashboardPage = () => {
       setAllCategories(categoriesData || []);
     }
 
-    // Removed subcategories fetch
+    const { data: subcategoriesData, error: subcategoriesError } = await supabase
+      .from('subcategories')
+      .select('*');
+    if (subcategoriesError) {
+      console.error('Error fetching subcategories:', subcategoriesError);
+      toast({ title: "Error", description: "Failed to load subcategories for recommendations.", variant: "destructive" });
+    } else {
+      setAllSubcategories(subcategoriesData || []);
+    }
   };
 
   const fetchQuizPerformance = async () => {
@@ -108,7 +120,7 @@ const UserDashboardPage = () => {
 
     const { data: attemptsData, error: attemptsError } = await supabase
       .from('user_quiz_attempts')
-      .select('is_correct, category_id') // Removed subcategory_id
+      .select('is_correct, category_id, subcategory_id')
       .eq('user_id', user.id);
 
     if (attemptsError) {
@@ -134,7 +146,7 @@ const UserDashboardPage = () => {
 
   const generateRecommendations = (attemptsData: any[]) => {
     const categoryPerformance: { [key: string]: { total: number; correct: number; name: string } } = {};
-    // Removed subcategoryPerformance
+    const subcategoryPerformance: { [key: string]: { total: number; correct: number; name: string; categoryId: string } } = {};
 
     attemptsData.forEach(attempt => {
       if (attempt.category_id) {
@@ -146,7 +158,15 @@ const UserDashboardPage = () => {
           categoryPerformance[attempt.category_id].correct++;
         }
       }
-      // Removed subcategory performance tracking
+      if (attempt.subcategory_id) {
+        if (!subcategoryPerformance[attempt.subcategory_id]) {
+          subcategoryPerformance[attempt.subcategory_id] = { total: 0, correct: 0, name: '', categoryId: attempt.category_id };
+        }
+        subcategoryPerformance[attempt.subcategory_id].total++;
+        if (attempt.is_correct) {
+          subcategoryPerformance[attempt.subcategory_id].correct++;
+        }
+      }
     });
 
     const performanceSummaries: PerformanceSummary[] = [];
@@ -168,7 +188,22 @@ const UserDashboardPage = () => {
       }
     });
 
-    // Removed Subcategories from performance summaries
+    // Subcategories
+    Object.keys(subcategoryPerformance).forEach(subcatId => {
+      const subcat = allSubcategories.find(s => s.id === subcatId);
+      if (subcat) {
+        const perf = subcategoryPerformance[subcatId];
+        const accuracy = perf.total > 0 ? (perf.correct / perf.total) * 100 : 0;
+        performanceSummaries.push({
+          id: subcatId,
+          name: subcat.name,
+          type: 'subcategory',
+          totalAttempts: perf.total,
+          correctAttempts: perf.correct,
+          accuracy: accuracy,
+        });
+      }
+    });
 
     // Sort by accuracy (lowest first) for areas for improvement
     const sortedByAccuracy = [...performanceSummaries].sort((a, b) => a.accuracy - b.accuracy);
@@ -402,7 +437,7 @@ const UserDashboardPage = () => {
             <div className="space-y-3">
               {areasForImprovement.map((area) => (
                 <div key={area.id} className="flex items-center justify-between p-2 border rounded-md">
-                  <p className="font-medium">{area.name} (Category)</p>
+                  <p className="font-medium">{area.name} ({area.type === 'category' ? 'Category' : 'Subcategory'})</p>
                   <Badge variant={area.accuracy < 50 ? "destructive" : "secondary"}>
                     Accuracy: {area.accuracy.toFixed(2)}%
                   </Badge>
@@ -432,7 +467,7 @@ const UserDashboardPage = () => {
             <div className="space-y-3">
               {suggestedPractice.map((suggestion) => (
                 <div key={suggestion.id} className="flex items-center justify-between p-2 border rounded-md">
-                  <p className="font-medium">{suggestion.name} (Category)</p>
+                  <p className="font-medium">{suggestion.name} ({suggestion.type === 'category' ? 'Category' : 'Subcategory'})</p>
                   <Link to="/quiz">
                     <Button variant="outline" size="sm">Practice</Button>
                   </Link>

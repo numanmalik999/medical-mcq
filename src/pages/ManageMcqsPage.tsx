@@ -21,7 +21,11 @@ interface Category {
   mcq_count?: number;
 }
 
-// Removed Subcategory interface
+interface Subcategory {
+  id: string;
+  category_id: string;
+  name: string;
+}
 
 type DisplayMCQ = MCQ;
 
@@ -36,14 +40,15 @@ const ManageMcqsPage = () => {
   const [selectedMcqForEdit, setSelectedMcqForEdit] = useState<MCQ | null>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
-  // Removed subcategories state
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<string | null>(null);
-  // Removed selectedFilterSubcategory and filteredSubcategoriesForFilter states
+  const [selectedFilterSubcategory, setSelectedFilterSubcategory] = useState<string | null>(null);
+  const [filteredSubcategoriesForFilter, setFilteredSubcategoriesForFilter] = useState<Subcategory[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
   const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
 
-  const fetchCategories = async () => {
+  const fetchCategoriesAndSubcategories = async () => {
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*');
@@ -88,7 +93,15 @@ const ManageMcqsPage = () => {
       setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: Math.max(0, uncategorizedMcqCount) }]);
     }
 
-    // Removed subcategories fetch
+    const { data: subcategoriesData, error: subcategoriesError } = await supabase
+      .from('subcategories')
+      .select('*');
+    if (subcategoriesError) {
+      console.error('Error fetching subcategories:', subcategoriesError);
+      toast({ title: "Error", description: "Failed to load subcategories for filter.", variant: "destructive" });
+    } else {
+      setSubcategories(subcategoriesData || []);
+    }
   };
 
   const fetchMcqs = async () => {
@@ -122,7 +135,7 @@ const ManageMcqsPage = () => {
       const allMcqIdsSet = new Set(allMcqIds?.map(mcq => mcq.id) || []);
       mcqIdsToFilter = Array.from(allMcqIdsSet).filter(id => !categorizedMcqIds.includes(id));
 
-    } else if (selectedFilterCategory) { // Only filter by category, no subcategory
+    } else if (selectedFilterCategory || selectedFilterSubcategory) {
       let linksQuery = supabase
         .from('mcq_category_links')
         .select('mcq_id');
@@ -130,13 +143,15 @@ const ManageMcqsPage = () => {
       if (selectedFilterCategory) {
         linksQuery = linksQuery.eq('category_id', selectedFilterCategory);
       }
-      // Removed subcategory filter
+      if (selectedFilterSubcategory) {
+        linksQuery = linksQuery.eq('subcategory_id', selectedFilterSubcategory);
+      }
 
       const { data: filteredLinks, error: linksError } = await linksQuery;
 
       if (linksError) {
         console.error('Error fetching filtered MCQ links:', linksError);
-        toast({ title: "Error", description: "Failed to filter MCQs by category.", variant: "destructive" });
+        toast({ title: "Error", description: "Failed to filter MCQs by category/subcategory.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
@@ -149,7 +164,9 @@ const ManageMcqsPage = () => {
         *,
         mcq_category_links!mcq_category_links_mcq_id_fkey (
           category_id,
-          categories (name)
+          subcategory_id,
+          categories (name),
+          subcategories (name)
         )
       `);
 
@@ -182,8 +199,8 @@ const ManageMcqsPage = () => {
         category_links: mcq.mcq_category_links.map((link: any) => ({
           category_id: link.category_id,
           category_name: link.categories?.name || null,
-          // Removed subcategory_id
-          // Removed subcategory_name
+          subcategory_id: link.subcategory_id,
+          subcategory_name: link.subcategories?.name || null,
         })),
       }));
       setMcqs(displayMcqs || []);
@@ -193,7 +210,7 @@ const ManageMcqsPage = () => {
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      fetchCategories();
+      fetchCategoriesAndSubcategories();
     }
   }, [hasCheckedInitialSession]);
 
@@ -201,9 +218,17 @@ const ManageMcqsPage = () => {
     if (hasCheckedInitialSession) {
       fetchMcqs();
     }
-  }, [selectedFilterCategory, searchTerm, hasCheckedInitialSession]); // Removed selectedFilterSubcategory
+  }, [selectedFilterCategory, selectedFilterSubcategory, searchTerm, hasCheckedInitialSession]);
 
-  // Removed useEffect for filtering subcategories for filter
+  useEffect(() => {
+    if (selectedFilterCategory && selectedFilterCategory !== UNCATEGORIZED_ID) {
+      setFilteredSubcategoriesForFilter(subcategories.filter(sub => sub.category_id === selectedFilterCategory));
+    } else {
+      setFilteredSubcategoriesForFilter([]);
+      setSelectedFilterSubcategory(null); // Clear subcategory filter if category is unselected or uncategorized
+    }
+  }, [selectedFilterCategory, subcategories]);
+
 
   const handleDeleteMcq = async (mcqId: string, explanationId: string | null) => {
     if (!window.confirm("Are you sure you want to delete this MCQ? This action cannot be undone.")) {
@@ -250,7 +275,7 @@ const ManageMcqsPage = () => {
         description: "MCQ deleted successfully.",
       });
       fetchMcqs(); // Refresh the list
-      fetchCategories(); // Refresh counts
+      fetchCategoriesAndSubcategories(); // Refresh counts
     } catch (error: any) {
       console.error("Error deleting MCQ:", error);
       toast({
@@ -372,7 +397,7 @@ const ManageMcqsPage = () => {
         description: `All ${mcqIdsToDelete.length} MCQs and their explanations linked to "${categoryName}" have been deleted.`,
       });
       fetchMcqs(); // Refresh the list
-      fetchCategories(); // Refresh counts
+      fetchCategoriesAndSubcategories(); // Refresh counts
       setSelectedFilterCategory(null); // Clear filter after mass deletion
     } catch (error: any) {
       console.error("Error deleting all MCQs in category:", error);
@@ -408,7 +433,7 @@ const ManageMcqsPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Filter MCQs</CardTitle>
-          <CardDescription>Filter MCQs by category or search by question text.</CardDescription>
+          <CardDescription>Filter MCQs by category, subcategory, or search by question text.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex-1">
@@ -435,10 +460,23 @@ const ManageMcqsPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            {/* Removed Subcategory filter */}
+            <div className="flex-1">
+              <Label htmlFor="filterSubcategory">Subcategory</Label>
+              <Select onValueChange={(value) => setSelectedFilterSubcategory(value === "all" ? null : value)} value={selectedFilterSubcategory || "all"} disabled={!selectedFilterCategory || selectedFilterCategory === UNCATEGORIZED_ID || filteredSubcategoriesForFilter.length === 0}>
+                <SelectTrigger id="filterSubcategory">
+                  <SelectValue placeholder="Select subcategory" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subcategories</SelectItem>
+                  {filteredSubcategoriesForFilter.map((subcat) => (
+                    <SelectItem key={subcat.id} value={subcat.id}>{subcat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="flex gap-2 justify-end">
-            <Button onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); }} variant="outline">Clear Filters</Button>
+            <Button onClick={() => { setSelectedFilterCategory(null); setSelectedFilterSubcategory(null); setSearchTerm(''); }} variant="outline">Clear Filters</Button>
             <Button
               onClick={handleDeleteAllMcqsInCategory}
               variant="destructive"

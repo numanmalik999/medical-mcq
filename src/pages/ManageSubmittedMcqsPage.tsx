@@ -32,7 +32,7 @@ export interface UserSubmittedMcq {
   explanation_text: string;
   image_url: string | null;
   suggested_category_name: string | null;
-  // Removed suggested_subcategory_name
+  suggested_subcategory_name: string | null;
   suggested_difficulty: string | null;
   status: 'pending' | 'approved' | 'rejected';
   admin_notes: string | null;
@@ -107,7 +107,6 @@ const ManageSubmittedMcqsPage = () => {
       header: 'Suggested Category',
       cell: ({ row }) => row.original.suggested_category_name || 'N/A',
     },
-    // Removed suggested_subcategory_name column
     {
       accessorKey: 'suggested_difficulty',
       header: 'Suggested Difficulty',

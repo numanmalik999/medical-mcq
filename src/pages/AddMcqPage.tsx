@@ -24,14 +24,19 @@ interface Category {
   name: string;
 }
 
-// Removed Subcategory interface
+interface Subcategory {
+  id: string;
+  category_id: string;
+  name: string;
+}
 
 const AddMcqPage = () => {
   const { toast, dismiss } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  // Removed subcategories and availableSubcategories states
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [availableSubcategories, setAvailableSubcategories] = useState<Subcategory[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true); // New loading state for initial data fetch
 
   const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
@@ -47,11 +52,27 @@ const AddMcqPage = () => {
     explanation_text: z.string().min(1, "Explanation text is required."),
     image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
     category_ids: z.array(z.string().uuid("Invalid category ID.")).optional(),
-    // Removed subcategory_ids from schema
+    subcategory_ids: z.array(z.string().uuid("Invalid subcategory ID.")).optional(),
     difficulty: z.string().optional().or(z.literal('')),
     is_trial_mcq: z.boolean().optional(),
+  }).refine((data) => {
+    // If subcategories are selected, at least one category must be selected
+    if (data.subcategory_ids && data.subcategory_ids.length > 0 && (!data.category_ids || data.category_ids.length === 0)) {
+      return false;
+    }
+    // Also, ensure selected subcategories belong to selected categories
+    if (data.subcategory_ids && data.subcategory_ids.length > 0 && data.category_ids && data.category_ids.length > 0) {
+      const selectedSubcategoryObjects = subcategories.filter((sub: Subcategory) => data.subcategory_ids?.includes(sub.id));
+      const allSelectedSubcategoriesBelongToSelectedCategories = selectedSubcategoryObjects.every((sub: Subcategory) => data.category_ids?.includes(sub.category_id));
+      if (!allSelectedSubcategoriesBelongToSelectedCategories) {
+        return false;
+      }
+    }
+    return true;
+  }, {
+    message: "Selected subcategories must belong to selected categories, and a category must be selected if a subcategory is chosen.",
+    path: ["subcategory_ids"],
   });
-  // Removed .refine for subcategory validation
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -65,17 +86,17 @@ const AddMcqPage = () => {
       explanation_text: "",
       image_url: "",
       category_ids: [],
-      // Removed subcategory_ids from default values
+      subcategory_ids: [],
       difficulty: "",
       is_trial_mcq: false,
     },
   });
 
-  // Removed selectedCategoryIds watch
+  const selectedCategoryIds = form.watch("category_ids");
 
   useEffect(() => {
     if (hasCheckedInitialSession) { // Only fetch if initial session check is done
-      const fetchCategories = async () => {
+      const fetchCategoriesAndSubcategories = async () => {
         setIsPageLoading(true); // Set loading for this specific fetch
         const { data: categoriesData, error: categoriesError } = await supabase
           .from('categories')
@@ -86,14 +107,39 @@ const AddMcqPage = () => {
         } else {
           setCategories(categoriesData || []);
         }
-        // Removed subcategory fetch
+
+        const { data: subcategoriesData, error: subcategoriesError } = await supabase
+          .from('subcategories')
+          .select('*');
+        if (subcategoriesError) {
+          console.error('Error fetching subcategories:', subcategoriesError);
+          toast({ title: "Error", description: "Failed to load subcategories.", variant: "destructive" });
+        } else {
+          setSubcategories(subcategoriesData || []);
+        }
         setIsPageLoading(false); // Clear loading for this specific fetch
       };
-      fetchCategories();
+      fetchCategoriesAndSubcategories();
     }
   }, [hasCheckedInitialSession, toast]); // Dependencies changed
 
-  // Removed useEffect for filtering available subcategories
+  useEffect(() => {
+    if (selectedCategoryIds && selectedCategoryIds.length > 0) {
+      const filtered = subcategories.filter(sub => selectedCategoryIds.includes(sub.category_id));
+      setAvailableSubcategories(filtered);
+
+      const currentSelectedSubcategories = form.getValues("subcategory_ids") || [];
+      const validSelectedSubcategories = currentSelectedSubcategories.filter(subId =>
+        filtered.some(fSub => fSub.id === subId)
+      );
+      if (validSelectedSubcategories.length !== currentSelectedSubcategories.length) {
+        form.setValue("subcategory_ids", validSelectedSubcategories);
+      }
+    } else {
+      setAvailableSubcategories([]);
+      form.setValue("subcategory_ids", []);
+    }
+  }, [selectedCategoryIds, subcategories, form]);
 
   const handleGenerateWithAI = async () => {
     const { question_text, option_a, option_b, option_c, option_d, correct_answer } = form.getValues();
@@ -131,7 +177,38 @@ const AddMcqPage = () => {
       form.setValue("explanation_text", data.explanation_text);
       form.setValue("difficulty", data.difficulty);
 
-      // Removed subcategory suggestion logic
+      if (data.suggested_subcategory_name) {
+        const currentSelectedCategoryIds = form.getValues("category_ids") || [];
+        if (currentSelectedCategoryIds.length > 0) {
+          const matchedSubcategory = availableSubcategories.find(
+            (sub) => sub.name.toLowerCase() === data.suggested_subcategory_name.toLowerCase() &&
+                     currentSelectedCategoryIds.includes(sub.category_id)
+          );
+          if (matchedSubcategory) {
+            const currentSubcategoryIds = form.getValues("subcategory_ids") || [];
+            if (!currentSubcategoryIds.includes(matchedSubcategory.id)) {
+              form.setValue("subcategory_ids", [...currentSubcategoryIds, matchedSubcategory.id]);
+            }
+            toast({
+              title: "Subcategory Suggested",
+              description: `AI suggested and matched subcategory: "${matchedSubcategory.name}".`,
+              variant: "default",
+            });
+          } else {
+            toast({
+              title: "Subcategory Suggested",
+              description: `AI suggested subcategory "${data.suggested_subcategory_name}", but no match found in selected categories. Please select manually.`,
+              variant: "default",
+            });
+          }
+        } else {
+          toast({
+            title: "Subcategory Suggested",
+            description: `AI suggested subcategory "${data.suggested_subcategory_name}", but a category must be selected first. Please select manually.`,
+            variant: "default",
+          });
+        }
+      }
 
       dismiss(loadingToastId.id);
       toast({
@@ -192,11 +269,25 @@ const AddMcqPage = () => {
 
       // Handle mcq_category_links
       if (values.category_ids && values.category_ids.length > 0) {
-        const linksToInsert = values.category_ids.map(catId => ({
-          mcq_id: mcqData.id,
-          category_id: catId,
-          // Removed subcategory_id
-        }));
+        const linksToInsert = values.category_ids.map(catId => {
+          const selectedSubcategoriesForThisCategory = (values.subcategory_ids || []).filter(subId =>
+            subcategories.some(sub => sub.id === subId && sub.category_id === catId)
+          );
+
+          if (selectedSubcategoriesForThisCategory.length > 0) {
+            return selectedSubcategoriesForThisCategory.map(subId => ({
+              mcq_id: mcqData.id,
+              category_id: catId,
+              subcategory_id: subId,
+            }));
+          } else {
+            return [{
+              mcq_id: mcqData.id,
+              category_id: catId,
+              subcategory_id: null,
+            }];
+          }
+        }).flat();
 
         if (linksToInsert.length > 0) {
           const { error: insertLinkError } = await supabase
@@ -230,7 +321,7 @@ const AddMcqPage = () => {
   if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-gray-700 dark:text-gray-300">Loading categories...</p>
+        <p className="text-gray-700 dark:text-gray-300">Loading categories and subcategories...</p>
       </div>
     );
   }
@@ -367,7 +458,25 @@ const AddMcqPage = () => {
                 )}
               />
 
-              {/* Removed Subcategory MultiSelect */}
+              <FormField
+                control={form.control}
+                name="subcategory_ids"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subcategories (Optional)</FormLabel>
+                    <FormControl>
+                      <MultiSelect
+                        options={availableSubcategories.map(sub => ({ value: sub.id, label: sub.name }))}
+                        selectedValues={field.value || []}
+                        onValueChange={field.onChange}
+                        placeholder="Select subcategories"
+                        disabled={!selectedCategoryIds || selectedCategoryIds.length === 0}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}

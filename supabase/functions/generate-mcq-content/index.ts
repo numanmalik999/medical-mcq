@@ -27,7 +27,7 @@ async function generateExplanationAndDifficulty(
 
   const prompt = `Given the following multiple-choice question, its options, and the correct answer, generate a detailed explanation. The explanation should clearly state why the correct answer is right and why each of the other options is wrong, with each point on a new line.
 After the explanation, include a section titled '### Best Diagnostic Test' with the best diagnostic test to confirm the diagnosis, and another section titled '### Best Initial Treatment' with the best initial treatment.
-Also, assign a relevant subcategory name and a difficulty level (Easy, Medium, Hard) to the question.
+Also, assign a difficulty level (Easy, Medium, Hard) to the question.
 
 Question: ${question}
 Options:
@@ -37,7 +37,7 @@ C: ${options.C}
 D: ${options.D}
 Correct Answer: ${correct_answer}
 
-Please provide the output in a JSON format with three fields: "explanation_text" (string, containing the structured explanation, diagnostic test, and treatment), "difficulty" (string, one of "Easy", "Medium", "Hard"), and "suggested_subcategory_name" (string, e.g., "Cell Biology", "Anatomy", "Pharmacology").
+Please provide the output in a JSON format with two fields: "explanation_text" (string, containing the structured explanation, diagnostic test, and treatment), and "difficulty" (string, one of "Easy", "Medium", "Hard").
 IMPORTANT: Only return the JSON object, no other text or markdown.`;
 
   console.log('OpenAI Prompt:', prompt); // Log the prompt being sent to OpenAI
@@ -61,7 +61,6 @@ IMPORTANT: Only return the JSON object, no other text or markdown.`;
     return {
       explanation_text: parsedContent.explanation_text,
       difficulty: parsedContent.difficulty,
-      suggested_subcategory_name: parsedContent.suggested_subcategory_name || null, // Include suggested subcategory
     };
   } catch (error) {
     console.error('Failed to generate content with OpenAI AI:', error);

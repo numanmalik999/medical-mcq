@@ -2,6 +2,7 @@
 
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useEffect } from "react"; // Import useEffect
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +13,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function ThemeToggle() {
-  const { setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme(); // Get theme and resolvedTheme
+
+  useEffect(() => {
+    console.log("Current theme:", theme);
+    console.log("Resolved theme:", resolvedTheme);
+    // You can also inspect the <html> element in your browser's developer tools
+    // to see if the 'dark' class is being added/removed.
+  }, [theme, resolvedTheme]);
 
   return (
     <DropdownMenu>
@@ -24,13 +32,13 @@ export function ThemeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
+        <DropdownMenuItem onClick={() => { console.log("Setting theme to light"); setTheme("light"); }}>
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
+        <DropdownMenuItem onClick={() => { console.log("Setting theme to dark"); setTheme("dark"); }}>
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
+        <DropdownMenuItem onClick={() => { console.log("Setting theme to system"); setTheme("system"); }}>
           System
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Mail, Phone, MapPin } from 'lucide-react';
+// Removed unused 'Mail', 'Phone', 'MapPin' imports
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 

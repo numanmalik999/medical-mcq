@@ -42,12 +42,14 @@ import BookmarkedMcqsPage from "./pages/BookmarkedMcqsPage"; // Import new page
 import AdminSettingsPage from "./pages/AdminSettingsPage"; // Import new page
 
 import { ThemeProvider } from "@/components/theme-provider"; // Import ThemeProvider
+import { useGoogleAnalytics } from "@/hooks/use-google-analytics"; // Import useGoogleAnalytics hook
 
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { user } = useSession();
+  useGoogleAnalytics(); // Call the hook here to track page views
 
   return (
     <>

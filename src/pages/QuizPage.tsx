@@ -328,7 +328,7 @@ const QuizPage = () => {
             userAnswers: new Map(Object.entries(dbSession.user_answers_json)),
             currentQuestionIndex: dbSession.current_question_index,
             isTrialActiveSession: dbSession.is_trial_session,
-            userId: dbSession.user_id,
+            userId: user.id,
             categoryName: categoryName, // Add for display
             subcategoryName: subcategoryName, // Add for display
           } as LoadedQuizSession;
@@ -1245,19 +1245,19 @@ const QuizPage = () => {
     );
   }
 
+  if (!currentMcq) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
+        <p className="text-gray-700 dark:text-gray-300">Loading current question...</p>
+      </div>
+    );
+  }
+
   if (showResults) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
-        <div className="flex w-full max-w-6xl">
-          <QuizNavigator
-            mcqs={quizQuestions}
-            userAnswers={userAnswers}
-            currentQuestionIndex={currentQuestionIndex}
-            goToQuestion={goToQuestion}
-            showResults={true}
-            score={score}
-          />
-          <Card className="flex-1">
+        <div className="flex flex-col md:flex-row w-full max-w-6xl"> {/* Added flex-col md:flex-row */}
+          <Card className="flex-1 order-first md:order-last"> {/* Added order-first md:order-last */}
             <CardHeader>
               <CardTitle className="text-3xl">Quiz Results</CardTitle>
               <CardDescription>Review your performance on this quiz session.</CardDescription>
@@ -1307,7 +1307,7 @@ const QuizPage = () => {
                           <h4 className="font-semibold">Explanation:</h4>
                           <p>{explanation.explanation_text}</p>
                           {explanation.image_url && (
-                            <img src={explanation.image_url} alt="Explanation" className="mt-2 max-w-full h-auto rounded-md" />
+                            <img src={explanation.image_url} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
                           )}
                         </div>
                       )}
@@ -1320,16 +1320,16 @@ const QuizPage = () => {
               <Button onClick={() => { setShowCategorySelection(true); fetchQuizOverview(); }}>Back to Categories</Button>
             </CardFooter>
           </Card>
+          <QuizNavigator
+            mcqs={quizQuestions}
+            userAnswers={userAnswers}
+            currentQuestionIndex={currentQuestionIndex}
+            goToQuestion={goToQuestion}
+            showResults={true}
+            score={score}
+          />
         </div>
         <MadeWithDyad />
-      </div>
-    );
-  }
-
-  if (!currentMcq) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
-        <p className="text-gray-700 dark:text-gray-300">Loading current question...</p>
       </div>
     );
   }
@@ -1350,16 +1350,8 @@ const QuizPage = () => {
           </Card>
         </div>
       )}
-      <div className="flex w-full max-w-6xl">
-        <QuizNavigator
-          mcqs={quizQuestions}
-          userAnswers={userAnswers}
-          currentQuestionIndex={currentQuestionIndex}
-          goToQuestion={goToQuestion}
-          showResults={false}
-          score={0}
-        />
-        <Card className="flex-1">
+      <div className="flex flex-col md:flex-row w-full max-w-6xl"> {/* Changed to flex-col md:flex-row */}
+        <Card className="flex-1 order-first md:order-last"> {/* Changed order-first md:order-last */}
           <CardHeader>
             <CardTitle className="text-xl">Question {currentQuestionIndex + 1} / {quizQuestions.length}</CardTitle>
             {isTrialActiveSession && (
@@ -1493,6 +1485,14 @@ const QuizPage = () => {
             </DialogContent>
           </Dialog>
         </Card>
+        <QuizNavigator
+          mcqs={quizQuestions}
+          userAnswers={userAnswers}
+          currentQuestionIndex={currentQuestionIndex}
+          goToQuestion={goToQuestion}
+          showResults={false}
+          score={0}
+        />
       </div>
       <MadeWithDyad />
     </div>

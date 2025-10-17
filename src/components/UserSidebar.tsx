@@ -91,7 +91,7 @@ const UserSidebar = () => {
     return (
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50">
+          <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 text-primary-foreground hover:bg-primary/50"> {/* Updated styling */}
             <MenuIcon className="h-6 w-6" />
             <span className="sr-only">Toggle navigation</span>
           </Button>

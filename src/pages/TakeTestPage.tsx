@@ -385,7 +385,7 @@ const TakeTestPage = () => {
             testDurationSeconds: dbSession.test_duration_seconds || 0,
             remainingTimeSeconds: dbSession.remaining_time_seconds || 0,
             skippedMcqIds: new Set(dbSession.skipped_mcq_ids || []),
-            userId: dbSession.user_id,
+            userId: user.id,
           } as LoadedTestSession;
         });
       }
@@ -875,7 +875,7 @@ const TakeTestPage = () => {
       if (nextUnansweredIndex !== -1) {
         setCurrentQuestionIndex(nextUnansweredIndex);
       } else {
-        handleSubmitTest(); // All questions answered, submit test
+        handleSubmitTest();
       }
     }
   }, [currentReviewIndex, reviewSkippedQuestions.length, userAnswers, mcqs, handleSubmitTest]);
@@ -1155,16 +1155,8 @@ const TakeTestPage = () => {
   if (showResults) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-        <div className="flex w-full max-w-6xl">
-          <QuizNavigator
-            mcqs={mcqs}
-            userAnswers={userAnswers}
-            currentQuestionIndex={currentQuestionIndex}
-            goToQuestion={goToQuestion}
-            showResults={true}
-            score={score}
-          />
-          <Card className="flex-1">
+        <div className="flex flex-col md:flex-row w-full max-w-6xl"> {/* Added flex-col md:flex-row */}
+          <Card className="flex-1 order-first md:order-last"> {/* Added order-first md:order-last */}
             <CardHeader>
               <CardTitle className="text-3xl">Test Results</CardTitle>
               <CardDescription>Review your performance on the test.</CardDescription>
@@ -1226,6 +1218,14 @@ const TakeTestPage = () => {
               <Button onClick={() => navigate('/user/dashboard')}>Back to Dashboard</Button>
             </CardFooter>
           </Card>
+          <QuizNavigator
+            mcqs={mcqs}
+            userAnswers={userAnswers}
+            currentQuestionIndex={currentQuestionIndex}
+            goToQuestion={goToQuestion}
+            showResults={true}
+            score={score}
+          />
         </div>
         <MadeWithDyad />
       </div>
@@ -1236,17 +1236,8 @@ const TakeTestPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
-      <div className="flex w-full max-w-6xl">
-        <QuizNavigator
-          mcqs={mcqs}
-          userAnswers={userAnswers}
-          currentQuestionIndex={currentQuestionIndex}
-          goToQuestion={goToQuestion}
-          showResults={false}
-          score={0} // Score is not relevant during test progress
-          skippedMcqIds={skippedMcqIds}
-        />
-        <Card className="flex-1">
+      <div className="flex flex-col md:flex-row w-full max-w-6xl"> {/* Added flex-col md:flex-row */}
+        <Card className="flex-1 order-first md:order-last"> {/* Added order-first md:order-last */}
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-xl">Question {currentQuestionIndex + 1} / {mcqs.length}</CardTitle>
@@ -1255,7 +1246,7 @@ const TakeTestPage = () => {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2 text-lg font-medium">
-              <Button variant="ghost" size="icon" onClick={togglePause} className="h-8 w-8">
+              <Button variant="ghost" size="icon" onClick={togglePause}>
                 {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
                 <span className="sr-only">{isPaused ? "Resume" : "Pause"}</span>
               </Button>
@@ -1308,6 +1299,15 @@ const TakeTestPage = () => {
             </div>
           </CardFooter>
         </Card>
+        <QuizNavigator
+          mcqs={mcqs}
+          userAnswers={userAnswers}
+          currentQuestionIndex={currentQuestionIndex}
+          goToQuestion={goToQuestion}
+          showResults={false}
+          score={0} // Score is not relevant during test progress
+          skippedMcqIds={skippedMcqIds}
+        />
       </div>
       <MadeWithDyad />
 

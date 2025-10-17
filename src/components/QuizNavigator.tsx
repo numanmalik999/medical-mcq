@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle, SkipForward } from "lucide-react"; // Import SkipForward
 import { cn } from "@/lib/utils"; // Import cn utility
 
 // New interface for userAnswers map value, matching QuizPage
@@ -40,9 +40,10 @@ interface QuizNavigatorProps {
   goToQuestion: (index: number) => void;
   showResults: boolean;
   score: number;
+  skippedMcqIds?: Set<string>; // New prop for skipped questions in test mode
 }
 
-const QuizNavigator = ({ mcqs, userAnswers, currentQuestionIndex, goToQuestion, showResults, score }: QuizNavigatorProps) => {
+const QuizNavigator = ({ mcqs, userAnswers, currentQuestionIndex, goToQuestion, showResults, score, skippedMcqIds }: QuizNavigatorProps) => {
   const totalQuestions = mcqs.length;
   const correctPercentage = totalQuestions > 0 ? ((score / totalQuestions) * 100).toFixed(2) : '0.00';
 
@@ -53,36 +54,34 @@ const QuizNavigator = ({ mcqs, userAnswers, currentQuestionIndex, goToQuestion, 
         {mcqs.map((mcq, index) => {
           const userAnswerData = userAnswers.get(mcq.id);
           const isAnswered = userAnswerData?.selectedOption !== null;
-          const isSubmitted = userAnswerData?.submitted;
           const isCorrect = userAnswerData?.isCorrect;
           const isCurrent = index === currentQuestionIndex;
+          const isSkipped = skippedMcqIds?.has(mcq.id); // Check if explicitly skipped
 
           let buttonClass = "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium";
           let icon = null;
 
           if (showResults) {
-            // Logic for final results view
+            // Logic for final results view (after test submission)
             if (isCorrect) {
               buttonClass += " !bg-green-100 !text-green-700 dark:!bg-green-900 dark:!text-green-300";
               icon = <CheckCircle2 className="h-4 w-4" />;
-            } else if (isAnswered && !isCorrect) {
+            } else if (isAnswered && !isCorrect) { // Answered incorrectly
               buttonClass += " !bg-red-100 !text-red-700 dark:!bg-red-900 dark:!text-red-300";
               icon = <XCircle className="h-4 w-4" />;
-            } else { // Not answered
+            } else { // Not answered (could be skipped or just not touched)
               buttonClass += " bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
             }
           } else {
-            // Logic for quiz in progress
-            if (isSubmitted) {
-              if (isCorrect) {
-                buttonClass += " !bg-green-100 !text-green-700 dark:!bg-green-900 dark:!text-green-300";
-                icon = <CheckCircle2 className="h-4 w-4" />;
-              } else { // Submitted but incorrect
-                buttonClass += " !bg-red-100 !text-red-700 dark:!bg-red-900 dark:!text-red-300";
-                icon = <XCircle className="h-4 w-4" />;
-              }
-            } else { // Not submitted yet
-              buttonClass += " bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
+            // Logic for quiz/test in progress
+            if (isAnswered) {
+              buttonClass += " !bg-blue-100 !text-blue-700 dark:!bg-blue-900 dark:!text-blue-300"; // Answered
+              icon = <CheckCircle2 className="h-4 w-4" />;
+            } else if (isSkipped) {
+              buttonClass += " !bg-yellow-100 !text-yellow-700 dark:!bg-yellow-900 dark:!text-yellow-300"; // Skipped
+              icon = <SkipForward className="h-4 w-4" />;
+            } else {
+              buttonClass += " bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"; // Unanswered/Unvisited
             }
           }
 

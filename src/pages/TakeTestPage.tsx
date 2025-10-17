@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { McqCategoryLink } from '@/components/mcq-columns'; // Import McqCategoryLink
 import { Input } from '@/components/ui/input'; // Import Input for number of MCQs and duration
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'; // Added DialogDescription
+import QuizNavigator from '@/components/QuizNavigator'; // Import QuizNavigator
 
 interface MCQ {
   id: string;
@@ -42,6 +43,12 @@ interface Category {
   name: string;
 }
 
+interface UserAnswerData {
+  selectedOption: string | null;
+  isCorrect: boolean | null; // Null during test, true/false after submission
+  submitted: boolean; // False during test, true after submission
+}
+
 const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id'; // Unique ID for the virtual uncategorized category
 
 const TakeTestPage = () => {
@@ -59,7 +66,7 @@ const TakeTestPage = () => {
 
   const [mcqs, setMcqs] = useState<MCQ[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<Map<string, string | null>>(new Map());
+  const [userAnswers, setUserAnswers] = useState<Map<string, UserAnswerData>>(new Map()); // Updated type
   const [isTestSubmitted, setIsTestSubmitted] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state for initial data
   const [timer, setTimer] = useState(testDurationMinutes * 60); // Initialize timer with selected duration
@@ -118,12 +125,24 @@ const TakeTestPage = () => {
     const explanationPromises: Promise<MCQExplanation | null>[] = [];
     const mcqExplanationIds = new Set<string>();
 
+    const finalUserAnswers = new Map(userAnswers); // Create a mutable copy for final processing
+
     for (const mcq of mcqs) {
-      const userAnswer = userAnswers.get(mcq.id);
-      const isCorrect = userAnswer === mcq.correct_answer;
+      const userAnswerData = finalUserAnswers.get(mcq.id);
+      const selectedOption = userAnswerData?.selectedOption || null;
+      const isCorrect = selectedOption === mcq.correct_answer;
+      
       if (isCorrect) {
         correctCount++;
       }
+
+      // Update the userAnswers map with final correctness and submitted status
+      finalUserAnswers.set(mcq.id, {
+        selectedOption: selectedOption,
+        isCorrect: isCorrect,
+        submitted: true,
+      });
+
       // For recording attempts, we need a single category_id and subcategory_id.
       // We'll use the first one from category_links if available.
       const firstCategoryLink = mcq.category_links?.[0];
@@ -132,7 +151,7 @@ const TakeTestPage = () => {
         mcq_id: mcq.id,
         category_id: firstCategoryLink?.category_id || null,
         subcategory_id: firstCategoryLink?.subcategory_id || null,
-        selected_option: userAnswer || 'N/A', // Store 'N/A' if not answered
+        selected_option: selectedOption || 'N/A', // Store 'N/A' if not answered
         is_correct: isCorrect,
       });
       if (mcq.explanation_id && !mcqExplanationIds.has(mcq.explanation_id)) {
@@ -141,6 +160,7 @@ const TakeTestPage = () => {
       }
     }
 
+    setUserAnswers(finalUserAnswers); // Update state with final answers
     setScore(correctCount);
 
     // Fetch all explanations concurrently
@@ -370,11 +390,17 @@ const TakeTestPage = () => {
     setMcqs(selectedMcqs);
     setTimer(testDurationMinutes * 60); // Reset timer for new test
     setCurrentQuestionIndex(0);
-    setUserAnswers(new Map());
+    
+    // Initialize userAnswers for all questions with default values for a test
+    const initialUserAnswers = new Map<string, UserAnswerData>();
+    selectedMcqs.forEach(mcq => {
+      initialUserAnswers.set(mcq.id, { selectedOption: null, isCorrect: null, submitted: false });
+    });
+    setUserAnswers(initialUserAnswers);
+
     setSkippedMcqIds(new Set()); // Reset skipped MCQs
     setIsTestSubmitted(false);
     setScore(0);
-    setShowResults(false);
     setExplanations(new Map());
     setIsPaused(false); // Ensure not paused when starting new test
 
@@ -391,7 +417,12 @@ const TakeTestPage = () => {
 
   const handleOptionSelect = useCallback((value: string) => {
     if (currentMcq) {
-      setUserAnswers((prev) => new Map(prev).set(currentMcq.id, value));
+      setUserAnswers((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(currentMcq.id, { selectedOption: value, isCorrect: null, submitted: false });
+        return newMap;
+      });
+      // If an option is selected, it's no longer skipped
       setSkippedMcqIds((prev) => {
         const newSet = new Set(prev);
         newSet.delete(currentMcq.id);
@@ -421,7 +452,11 @@ const TakeTestPage = () => {
   const handleSkip = useCallback(() => {
     if (currentMcq) {
       setSkippedMcqIds((prev) => new Set(prev).add(currentMcq.id));
-      setUserAnswers((prev) => new Map(prev).set(currentMcq.id, null)); // Mark as unanswered
+      setUserAnswers((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(currentMcq.id, { selectedOption: null, isCorrect: null, submitted: false }); // Mark as unanswered
+        return newMap;
+      });
     }
     handleNext();
   }, [currentMcq, handleNext]);
@@ -448,14 +483,18 @@ const TakeTestPage = () => {
     } else {
       setShowReviewSkippedDialog(false);
       setIsPaused(false); // Resume main timer
-      const nextUnansweredIndex = mcqs.findIndex(mcq => !userAnswers.has(mcq.id) || userAnswers.get(mcq.id) === null);
+      // After review, find the next unanswered question in the original sequence
+      const nextUnansweredIndex = mcqs.findIndex(mcq => {
+        const answerData = userAnswers.get(mcq.id);
+        return !answerData || answerData.selectedOption === null;
+      });
       if (nextUnansweredIndex !== -1) {
         setCurrentQuestionIndex(nextUnansweredIndex);
       } else {
-        handleSubmitTest();
+        handleSubmitTest(); // All questions answered, submit test
       }
     }
-  }, [currentReviewIndex, reviewSkippedQuestions.length, skippedMcqIds, userAnswers, mcqs, handleSubmitTest]);
+  }, [currentReviewIndex, reviewSkippedQuestions.length, userAnswers, mcqs, handleSubmitTest]);
 
   const handleReviewPrevious = useCallback(() => {
     if (currentReviewIndex > 0) {
@@ -471,6 +510,12 @@ const TakeTestPage = () => {
     const s = seconds % 60;
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
+
+  const goToQuestion = useCallback((index: number) => {
+    if (index >= 0 && index < mcqs.length) {
+      setCurrentQuestionIndex(index);
+    }
+  }, [mcqs.length]);
 
   if (!hasCheckedInitialSession || isPageLoading) {
     return (
@@ -613,12 +658,12 @@ const TakeTestPage = () => {
             <ul className="list-disc list-inside space-y-1">
               <li>You will be presented with {mcqs.length} multiple-choice questions.</li>
               <li>You have {formatTime(testDurationMinutes * 60)} to complete the test.</li>
-              <li>Select one option for each question.</li>
-              <li>You can navigate between questions using the "Previous" and "Next" buttons.</li>
-              <li>Your answers will be saved automatically as you select them.</li>
+              <li>Select one option for each question. You can change your answer at any time before submission.</li>
+              <li>You can navigate between questions using the "Previous" and "Next" buttons, or by clicking on the question numbers in the sidebar.</li>
+              <li>Use the "Skip" button to mark a question for later review.</li>
               <li>The test will automatically submit when the time runs out.</li>
-              <li>You can submit the test manually at any time by clicking "Submit Test" on the last question.</li>
-              <li>You can also "Skip" questions and "Pause" the test.</li>
+              <li>You can submit the test manually at any time by clicking "Submit Test" on the last question, or "Review Skipped" if you have skipped questions.</li>
+              <li>You can "Pause" the test at any time.</li>
               <li>Once submitted, you will see your score and can review your answers with explanations.</li>
             </ul>
             <p className="font-semibold text-red-600">Good luck!</p>
@@ -667,131 +712,154 @@ const TakeTestPage = () => {
   if (showResults) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-        <Card className="w-full max-w-4xl">
-          <CardHeader>
-            <CardTitle className="text-3xl">Test Results</CardTitle>
-            <CardDescription>Review your performance on the test.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="text-center text-2xl font-bold">
-              Your Score: {score} / {mcqs.length}
-            </div>
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto p-2 border rounded-md">
-              {mcqs.map((mcq, index) => {
-                const userAnswer = userAnswers.get(mcq.id);
-                const isCorrect = userAnswer === mcq.correct_answer;
-                const explanation = explanations.get(mcq.explanation_id || '');
+        <div className="flex w-full max-w-6xl">
+          <QuizNavigator
+            mcqs={mcqs}
+            userAnswers={userAnswers}
+            currentQuestionIndex={currentQuestionIndex}
+            goToQuestion={goToQuestion}
+            showResults={true}
+            score={score}
+          />
+          <Card className="flex-1">
+            <CardHeader>
+              <CardTitle className="text-3xl">Test Results</CardTitle>
+              <CardDescription>Review your performance on the test.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="text-center text-2xl font-bold">
+                Your Score: {score} / {mcqs.length}
+              </div>
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto p-2 border rounded-md">
+                {mcqs.map((mcq, index) => {
+                  const userAnswer = userAnswers.get(mcq.id)?.selectedOption;
+                  const isCorrect = userAnswers.get(mcq.id)?.isCorrect;
+                  const explanation = explanations.get(mcq.explanation_id || '');
 
-                return (
-                  <div key={mcq.id} className="border-b pb-4 mb-4 last:border-b-0">
-                    <p className="font-semibold text-lg">
-                      {index + 1}. {mcq.question_text}
-                    </p>
-                    <ul className="list-disc list-inside ml-4 mt-2">
-                      {['A', 'B', 'C', 'D'].map((optionKey) => {
-                        const optionText = mcq[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
-                        const isSelected = userAnswer === optionKey;
-                        const isCorrectOption = mcq.correct_answer === optionKey;
+                  return (
+                    <div key={mcq.id} className="border-b pb-4 mb-4 last:border-b-0">
+                      <p className="font-semibold text-lg">
+                        {index + 1}. {mcq.question_text}
+                      </p>
+                      <ul className="list-disc list-inside ml-4 mt-2">
+                        {['A', 'B', 'C', 'D'].map((optionKey) => {
+                          const optionText = mcq[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
+                          const isSelected = userAnswer === optionKey;
+                          const isCorrectOption = mcq.correct_answer === optionKey;
 
-                        let className = "";
-                        if (isSelected && isCorrect) {
-                          className = "text-green-600 font-medium";
-                        } else if (isSelected && !isCorrect) {
-                          className = "text-red-600 font-medium";
-                        } else if (isCorrectOption) {
-                          className = "text-green-600 font-medium";
-                        }
+                          let className = "";
+                          if (isSelected && isCorrect) {
+                            className = "text-green-600 font-medium";
+                          } else if (isSelected && !isCorrect) {
+                            className = "text-red-600 font-medium";
+                          } else if (isCorrectOption) {
+                            className = "text-green-600 font-medium";
+                          }
 
-                        return (
-                          <li key={optionKey} className={className}>
-                            {optionKey}. {optionText}
-                            {isSelected && !isCorrect && <span className="ml-2">(Your Answer)</span>}
-                            {isCorrectOption && <span className="ml-2">(Correct Answer)</span>}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    {explanation && (
-                      <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md text-sm">
-                        <h4 className="font-semibold">Explanation:</h4>
-                        <p>{explanation.explanation_text}</p>
-                        {explanation.image_url && (
-                          <img src={explanation.image_url} alt="Explanation" className="mt-2 max-w-full h-auto rounded-md" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-center">
-            <Button onClick={() => navigate('/user/dashboard')}>Back to Dashboard</Button>
-          </CardFooter>
-        </Card>
+                          return (
+                            <li key={optionKey} className={className}>
+                              {optionKey}. {optionText}
+                              {isSelected && !isCorrect && <span className="ml-2">(Your Answer)</span>}
+                              {isCorrectOption && <span className="ml-2">(Correct Answer)</span>}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      {explanation && (
+                        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md text-sm">
+                          <h4 className="font-semibold">Explanation:</h4>
+                          <p>{explanation.explanation_text}</p>
+                          {explanation.image_url && (
+                            <img src={explanation.image_url} alt="Explanation" className="mt-2 max-w-full h-auto rounded-md" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-center">
+              <Button onClick={() => navigate('/user/dashboard')}>Back to Dashboard</Button>
+            </CardFooter>
+          </Card>
+        </div>
         <MadeWithDyad />
       </div>
     );
   }
 
+  const currentSelectedOption = userAnswers.get(currentMcq.id)?.selectedOption || "";
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-xl">Question {currentQuestionIndex + 1} / {mcqs.length}</CardTitle>
-            <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
-              {currentMcq?.difficulty && `Difficulty: ${currentMcq.difficulty}`}
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2 text-lg font-medium">
-            <Button variant="ghost" size="icon" onClick={togglePause} className="h-8 w-8">
-              {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-              <span className="sr-only">{isPaused ? "Resume" : "Pause"}</span>
-            </Button>
-            <TimerIcon className="h-5 w-5" />
-            <span>{formatTime(timer)}</span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-lg font-semibold mb-4">{currentMcq?.question_text}</p>
-          <RadioGroup
-            onValueChange={handleOptionSelect}
-            value={userAnswers.get(currentMcq?.id || '') || ''}
-            className="space-y-2"
-            disabled={isPaused}
-          >
-            {['A', 'B', 'C', 'D'].map((optionKey) => {
-              const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
-              return (
-                <div key={optionKey} className="flex items-center space-x-2">
-                  <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
-                  <Label htmlFor={`option-${optionKey}`}>{`${optionKey}. ${optionText}`}</Label>
-                </div>
-              );
-            })}
-          </RadioGroup>
-        </CardContent>
-        <CardFooter className="flex justify-between gap-2">
-          <Button onClick={handlePrevious} disabled={currentQuestionIndex === 0 || isPaused} variant="outline">
-            Previous
-          </Button>
-          <div className="flex gap-2">
-            <Button onClick={handleSkip} disabled={isPaused} variant="secondary">
-              <SkipForward className="h-4 w-4 mr-2" /> Skip
-            </Button>
-            {currentQuestionIndex === mcqs.length - 1 ? (
-              <Button onClick={skippedMcqIds.size > 0 ? prepareReviewSkipped : handleSubmitTest} disabled={isPaused}>
-                {skippedMcqIds.size > 0 ? `Review Skipped (${skippedMcqIds.size})` : "Submit Test"}
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
+      <div className="flex w-full max-w-6xl">
+        <QuizNavigator
+          mcqs={mcqs}
+          userAnswers={userAnswers}
+          currentQuestionIndex={currentQuestionIndex}
+          goToQuestion={goToQuestion}
+          showResults={false}
+          score={0} // Score is not relevant during test progress
+          skippedMcqIds={skippedMcqIds}
+        />
+        <Card className="flex-1">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-xl">Question {currentQuestionIndex + 1} / {mcqs.length}</CardTitle>
+              <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
+                {currentMcq?.difficulty && `Difficulty: ${currentMcq.difficulty}`}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2 text-lg font-medium">
+              <Button variant="ghost" size="icon" onClick={togglePause} className="h-8 w-8">
+                {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                <span className="sr-only">{isPaused ? "Resume" : "Pause"}</span>
               </Button>
-            ) : (
-              <Button onClick={handleNext} disabled={isPaused}>
-                Next
+              <TimerIcon className="h-5 w-5" />
+              <span>{formatTime(timer)}</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold mb-4">{currentMcq?.question_text}</p>
+            <RadioGroup
+              onValueChange={handleOptionSelect}
+              value={currentSelectedOption}
+              className="space-y-2"
+              disabled={isPaused}
+            >
+              {['A', 'B', 'C', 'D'].map((optionKey) => {
+                const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
+                return (
+                  <div key={optionKey} className="flex items-center space-x-2">
+                    <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
+                    <Label htmlFor={`option-${optionKey}`}>{`${optionKey}. ${optionText}`}</Label>
+                  </div>
+                );
+              })}
+            </RadioGroup>
+          </CardContent>
+          <CardFooter className="flex justify-between gap-2">
+            <Button onClick={handlePrevious} disabled={currentQuestionIndex === 0 || isPaused} variant="outline">
+              Previous
+            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleSkip} disabled={isPaused} variant="secondary">
+                <SkipForward className="h-4 w-4 mr-2" /> Skip
               </Button>
-            )}
-          </div>
-        </CardFooter>
-      </Card>
+              {currentQuestionIndex === mcqs.length - 1 ? (
+                <Button onClick={skippedMcqIds.size > 0 ? prepareReviewSkipped : handleSubmitTest} disabled={isPaused}>
+                  {skippedMcqIds.size > 0 ? `Review Skipped (${skippedMcqIds.size})` : "Submit Test"}
+                </Button>
+              ) : (
+                <Button onClick={handleNext} disabled={isPaused}>
+                  Next
+                </Button>
+              )}
+            </div>
+          </CardFooter>
+        </Card>
+      </div>
       <MadeWithDyad />
 
       {/* Review Skipped Questions Dialog */}
@@ -812,9 +880,9 @@ const TakeTestPage = () => {
                 onValueChange={(value) => {
                   handleOptionSelect(value); // This will also remove from skippedMcqIds
                   // Update userAnswers for the current review MCQ
-                  setUserAnswers((prev) => new Map(prev).set(currentReviewMcq.id, value));
+                  setUserAnswers((prev) => new Map(prev).set(currentReviewMcq.id, { selectedOption: value, isCorrect: null, submitted: false }));
                 }}
-                value={userAnswers.get(currentReviewMcq.id) || ""}
+                value={userAnswers.get(currentReviewMcq.id)?.selectedOption || ""}
                 className="space-y-2"
               >
                 {['A', 'B', 'C', 'D'].map((optionKey) => {
@@ -834,7 +902,10 @@ const TakeTestPage = () => {
               setShowReviewSkippedDialog(false);
               setIsPaused(false); // Resume timer if user exits review
               // Go back to the main quiz flow, potentially to the next unanswered question or submit
-              const nextUnansweredIndex = mcqs.findIndex(mcq => !userAnswers.has(mcq.id) || userAnswers.get(mcq.id) === null);
+              const nextUnansweredIndex = mcqs.findIndex(mcq => {
+                const answerData = userAnswers.get(mcq.id);
+                return !answerData || answerData.selectedOption === null;
+              });
               if (nextUnansweredIndex !== -1) {
                 setCurrentQuestionIndex(nextUnansweredIndex);
               } else {

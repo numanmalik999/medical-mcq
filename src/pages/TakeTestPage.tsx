@@ -10,7 +10,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate, Link } from 'react-router-dom';
-import { TimerIcon, Pause, Play, SkipForward } from 'lucide-react';
+import { TimerIcon, Pause, Play, SkipForward, Save } from 'lucide-react'; // Added Save icon
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { McqCategoryLink } from '@/components/mcq-columns'; // Import McqCategoryLink
@@ -49,6 +49,37 @@ interface UserAnswerData {
   submitted: boolean; // False during test, true after submission
 }
 
+// Interface for data stored in the database (used internally for typing fetched data)
+interface DbQuizSession {
+  id: string;
+  user_id: string;
+  category_id: string | null;
+  subcategory_id: string | null;
+  mcq_ids_order: string[]; // Array of MCQ IDs
+  current_question_index: number;
+  user_answers_json: { [mcqId: string]: UserAnswerData }; // JSONB object
+  is_trial_session: boolean;
+  test_duration_seconds: number | null; // New
+  remaining_time_seconds: number | null; // New
+  skipped_mcq_ids: string[] | null; // New
+  created_at: string;
+  updated_at: string;
+}
+
+// Client-side representation of a loaded session, including full MCQ objects
+interface LoadedTestSession {
+  dbSessionId: string; // The ID from the database
+  categoryIds: string[]; // Can be multiple for tests
+  categoryNames: string[]; // For display
+  mcqs: MCQ[]; // Full MCQ objects
+  userAnswers: Map<string, UserAnswerData>;
+  currentQuestionIndex: number;
+  testDurationSeconds: number; // New
+  remainingTimeSeconds: number; // New
+  skippedMcqIds: Set<string>; // New
+  userId: string;
+}
+
 const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id'; // Unique ID for the virtual uncategorized category
 
 const TakeTestPage = () => {
@@ -80,6 +111,9 @@ const TakeTestPage = () => {
   const [reviewSkippedQuestions, setReviewSkippedQuestions] = useState<MCQ[]>([]);
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
 
+  const [currentDbSessionId, setCurrentDbSessionId] = useState<string | null>(null); // New: Track the DB session ID
+  const [activeSavedTests, setActiveSavedTests] = useState<LoadedTestSession[]>([]); // New: List of saved tests
+
   const timerIntervalRef = useRef<number | null>(null);
 
   // Memoized function to fetch a single explanation
@@ -107,6 +141,102 @@ const TakeTestPage = () => {
     }
     return null;
   }, [explanations, toast]);
+
+  // Function to save test state to the database
+  const saveTestState = useCallback(async (
+    dbSessionId: string | null,
+    categoryIds: string[],
+    mcqs: MCQ[],
+    answers: Map<string, UserAnswerData>,
+    index: number,
+    duration: number, // original test duration in seconds
+    remaining: number, // remaining time in seconds
+    skipped: Set<string>,
+    currentUserId: string
+  ): Promise<{ id: string; sessionData: DbQuizSession } | null> => {
+    if (!currentUserId) {
+      console.warn("Cannot save test state: User not logged in.");
+      return null;
+    }
+
+    const mcqIdsOrder = mcqs.map(m => m.id);
+    const userAnswersJson = Object.fromEntries(answers);
+    const skippedMcqIdsArray = Array.from(skipped);
+
+    // For simplicity, we'll store the first category ID as category_id in user_quiz_sessions
+    // and rely on mcq_ids_order to reconstruct the test.
+    const primaryCategoryId = categoryIds.length > 0 ? categoryIds[0] : null;
+
+    const sessionData = {
+      user_id: currentUserId,
+      category_id: primaryCategoryId, // Store primary category for display/grouping
+      subcategory_id: null, // Not directly used for multi-category tests
+      mcq_ids_order: mcqIdsOrder,
+      current_question_index: index,
+      user_answers_json: userAnswersJson,
+      is_trial_session: false, // Tests are not trial sessions
+      test_duration_seconds: duration,
+      remaining_time_seconds: remaining,
+      skipped_mcq_ids: skippedMcqIdsArray,
+    };
+
+    try {
+      if (dbSessionId) {
+        // Update existing session
+        const { data, error } = await supabase
+          .from('user_quiz_sessions')
+          .update({ ...sessionData, updated_at: new Date().toISOString() })
+          .eq('id', dbSessionId)
+          .select('id')
+          .single();
+
+        if (error) throw error;
+        console.log(`Test session ${dbSessionId} updated in DB.`);
+        return { id: data.id, sessionData: { ...sessionData, id: data.id, created_at: '', updated_at: new Date().toISOString() } as DbQuizSession };
+      } else {
+        // Insert new session
+        const { data, error } = await supabase
+          .from('user_quiz_sessions')
+          .insert(sessionData)
+          .select('id, created_at, updated_at')
+          .single();
+
+        if (error) throw error;
+        setCurrentDbSessionId(data.id); // Store the new session ID
+        console.log(`New test session ${data.id} created in DB.`);
+        return { id: data.id, sessionData: { ...sessionData, id: data.id, created_at: data.created_at, updated_at: data.updated_at } as DbQuizSession };
+      }
+    } catch (error: any) {
+      console.error("Error saving test state to DB:", error);
+      toast({
+        title: "Error",
+        description: `Failed to save test progress: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+      return null;
+    }
+  }, [toast]);
+
+  // Function to clear a specific test session from the database
+  const clearSpecificTestState = useCallback(async (dbSessionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_quiz_sessions')
+        .delete()
+        .eq('id', dbSessionId);
+
+      if (error) throw error;
+      console.log(`Test session ${dbSessionId} deleted from DB.`);
+      setActiveSavedTests(prev => prev.filter(session => session.dbSessionId !== dbSessionId));
+    } catch (error: any) {
+      console.error("Error clearing test state from DB:", error);
+      toast({
+        title: "Error",
+        description: `Failed to clear test progress: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
   const handleSubmitTest = useCallback(async () => {
     if (!user) {
@@ -185,28 +315,17 @@ const TakeTestPage = () => {
         });
       }
     }
-  }, [user, mcqs, userAnswers, toast, fetchExplanation]);
 
-  // Initial load: Fetch all categories
+    if (currentDbSessionId) {
+      clearSpecificTestState(currentDbSessionId); // Clear saved state after test submission
+    }
+  }, [user, mcqs, userAnswers, toast, fetchExplanation, currentDbSessionId, clearSpecificTestState]);
+
+  // Initial load: Fetch all categories and saved tests
   useEffect(() => {
     if (hasCheckedInitialSession) {
       if (user && user.has_active_subscription) {
-        const fetchCategories = async () => {
-          setIsPageLoading(true); // Set loading for this specific fetch
-          const { data, error } = await supabase
-            .from('categories')
-            .select('*');
-
-          if (error) {
-            console.error('Error fetching categories:', error);
-            toast({ title: "Error", description: "Failed to load categories for test configuration.", variant: "destructive" });
-          } else {
-            // Add the virtual "Uncategorized" category
-            setAllCategories([...(data || []), { id: UNCATEGORIZED_ID, name: 'Uncategorized' }]);
-          }
-          setIsPageLoading(false); // Clear loading for this specific fetch
-        };
-        fetchCategories();
+        fetchTestOverview();
       } else if (user && !user.has_active_subscription) {
         setIsPageLoading(false); // User is logged in but not subscribed, stop loading
       } else {
@@ -214,6 +333,66 @@ const TakeTestPage = () => {
       }
     }
   }, [user, hasCheckedInitialSession, navigate, toast]);
+
+  const fetchTestOverview = async () => {
+    setIsPageLoading(true); // Set loading for this specific fetch
+
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from('categories')
+      .select('*');
+
+    if (categoriesError) {
+      console.error('Error fetching categories:', categoriesError);
+      toast({ title: "Error", description: "Failed to load categories for test configuration.", variant: "destructive" });
+      setIsPageLoading(false);
+      return;
+    } else {
+      // Add the virtual "Uncategorized" category
+      setAllCategories([...(categoriesData || []), { id: UNCATEGORIZED_ID, name: 'Uncategorized' }]);
+    }
+
+    // Fetch saved test sessions
+    let loadedSavedTests: LoadedTestSession[] = [];
+    if (user) {
+      const { data: dbSessions, error: dbSessionsError } = await supabase
+        .from('user_quiz_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_trial_session', false) // Only fetch non-trial sessions (tests)
+        .order('updated_at', { ascending: false });
+
+      if (dbSessionsError) {
+        console.error('Error fetching saved test sessions from DB:', dbSessionsError);
+        toast({ title: "Error", description: "Failed to load saved test sessions.", variant: "destructive" });
+      } else {
+        loadedSavedTests = dbSessions.map((dbSession: DbQuizSession) => {
+          // Reconstruct categoryIds from mcq_ids_order if needed, or use the stored category_id
+          // For simplicity, we'll use the stored category_id for display, but a full reconstruction
+          // would involve fetching mcq_category_links for each MCQ in mcq_ids_order.
+          const categoryName = categoriesData?.find(c => c.id === dbSession.category_id)?.name || 'Mixed Categories';
+          return {
+            dbSessionId: dbSession.id,
+            categoryIds: dbSession.category_id ? [dbSession.category_id] : [], // Simplified for display
+            categoryNames: [categoryName],
+            mcqs: dbSession.mcq_ids_order.map((id: string) => ({
+              id,
+              question_text: 'Loading...', // Placeholder
+              option_a: '', option_b: '', option_c: '', option_d: '',
+              correct_answer: 'A', explanation_id: null, difficulty: null, is_trial_mcq: null, category_links: [],
+            })),
+            userAnswers: new Map(Object.entries(dbSession.user_answers_json)),
+            currentQuestionIndex: dbSession.current_question_index,
+            testDurationSeconds: dbSession.test_duration_seconds || 0,
+            remainingTimeSeconds: dbSession.remaining_time_seconds || 0,
+            skippedMcqIds: new Set(dbSession.skipped_mcq_ids || []),
+            userId: dbSession.user_id,
+          } as LoadedTestSession;
+        });
+      }
+    }
+    setActiveSavedTests(loadedSavedTests);
+    setIsPageLoading(false); // Clear loading for this specific fetch
+  };
 
   // Timer effect
   useEffect(() => {
@@ -249,10 +428,43 @@ const TakeTestPage = () => {
     };
   }, [isPageLoading, isTestSubmitted, showResults, showConfiguration, showInstructions, mcqs.length, isPaused, handleSubmitTest]);
 
-  // Update timer when testDurationMinutes changes
+  // Auto-save effect
   useEffect(() => {
-    setTimer(testDurationMinutes * 60);
-  }, [testDurationMinutes]);
+    if (user && currentDbSessionId && !showConfiguration && !showInstructions && !showResults && !isTestSubmitted && mcqs.length > 0) {
+      const timeoutId = setTimeout(() => {
+        console.log("Auto-saving test progress...");
+        saveTestState(
+          currentDbSessionId,
+          selectedCategoryIds, // Use current selected categories for saving
+          mcqs,
+          userAnswers,
+          currentQuestionIndex,
+          testDurationMinutes * 60, // Original duration
+          timer, // Remaining time
+          skippedMcqIds,
+          user.id
+        );
+      }, 5000); // Save every 5 seconds of activity
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [
+    user,
+    currentDbSessionId,
+    showConfiguration,
+    showInstructions,
+    showResults,
+    isTestSubmitted,
+    mcqs,
+    userAnswers,
+    currentQuestionIndex,
+    testDurationMinutes,
+    timer,
+    skippedMcqIds,
+    saveTestState,
+    selectedCategoryIds
+  ]);
+
 
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategoryIds((prev) => {
@@ -407,6 +619,178 @@ const TakeTestPage = () => {
     setShowConfiguration(false);
     setShowInstructions(true);
     setIsPageLoading(false);
+
+    // Create a new session in the database
+    if (user) {
+      const savedSessionResult = await saveTestState(
+        null, // No existing session ID
+        selectedCategoryIds,
+        selectedMcqs,
+        initialUserAnswers,
+        0, // currentQuestionIndex
+        testDurationMinutes * 60, // original duration
+        testDurationMinutes * 60, // remaining time
+        new Set(), // skipped MCQs
+        user.id
+      );
+      if (savedSessionResult) {
+        const categoryNames = selectedCategoryIds.map(id => allCategories.find(c => c.id === id)?.name || 'Unknown').filter(Boolean) as string[];
+        setActiveSavedTests(prev => [
+          {
+            dbSessionId: savedSessionResult.id,
+            categoryIds: selectedCategoryIds,
+            categoryNames: categoryNames.length > 0 ? categoryNames : ['All Categories'],
+            mcqs: selectedMcqs,
+            userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
+            currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
+            testDurationSeconds: savedSessionResult.sessionData.test_duration_seconds || 0,
+            remainingTimeSeconds: savedSessionResult.sessionData.remaining_time_seconds || 0,
+            skippedMcqIds: new Set(savedSessionResult.sessionData.skipped_mcq_ids || []),
+            userId: user.id,
+          },
+          ...prev,
+        ]);
+      }
+    }
+  };
+
+  const continueTestSession = useCallback(async (loadedSession: LoadedTestSession) => {
+    setIsPageLoading(true);
+    setCurrentDbSessionId(loadedSession.dbSessionId);
+    setSelectedCategoryIds(loadedSession.categoryIds); // Restore selected categories for auto-save
+    setNumMcqsToSelect(loadedSession.mcqs.length); // Restore number of MCQs
+    setTestDurationMinutes(loadedSession.testDurationSeconds / 60); // Restore original duration
+
+    // Fetch full MCQ objects based on mcq_ids_order from the loaded session
+    const { data: mcqsData, error: mcqsError } = await supabase
+      .from('mcqs')
+      .select(`
+        *,
+        mcq_category_links (
+          category_id,
+          subcategory_id,
+          categories (name),
+          subcategories (name)
+        )
+      `)
+      .in('id', loadedSession.mcqs.map(m => m.id)) // Use the IDs from the placeholder MCQs
+      .order('created_at', { ascending: true }); // Maintain original order if possible
+
+    if (mcqsError) {
+      console.error('Error fetching MCQs for resumed session:', mcqsError);
+      toast({ title: "Error", description: "Failed to load test questions for your saved session.", variant: "destructive" });
+      setIsPageLoading(false);
+      return;
+    }
+
+    const formattedMcqs: MCQ[] = mcqsData.map((mcq: any) => ({
+      ...mcq,
+      category_links: mcq.mcq_category_links.map((link: any) => ({
+        category_id: link.category_id,
+        category_name: link.categories?.name || null,
+        subcategory_id: link.subcategory_id,
+        subcategory_name: link.subcategories?.name || null,
+      })),
+    }));
+
+    // Reorder fetched MCQs to match mcq_ids_order
+    const orderedMcqs = loadedSession.mcqs.map(loadedMcq => 
+      formattedMcqs.find(fetchedMcq => fetchedMcq.id === loadedMcq.id)
+    ).filter((mcq): mcq is MCQ => mcq !== undefined);
+
+    setMcqs(orderedMcqs);
+    setUserAnswers(loadedSession.userAnswers);
+    setCurrentQuestionIndex(loadedSession.currentQuestionIndex);
+    setTimer(loadedSession.remainingTimeSeconds);
+    setSkippedMcqIds(loadedSession.skippedMcqIds);
+
+    setShowConfiguration(false);
+    setShowInstructions(false); // Directly jump into test
+    setIsPageLoading(false);
+    toast({
+      title: "Test Resumed",
+      description: "Continuing from where you left off.",
+      duration: 3000,
+    });
+  }, [toast]);
+
+  const handleSaveProgress = async () => {
+    if (!user) {
+      toast({
+        title: "Cannot Save",
+        description: "You must be logged in to save test progress.",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
+    if (currentDbSessionId && mcqs.length > 0) {
+      const savedSessionResult = await saveTestState(
+        currentDbSessionId,
+        selectedCategoryIds,
+        mcqs,
+        userAnswers,
+        currentQuestionIndex,
+        testDurationMinutes * 60,
+        timer,
+        skippedMcqIds,
+        user.id
+      );
+
+      if (savedSessionResult) {
+        const categoryNames = selectedCategoryIds.map(id => allCategories.find(c => c.id === id)?.name || 'Unknown').filter(Boolean) as string[];
+        setActiveSavedTests(prev => {
+          const existingIndex = prev.findIndex(session => session.dbSessionId === savedSessionResult.id);
+          if (existingIndex > -1) {
+            // Update existing session in the list
+            const updatedPrev = [...prev];
+            updatedPrev[existingIndex] = {
+              dbSessionId: savedSessionResult.id,
+              categoryIds: selectedCategoryIds,
+              categoryNames: categoryNames.length > 0 ? categoryNames : ['All Categories'],
+              mcqs: mcqs,
+              userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
+              currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
+              testDurationSeconds: savedSessionResult.sessionData.test_duration_seconds || 0,
+              remainingTimeSeconds: savedSessionResult.sessionData.remaining_time_seconds || 0,
+              skippedMcqIds: new Set(savedSessionResult.sessionData.skipped_mcq_ids || []),
+              userId: user.id,
+            };
+            return updatedPrev;
+          } else {
+            // Add new session to the list (should ideally not happen if currentDbSessionId is set)
+            return [
+              {
+                dbSessionId: savedSessionResult.id,
+                categoryIds: selectedCategoryIds,
+                categoryNames: categoryNames.length > 0 ? categoryNames : ['All Categories'],
+                mcqs: mcqs,
+                userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
+                currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
+                testDurationSeconds: savedSessionResult.sessionData.test_duration_seconds || 0,
+                remainingTimeSeconds: savedSessionResult.sessionData.remaining_time_seconds || 0,
+                skippedMcqIds: new Set(savedSessionResult.sessionData.skipped_mcq_ids || []),
+                userId: user.id,
+              },
+              ...prev,
+            ];
+          }
+        });
+
+        toast({
+          title: "Progress Saved!",
+          description: "Your test progress has been saved.",
+          duration: 3000,
+        });
+      }
+    } else {
+      toast({
+        title: "Cannot Save",
+        description: "No active test session to save.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
   };
 
   const beginTest = () => {
@@ -431,6 +815,18 @@ const TakeTestPage = () => {
     }
   }, [currentMcq]);
 
+  const prepareReviewSkipped = useCallback(() => {
+    const skippedQuestions = mcqs.filter(mcq => skippedMcqIds.has(mcq.id));
+    if (skippedQuestions.length > 0) {
+      setReviewSkippedQuestions(skippedQuestions);
+      setCurrentReviewIndex(0);
+      setShowReviewSkippedDialog(true);
+      setIsPaused(true); // Pause main timer during review
+    } else {
+      handleSubmitTest(); // No skipped questions, submit test
+    }
+  }, [mcqs, skippedMcqIds, handleSubmitTest]);
+
   const handleNext = useCallback(() => {
     if (currentQuestionIndex < mcqs.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
@@ -441,7 +837,7 @@ const TakeTestPage = () => {
         handleSubmitTest();
       }
     }
-  }, [currentQuestionIndex, mcqs.length, skippedMcqIds, handleSubmitTest]);
+  }, [currentQuestionIndex, mcqs.length, skippedMcqIds, handleSubmitTest, prepareReviewSkipped]);
 
   const handlePrevious = useCallback(() => {
     if (currentQuestionIndex > 0) {
@@ -464,18 +860,6 @@ const TakeTestPage = () => {
   const togglePause = useCallback(() => {
     setIsPaused((prev) => !prev);
   }, []);
-
-  const prepareReviewSkipped = useCallback(() => {
-    const skippedQuestions = mcqs.filter(mcq => skippedMcqIds.has(mcq.id));
-    if (skippedQuestions.length > 0) {
-      setReviewSkippedQuestions(skippedQuestions);
-      setCurrentReviewIndex(0);
-      setShowReviewSkippedDialog(true);
-      setIsPaused(true); // Pause main timer during review
-    } else {
-      handleSubmitTest(); // No skipped questions, submit test
-    }
-  }, [mcqs, skippedMcqIds, handleSubmitTest]);
 
   const handleReviewNext = useCallback(() => {
     if (currentReviewIndex < reviewSkippedQuestions.length - 1) {
@@ -516,6 +900,32 @@ const TakeTestPage = () => {
       setCurrentQuestionIndex(index);
     }
   }, [mcqs.length]);
+
+  const handleBackToConfiguration = () => {
+    const isCurrentTestSaved = currentDbSessionId && activeSavedTests.some(session => session.dbSessionId === currentDbSessionId);
+
+    if (!isCurrentTestSaved && mcqs.length > 0 && !isTestSubmitted) {
+      if (!window.confirm("Are you sure you want to end this test session and go back to configuration? Your current unsaved progress will be lost.")) {
+        return; // User cancelled
+      }
+    }
+
+    // Reset all test-related states
+    setMcqs([]);
+    setUserAnswers(new Map());
+    setCurrentQuestionIndex(0);
+    setIsTestSubmitted(false);
+    setTimer(testDurationMinutes * 60); // Reset timer to default config value
+    setScore(0);
+    setExplanations(new Map());
+    setIsPaused(false);
+    setSkippedMcqIds(new Set());
+    setShowResults(false);
+    setShowConfiguration(true);
+    setShowInstructions(false);
+    setCurrentDbSessionId(null);
+    fetchTestOverview(); // Refresh saved tests list
+  };
 
   if (!hasCheckedInitialSession || isPageLoading) {
     return (
@@ -562,6 +972,39 @@ const TakeTestPage = () => {
             <CardDescription>Select categories, difficulty, number of questions, and test duration.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {activeSavedTests.length > 0 && (
+              <Card className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-950">
+                <CardHeader>
+                  <CardTitle className="text-blue-700 dark:text-blue-300">Continue Your Saved Tests</CardTitle>
+                  <CardDescription className="text-blue-600 dark:text-blue-400">
+                    Pick up where you left off in any of your saved test sessions.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {activeSavedTests.map((savedState) => {
+                    const progress = savedState.currentQuestionIndex + 1;
+                    const total = savedState.mcqs.length;
+                    const remainingTime = formatTime(savedState.remainingTimeSeconds);
+
+                    return (
+                      <div key={savedState.dbSessionId} className="flex flex-col sm:flex-row items-center justify-between p-3 border rounded-md bg-white dark:bg-gray-800">
+                        <div>
+                          <p className="font-semibold">{savedState.categoryNames.join(', ')}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Question {progress} of {total} | Time Left: {remainingTime}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 mt-2 sm:mt-0">
+                          <Button onClick={() => continueTestSession(savedState)} size="sm">Continue</Button>
+                          <Button onClick={() => clearSpecificTestState(savedState.dbSessionId)} variant="outline" size="sm">Clear</Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
+
             <div className="space-y-2">
               <Label className="text-lg font-semibold">Select Categories (Optional)</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border rounded-md">
@@ -693,7 +1136,7 @@ const TakeTestPage = () => {
             </p>
           </CardContent>
           <CardFooter className="flex justify-center">
-            <Button onClick={() => setShowConfiguration(true)}>Go Back to Configuration</Button>
+            <Button onClick={handleBackToConfiguration}>Go Back to Configuration</Button>
           </CardFooter>
         </Card>
         <MadeWithDyad />
@@ -840,10 +1283,16 @@ const TakeTestPage = () => {
             </RadioGroup>
           </CardContent>
           <CardFooter className="flex justify-between gap-2">
-            <Button onClick={handlePrevious} disabled={currentQuestionIndex === 0 || isPaused} variant="outline">
-              Previous
+            <Button onClick={handleBackToConfiguration} variant="outline" disabled={isPaused}>
+              Back to Configuration
             </Button>
             <div className="flex gap-2">
+              <Button onClick={handleSaveProgress} variant="secondary" disabled={isPaused || !currentDbSessionId || !user}>
+                <Save className="h-4 w-4 mr-2" /> Save Progress
+              </Button>
+              <Button onClick={handlePrevious} disabled={currentQuestionIndex === 0 || isPaused} variant="outline">
+                Previous
+              </Button>
               <Button onClick={handleSkip} disabled={isPaused} variant="secondary">
                 <SkipForward className="h-4 w-4 mr-2" /> Skip
               </Button>

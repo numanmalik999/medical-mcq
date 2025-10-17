@@ -230,7 +230,7 @@ const AddMcqPage = () => {
   if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-gray-700 dark:text-gray-300">Loading categories and subcategories...</p>
+        <p className="text-gray-700 dark:text-gray-300">Loading categories...</p>
       </div>
     );
   }

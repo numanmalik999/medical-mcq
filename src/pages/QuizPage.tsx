@@ -515,8 +515,8 @@ const QuizPage = () => {
       category_links: mcq.mcq_category_links.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
-        subcategory_id: null, // Subcategory is disabled
-        subcategory_name: null, // Subcategory is disabled
+        // Removed subcategory_id
+        // Removed subcategory_name
       })),
     }));
 
@@ -622,8 +622,8 @@ const QuizPage = () => {
       category_links: mcq.mcq_category_links.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
-        subcategory_id: null, // Subcategory is disabled
-        subcategory_name: null, // Subcategory is disabled
+        // Removed subcategory_id
+        // Removed subcategory_name
       })),
     }));
 

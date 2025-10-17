@@ -33,7 +33,7 @@ interface EditMcqDialogProps {
 }
 
 const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) => {
-  const { toast, dismiss } = useToast();
+  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -186,14 +186,12 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
       
       // Removed subcategory suggestion logic
 
-      dismiss(loadingToastId.id);
       toast({
         title: "AI Generation Complete!",
         description: "Explanation and difficulty have been generated. Please review.",
         variant: "default",
       });
     } catch (error: any) {
-      dismiss(loadingToastId.id);
       console.error("Error generating with AI:", error);
       toast({
         title: "AI Generation Failed",

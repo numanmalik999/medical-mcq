@@ -43,8 +43,6 @@ interface Category {
   name: string;
 }
 
-// Removed Subcategory interface
-
 interface UserAnswerData {
   selectedOption: string | null;
   isCorrect: boolean | null; // Null during test, true/false after submission
@@ -581,8 +579,8 @@ const TakeTestPage = () => {
       category_links: mcq.mcq_category_links.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
-        subcategory_id: null, // Subcategory is disabled
-        subcategory_name: null, // Subcategory is disabled
+        // Removed subcategory_id
+        // Removed subcategory_name
       })),
     }));
 
@@ -682,8 +680,8 @@ const TakeTestPage = () => {
       category_links: mcq.mcq_category_links.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
-        subcategory_id: null, // Subcategory is disabled
-        subcategory_name: null, // Subcategory is disabled
+        // Removed subcategory_id
+        // Removed subcategory_name
       })),
     }));
 

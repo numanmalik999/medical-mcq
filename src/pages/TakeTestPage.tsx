@@ -382,7 +382,7 @@ const TakeTestPage = () => {
             testDurationSeconds: dbSession.test_duration_seconds || 0,
             remainingTimeSeconds: dbSession.remaining_time_seconds || 0,
             skippedMcqIds: new Set(dbSession.skipped_mcq_ids || []),
-            userId: dbSession.user_id,
+            userId: user.id,
           } as LoadedTestSession;
         });
       }
@@ -493,14 +493,13 @@ const TakeTestPage = () => {
 
     setIsPageLoading(true);
 
-    let mcqsData: any[] | null = null;
-    let mcqsError: any = null;
+    let mcqIdsToFilter: string[] | null = null; // This will hold the final list of MCQ IDs after category filtering
 
     const isUncategorizedSelected = selectedCategoryIds.includes(UNCATEGORIZED_ID);
     const regularCategoryIds = selectedCategoryIds.filter(id => id !== UNCATEGORIZED_ID);
 
     if (isUncategorizedSelected && regularCategoryIds.length === 0) {
-      // Fetch MCQs that are NOT in mcq_category_links
+      // Logic for Uncategorized MCQs
       const { data: categorizedMcqLinks, error: linksError } = await supabase
         .from('mcq_category_links')
         .select('mcq_id');
@@ -511,52 +510,77 @@ const TakeTestPage = () => {
         setIsPageLoading(false);
         return;
       }
-
       const categorizedMcqIds = Array.from(new Set(categorizedMcqLinks?.map(link => link.mcq_id) || []));
 
-      const { data, error } = await supabase
+      const { data: allMcqIds, error: allMcqIdsError } = await supabase
         .from('mcqs')
-        .select(`
-          *,
-          mcq_category_links (
-            category_id,
-            categories (name)
-          )
-        `)
-        .not('id', 'in', `(${categorizedMcqIds.join(',')})`); // Filter for MCQs not in any category
+        .select('id');
 
-      mcqsData = data;
-      mcqsError = error;
+      if (allMcqIdsError) {
+        console.error('Error fetching all MCQ IDs for uncategorized filter:', allMcqIdsError);
+        toast({ title: "Error", description: "Failed to fetch all MCQs for uncategorized filter.", variant: "destructive" });
+        setIsPageLoading(false);
+        return;
+      }
+      const allMcqIdsSet = new Set(allMcqIds?.map(mcq => mcq.id) || []);
+      mcqIdsToFilter = Array.from(allMcqIdsSet).filter(id => !categorizedMcqIds.includes(id));
 
     } else if (regularCategoryIds.length > 0) {
-      // Fetch MCQs from selected categories
-      const { data, error } = await supabase
-        .from('mcqs')
-        .select(`
-          *,
-          mcq_category_links (
-            category_id,
-            categories (name)
-          )
-        `)
-        .in('mcq_category_links.category_id', regularCategoryIds);
+      // Refactored: First get MCQ IDs from mcq_category_links
+      const { data: filteredLinks, error: linksError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id')
+        .in('category_id', regularCategoryIds);
 
-      mcqsData = data;
-      mcqsError = error;
+      if (linksError) {
+        console.error('Error fetching filtered MCQ links:', linksError);
+        toast({ title: "Error", description: "Failed to filter MCQs by category.", variant: "destructive" });
+        setIsPageLoading(false);
+        return;
+      }
+      mcqIdsToFilter = Array.from(new Set(filteredLinks?.map(link => link.mcq_id) || []));
+
     } else {
-      // No categories selected, fetch all MCQs
-      const { data, error } = await supabase
+      // No categories selected, fetch all MCQ IDs
+      const { data: allMcqIds, error: allMcqIdsError } = await supabase
         .from('mcqs')
-        .select(`
-          *,
-          mcq_category_links (
-            category_id,
-            categories (name)
-          )
-        `);
-      mcqsData = data;
-      mcqsError = error;
+        .select('id');
+      if (allMcqIdsError) {
+        console.error('Error fetching all MCQ IDs:', allMcqIdsError);
+        toast({ title: "Error", description: "Failed to fetch all MCQs.", variant: "destructive" });
+        setIsPageLoading(false);
+        return;
+      }
+      mcqIdsToFilter = allMcqIds?.map(mcq => mcq.id) || [];
     }
+
+    // If no MCQs found after category filtering, return early
+    if (mcqIdsToFilter !== null && mcqIdsToFilter.length === 0) {
+      toast({ title: "No MCQs", description: "No MCQs available for the selected criteria.", variant: "default" });
+      setIsPageLoading(false);
+      return;
+    }
+
+    // Now, fetch the actual MCQ data using the filtered IDs and apply other filters
+    let mcqsQuery = supabase
+      .from('mcqs')
+      .select(`
+        *,
+        mcq_category_links (
+          category_id,
+          categories (name)
+        )
+      `);
+
+    if (mcqIdsToFilter !== null) {
+      mcqsQuery = mcqsQuery.in('id', mcqIdsToFilter);
+    }
+
+    if (selectedDifficulty && selectedDifficulty !== "all") {
+      mcqsQuery = mcqsQuery.eq('difficulty', selectedDifficulty);
+    }
+
+    const { data: mcqsData, error: mcqsError } = await mcqsQuery;
 
     if (mcqsError) {
       console.error('Error fetching MCQs:', mcqsError);

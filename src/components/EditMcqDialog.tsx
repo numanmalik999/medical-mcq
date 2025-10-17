@@ -23,11 +23,7 @@ interface Category {
   name: string;
 }
 
-interface Subcategory {
-  id: string;
-  category_id: string;
-  name: string;
-}
+// Removed Subcategory interface
 
 interface EditMcqDialogProps {
   open: boolean;
@@ -41,8 +37,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  const [availableSubcategories, setAvailableSubcategories] = useState<Subcategory[]>([]); // Subcategories filtered by selected categories
+  // Removed subcategories and availableSubcategories states
 
   // Define formSchema inside the component to access `subcategories` state
   const formSchema = z.object({
@@ -57,27 +52,11 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
     explanation_text: z.string().min(1, "Explanation text is required."),
     image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
     category_ids: z.array(z.string().uuid("Invalid category ID.")).optional(), // Now an array
-    subcategory_ids: z.array(z.string().uuid("Invalid subcategory ID.")).optional(), // Now an array
+    // Removed subcategory_ids from schema
     difficulty: z.string().optional().or(z.literal('')),
     is_trial_mcq: z.boolean().optional(),
-  }).refine((data) => {
-    // If subcategories are selected, at least one category must be selected
-    if (data.subcategory_ids && data.subcategory_ids.length > 0 && (!data.category_ids || data.category_ids.length === 0)) {
-      return false;
-    }
-    // Also, ensure selected subcategories belong to selected categories
-    if (data.subcategory_ids && data.subcategory_ids.length > 0 && data.category_ids && data.category_ids.length > 0) {
-      const selectedSubcategoryObjects = subcategories.filter((sub: Subcategory) => data.subcategory_ids?.includes(sub.id));
-      const allSelectedSubcategoriesBelongToSelectedCategories = selectedSubcategoryObjects.every((sub: Subcategory) => data.category_ids?.includes(sub.category_id));
-      if (!allSelectedSubcategoriesBelongToSelectedCategories) {
-        return false;
-      }
-    }
-    return true;
-  }, {
-    message: "Selected subcategories must belong to selected categories, and a category must be selected if a subcategory is chosen.",
-    path: ["subcategory_ids"],
   });
+  // Removed .refine for subcategory validation
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -91,17 +70,17 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
       explanation_text: "",
       image_url: "",
       category_ids: [], // Initialize as empty array
-      subcategory_ids: [], // Initialize as empty array
+      // Removed subcategory_ids from default values
       difficulty: "",
       is_trial_mcq: false,
     },
   });
 
-  const selectedCategoryIds = form.watch("category_ids");
+  // Removed selectedCategoryIds watch
 
-  // Fetch categories and subcategories
+  // Fetch categories
   useEffect(() => {
-    const fetchCategoriesAndSubcategories = async () => {
+    const fetchCategories = async () => {
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('categories')
         .select('*');
@@ -112,38 +91,12 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
         setCategories(categoriesData || []);
       }
 
-      const { data: subcategoriesData, error: subcategoriesError } = await supabase
-        .from('subcategories')
-        .select('*');
-      if (subcategoriesError) {
-        console.error('Error fetching subcategories:', subcategoriesError);
-        toast({ title: "Error", description: "Failed to load subcategories.", variant: "destructive" });
-      } else {
-        setSubcategories(subcategoriesData || []);
-      }
+      // Removed subcategory fetch
     };
-    fetchCategoriesAndSubcategories();
+    fetchCategories();
   }, [toast]);
 
-  // Filter available subcategories based on selected categories
-  useEffect(() => {
-    if (selectedCategoryIds && selectedCategoryIds.length > 0) {
-      const filtered = subcategories.filter(sub => selectedCategoryIds.includes(sub.category_id));
-      setAvailableSubcategories(filtered);
-
-      // Also, remove any selected subcategories that no longer belong to the selected categories
-      const currentSelectedSubcategories = form.getValues("subcategory_ids") || [];
-      const validSelectedSubcategories = currentSelectedSubcategories.filter(subId =>
-        filtered.some(fSub => fSub.id === subId)
-      );
-      if (validSelectedSubcategories.length !== currentSelectedSubcategories.length) {
-        form.setValue("subcategory_ids", validSelectedSubcategories);
-      }
-    } else {
-      setAvailableSubcategories([]);
-      form.setValue("subcategory_ids", []); // Clear subcategories if no category is selected
-    }
-  }, [selectedCategoryIds, subcategories, form]);
+  // Removed useEffect for filtering available subcategories
 
   // Populate form when MCQ prop changes
   useEffect(() => {
@@ -168,9 +121,9 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           }
         }
 
-        // Extract category_ids and subcategory_ids from mcq.category_links
+        // Extract category_ids from mcq.category_links
         const initialCategoryIds = mcq.category_links?.map(link => link.category_id).filter((id): id is string => id !== null) || [];
-        const initialSubcategoryIds = mcq.category_links?.map(link => link.subcategory_id).filter((id): id is string => id !== null) || [];
+        // Removed initialSubcategoryIds
 
         form.reset({
           id: mcq.id,
@@ -184,7 +137,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           explanation_text: explanationText,
           image_url: imageUrl,
           category_ids: initialCategoryIds,
-          subcategory_ids: initialSubcategoryIds,
+          // Removed subcategory_ids from reset
           difficulty: mcq.difficulty || "",
           is_trial_mcq: mcq.is_trial_mcq || false,
         });
@@ -231,39 +184,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
       form.setValue("explanation_text", data.explanation_text);
       form.setValue("difficulty", data.difficulty);
       
-      // NEW LOGIC: Handle suggested subcategory
-      if (data.suggested_subcategory_name) {
-        const currentSelectedCategoryIds = form.getValues("category_ids") || [];
-        if (currentSelectedCategoryIds.length > 0) {
-          const matchedSubcategory = availableSubcategories.find(
-            (sub) => sub.name.toLowerCase() === data.suggested_subcategory_name.toLowerCase() &&
-                     currentSelectedCategoryIds.includes(sub.category_id)
-          );
-          if (matchedSubcategory) {
-            const currentSubcategoryIds = form.getValues("subcategory_ids") || [];
-            if (!currentSubcategoryIds.includes(matchedSubcategory.id)) {
-              form.setValue("subcategory_ids", [...currentSubcategoryIds, matchedSubcategory.id]);
-            }
-            toast({
-              title: "Subcategory Suggested",
-              description: `AI suggested and matched subcategory: "${matchedSubcategory.name}".`,
-              variant: "default",
-            });
-          } else {
-            toast({
-              title: "Subcategory Suggested",
-              description: `AI suggested subcategory "${data.suggested_subcategory_name}", but no match found in selected categories. Please select manually.`,
-              variant: "default",
-            });
-          }
-        } else {
-          toast({
-            title: "Subcategory Suggested",
-            description: `AI suggested subcategory "${data.suggested_subcategory_name}", but a category must be selected first. Please select manually.`,
-            variant: "default",
-          });
-        }
-      }
+      // Removed subcategory suggestion logic
 
       dismiss(loadingToastId.id);
       toast({
@@ -355,28 +276,11 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
 
       // Then, insert new links if category_ids are provided
       if (values.category_ids && values.category_ids.length > 0) {
-        const linksToInsert = values.category_ids.map(catId => {
-          // Find subcategories that belong to this category and are selected
-          const selectedSubcategoriesForThisCategory = (values.subcategory_ids || []).filter(subId =>
-            subcategories.some(sub => sub.id === subId && sub.category_id === catId)
-          );
-
-          if (selectedSubcategoriesForThisCategory.length > 0) {
-            // Create a link for each selected subcategory within this category
-            return selectedSubcategoriesForThisCategory.map(subId => ({
-              mcq_id: values.id,
-              category_id: catId,
-              subcategory_id: subId,
-            }));
-          } else {
-            // If no subcategories are selected for this category, create a link with null subcategory
-            return [{
-              mcq_id: values.id,
-              category_id: catId,
-              subcategory_id: null,
-            }];
-          }
-        }).flat(); // Flatten the array of arrays
+        const linksToInsert = values.category_ids.map(catId => ({
+          mcq_id: values.id,
+          category_id: catId,
+          // Removed subcategory_id
+        }));
 
         if (linksToInsert.length > 0) {
           const { error: insertLinkError } = await supabase
@@ -538,25 +442,7 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="subcategory_ids"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Subcategories (Optional)</FormLabel>
-                  <FormControl>
-                    <MultiSelect
-                      options={availableSubcategories.map(sub => ({ value: sub.id, label: sub.name }))}
-                      selectedValues={field.value || []}
-                      onValueChange={field.onChange}
-                      placeholder="Select subcategories"
-                      disabled={!selectedCategoryIds || selectedCategoryIds.length === 0}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Removed Subcategories MultiSelect */}
 
             <FormField
               control={form.control}

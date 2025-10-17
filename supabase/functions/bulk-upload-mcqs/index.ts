@@ -21,7 +21,7 @@ interface IncomingMcq {
   explanation: string;
   image_url?: string;
   category_name?: string; // Changed from category_id to category_name
-  subcategory_name?: string; // Changed from subcategory_id to subcategory_name
+  // Removed subcategory_name
   difficulty?: string;
   is_trial_mcq?: boolean;
 }
@@ -69,7 +69,7 @@ serve(async (req: Request) => {
     for (const mcq of incomingMcqs) {
       try {
         let categoryId: string | null = null;
-        let subcategoryId: string | null = null;
+        // Removed subcategoryId
 
         // Handle Category
         if (mcq.category_name) {
@@ -101,36 +101,7 @@ serve(async (req: Request) => {
           }
         }
 
-        // Handle Subcategory (only if categoryId is determined)
-        if (mcq.subcategory_name && categoryId) {
-          // Check if subcategory exists
-          const { data: existingSubcategory, error: subcategoryFetchError } = await supabaseAdmin
-            .from('subcategories')
-            .select('id')
-            .eq('name', mcq.subcategory_name)
-            .eq('category_id', categoryId)
-            .single();
-
-          if (subcategoryFetchError && subcategoryFetchError.code !== 'PGRST116') {
-            throw new Error(`Subcategory fetch failed for "${mcq.subcategory_name}": ${subcategoryFetchError.message}`);
-          }
-
-          if (existingSubcategory) {
-            subcategoryId = existingSubcategory.id;
-          } else {
-            // Create new subcategory if it doesn't exist
-            const { data: newSubcategory, error: subcategoryInsertError } = await supabaseAdmin
-              .from('subcategories')
-              .insert({ name: mcq.subcategory_name, category_id: categoryId })
-              .select('id')
-              .single();
-
-            if (subcategoryInsertError) {
-              throw new Error(`Subcategory insert failed for "${mcq.subcategory_name}": ${subcategoryInsertError.message}`);
-            }
-            subcategoryId = newSubcategory.id;
-          }
-        }
+        // Removed Subcategory handling
 
         // 1. Insert explanation
         const { data: explanationData, error: explanationError } = await supabaseAdmin
@@ -158,7 +129,7 @@ serve(async (req: Request) => {
             correct_answer: mcq.correct_answer,
             explanation_id: explanationData.id,
             category_id: categoryId, // Use resolved categoryId
-            subcategory_id: subcategoryId, // Use resolved subcategoryId
+            // Removed subcategory_id
             difficulty: mcq.difficulty || null,
             is_trial_mcq: mcq.is_trial_mcq ?? false,
           });

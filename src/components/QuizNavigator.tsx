@@ -14,8 +14,6 @@ interface UserAnswerData {
 export type McqCategoryLink = {
   category_id: string;
   category_name: string; // For display
-  subcategory_id: string | null;
-  subcategory_name: string | null; // For display
 };
 
 export type MCQ = {

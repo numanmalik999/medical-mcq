@@ -17,6 +17,21 @@ interface AuthUser extends User {
   trial_taken?: boolean;
 }
 
+interface DbQuizSession {
+  id: string;
+  user_id: string;
+  category_id: string | null;
+  mcq_ids_order: string[]; // Array of MCQ IDs
+  current_question_index: number;
+  user_answers_json: { [mcqId: string]: any }; // JSONB object
+  is_trial_session: boolean;
+  test_duration_seconds: number | null;
+  remaining_time_seconds: number | null;
+  skipped_mcq_ids: string[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface SessionContextType {
   session: Session | null;
   user: AuthUser | null;

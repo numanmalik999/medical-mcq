@@ -32,7 +32,6 @@ export interface UserSubmittedMcq {
   explanation_text: string;
   image_url: string | null;
   suggested_category_name: string | null;
-  suggested_subcategory_name: string | null;
   suggested_difficulty: string | null;
   status: 'pending' | 'approved' | 'rejected';
   admin_notes: string | null;

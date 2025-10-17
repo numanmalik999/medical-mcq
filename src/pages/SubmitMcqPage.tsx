@@ -27,7 +27,6 @@ const formSchema = z.object({
   explanation_text: z.string().min(1, "Explanation text is required."),
   image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
   suggested_category_name: z.string().optional().or(z.literal('')),
-  suggested_subcategory_name: z.string().optional().or(z.literal('')),
   suggested_difficulty: z.string().optional().or(z.literal('')),
 });
 
@@ -51,7 +50,6 @@ const SubmitMcqPage = () => {
       explanation_text: "",
       image_url: "",
       suggested_category_name: "",
-      suggested_subcategory_name: "",
       suggested_difficulty: "",
     },
   });
@@ -117,7 +115,6 @@ const SubmitMcqPage = () => {
           explanation_text: values.explanation_text,
           image_url: values.image_url || null,
           suggested_category_name: values.suggested_category_name || null,
-          suggested_subcategory_name: values.suggested_subcategory_name || null,
           suggested_difficulty: values.suggested_difficulty || null,
           status: 'pending',
         });
@@ -134,7 +131,6 @@ const SubmitMcqPage = () => {
                  Question: ${values.question_text}<br/>
                  Correct Answer: ${values.correct_answer}<br/>
                  Suggested Category: ${values.suggested_category_name || 'N/A'}<br/>
-                 Suggested Subcategory: ${values.suggested_subcategory_name || 'N/A'}<br/>
                  Suggested Difficulty: ${values.suggested_difficulty || 'N/A'}<br/><br/>
                  Explanation: ${values.explanation_text}<br/><br/>
                  Review in admin panel (future feature).`,
@@ -276,20 +272,6 @@ const SubmitMcqPage = () => {
                     <FormLabel>Suggested Category Name (Optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g., Biology, Chemistry" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="suggested_subcategory_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Suggested Subcategory Name (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Cell Biology, Organic Chemistry" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

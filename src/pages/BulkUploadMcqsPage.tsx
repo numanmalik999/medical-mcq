@@ -25,8 +25,7 @@ interface IncomingMcq {
   correct_answer: 'A' | 'B' | 'C' | 'D';
   explanation: string;
   image_url?: string;
-  category_name?: string;
-  subcategory_name?: string;
+  category_name?: string; // Changed from category_id to category_name
   difficulty?: string;
   is_trial_mcq?: boolean;
 }
@@ -117,7 +116,6 @@ const BulkUploadMcqsPage = () => {
               explanation: explanation ? String(explanation) : 'No explanation provided.',
               image_url: row['Image URL'] ? String(row['Image URL']) : undefined,
               category_name: row['Category Name'] ? String(row['Category Name']) : undefined,
-              subcategory_name: row['Subcategory Name'] ? String(row['Subcategory Name']) : undefined,
               difficulty: row['Difficulty'] ? String(row['Difficulty']) : undefined,
               is_trial_mcq: isTrialMcq,
             };
@@ -220,7 +218,7 @@ const BulkUploadMcqsPage = () => {
             <p className="text-sm text-muted-foreground">
               Your spreadsheet should have the following **exact** column headers: `Question`, `Option A`, `Option B`, `Option C`, `Option D`, `Correct Answer` (A, B, C, or D).
               <br />
-              Optional columns: `Explanation` (defaults to "No explanation provided." if empty), `Image URL`, `Category Name`, `Subcategory Name`, `Difficulty` (Easy, Medium, Hard), `Is Trial MCQ` (TRUE or FALSE).
+              Optional columns: `Explanation` (defaults to "No explanation provided." if empty), `Image URL`, `Category Name`, `Difficulty` (Easy, Medium, Hard), `Is Trial MCQ` (TRUE or FALSE).
             </p>
             <a href="/example_mcqs.xlsx" download="example_mcqs.xlsx" className="inline-flex items-center text-primary hover:underline text-sm">
               <Download className="h-4 w-4 mr-1" /> Download Example Spreadsheet
@@ -258,7 +256,6 @@ const BulkUploadMcqsPage = () => {
     "explanation": "Detailed explanation for the correct answer.", // Optional, will default if empty
     "image_url": "https://example.com/image.jpg", // Optional
     "category_name": "Biology", // Optional
-    "subcategory_name": "Cell Biology", // Optional
     "difficulty": "Easy", // Optional: "Easy", "Medium", "Hard"
     "is_trial_mcq": true // Optional: defaults to false
   },

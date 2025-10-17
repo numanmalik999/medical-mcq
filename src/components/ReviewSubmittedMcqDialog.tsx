@@ -22,12 +22,6 @@ interface Category {
   name: string;
 }
 
-interface Subcategory {
-  id: string;
-  category_id: string;
-  name: string;
-}
-
 const formSchema = z.object({
   id: z.string().uuid(),
   question_text: z.string().min(1, "Question text is required."),
@@ -39,18 +33,9 @@ const formSchema = z.object({
   explanation_text: z.string().min(1, "Explanation text is required."),
   image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
   suggested_category_name: z.string().optional().or(z.literal('')),
-  suggested_subcategory_name: z.string().optional().or(z.literal('')),
   suggested_difficulty: z.string().optional().or(z.literal('')),
   admin_notes: z.string().optional().or(z.literal('')),
   is_trial_mcq: z.boolean().optional(), // For when it's approved and added to main MCQs
-}).refine((data) => {
-  if (data.suggested_subcategory_name && !data.suggested_category_name) {
-    return false;
-  }
-  return true;
-}, {
-  message: "A suggested category must be provided if a suggested subcategory is chosen.",
-  path: ["suggested_category_name"],
 });
 
 interface ReviewSubmittedMcqDialogProps {
@@ -64,8 +49,6 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -80,17 +63,14 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
       explanation_text: submittedMcq.explanation_text,
       image_url: submittedMcq.image_url || "",
       suggested_category_name: submittedMcq.suggested_category_name || "",
-      suggested_subcategory_name: submittedMcq.suggested_subcategory_name || "",
       suggested_difficulty: submittedMcq.suggested_difficulty || "",
       admin_notes: submittedMcq.admin_notes || "",
       is_trial_mcq: false, // Reset to default for review
     },
   });
 
-  const suggestedCategoryName = form.watch("suggested_category_name");
-
   useEffect(() => {
-    const fetchCategoriesAndSubcategories = async () => {
+    const fetchCategories = async () => {
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('categories')
         .select('id, name'); // Select all required fields
@@ -100,32 +80,9 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
       } else {
         setCategories(categoriesData || []);
       }
-
-      const { data: subcategoriesData, error: subcategoriesError } = await supabase
-        .from('subcategories')
-        .select('id, category_id, name'); // Select all required fields
-      if (subcategoriesError) {
-        console.error('Error fetching subcategories:', subcategoriesError);
-        toast({ title: "Error", description: "Failed to load subcategories.", variant: "destructive" });
-      } else {
-        setSubcategories(subcategoriesData || []);
-      }
     };
-    fetchCategoriesAndSubcategories();
+    fetchCategories();
   }, [toast]);
-
-  useEffect(() => {
-    if (suggestedCategoryName) {
-      const matchedCategory = categories.find(cat => cat.name === suggestedCategoryName);
-      if (matchedCategory) {
-        setFilteredSubcategories(subcategories.filter(sub => sub.category_id === matchedCategory.id));
-      } else {
-        setFilteredSubcategories([]);
-      }
-    } else {
-      setFilteredSubcategories([]);
-    }
-  }, [suggestedCategoryName, categories, subcategories]);
 
   useEffect(() => {
     if (open) {
@@ -140,7 +97,6 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
         explanation_text: submittedMcq.explanation_text,
         image_url: submittedMcq.image_url || "",
         suggested_category_name: submittedMcq.suggested_category_name || "",
-        suggested_subcategory_name: submittedMcq.suggested_subcategory_name || "",
         suggested_difficulty: submittedMcq.suggested_difficulty || "",
         admin_notes: submittedMcq.admin_notes || "",
         is_trial_mcq: false, // Reset to default for review
@@ -151,9 +107,8 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
   const handleApprove = async (values: z.infer<typeof formSchema>) => {
     setIsProcessing(true);
     try {
-      // 1. Resolve Category and Subcategory IDs
+      // 1. Resolve Category ID
       let categoryId: string | null = null;
-      let subcategoryId: string | null = null;
 
       if (values.suggested_category_name) {
         let existingCategory = categories.find(cat => cat.name === values.suggested_category_name);
@@ -171,22 +126,6 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
         }
       }
 
-      if (values.suggested_subcategory_name && categoryId) {
-        let existingSubcategory = subcategories.find(sub => sub.name === values.suggested_subcategory_name && sub.category_id === categoryId);
-        if (!existingSubcategory) {
-          const { data: newSubcategory, error: subCatError } = await supabase
-            .from('subcategories')
-            .insert({ name: values.suggested_subcategory_name, category_id: categoryId })
-            .select('id, category_id, name') // Select all required fields
-            .single();
-          if (subCatError) throw subCatError;
-          existingSubcategory = newSubcategory;
-        }
-        if (existingSubcategory) { // Ensure existingSubcategory is not null/undefined
-          subcategoryId = existingSubcategory.id;
-        }
-      }
-
       // 2. Insert Explanation
       const { data: explanationData, error: explanationError } = await supabase
         .from('mcq_explanations')
@@ -200,7 +139,7 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
       if (explanationError) throw explanationError;
 
       // 3. Insert MCQ into main mcqs table
-      const { error: mcqInsertError } = await supabase
+      const { data: mcqData, error: mcqInsertError } = await supabase
         .from('mcqs')
         .insert({
           question_text: values.question_text,
@@ -210,15 +149,29 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
           option_d: values.option_d,
           correct_answer: values.correct_answer,
           explanation_id: explanationData.id,
-          category_id: categoryId,
-          subcategory_id: subcategoryId,
           difficulty: values.suggested_difficulty || null,
           is_trial_mcq: values.is_trial_mcq ?? false,
-        });
+        })
+        .select('id')
+        .single();
 
       if (mcqInsertError) throw mcqInsertError;
 
-      // 4. Update status of submitted MCQ
+      // 4. Link MCQ to category if categoryId exists
+      if (categoryId) {
+        const { error: linkError } = await supabase
+          .from('mcq_category_links')
+          .insert({
+            mcq_id: mcqData.id,
+            category_id: categoryId,
+          });
+        if (linkError) {
+          console.error("Error linking MCQ to category:", linkError);
+          // Don't throw, proceed with status update
+        }
+      }
+
+      // 5. Update status of submitted MCQ
       const { error: updateStatusError } = await supabase
         .from('user_submitted_mcqs')
         .update({ status: 'approved', admin_notes: values.admin_notes || null })
@@ -226,7 +179,7 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
 
       if (updateStatusError) throw updateStatusError;
 
-      // 5. Send email to user
+      // 6. Send email to user
       const { error: emailError } = await supabase.functions.invoke('send-email', {
         body: {
           to: submittedMcq.user_email,
@@ -324,7 +277,6 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
           explanation_text: values.explanation_text,
           image_url: values.image_url || null,
           suggested_category_name: values.suggested_category_name || null,
-          suggested_subcategory_name: values.suggested_subcategory_name || null,
           suggested_difficulty: values.suggested_difficulty || null,
           admin_notes: values.admin_notes || null,
         })
@@ -462,29 +414,6 @@ const ReviewSubmittedMcqDialog = ({ open, onOpenChange, submittedMcq, onSave }: 
                     <SelectContent>
                       {categories.map((cat) => (
                         <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="suggested_subcategory_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Suggested Subcategory Name (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ''} disabled={!suggestedCategoryName || filteredSubcategories.length === 0}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select or type a subcategory" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {filteredSubcategories.map((subcat) => (
-                        <SelectItem key={subcat.id} value={subcat.name}>{subcat.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

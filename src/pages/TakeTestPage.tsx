@@ -10,13 +10,14 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate, Link } from 'react-router-dom';
-import { TimerIcon, Pause, Play, SkipForward, Save } from 'lucide-react'; // Added Save icon
+import { TimerIcon, Pause, Play, SkipForward, Save, Bookmark, BookmarkCheck } from 'lucide-react'; // Added Save icon and bookmark icons
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { McqCategoryLink } from '@/components/mcq-columns'; // Import McqCategoryLink
 import { Input } from '@/components/ui/input'; // Import Input for number of MCQs and duration
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'; // Added DialogDescription
 import QuizNavigator from '@/components/QuizNavigator'; // Import QuizNavigator
+import { useBookmark } from '@/hooks/use-bookmark'; // Import useBookmark hook
 
 interface MCQ {
   id: string;
@@ -114,6 +115,9 @@ const TakeTestPage = () => {
   const [activeSavedTests, setActiveSavedTests] = useState<LoadedTestSession[]>([]); // New: List of saved tests
 
   const timerIntervalRef = useRef<number | null>(null);
+
+  const currentMcq = mcqs[currentQuestionIndex];
+  const { isBookmarked, toggleBookmark, isLoading: isBookmarkLoading } = useBookmark(currentMcq?.id || null);
 
   // Memoized function to fetch a single explanation
   const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
@@ -806,8 +810,6 @@ const TakeTestPage = () => {
     setShowInstructions(false);
   };
 
-  const currentMcq = mcqs[currentQuestionIndex];
-
   const handleOptionSelect = useCallback((value: string) => {
     if (currentMcq) {
       setUserAnswers((prev) => {
@@ -1271,6 +1273,18 @@ const TakeTestPage = () => {
               <TimerIcon className="h-5 w-5" />
               <span>{formatTime(timer)}</span>
             </div>
+            {!user.is_admin && ( // Only show bookmark for non-admin users
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleBookmark}
+                disabled={isBookmarkLoading || isPaused}
+                className="text-primary hover:text-primary-foreground/90"
+              >
+                {isBookmarked ? <BookmarkCheck className="h-6 w-6 fill-current" /> : <Bookmark className="h-6 w-6" />}
+                <span className="sr-only">{isBookmarked ? "Remove bookmark" : "Add bookmark"}</span>
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             <p className="text-lg font-semibold mb-4">{currentMcq?.question_text}</p>
@@ -1281,7 +1295,7 @@ const TakeTestPage = () => {
               disabled={isPaused}
             >
               {['A', 'B', 'C', 'D'].map((optionKey) => {
-                const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
+                const optionText = currentMcq[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
                 return (
                   <div key={optionKey} className="flex items-center space-x-2">
                     <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />

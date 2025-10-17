@@ -5,6 +5,7 @@ import { useSession } from '@/components/SessionContextProvider';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom'; // Import Link for the Login button
+import { ThemeToggle } from './ThemeToggle'; // Import ThemeToggle
 
 const Header = () => {
   const { user, hasCheckedInitialSession } = useSession();
@@ -45,7 +46,8 @@ const Header = () => {
         >
           Study Prometric MCQs
         </Button>
-        <div className="w-16 flex justify-end"> {/* Container for right-aligned items */}
+        <div className="w-16 flex justify-end items-center gap-2"> {/* Container for right-aligned items, added gap-2 */}
+          <ThemeToggle /> {/* Add ThemeToggle here */}
           {hasCheckedInitialSession && !user && (
             <Link to="/login">
               <Button variant="secondary" size="sm" className="text-primary">

@@ -10,13 +10,14 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save, Bookmark, BookmarkCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import QuizNavigator from '@/components/QuizNavigator';
 import { MCQ } from '@/components/mcq-columns';
 import { cn } from '@/lib/utils'; // Import cn utility for conditional class names
+import { useBookmark } from '@/hooks/use-bookmark'; // Import useBookmark hook
 
 interface MCQExplanation {
   id: string;
@@ -104,6 +105,10 @@ const QuizPage = () => {
   // New states for current quiz accuracy
   const [currentCorrectCount, setCurrentCorrectCount] = useState(0);
   const [currentCorrectnessPercentage, setCurrentCorrectnessPercentage] = useState('0.00%');
+
+  const currentMcq = quizQuestions[currentQuestionIndex];
+  const { isBookmarked, toggleBookmark, isLoading: isBookmarkLoading } = useBookmark(currentMcq?.id || null);
+  const isGuest = !user; // Define isGuest here
 
   // Effect to calculate current quiz accuracy
   useEffect(() => {
@@ -343,7 +348,7 @@ const QuizPage = () => {
       if (user) { // Only fetch user attempts if a user is logged in
         const { data: userAttemptsData, error: userAttemptsError } = await supabase
           .from('user_quiz_attempts')
-          .select('is_correct, mcq_id')
+          .select('is_correct, category_id') // Removed subcategory_id
           .eq('user_id', user.id)
           .eq('category_id', category.id);
 
@@ -686,8 +691,6 @@ const QuizPage = () => {
     }
   };
 
-  const currentMcq = quizQuestions[currentQuestionIndex];
-
   const handleOptionSelect = useCallback((value: string) => {
     if (currentMcq) {
       setSelectedAnswer(value);
@@ -932,8 +935,10 @@ const QuizPage = () => {
           to: 'ADMIN_EMAIL',
           subject: `New MCQ Feedback from ${user.email}`,
           body: `User ${user.email} (${user.id}) submitted feedback for MCQ ID: ${currentMcq.id}.<br/><br/>
-                 Question: ${currentMcq.question_text}<br/><br/>
-                 Feedback: ${feedbackText.trim()}<br/><br/>
+                 Question: ${currentMcq.question_text}<br/>
+                 Correct Answer: ${currentMcq.correct_answer}<br/>
+                 Suggested Category: ${currentQuizCategoryId || 'N/A'}<br/>
+                 Explanation: ${feedbackText.trim()}<br/><br/>
                  Review in admin panel (future feature).`,
         },
       });
@@ -1276,17 +1281,31 @@ const QuizPage = () => {
       )}
       <div className="flex flex-col md:flex-row w-full max-w-6xl"> {/* Changed to flex-col md:flex-row */}
         <Card className="flex-1 order-first md:order-last"> {/* Added order-first md:order-last */}
-          <CardHeader>
-            <CardTitle className="text-xl">Question {currentQuestionIndex + 1} / {quizQuestions.length}</CardTitle>
-            {isTrialActiveSession && (
-              <CardDescription className="text-sm text-blue-500 dark:text-blue-400">
-                Trial Mode ({currentQuestionIndex + 1} / {TRIAL_MCQ_LIMIT} questions)
-              </CardDescription>
-            )}
-            {currentMcq?.difficulty && (
-              <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
-                Difficulty: {currentMcq.difficulty}
-              </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-xl">Question {currentQuestionIndex + 1} / {quizQuestions.length}</CardTitle>
+              {isTrialActiveSession && (
+                <CardDescription className="text-sm text-blue-500 dark:text-blue-400">
+                  Trial Mode ({currentQuestionIndex + 1} / {TRIAL_MCQ_LIMIT} questions)
+                </CardDescription>
+              )}
+              {currentMcq?.difficulty && (
+                <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
+                  Difficulty: {currentMcq.difficulty}
+                </CardDescription>
+              )}
+            </div>
+            {!isGuest && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleBookmark}
+                disabled={isBookmarkLoading}
+                className="text-primary hover:text-primary-foreground/90"
+              >
+                {isBookmarked ? <BookmarkCheck className="h-6 w-6 fill-current" /> : <Bookmark className="h-6 w-6" />}
+                <span className="sr-only">{isBookmarked ? "Remove bookmark" : "Add bookmark"}</span>
+              </Button>
             )}
           </CardHeader>
           <CardContent>

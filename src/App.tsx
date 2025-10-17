@@ -38,6 +38,9 @@ import ContactPage from "./pages/ContactPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 import FAQPage from "./pages/FAQPage";
+import BookmarkedMcqsPage from "./pages/BookmarkedMcqsPage"; // Import new page
+
+import { ThemeProvider } from "@/components/theme-provider"; // Import ThemeProvider
 
 
 const queryClient = new QueryClient();
@@ -91,6 +94,7 @@ const AppContent = () => {
                 <Route path="profile" element={<UserProfilePage />} />
                 <Route path="subscriptions" element={<UserSubscriptionsPage />} />
                 <Route path="submit-mcq" element={<SubmitMcqPage />} />
+                <Route path="bookmarked-mcqs" element={<BookmarkedMcqsPage />} /> {/* New route */}
               </Route>
             </Route>
 
@@ -106,15 +110,17 @@ const AppContent = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <SessionContextProvider>
-          <AppContent />
-        </SessionContextProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme"> {/* Wrap with ThemeProvider */}
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <SessionContextProvider>
+            <AppContent />
+          </SessionContextProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

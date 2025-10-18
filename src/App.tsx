@@ -41,6 +41,12 @@ import FAQPage from "./pages/FAQPage";
 import BookmarkedMcqsPage from "./pages/BookmarkedMcqsPage"; // Import new page
 import AdminSettingsPage from "./pages/AdminSettingsPage"; // Import new page
 
+// New Course Pages
+import ManageCoursesPage from "./pages/ManageCoursesPage";
+import ManageCourseTopicsPage from "./pages/ManageCourseTopicsPage";
+import UserCoursesPage from "./pages/UserCoursesPage";
+import UserCourseDetailsPage from "./pages/UserCourseDetailsPage";
+
 import { ThemeProvider } from "@/components/theme-provider"; // Import ThemeProvider
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics"; // Import useGoogleAnalytics hook
 
@@ -81,6 +87,8 @@ const AppContent = () => {
                 <Route path="manage-mcqs" element={<ManageMcqsPage />} />
                 <Route path="manage-submitted-mcqs" element={<ManageSubmittedMcqsPage />} />
                 <Route path="manage-categories" element={<ManageCategoriesPage />} />
+                <Route path="manage-courses" element={<ManageCoursesPage />} /> {/* New route */}
+                <Route path="manage-courses/:courseId/topics" element={<ManageCourseTopicsPage />} /> {/* New route */}
                 <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
                 <Route path="manage-users" element={<ManageUsersPage />} />
                 <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />
@@ -99,6 +107,8 @@ const AppContent = () => {
                 <Route path="subscriptions" element={<UserSubscriptionsPage />} />
                 <Route path="submit-mcq" element={<SubmitMcqPage />} />
                 <Route path="bookmarked-mcqs" element={<BookmarkedMcqsPage />} />
+                <Route path="courses" element={<UserCoursesPage />} /> {/* New route */}
+                <Route path="courses/:courseId" element={<UserCourseDetailsPage />} /> {/* New route */}
               </Route>
             </Route>
 

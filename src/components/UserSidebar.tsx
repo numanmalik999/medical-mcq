@@ -1,11 +1,11 @@
 "use client";
 
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom'; // Import useNavigate
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, User, BookOpenText, LogOut, ClipboardCheck, CreditCard, FilePlus, Bookmark } from 'lucide-react'; // Import FilePlus and Bookmark icon
+import { MenuIcon, LayoutDashboard, User, BookOpenText, LogOut, ClipboardCheck, CreditCard, FilePlus, Bookmark, GraduationCap } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -49,7 +49,7 @@ const UserSidebar = () => {
   const [isOpen, setIsOpen] = React.useState(false);
   const { toast } = useToast();
   const { user } = useSession();
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -70,7 +70,7 @@ const UserSidebar = () => {
     if (isMobile) {
       setIsOpen(false);
     }
-    navigate('/login'); // Redirect to login page after logout
+    navigate('/login');
   };
 
   const navItems = [
@@ -83,16 +83,17 @@ const UserSidebar = () => {
       label: "Take A Test",
       disabled: !user?.has_active_subscription
     },
+    { to: "/user/courses", icon: <GraduationCap className="h-4 w-4" />, label: "Courses" },
     { to: "/user/subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "My Subscriptions" },
     { to: "/user/submit-mcq", icon: <FilePlus className="h-4 w-4" />, label: "Submit MCQ" },
-    { to: "/user/bookmarked-mcqs", icon: <Bookmark className="h-4 w-4" />, label: "Bookmarked MCQs" }, // New link
+    { to: "/user/bookmarked-mcqs", icon: <Bookmark className="h-4 w-4" />, label: "Bookmarked MCQs" },
   ];
 
   if (isMobile) {
     return (
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 text-primary-foreground hover:bg-primary/50"> {/* Updated styling */}
+          <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 text-primary-foreground hover:bg-primary/50">
             <MenuIcon className="h-6 w-6" />
             <span className="sr-only">Toggle navigation</span>
           </Button>

@@ -1,13 +1,13 @@
 "use client";
 
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom'; // Import useNavigate
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users, LogOut, UploadCloud, MessageSquareWarning, FileQuestion, Settings } from 'lucide-react'; // Import Settings icon
+import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users, LogOut, UploadCloud, MessageSquareWarning, FileQuestion, Settings, GraduationCap } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { supabase } from '@/integrations/supabase/client'; // Import supabase client
+import { supabase } from '@/integrations/supabase/client';
 
 interface NavLinkProps {
   to: string;
@@ -43,7 +43,7 @@ const NavLink = ({ to, icon, label, isMobile, onLinkClick }: NavLinkProps) => {
 const AdminSidebar = () => {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -56,7 +56,7 @@ const AdminSidebar = () => {
     if (isMobile) {
       setIsOpen(false);
     }
-    navigate('/login'); // Redirect to login page after logout
+    navigate('/login');
   };
 
   const navItems = [
@@ -66,10 +66,11 @@ const AdminSidebar = () => {
     { to: "/admin/manage-mcqs", icon: <BookOpenText className="h-4 w-4" />, label: "Manage MCQs" },
     { to: "/admin/manage-submitted-mcqs", icon: <FileQuestion className="h-4 w-4" />, label: "Submitted MCQs" },
     { to: "/admin/manage-categories", icon: <FolderKanban className="h-4 w-4" />, label: "Manage Categories" },
+    { to: "/admin/manage-courses", icon: <GraduationCap className="h-4 w-4" />, label: "Manage Courses" },
     { to: "/admin/manage-subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "Manage Subscriptions" },
     { to: "/admin/manage-users", icon: <Users className="h-4 w-4" />, label: "Manage Users" },
     { to: "/admin/manage-feedback", icon: <MessageSquareWarning className="h-4 w-4" />, label: "Manage Feedback" },
-    { to: "/admin/settings", icon: <Settings className="h-4 w-4" />, label: "Settings" }, // New link
+    { to: "/admin/settings", icon: <Settings className="h-4 w-4" />, label: "Settings" },
   ];
 
   if (isMobile) {

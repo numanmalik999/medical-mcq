@@ -10,7 +10,8 @@ import { useSession } from '@/components/SessionContextProvider';
 import { useParams, Link } from 'react-router-dom';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ArrowLeft } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'; // Import Dialog components
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
 
 interface Course {
   id: string;
@@ -144,12 +145,7 @@ const UserCourseDetailsPage = () => {
                   <AccordionTrigger className="text-left font-medium text-lg" onClick={() => handleTopicClick(topic)}>
                     {topic.order}. {topic.title}
                   </AccordionTrigger>
-                  {/* The AccordionContent below is now redundant for displaying full content,
-                      but can be kept for a brief preview if desired, or removed.
-                      For now, I'll keep it but the main content will be in the dialog. */}
-                  <AccordionContent className="text-muted-foreground prose dark:prose-invert max-w-none">
-                    <div dangerouslySetInnerHTML={{ __html: topic.content?.substring(0, 150) + '...' || 'No content available.' }} />
-                  </AccordionContent>
+                  {/* Removed AccordionContent here to ensure full content is only in the dialog */}
                 </AccordionItem>
               ))}
             </Accordion>
@@ -170,7 +166,7 @@ const UserCourseDetailsPage = () => {
           </DialogHeader>
           <div className="py-4 prose dark:prose-invert max-w-none">
             {selectedTopic?.content ? (
-              <div dangerouslySetInnerHTML={{ __html: selectedTopic.content }} />
+              <ReactMarkdown>{selectedTopic.content}</ReactMarkdown>
             ) : (
               <p className="text-muted-foreground">No content available for this topic.</p>
             )}

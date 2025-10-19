@@ -45,6 +45,7 @@ serve(async (req: Request) => {
     const { daily_mcq_id, mcq_id, selected_option, user_id, guest_name, guest_email } = requestBody;
 
     if (!daily_mcq_id || !mcq_id || !selected_option) {
+      console.error('Validation Error: Missing required fields.');
       return new Response(JSON.stringify({ error: 'Missing required fields: daily_mcq_id, mcq_id, or selected_option.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -52,6 +53,7 @@ serve(async (req: Request) => {
     }
 
     if (!user_id && (!guest_name || !guest_email)) {
+      console.error('Validation Error: Missing guest_name or guest_email for unauthenticated submission.');
       return new Response(JSON.stringify({ error: 'Missing guest_name or guest_email for unauthenticated submission.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -59,6 +61,7 @@ serve(async (req: Request) => {
     }
 
     // 1. Get the correct answer for the MCQ
+    console.log(`Fetching MCQ ${mcq_id} for validation...`);
     const { data: mcqData, error: mcqError } = await supabaseAdmin
       .from('mcqs')
       .select('correct_answer, question_text') // Also fetch question_text for email
@@ -69,6 +72,7 @@ serve(async (req: Request) => {
       console.error('Error fetching MCQ for submission:', mcqError);
       throw new Error('MCQ not found for validation.');
     }
+    console.log('MCQ data fetched successfully.');
 
     const isCorrect = selected_option === mcqData.correct_answer;
     const pointsAwarded = isCorrect ? POINTS_PER_CORRECT_ANSWER : 0;
@@ -84,6 +88,7 @@ serve(async (req: Request) => {
       points_awarded: pointsAwarded,
     };
 
+    console.log('Checking for existing submission...');
     const { data: existingSubmission, error: checkSubmissionError } = await supabaseAdmin
       .from('daily_mcq_submissions')
       .select('id, is_correct, points_awarded')
@@ -96,6 +101,7 @@ serve(async (req: Request) => {
     }
 
     if (existingSubmission && existingSubmission.length > 0) {
+      console.log('Existing submission found, returning conflict response.');
       return new Response(JSON.stringify({
         error: 'You have already submitted an answer for today\'s question.',
         is_correct: existingSubmission[0].is_correct,
@@ -108,6 +114,7 @@ serve(async (req: Request) => {
       });
     }
 
+    console.log('Inserting new daily MCQ submission...');
     const { error: insertSubmissionError } = await supabaseAdmin
       .from('daily_mcq_submissions')
       .insert(submissionData);
@@ -116,12 +123,14 @@ serve(async (req: Request) => {
       console.error('Error inserting daily MCQ submission:', insertSubmissionError);
       throw new Error(`Failed to record submission: ${insertSubmissionError.message}`);
     }
+    console.log('Daily MCQ submission inserted successfully.');
 
     let totalPoints = null;
     let freeMonthAwarded = false;
 
     // 3. Update user's cumulative score if logged in
     if (user_id) {
+      console.log(`Updating cumulative score for user ${user_id}...`);
       const { data: userScore, error: fetchScoreError } = await supabaseAdmin
         .from('user_daily_mcq_scores')
         .select('total_points, last_awarded_subscription_at')
@@ -148,9 +157,11 @@ serve(async (req: Request) => {
         console.error('Error upserting user score:', upsertScoreError);
         throw new Error(`Failed to update user score: ${upsertScoreError.message}`);
       }
+      console.log(`User score updated. New total points: ${newTotalPoints}`);
 
       // 4. Check for free month award
       if (newTotalPoints >= POINTS_FOR_FREE_MONTH) {
+        console.log(`User ${user_id} reached ${POINTS_FOR_FREE_MONTH} points. Checking for free month award...`);
         // Check if a free month has already been awarded since the last score update or if it's a new award threshold
         const lastAwarded = userScore?.last_awarded_subscription_at ? new Date(userScore.last_awarded_subscription_at) : null;
         const oneMonthAgo = new Date();
@@ -158,6 +169,7 @@ serve(async (req: Request) => {
 
         // Award if points reached threshold and no award in the last month (or never awarded)
         if (!lastAwarded || lastAwarded < oneMonthAgo) { // Simple check to prevent frequent awards
+          console.log('Awarding free subscription...');
           const { error: awardError } = await supabaseAdmin.functions.invoke('award-free-subscription', {
             body: { user_id },
           });
@@ -172,14 +184,21 @@ serve(async (req: Request) => {
               .from('user_daily_mcq_scores')
               .update({ last_awarded_subscription_at: new Date().toISOString() })
               .eq('user_id', user_id);
+            console.log('Free subscription awarded and last_awarded_subscription_at updated.');
           }
+        } else {
+          console.log('Free subscription not awarded: already awarded recently.');
         }
       }
     }
 
     // 5. Send email notification
-    const recipientEmail = user_id ? (await supabaseAdmin.from('profiles').select('email').eq('id', user_id).single()).data?.email : guest_email;
-    const recipientName = user_id ? (await supabaseAdmin.from('profiles').select('first_name').eq('id', user_id).single()).data?.first_name || 'User' : guest_name || 'Guest';
+    console.log('Preparing email notification...');
+    const recipientEmailResult = await supabaseAdmin.from('profiles').select('email').eq('id', user_id).single();
+    const recipientEmail = user_id ? recipientEmailResult.data?.email : guest_email;
+    
+    const recipientNameResult = await supabaseAdmin.from('profiles').select('first_name').eq('id', user_id).single();
+    const recipientName = user_id ? recipientNameResult.data?.first_name || 'User' : guest_name || 'Guest';
 
     if (recipientEmail) {
       const emailSubject = isCorrect ? '🎉 Correct Answer! Question of the Day' : '💡 Your Answer for Question of the Day';
@@ -207,8 +226,12 @@ serve(async (req: Request) => {
         console.error('Error sending QOD submission email:', emailError);
         // Don't throw, just log the warning
       }
+      console.log('Email notification sent (or attempted).');
+    } else {
+      console.log('No recipient email found, skipping email notification.');
     }
 
+    console.log('Returning final success response.');
     return new Response(JSON.stringify({
       message: 'Submission recorded successfully.',
       is_correct: isCorrect,

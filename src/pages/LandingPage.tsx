@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { BookOpenText, ClipboardCheck, User, FilePlus, ShieldCheck, Brain, CalendarDays } from 'lucide-react';
+import { BookOpenText, ClipboardCheck, User, FilePlus, ShieldCheck, Brain, CalendarDays, LayoutDashboard } from 'lucide-react'; // Re-import LayoutDashboard
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -128,7 +128,7 @@ const LandingPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground pt-16"> {/* Added pt-16 for fixed header */}
+    <div className="min-h-screen bg-background text-foreground pt-16">
       {/* Hero Section */}
       <section className="relative w-full py-20 md:py-32 bg-gradient-to-r from-primary to-blue-600 text-primary-foreground text-center overflow-hidden">
         <div className="container mx-auto px-4 relative z-10">
@@ -152,9 +152,9 @@ const LandingPage = () => {
                     Get Started
                   </Button>
                 </Link>
-                <Link to="/quiz"> {/* Reverted to /quiz */}
+                <Link to="/user/dashboard"> {/* Link to /user/dashboard */}
                   <Button size="lg" variant="secondary" className="flex items-center gap-2">
-                    <BookOpenText className="h-5 w-5" /> Try a Free Quiz {/* Reverted text and icon */}
+                    <LayoutDashboard className="h-5 w-5" /> Try a Free Quiz {/* Keep text, use LayoutDashboard icon */}
                   </Button>
                 </Link>
                 <Link to="/quiz-of-the-day">

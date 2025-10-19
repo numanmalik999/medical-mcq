@@ -107,7 +107,7 @@ const QuestionOfTheDayPage = () => {
   }, [toast]);
 
   const fetchDailyLeaderboard = useCallback(async (currentDailyMcqId: string) => {
-    const { data, error } = await supabase
+    const { data: submissions, error: submissionsError } = await supabase
       .from('daily_mcq_submissions')
       .select(`
         id,
@@ -115,35 +115,60 @@ const QuestionOfTheDayPage = () => {
         guest_name,
         guest_email,
         points_awarded,
-        created_at,
-        user_public_profiles (first_name, last_name)
+        created_at
       `)
       .eq('daily_mcq_id', currentDailyMcqId)
       .order('points_awarded', { ascending: false })
       .order('created_at', { ascending: true }) // Tie-break by submission time
       .limit(10);
 
-    if (error) {
-      console.error('Error fetching daily leaderboard:', error);
-      toast({ title: "Error", description: "Failed to load daily leaderboard.", variant: "destructive" });
+    if (submissionsError) {
+      console.error('Error fetching daily leaderboard submissions:', submissionsError);
+      toast({ title: "Error", description: "Failed to load daily leaderboard submissions.", variant: "destructive" });
       setDailyLeaderboard([]);
-    } else {
-      const formattedLeaderboard: LeaderboardEntry[] = data.map((entry: any) => {
-        const displayName = entry.user_id
-          ? `${entry.user_public_profiles?.first_name || ''} ${entry.user_public_profiles?.last_name || ''}`.trim() || `User (${entry.user_id.substring(0, 4)})`
-          : entry.guest_name || `Guest (${entry.guest_email?.split('@')[0] || 'N/A'})`;
-        return {
-          id: entry.id,
-          user_id: entry.user_id,
-          guest_name: entry.guest_name,
-          guest_email: entry.guest_email,
-          points_awarded: entry.points_awarded,
-          created_at: entry.created_at,
-          user_display_name: displayName,
-        };
-      });
-      setDailyLeaderboard(formattedLeaderboard);
+      return;
     }
+
+    const userIds = submissions.map(s => s.user_id).filter(Boolean) as string[];
+    let publicProfilesMap = new Map<string, { first_name: string | null; last_name: string | null }>();
+
+    if (userIds.length > 0) {
+      const { data: publicProfiles, error: profilesError } = await supabase.functions.invoke('get-public-profiles', {
+        body: { user_ids: userIds },
+      });
+
+      if (profilesError) {
+        console.error('Error fetching public profiles from Edge Function:', profilesError);
+        toast({ title: "Error", description: "Failed to load user names for leaderboard.", variant: "destructive" });
+      } else if (publicProfiles) {
+        publicProfiles.forEach((profile: { id: string; first_name: string | null; last_name: string | null }) => {
+          publicProfilesMap.set(profile.id, { first_name: profile.first_name, last_name: profile.last_name });
+        });
+      }
+    }
+
+    const formattedLeaderboard: LeaderboardEntry[] = submissions.map((entry: any) => {
+      let displayName = '';
+      if (entry.user_id) {
+        const profile = publicProfilesMap.get(entry.user_id);
+        displayName = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim();
+        if (!displayName) {
+          displayName = `User (${entry.user_id.substring(0, 4)})`;
+        }
+      } else {
+        displayName = entry.guest_name || `Guest (${entry.guest_email?.split('@')[0] || 'N/A'})`;
+      }
+      return {
+        id: entry.id,
+        user_id: entry.user_id,
+        guest_name: entry.guest_name,
+        guest_email: entry.guest_email,
+        points_awarded: entry.points_awarded,
+        created_at: entry.created_at,
+        user_display_name: displayName,
+      };
+    });
+    setDailyLeaderboard(formattedLeaderboard);
   }, [toast]);
 
   const fetchDailyMcq = useCallback(async () => {

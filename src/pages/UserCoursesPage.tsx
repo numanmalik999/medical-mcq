@@ -14,6 +14,7 @@ interface Course {
   id: string;
   title: string;
   description: string | null;
+  image_url: string | null; // Added image_url
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -67,17 +68,31 @@ const UserCoursesPage = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {courses.map((course) => (
-            <Card key={course.id} className="flex flex-col">
-              <CardHeader>
-                <CardTitle className="text-xl">{course.title}</CardTitle>
-                <CardDescription className="flex-grow">{course.description || 'No description provided.'}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                {/* Additional course details can go here */}
+            <Card key={course.id} className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
+              {course.image_url && (
+                <div className="relative h-48 w-full">
+                  <img
+                    src={course.image_url}
+                    alt={course.title}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                  <CardTitle className="absolute bottom-4 left-4 text-white text-2xl z-10">{course.title}</CardTitle>
+                </div>
+              )}
+              {!course.image_url && (
+                <CardHeader>
+                  <CardTitle className="text-xl">{course.title}</CardTitle>
+                </CardHeader>
+              )}
+              <CardContent className="flex-grow p-4">
+                <CardDescription className="text-sm text-muted-foreground line-clamp-3">
+                  {course.description || 'No description provided.'}
+                </CardDescription>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="p-4 pt-0">
                 <Link to={`/user/courses/${course.id}`} className="w-full">
                   <Button className="w-full">
                     <BookOpenText className="mr-2 h-4 w-4" /> View Course

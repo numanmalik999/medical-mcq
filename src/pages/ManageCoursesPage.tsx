@@ -19,6 +19,7 @@ import {
 import EditCourseDialog, { Course } from '@/components/EditCourseDialog';
 import { useSession } from '@/components/SessionContextProvider';
 import { Link } from 'react-router-dom';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // Import Avatar components
 
 const ManageCoursesPage = () => {
   const { toast } = useToast();
@@ -78,6 +79,16 @@ const ManageCoursesPage = () => {
   };
 
   const columns: ColumnDef<Course>[] = [
+    {
+      accessorKey: 'image_url',
+      header: 'Image',
+      cell: ({ row }) => (
+        <Avatar className="h-10 w-10 rounded-md">
+          <AvatarImage src={row.original.image_url || undefined} alt={row.original.title} className="object-cover" />
+          <AvatarFallback className="rounded-md text-xs">{row.original.title.substring(0, 2)}</AvatarFallback>
+        </Avatar>
+      ),
+    },
     { accessorKey: 'title', header: 'Course Title' },
     {
       accessorKey: 'description',
@@ -128,7 +139,7 @@ const ManageCoursesPage = () => {
           <CardTitle className="text-xl">Courses</CardTitle>
           <Button onClick={() => openEditDialog()}>Add New Course</Button>
         </CardHeader>
-        <CardDescription>Create, edit, and delete educational courses.</CardDescription> {/* Added CardDescription */}
+        <CardDescription>Create, edit, and delete educational courses.</CardDescription>
         <CardContent>
           <DataTable columns={columns} data={courses} />
         </CardContent>

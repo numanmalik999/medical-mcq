@@ -8,15 +8,16 @@ import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { useParams, Link } from 'react-router-dom';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { ArrowLeft } from 'lucide-react';
+import { Accordion, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'; // Removed AccordionContent
+import { ArrowLeft, BookOpenText } from 'lucide-react'; // Added BookOpenText icon
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
+import ReactMarkdown from 'react-markdown';
 
 interface Course {
   id: string;
   title: string;
   description: string | null;
+  image_url: string | null; // Added image_url
 }
 
 interface CourseTopic {
@@ -115,7 +116,7 @@ const UserCourseDetailsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 mb-6">
         <Link to="/user/courses">
           <Button variant="outline" size="icon">
             <ArrowLeft className="h-4 w-4" />
@@ -123,6 +124,21 @@ const UserCourseDetailsPage = () => {
         </Link>
         <h1 className="text-3xl font-bold">{course.title}</h1>
       </div>
+
+      {course.image_url && (
+        <Card className="relative w-full h-64 overflow-hidden rounded-lg shadow-lg mb-6">
+          <img
+            src={course.image_url}
+            alt={course.title}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+          <div className="absolute bottom-4 left-4 text-white z-10">
+            <CardTitle className="text-4xl font-extrabold">{course.title}</CardTitle>
+            <CardDescription className="text-lg text-gray-200">{course.description}</CardDescription>
+          </div>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -141,11 +157,17 @@ const UserCourseDetailsPage = () => {
           ) : (
             <Accordion type="single" collapsible className="w-full">
               {topics.map((topic) => (
-                <AccordionItem key={topic.id} value={topic.id}>
-                  <AccordionTrigger className="text-left font-medium text-lg" onClick={() => handleTopicClick(topic)}>
-                    {topic.order}. {topic.title}
+                <AccordionItem key={topic.id} value={topic.id} className="border-b border-border last:border-b-0">
+                  <AccordionTrigger
+                    className="flex items-center justify-between w-full p-4 text-left font-medium text-lg hover:bg-accent hover:text-accent-foreground transition-colors duration-200"
+                    onClick={() => handleTopicClick(topic)}
+                  >
+                    <span className="flex items-center gap-3">
+                      <BookOpenText className="h-5 w-5 text-primary" />
+                      {topic.order}. {topic.title}
+                    </span>
                   </AccordionTrigger>
-                  {/* Removed AccordionContent here to ensure full content is only in the dialog */}
+                  {/* AccordionContent is intentionally empty as content is shown in dialog */}
                 </AccordionItem>
               ))}
             </Accordion>

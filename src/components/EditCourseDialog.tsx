@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import * as z from 'zod'; // Corrected: changed '*s' to '* as'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSession } from './SessionContextProvider';
 
@@ -17,6 +17,7 @@ export interface Course {
   id: string;
   title: string;
   description: string | null;
+  image_url: string | null; // Added image_url
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -26,6 +27,7 @@ const formSchema = z.object({
   id: z.string().uuid().optional(),
   title: z.string().min(1, "Course title is required."),
   description: z.string().optional().or(z.literal('')),
+  image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')), // Added image_url schema
 });
 
 interface EditCourseDialogProps {
@@ -45,6 +47,7 @@ const EditCourseDialog = ({ open, onOpenChange, course, onSave }: EditCourseDial
     defaultValues: {
       title: "",
       description: "",
+      image_url: "", // Default value for image_url
     },
   });
 
@@ -54,6 +57,7 @@ const EditCourseDialog = ({ open, onOpenChange, course, onSave }: EditCourseDial
         id: course.id,
         title: course.title,
         description: course.description || "",
+        image_url: course.image_url || "", // Set image_url from course data
       });
     } else if (!open) {
       form.reset(); // Reset form when dialog closes
@@ -66,6 +70,7 @@ const EditCourseDialog = ({ open, onOpenChange, course, onSave }: EditCourseDial
       const courseData = {
         title: values.title,
         description: values.description || null,
+        image_url: values.image_url || null, // Include image_url in data
         updated_at: new Date().toISOString(),
       };
 
@@ -132,6 +137,20 @@ const EditCourseDialog = ({ open, onOpenChange, course, onSave }: EditCourseDial
                   <FormLabel>Description (Optional)</FormLabel>
                   <FormControl>
                     <Textarea placeholder="Brief description of the course" rows={5} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="image_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Image URL (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., https://example.com/course-image.jpg" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -47,6 +47,8 @@ import ManageCourseTopicsPage from "./pages/ManageCourseTopicsPage";
 import UserCoursesPage from "./pages/UserCoursesPage";
 import UserCourseDetailsPage from "./pages/UserCourseDetailsPage";
 
+import QuestionOfTheDayPage from "./pages/QuestionOfTheDayPage"; // Import new page
+
 import { ThemeProvider } from "@/components/theme-provider"; // Import ThemeProvider
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics"; // Import useGoogleAnalytics hook
 
@@ -69,6 +71,7 @@ const AppContent = () => {
             <Route path="/signup" element={<SignUp />} />
             <Route path="/quiz" element={<QuizPage />} />
             <Route path="/subscription" element={<SubscriptionPage />} />
+            <Route path="/quiz-of-the-day" element={<QuestionOfTheDayPage />} /> {/* New QOD route */}
             
             {/* New Static Pages */}
             <Route path="/about" element={<AboutUsPage />} />

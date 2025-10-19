@@ -1,0 +1,432 @@
+"use client";
+
+import { useEffect, useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { useSession } from '@/components/SessionContextProvider';
+import { MadeWithDyad } from '@/components/made-with-dyad';
+import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import * as z from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
+interface DailyMcq {
+  daily_mcq_id: string;
+  mcq: {
+    id: string;
+    question_text: string;
+    option_a: string;
+    option_b: string;
+    option_c: string;
+    option_d: string;
+    correct_answer: 'A' | 'B' | 'C' | 'D';
+    explanation_id: string | null;
+    difficulty: string | null;
+    is_trial_mcq: boolean | null;
+  };
+}
+
+interface SubmissionResult {
+  message: string;
+  is_correct: boolean;
+  points_awarded: number;
+  total_points: number | null;
+  free_month_awarded: boolean;
+  error?: string;
+}
+
+interface MCQExplanation {
+  id: string;
+  explanation_text: string;
+  image_url: string | null;
+}
+
+const guestFormSchema = z.object({
+  guest_name: z.string().min(1, "Name is required."),
+  guest_email: z.string().email("Invalid email address.").min(1, "Email is required."),
+});
+
+const QuestionOfTheDayPage = () => {
+  const { user, hasCheckedInitialSession } = useSession();
+  const { toast } = useToast();
+
+  const [dailyMcq, setDailyMcq] = useState<DailyMcq | null>(null);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null);
+  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [explanation, setExplanation] = useState<MCQExplanation | null>(null);
+  const [userTotalPoints, setUserTotalPoints] = useState<number | null>(null); // For logged-in users
+
+  const isGuest = !user;
+
+  const guestForm = useForm<z.infer<typeof guestFormSchema>>({
+    resolver: zodResolver(guestFormSchema),
+    defaultValues: {
+      guest_name: "",
+      guest_email: "",
+    },
+  });
+
+  const fetchDailyMcq = useCallback(async () => {
+    setIsPageLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-daily-mcq');
+
+      if (error) {
+        throw error;
+      }
+      setDailyMcq(data as DailyMcq);
+      setSelectedOption(null);
+      setSubmissionResult(null);
+      setExplanation(null);
+
+      // Check if user has already submitted for today
+      if (user && data?.daily_mcq_id) {
+        const { data: existingSubmission, error: subError } = await supabase
+          .from('daily_mcq_submissions')
+          .select('selected_option, is_correct, points_awarded')
+          .eq('daily_mcq_id', data.daily_mcq_id)
+          .eq('user_id', user.id)
+          .single();
+
+        if (subError && subError.code !== 'PGRST116') {
+          console.error('Error checking existing submission:', subError);
+          toast({ title: "Error", description: "Failed to check your previous submission.", variant: "destructive" });
+        } else if (existingSubmission) {
+          setSubmissionResult({
+            message: 'You have already submitted an answer for today\'s question.',
+            is_correct: existingSubmission.is_correct,
+            points_awarded: existingSubmission.points_awarded,
+            total_points: null, // Will fetch separately
+            free_month_awarded: false,
+          });
+          setSelectedOption(existingSubmission.selected_option);
+          if (data.mcq.explanation_id) {
+            fetchExplanation(data.mcq.explanation_id);
+          }
+        }
+      }
+      
+      // Fetch user's total points if logged in
+      if (user) {
+        const { data: scoreData, error: scoreError } = await supabase
+          .from('user_daily_mcq_scores')
+          .select('total_points')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (scoreError && scoreError.code !== 'PGRST116') {
+          console.error('Error fetching user total points:', scoreError);
+        } else if (scoreData) {
+          setUserTotalPoints(scoreData.total_points);
+        } else {
+          setUserTotalPoints(0); // User has no score yet
+        }
+      } else {
+        setUserTotalPoints(null); // Guests don't have cumulative scores
+      }
+
+    } catch (error: any) {
+      console.error('Error fetching daily MCQ:', error);
+      toast({
+        title: "Error",
+        description: `Failed to load Question of the Day: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+      setDailyMcq(null);
+    } finally {
+      setIsPageLoading(false);
+    }
+  }, [user, toast]);
+
+  const fetchExplanation = useCallback(async (explanationId: string) => {
+    const { data, error } = await supabase
+      .from('mcq_explanations')
+      .select('*')
+      .eq('id', explanationId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Supabase Error fetching explanation:', error);
+      toast({
+        title: "Error",
+        description: `Failed to load explanation: ${error.message || 'Unknown error'}.`,
+        variant: "destructive",
+      });
+      setExplanation(null);
+    } else if (data) {
+      setExplanation(data);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (hasCheckedInitialSession) {
+      fetchDailyMcq();
+    }
+  }, [hasCheckedInitialSession, fetchDailyMcq]);
+
+  const handleSubmit = async (guestValues?: z.infer<typeof guestFormSchema>) => {
+    if (!dailyMcq || !selectedOption) {
+      toast({ title: "Error", description: "Please select an option before submitting.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        daily_mcq_id: dailyMcq.daily_mcq_id,
+        mcq_id: dailyMcq.mcq.id,
+        selected_option: selectedOption,
+        user_id: user?.id || null,
+        guest_name: guestValues?.guest_name || null,
+        guest_email: guestValues?.guest_email || null,
+      };
+
+      const { data, error } = await supabase.functions.invoke('submit-daily-mcq-answer', {
+        body: payload,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setSubmissionResult(data as SubmissionResult);
+      if (data.total_points !== null) {
+        setUserTotalPoints(data.total_points);
+      }
+      if (dailyMcq.mcq.explanation_id) {
+        fetchExplanation(dailyMcq.mcq.explanation_id);
+      }
+
+      if (data.free_month_awarded) {
+        toast({
+          title: "Congratulations!",
+          description: "You've earned a free month subscription!",
+          variant: "default",
+          duration: 5000,
+        });
+      } else if (data.error && data.error.includes("already submitted")) {
+        toast({
+          title: "Already Submitted",
+          description: data.error,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Submission Received",
+          description: data.is_correct ? "Correct answer!" : "Incorrect answer.",
+          variant: data.is_correct ? "default" : "destructive",
+        });
+      }
+
+    } catch (error: any) {
+      console.error('Error submitting answer:', error);
+      const errorMessage = error.message || 'Unknown error';
+      if (errorMessage.includes("already submitted")) {
+        // Re-fetch daily MCQ to get the existing submission status
+        fetchDailyMcq();
+      }
+      toast({
+        title: "Submission Failed",
+        description: `Failed to submit answer: ${errorMessage}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGuestSubmit = guestForm.handleSubmit(handleSubmit);
+
+  if (isPageLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
+        <p className="text-gray-700 dark:text-gray-300">Loading Question of the Day...</p>
+      </div>
+    );
+  }
+
+  if (!dailyMcq) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
+        <Card className="w-full max-w-2xl text-center">
+          <CardHeader>
+            <CardTitle className="text-2xl">No Question Available</CardTitle>
+            <CardDescription>
+              We couldn't load today's question. Please try again later.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="flex justify-center">
+            <Button onClick={fetchDailyMcq}>Retry</Button>
+          </CardFooter>
+        </Card>
+        <MadeWithDyad />
+      </div>
+    );
+  }
+
+  const isSubmitted = !!submissionResult;
+  const isCorrect = submissionResult?.is_correct;
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
+      <Card className="w-full max-w-3xl">
+        <CardHeader>
+          <CardTitle className="text-3xl text-center">Question of the Day</CardTitle>
+          <CardDescription className="text-center mt-2">
+            Test your knowledge daily!
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg font-semibold mb-4">{dailyMcq.mcq.question_text}</p>
+          <RadioGroup
+            onValueChange={setSelectedOption}
+            value={selectedOption || ""}
+            className="space-y-2"
+            disabled={isSubmitted}
+          >
+            {['A', 'B', 'C', 'D'].map((optionKey) => {
+              const optionText = dailyMcq.mcq[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
+              const isCorrectOption = dailyMcq.mcq.correct_answer === optionKey;
+              const isSelected = selectedOption === optionKey;
+
+              let className = "";
+              if (isSubmitted) {
+                if (isSelected && isCorrect) {
+                  className = "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+                } else if (isSelected && !isCorrect) {
+                  className = "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
+                } else if (isCorrectOption) {
+                  className = "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+                }
+              }
+
+              return (
+                <div
+                  key={optionKey}
+                  className={`flex items-center space-x-2 p-2 rounded-md cursor-pointer transition-colors duration-200 ${className}`}
+                  onClick={() => !isSubmitted && setSelectedOption(optionKey)}
+                >
+                  <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
+                  <Label htmlFor={`option-${optionKey}`} className="flex-grow cursor-pointer">
+                    {`${optionKey}. ${optionText}`}
+                    {isSubmitted && isCorrectOption && <span className="ml-2">(Correct Answer)</span>}
+                    {isSubmitted && isSelected && !isCorrect && <span className="ml-2">(Your Answer)</span>}
+                  </Label>
+                </div>
+              );
+            })}
+          </RadioGroup>
+
+          {isSubmitted && (
+            <div className="mt-6 space-y-4">
+              <div className={`p-4 rounded-md ${isCorrect ? 'bg-green-50 border border-green-200 text-green-800 dark:bg-green-950 dark:border-green-700 dark:text-green-200' : 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-700 dark:text-red-200'}`}>
+                <h3 className="font-bold text-xl flex items-center gap-2">
+                  {isCorrect ? <CheckCircle2 className="h-6 w-6" /> : <AlertCircle className="h-6 w-6" />}
+                  {isCorrect ? "Correct!" : "Incorrect."}
+                </h3>
+                <p className="mt-2">You {isCorrect ? "earned" : "did not earn"} {submissionResult?.points_awarded} points today.</p>
+              </div>
+
+              {userTotalPoints !== null && (
+                <Card className="p-4">
+                  <CardTitle className="text-xl">Your Total Points: {userTotalPoints}</CardTitle>
+                  <CardDescription className="mt-2">
+                    Reach 500 points to earn a free month subscription!
+                    {userTotalPoints >= 500 && submissionResult?.free_month_awarded && (
+                      <span className="text-green-600 font-semibold ml-2"> (Awarded!)</span>
+                    )}
+                  </CardDescription>
+                </Card>
+              )}
+
+              {explanation && (
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+                  <h3 className="text-lg font-semibold mb-2">Explanation:</h3>
+                  <p className="text-gray-800 dark:text-gray-200">{explanation.explanation_text}</p>
+                  {explanation.image_url && (
+                    <img src={explanation.image_url} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isSubmitted && (
+            <div className="mt-6">
+              {isGuest && (
+                <Form {...guestForm}>
+                  <form onSubmit={handleGuestSubmit} className="space-y-4 mb-6">
+                    <p className="text-sm text-muted-foreground">
+                      Enter your details to track your score and participate in the free month subscription challenge!
+                    </p>
+                    <FormField
+                      control={guestForm.control}
+                      name="guest_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Your Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="John Doe" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={guestForm.control}
+                      name="guest_email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Your Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="john.doe@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" className="w-full" disabled={isSubmitting || !selectedOption}>
+                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Submit Answer
+                    </Button>
+                  </form>
+                </Form>
+              )}
+
+              {!isGuest && (
+                <Button onClick={() => handleSubmit()} className="w-full" disabled={isSubmitting || !selectedOption}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Submit Answer
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex justify-center">
+          {isGuest && (
+            <p className="text-sm text-muted-foreground">
+              Already have an account? <Link to="/login" className="text-primary hover:underline">Log In</Link>
+            </p>
+          )}
+          {!isGuest && (
+            <Button onClick={fetchDailyMcq} variant="outline" disabled={isSubmitting}>
+              Load Next Day's Question (for testing)
+            </Button>
+          )}
+        </CardFooter>
+      </Card>
+      <MadeWithDyad />
+    </div>
+  );
+};
+
+export default QuestionOfTheDayPage;

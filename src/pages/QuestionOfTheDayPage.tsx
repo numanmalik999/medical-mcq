@@ -116,7 +116,7 @@ const QuestionOfTheDayPage = () => {
         guest_email,
         points_awarded,
         created_at,
-        profiles (first_name, last_name)
+        user_public_profiles (first_name, last_name)
       `)
       .eq('daily_mcq_id', currentDailyMcqId)
       .order('points_awarded', { ascending: false })
@@ -130,7 +130,7 @@ const QuestionOfTheDayPage = () => {
     } else {
       const formattedLeaderboard: LeaderboardEntry[] = data.map((entry: any) => {
         const displayName = entry.user_id
-          ? `${entry.profiles?.first_name || ''} ${entry.profiles?.last_name || ''}`.trim() || `User (${entry.user_id.substring(0, 4)})`
+          ? `${entry.user_public_profiles?.first_name || ''} ${entry.user_public_profiles?.last_name || ''}`.trim() || `User (${entry.user_id.substring(0, 4)})`
           : entry.guest_name || `Guest (${entry.guest_email?.split('@')[0] || 'N/A'})`;
         return {
           id: entry.id,

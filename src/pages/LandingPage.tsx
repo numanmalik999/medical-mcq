@@ -9,6 +9,11 @@ import { BookOpenText, ClipboardCheck, User, FilePlus, ShieldCheck, Brain, Calen
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input'; // Import Input
+import { useForm } from 'react-hook-form'; // Import useForm
+import { zodResolver } from '@hookform/resolvers/zod'; // Import zodResolver
+import * as z from 'zod'; // Import zod
+import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'; // Import Form components
 
 // Define a type for FAQ items
 interface FaqItem {
@@ -79,11 +84,23 @@ const defaultFaqItems: FaqCategory[] = [
   },
 ];
 
+const marketingFormSchema = z.object({
+  email: z.string().email("Invalid email address.").min(1, "Email is required."),
+});
+
 const LandingPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
   const [faqItems, setFaqItems] = useState<FaqCategory[]>(defaultFaqItems);
   const [isLoadingFaq, setIsLoadingFaq] = useState(true);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+
+  const marketingForm = useForm<z.infer<typeof marketingFormSchema>>({
+    resolver: zodResolver(marketingFormSchema),
+    defaultValues: {
+      email: "",
+    },
+  });
 
   useEffect(() => {
     const fetchFaqContent = async () => {
@@ -119,6 +136,43 @@ const LandingPage = () => {
     fetchFaqContent();
   }, [toast]);
 
+  const handleMarketingSubscribe = async (values: z.infer<typeof marketingFormSchema>) => {
+    setIsSubscribing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('subscribe-marketing-email', {
+        body: { email: values.email },
+      });
+
+      if (error) {
+        if (error.status === 409) { // Conflict, email already subscribed
+          toast({
+            title: "Already Subscribed",
+            description: "This email is already on our mailing list!",
+            variant: "default",
+          });
+        } else {
+          throw error;
+        }
+      } else {
+        toast({
+          title: "Subscription Successful!",
+          description: data.message || "Check your inbox for a confirmation email.", // Explicitly use data.message
+          variant: "default",
+        });
+        marketingForm.reset();
+      }
+    } catch (error: any) {
+      console.error("Marketing subscription error:", error);
+      toast({
+        title: "Subscription Failed",
+        description: `Failed to subscribe: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
+
   if (!hasCheckedInitialSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
@@ -152,9 +206,9 @@ const LandingPage = () => {
                     Get Started
                   </Button>
                 </Link>
-                <Link to="/user/dashboard"> {/* Link to /user/dashboard */}
+                <Link to="/quiz"> {/* Changed to /quiz for a generic free quiz */}
                   <Button size="lg" variant="secondary" className="flex items-center gap-2">
-                    <LayoutDashboard className="h-5 w-5" /> Try a Free Quiz {/* Keep text, use LayoutDashboard icon */}
+                    <LayoutDashboard className="h-5 w-5" /> Try a Free Quiz
                   </Button>
                 </Link>
                 <Link to="/quiz-of-the-day">
@@ -195,15 +249,50 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Call to Action Section */}
+      {/* Marketing Email Subscription Section */}
       <section className="py-16 md:py-24 bg-secondary text-secondary-foreground text-center">
+        <div className="container mx-auto px-4 max-w-2xl">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Stay Updated!</h2>
+          <p className="text-lg mb-8">
+            Subscribe to our newsletter for daily quiz updates, study tips, and special offers.
+          </p>
+          <Form {...marketingForm}>
+            <form onSubmit={marketingForm.handleSubmit(handleMarketingSubscribe)} className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+              <FormField
+                control={marketingForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem className="flex-grow">
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="Enter your email"
+                        className="h-12 text-lg"
+                        disabled={isSubscribing}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-left" />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" size="lg" className="h-12 text-lg" disabled={isSubscribing}>
+                {isSubscribing ? "Subscribing..." : "Subscribe"}
+              </Button>
+            </form>
+          </Form>
+        </div>
+      </section>
+
+      {/* Call to Action Section */}
+      <section className="py-16 md:py-24 bg-primary text-primary-foreground text-center">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Boost Your Scores?</h2>
           <p className="text-lg mb-8 max-w-2xl mx-auto">
             Join thousands of students who are already excelling with Study Prometric MCQs.
           </p>
           <Link to="/subscription">
-            <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
+            <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
               Start Your Journey Today
             </Button>
           </Link>

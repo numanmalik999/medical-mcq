@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { BookOpenText, ClipboardCheck, User, FilePlus, ShieldCheck, Brain, CalendarDays } from 'lucide-react'; // Import CalendarDays
+import { BookOpenText, ClipboardCheck, User, FilePlus, ShieldCheck, Brain, CalendarDays, LayoutDashboard } from 'lucide-react'; // Import LayoutDashboard
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client'; // Import supabase
 import { useToast } from '@/hooks/use-toast'; // Import useToast
@@ -152,9 +152,9 @@ const LandingPage = () => {
                     Get Started
                   </Button>
                 </Link>
-                <Link to="/quiz"> {/* New: Try a Free Quiz button */}
+                <Link to="/user/dashboard"> {/* Changed to /user/dashboard */}
                   <Button size="lg" variant="secondary" className="flex items-center gap-2">
-                    <BookOpenText className="h-5 w-5" /> Try a Free Quiz
+                    <LayoutDashboard className="h-5 w-5" /> Guest Dashboard {/* Changed text and icon */}
                   </Button>
                 </Link>
                 <Link to="/quiz-of-the-day">

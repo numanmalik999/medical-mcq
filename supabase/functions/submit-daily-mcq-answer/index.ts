@@ -2,6 +2,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+// @ts-ignore
+import { Resend } from 'https://esm.sh/resend@1.1.0';
 
 declare global {
   namespace Deno {
@@ -49,7 +51,7 @@ serve(async (req: Request) => {
     // 1. Get the correct answer for the MCQ
     const { data: mcqData, error: mcqError } = await supabaseAdmin
       .from('mcqs')
-      .select('correct_answer')
+      .select('correct_answer, question_text') // Also fetch question_text for email
       .eq('id', mcq_id)
       .single();
 
@@ -162,6 +164,38 @@ serve(async (req: Request) => {
               .eq('user_id', user_id);
           }
         }
+      }
+    }
+
+    // 5. Send email notification
+    const recipientEmail = user_id ? (await supabaseAdmin.from('profiles').select('email').eq('id', user_id).single()).data?.email : guest_email;
+    const recipientName = user_id ? (await supabaseAdmin.from('profiles').select('first_name').eq('id', user_id).single()).data?.first_name || 'User' : guest_name || 'Guest';
+
+    if (recipientEmail) {
+      const emailSubject = isCorrect ? '🎉 Correct Answer! Question of the Day' : '💡 Your Answer for Question of the Day';
+      const emailBody = `
+        <p>Dear ${recipientName},</p>
+        <p>Thank you for participating in today's Question of the Day!</p>
+        <p><strong>Question:</strong> ${mcqData.question_text}</p>
+        <p>Your answer was: <strong>${isCorrect ? 'Correct!' : 'Incorrect.'}</strong></p>
+        <p>You earned <strong>${pointsAwarded} points</strong> today.</p>
+        ${user_id && totalPoints !== null ? `<p>Your total cumulative points are now: <strong>${totalPoints}</strong>.</p>` : ''}
+        ${freeMonthAwarded ? '<p><strong>Congratulations! You\'ve reached 500 points and earned a free month subscription!</strong></p>' : ''}
+        <p>Keep learning and come back tomorrow for a new challenge!</p>
+        <p>Best regards,<br/>Study Prometric MCQs Team</p>
+      `;
+
+      const { error: emailError } = await supabaseAdmin.functions.invoke('send-email', {
+        body: {
+          to: recipientEmail,
+          subject: emailSubject,
+          body: emailBody,
+        },
+      });
+
+      if (emailError) {
+        console.error('Error sending QOD submission email:', emailError);
+        // Don't throw, just log the warning
       }
     }
 

@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, Trophy } from 'lucide-react'; // Import Trophy icon
 import { Link } from 'react-router-dom';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
@@ -48,6 +48,16 @@ interface MCQExplanation {
   image_url: string | null;
 }
 
+interface LeaderboardEntry {
+  id: string;
+  user_id: string | null;
+  guest_name: string | null;
+  guest_email: string | null;
+  points_awarded: number;
+  created_at: string;
+  user_display_name: string; // Combined name for display
+}
+
 const guestFormSchema = z.object({
   guest_name: z.string().min(1, "Name is required."),
   guest_email: z.string().email("Invalid email address.").min(1, "Email is required."),
@@ -64,6 +74,7 @@ const QuestionOfTheDayPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [explanation, setExplanation] = useState<MCQExplanation | null>(null);
   const [userTotalPoints, setUserTotalPoints] = useState<number | null>(null); // For logged-in users
+  const [dailyLeaderboard, setDailyLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   const isGuest = !user;
 
@@ -74,6 +85,66 @@ const QuestionOfTheDayPage = () => {
       guest_email: "",
     },
   });
+
+  const fetchExplanation = useCallback(async (explanationId: string) => {
+    const { data, error } = await supabase
+      .from('mcq_explanations')
+      .select('*')
+      .eq('id', explanationId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Supabase Error fetching explanation:', error);
+      toast({
+        title: "Error",
+        description: `Failed to load explanation: ${error.message || 'Unknown error'}.`,
+        variant: "destructive",
+      });
+      setExplanation(null);
+    } else if (data) {
+      setExplanation(data);
+    }
+  }, [toast]);
+
+  const fetchDailyLeaderboard = useCallback(async (currentDailyMcqId: string) => {
+    const { data, error } = await supabase
+      .from('daily_mcq_submissions')
+      .select(`
+        id,
+        user_id,
+        guest_name,
+        guest_email,
+        points_awarded,
+        created_at,
+        profiles (first_name, last_name)
+      `)
+      .eq('daily_mcq_id', currentDailyMcqId)
+      .order('points_awarded', { ascending: false })
+      .order('created_at', { ascending: true }) // Tie-break by submission time
+      .limit(10);
+
+    if (error) {
+      console.error('Error fetching daily leaderboard:', error);
+      toast({ title: "Error", description: "Failed to load daily leaderboard.", variant: "destructive" });
+      setDailyLeaderboard([]);
+    } else {
+      const formattedLeaderboard: LeaderboardEntry[] = data.map((entry: any) => {
+        const displayName = entry.user_id
+          ? `${entry.profiles?.first_name || ''} ${entry.profiles?.last_name || ''}`.trim() || `User (${entry.user_id.substring(0, 4)})`
+          : entry.guest_name || `Guest (${entry.guest_email?.split('@')[0] || 'N/A'})`;
+        return {
+          id: entry.id,
+          user_id: entry.user_id,
+          guest_name: entry.guest_name,
+          guest_email: entry.guest_email,
+          points_awarded: entry.points_awarded,
+          created_at: entry.created_at,
+          user_display_name: displayName,
+        };
+      });
+      setDailyLeaderboard(formattedLeaderboard);
+    }
+  }, [toast]);
 
   const fetchDailyMcq = useCallback(async () => {
     setIsPageLoading(true);
@@ -88,29 +159,60 @@ const QuestionOfTheDayPage = () => {
       setSubmissionResult(null);
       setExplanation(null);
 
-      // Check if user has already submitted for today
-      if (user && data?.daily_mcq_id) {
-        const { data: existingSubmission, error: subError } = await supabase
-          .from('daily_mcq_submissions')
-          .select('selected_option, is_correct, points_awarded')
-          .eq('daily_mcq_id', data.daily_mcq_id)
-          .eq('user_id', user.id)
-          .single();
+      if (data?.daily_mcq_id) {
+        fetchDailyLeaderboard(data.daily_mcq_id); // Fetch leaderboard for today's MCQ
 
-        if (subError && subError.code !== 'PGRST116') {
-          console.error('Error checking existing submission:', subError);
-          toast({ title: "Error", description: "Failed to check your previous submission.", variant: "destructive" });
-        } else if (existingSubmission) {
-          setSubmissionResult({
-            message: 'You have already submitted an answer for today\'s question.',
-            is_correct: existingSubmission.is_correct,
-            points_awarded: existingSubmission.points_awarded,
-            total_points: null, // Will fetch separately
-            free_month_awarded: false,
-          });
-          setSelectedOption(existingSubmission.selected_option);
-          if (data.mcq.explanation_id) {
-            fetchExplanation(data.mcq.explanation_id);
+        // Check if user has already submitted for today
+        if (user) {
+          const { data: existingSubmission, error: subError } = await supabase
+            .from('daily_mcq_submissions')
+            .select('selected_option, is_correct, points_awarded')
+            .eq('daily_mcq_id', data.daily_mcq_id)
+            .eq('user_id', user.id)
+            .single();
+
+          if (subError && subError.code !== 'PGRST116') {
+            console.error('Error checking existing submission:', subError);
+            toast({ title: "Error", description: "Failed to check your previous submission.", variant: "destructive" });
+          } else if (existingSubmission) {
+            setSubmissionResult({
+              message: 'You have already submitted an answer for today\'s question.',
+              is_correct: existingSubmission.is_correct,
+              points_awarded: existingSubmission.points_awarded,
+              total_points: null, // Will fetch separately
+              free_month_awarded: false,
+            });
+            setSelectedOption(existingSubmission.selected_option);
+            if (data.mcq.explanation_id) {
+              fetchExplanation(data.mcq.explanation_id);
+            }
+          }
+        } else { // Guest user check for existing submission
+          const guestEmail = localStorage.getItem('qod_guest_email');
+          if (guestEmail) {
+            const { data: existingGuestSubmission, error: guestSubError } = await supabase
+              .from('daily_mcq_submissions')
+              .select('selected_option, is_correct, points_awarded')
+              .eq('daily_mcq_id', data.daily_mcq_id)
+              .eq('guest_email', guestEmail)
+              .is('user_id', null)
+              .single();
+
+            if (guestSubError && guestSubError.code !== 'PGRST116') {
+              console.error('Error checking existing guest submission:', guestSubError);
+            } else if (existingGuestSubmission) {
+              setSubmissionResult({
+                message: 'You have already submitted an answer for today\'s question.',
+                is_correct: existingGuestSubmission.is_correct,
+                points_awarded: existingGuestSubmission.points_awarded,
+                total_points: null,
+                free_month_awarded: false,
+              });
+              setSelectedOption(existingGuestSubmission.selected_option);
+              if (data.mcq.explanation_id) {
+                fetchExplanation(data.mcq.explanation_id);
+              }
+            }
           }
         }
       }
@@ -145,27 +247,7 @@ const QuestionOfTheDayPage = () => {
     } finally {
       setIsPageLoading(false);
     }
-  }, [user, toast]);
-
-  const fetchExplanation = useCallback(async (explanationId: string) => {
-    const { data, error } = await supabase
-      .from('mcq_explanations')
-      .select('*')
-      .eq('id', explanationId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Supabase Error fetching explanation:', error);
-      toast({
-        title: "Error",
-        description: `Failed to load explanation: ${error.message || 'Unknown error'}.`,
-        variant: "destructive",
-      });
-      setExplanation(null);
-    } else if (data) {
-      setExplanation(data);
-    }
-  }, [toast]);
+  }, [user, toast, fetchExplanation, fetchDailyLeaderboard]);
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
@@ -227,6 +309,17 @@ const QuestionOfTheDayPage = () => {
         });
       }
 
+      // Store guest info in local storage
+      if (isGuest && guestValues) {
+        localStorage.setItem('qod_guest_name', guestValues.guest_name);
+        localStorage.setItem('qod_guest_email', guestValues.guest_email);
+      }
+      
+      // Refresh leaderboard after submission
+      if (dailyMcq.daily_mcq_id) {
+        fetchDailyLeaderboard(dailyMcq.daily_mcq_id);
+      }
+
     } catch (error: any) {
       console.error('Error submitting answer:', error);
       const errorMessage = error.message || 'Unknown error';
@@ -245,6 +338,16 @@ const QuestionOfTheDayPage = () => {
   };
 
   const handleGuestSubmit = guestForm.handleSubmit(handleSubmit);
+
+  // Load guest info from local storage on component mount
+  useEffect(() => {
+    if (isGuest) {
+      const savedGuestName = localStorage.getItem('qod_guest_name');
+      const savedGuestEmail = localStorage.getItem('qod_guest_email');
+      if (savedGuestName) guestForm.setValue('guest_name', savedGuestName);
+      if (savedGuestEmail) guestForm.setValue('guest_email', savedGuestEmail);
+    }
+  }, [isGuest, guestForm]);
 
   if (isPageLoading) {
     return (
@@ -278,152 +381,181 @@ const QuestionOfTheDayPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
-      <Card className="w-full max-w-3xl">
-        <CardHeader>
-          <CardTitle className="text-3xl text-center">Question of the Day</CardTitle>
-          <CardDescription className="text-center mt-2">
-            Test your knowledge daily!
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-lg font-semibold mb-4">{dailyMcq.mcq.question_text}</p>
-          <RadioGroup
-            onValueChange={setSelectedOption}
-            value={selectedOption || ""}
-            className="space-y-2"
-            disabled={isSubmitted}
-          >
-            {['A', 'B', 'C', 'D'].map((optionKey) => {
-              const optionText = dailyMcq.mcq[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
-              const isCorrectOption = dailyMcq.mcq.correct_answer === optionKey;
-              const isSelected = selectedOption === optionKey;
+      <div className="flex flex-col lg:flex-row w-full max-w-6xl gap-6">
+        {/* Main Content Area */}
+        <Card className="flex-1">
+          <CardHeader>
+            <CardTitle className="text-3xl text-center">Question of the Day</CardTitle>
+            <CardDescription className="text-center mt-2">
+              Test your knowledge daily!
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold mb-4">{dailyMcq.mcq.question_text}</p>
+            <RadioGroup
+              onValueChange={setSelectedOption}
+              value={selectedOption || ""}
+              className="space-y-2"
+              disabled={isSubmitted}
+            >
+              {['A', 'B', 'C', 'D'].map((optionKey) => {
+                const optionText = dailyMcq.mcq[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
+                const isCorrectOption = dailyMcq.mcq.correct_answer === optionKey;
+                const isSelected = selectedOption === optionKey;
 
-              let className = "";
-              if (isSubmitted) {
-                if (isSelected && isCorrect) {
-                  className = "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
-                } else if (isSelected && !isCorrect) {
-                  className = "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
-                } else if (isCorrectOption) {
-                  className = "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+                let className = "";
+                if (isSubmitted) {
+                  if (isSelected && isCorrect) {
+                    className = "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+                  } else if (isSelected && !isCorrect) {
+                    className = "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
+                  } else if (isCorrectOption) {
+                    className = "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+                  }
                 }
-              }
 
-              return (
-                <div
-                  key={optionKey}
-                  className={`flex items-center space-x-2 p-2 rounded-md cursor-pointer transition-colors duration-200 ${className}`}
-                  onClick={() => !isSubmitted && setSelectedOption(optionKey)}
-                >
-                  <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
-                  <Label htmlFor={`option-${optionKey}`} className="flex-grow cursor-pointer">
-                    {`${optionKey}. ${optionText}`}
-                    {isSubmitted && isCorrectOption && <span className="ml-2">(Correct Answer)</span>}
-                    {isSubmitted && isSelected && !isCorrect && <span className="ml-2">(Your Answer)</span>}
-                  </Label>
+                return (
+                  <div
+                    key={optionKey}
+                    className={`flex items-center space-x-2 p-2 rounded-md cursor-pointer transition-colors duration-200 ${className}`}
+                    onClick={() => !isSubmitted && setSelectedOption(optionKey)}
+                  >
+                    <RadioGroupItem value={optionKey} id={`option-${optionKey}`} />
+                    <Label htmlFor={`option-${optionKey}`} className="flex-grow cursor-pointer">
+                      {`${optionKey}. ${optionText}`}
+                      {isSubmitted && isCorrectOption && <span className="ml-2">(Correct Answer)</span>}
+                      {isSubmitted && isSelected && !isCorrect && <span className="ml-2">(Your Answer)</span>}
+                    </Label>
+                  </div>
+                );
+              })}
+            </RadioGroup>
+
+            {isSubmitted && (
+              <div className="mt-6 space-y-4">
+                <div className={`p-4 rounded-md ${isCorrect ? 'bg-green-50 border border-green-200 text-green-800 dark:bg-green-950 dark:border-green-700 dark:text-green-200' : 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-700 dark:text-red-200'}`}>
+                  <h3 className="font-bold text-xl flex items-center gap-2">
+                    {isCorrect ? <CheckCircle2 className="h-6 w-6" /> : <AlertCircle className="h-6 w-6" />}
+                    {isCorrect ? "Correct!" : "Incorrect."}
+                  </h3>
+                  <p className="mt-2">You {isCorrect ? "earned" : "did not earn"} {submissionResult?.points_awarded} points today.</p>
                 </div>
-              );
-            })}
-          </RadioGroup>
 
-          {isSubmitted && (
-            <div className="mt-6 space-y-4">
-              <div className={`p-4 rounded-md ${isCorrect ? 'bg-green-50 border border-green-200 text-green-800 dark:bg-green-950 dark:border-green-700 dark:text-green-200' : 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-700 dark:text-red-200'}`}>
-                <h3 className="font-bold text-xl flex items-center gap-2">
-                  {isCorrect ? <CheckCircle2 className="h-6 w-6" /> : <AlertCircle className="h-6 w-6" />}
-                  {isCorrect ? "Correct!" : "Incorrect."}
-                </h3>
-                <p className="mt-2">You {isCorrect ? "earned" : "did not earn"} {submissionResult?.points_awarded} points today.</p>
-              </div>
+                {userTotalPoints !== null && (
+                  <Card className="p-4">
+                    <CardTitle className="text-xl">Your Total Points: {userTotalPoints}</CardTitle>
+                    <CardDescription className="mt-2">
+                      Reach 500 points to earn a free month subscription!
+                      {userTotalPoints >= 500 && submissionResult?.free_month_awarded && (
+                        <span className="text-green-600 font-semibold ml-2"> (Awarded!)</span>
+                      )}
+                    </CardDescription>
+                  </Card>
+                )}
 
-              {userTotalPoints !== null && (
-                <Card className="p-4">
-                  <CardTitle className="text-xl">Your Total Points: {userTotalPoints}</CardTitle>
-                  <CardDescription className="mt-2">
-                    Reach 500 points to earn a free month subscription!
-                    {userTotalPoints >= 500 && submissionResult?.free_month_awarded && (
-                      <span className="text-green-600 font-semibold ml-2"> (Awarded!)</span>
+                {explanation && (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+                    <h3 className="text-lg font-semibold mb-2">Explanation:</h3>
+                    <p className="text-gray-800 dark:text-gray-200">{explanation.explanation_text}</p>
+                    {explanation.image_url && (
+                      <img src={explanation.image_url} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
                     )}
-                  </CardDescription>
-                </Card>
-              )}
+                  </div>
+                )}
+              </div>
+            )}
 
-              {explanation && (
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
-                  <h3 className="text-lg font-semibold mb-2">Explanation:</h3>
-                  <p className="text-gray-800 dark:text-gray-200">{explanation.explanation_text}</p>
-                  {explanation.image_url && (
-                    <img src={explanation.image_url} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+            {!isSubmitted && (
+              <div className="mt-6">
+                {isGuest && (
+                  <Form {...guestForm}>
+                    <form onSubmit={handleGuestSubmit} className="space-y-4 mb-6">
+                      <p className="text-sm text-muted-foreground">
+                        Enter your details to track your score and participate in the free month subscription challenge!
+                      </p>
+                      <FormField
+                        control={guestForm.control}
+                        name="guest_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Your Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="John Doe" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={guestForm.control}
+                        name="guest_email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Your Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" placeholder="john.doe@example.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button type="submit" className="w-full" disabled={isSubmitting || !selectedOption}>
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Submit Answer
+                      </Button>
+                    </form>
+                  </Form>
+                )}
 
-          {!isSubmitted && (
-            <div className="mt-6">
-              {isGuest && (
-                <Form {...guestForm}>
-                  <form onSubmit={handleGuestSubmit} className="space-y-4 mb-6">
-                    <p className="text-sm text-muted-foreground">
-                      Enter your details to track your score and participate in the free month subscription challenge!
-                    </p>
-                    <FormField
-                      control={guestForm.control}
-                      name="guest_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Your Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="John Doe" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={guestForm.control}
-                      name="guest_email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Your Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" placeholder="john.doe@example.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" className="w-full" disabled={isSubmitting || !selectedOption}>
-                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Submit Answer
-                    </Button>
-                  </form>
-                </Form>
-              )}
+                {!isGuest && (
+                  <Button onClick={() => handleSubmit()} className="w-full" disabled={isSubmitting || !selectedOption}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Submit Answer
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            {isGuest && (
+              <p className="text-sm text-muted-foreground">
+                Already have an account? <Link to="/login" className="text-primary hover:underline">Log In</Link>
+              </p>
+            )}
+            {!isGuest && (
+              <Button onClick={fetchDailyMcq} variant="outline" disabled={isSubmitting}>
+                Load Next Day's Question (for testing)
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
 
-              {!isGuest && (
-                <Button onClick={() => handleSubmit()} className="w-full" disabled={isSubmitting || !selectedOption}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Submit Answer
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          {isGuest && (
-            <p className="text-sm text-muted-foreground">
-              Already have an account? <Link to="/login" className="text-primary hover:underline">Log In</Link>
-            </p>
-          )}
-          {!isGuest && (
-            <Button onClick={fetchDailyMcq} variant="outline" disabled={isSubmitting}>
-              Load Next Day's Question (for testing)
-            </Button>
-          )}
-        </CardFooter>
-      </Card>
+        {/* Leaderboard Sidebar */}
+        <Card className="w-full lg:w-80 flex-shrink-0">
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-500" /> Today's Top Scorers
+            </CardTitle>
+            <CardDescription>Highest points for today's question.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dailyLeaderboard.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No submissions yet for today's question. Be the first!</p>
+            ) : (
+              <ol className="space-y-2">
+                {dailyLeaderboard.map((entry, index) => (
+                  <li key={entry.id} className="flex items-center justify-between text-sm">
+                    <span className="font-medium">
+                      {index + 1}. {entry.user_display_name}
+                    </span>
+                    <span className="text-primary font-semibold">{entry.points_awarded} pts</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </CardContent>
+        </Card>
+      </div>
       <MadeWithDyad />
     </div>
   );

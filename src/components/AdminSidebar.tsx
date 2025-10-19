@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users, LogOut, UploadCloud, MessageSquareWarning, FileQuestion, Settings, GraduationCap } from 'lucide-react';
+import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users, LogOut, UploadCloud, MessageSquareWarning, FileQuestion, Settings, GraduationCap, CalendarDays } from 'lucide-react'; // Import CalendarDays
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -64,6 +64,7 @@ const AdminSidebar = () => {
     { to: "/admin/add-mcq", icon: <PlusCircle className="h-4 w-4" />, label: "Add MCQ" },
     { to: "/admin/bulk-upload-mcqs", icon: <UploadCloud className="h-4 w-4" />, label: "Bulk Upload MCQs" },
     { to: "/admin/manage-mcqs", icon: <BookOpenText className="h-4 w-4" />, label: "Manage MCQs" },
+    { to: "/admin/manage-daily-mcqs", icon: <CalendarDays className="h-4 w-4" />, label: "Manage Daily MCQs" }, // New item
     { to: "/admin/manage-submitted-mcqs", icon: <FileQuestion className="h-4 w-4" />, label: "Submitted MCQs" },
     { to: "/admin/manage-categories", icon: <FolderKanban className="h-4 w-4" />, label: "Manage Categories" },
     { to: "/admin/manage-courses", icon: <GraduationCap className="h-4 w-4" />, label: "Manage Courses" },

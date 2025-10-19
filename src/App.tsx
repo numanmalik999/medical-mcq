@@ -48,6 +48,7 @@ import UserCoursesPage from "./pages/UserCoursesPage";
 import UserCourseDetailsPage from "./pages/UserCourseDetailsPage";
 
 import QuestionOfTheDayPage from "./pages/QuestionOfTheDayPage"; // Import new page
+import ManageDailyMcqsPage from "./pages/ManageDailyMcqsPage"; // Import new page
 
 import { ThemeProvider } from "@/components/theme-provider"; // Import ThemeProvider
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics"; // Import useGoogleAnalytics hook
@@ -88,6 +89,7 @@ const AppContent = () => {
                 <Route path="add-mcq" element={<AddMcqPage />} />
                 <Route path="bulk-upload-mcqs" element={<BulkUploadMcqsPage />} />
                 <Route path="manage-mcqs" element={<ManageMcqsPage />} />
+                <Route path="manage-daily-mcqs" element={<ManageDailyMcqsPage />} /> {/* New route */}
                 <Route path="manage-submitted-mcqs" element={<ManageSubmittedMcqsPage />} />
                 <Route path="manage-categories" element={<ManageCategoriesPage />} />
                 <Route path="manage-courses" element={<ManageCoursesPage />} /> {/* New route */}

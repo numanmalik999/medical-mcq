@@ -10,6 +10,7 @@ import { useSession } from '@/components/SessionContextProvider';
 import { useParams, Link } from 'react-router-dom';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ArrowLeft } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'; // Import Dialog components
 
 interface Course {
   id: string;
@@ -32,6 +33,10 @@ const UserCourseDetailsPage = () => {
   const [course, setCourse] = useState<Course | null>(null);
   const [topics, setTopics] = useState<CourseTopic[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
+
+  // State for the topic dialog
+  const [isTopicDialogOpen, setIsTopicDialogOpen] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<CourseTopic | null>(null);
 
   useEffect(() => {
     if (hasCheckedInitialSession && courseId) {
@@ -71,6 +76,11 @@ const UserCourseDetailsPage = () => {
       setTopics(topicsData || []);
     }
     setIsPageLoading(false);
+  };
+
+  const handleTopicClick = (topic: CourseTopic) => {
+    setSelectedTopic(topic);
+    setIsTopicDialogOpen(true);
   };
 
   if (!hasCheckedInitialSession || isPageLoading) {
@@ -131,9 +141,14 @@ const UserCourseDetailsPage = () => {
             <Accordion type="single" collapsible className="w-full">
               {topics.map((topic) => (
                 <AccordionItem key={topic.id} value={topic.id}>
-                  <AccordionTrigger className="text-left font-medium text-lg">{topic.order}. {topic.title}</AccordionTrigger>
+                  <AccordionTrigger className="text-left font-medium text-lg" onClick={() => handleTopicClick(topic)}>
+                    {topic.order}. {topic.title}
+                  </AccordionTrigger>
+                  {/* The AccordionContent below is now redundant for displaying full content,
+                      but can be kept for a brief preview if desired, or removed.
+                      For now, I'll keep it but the main content will be in the dialog. */}
                   <AccordionContent className="text-muted-foreground prose dark:prose-invert max-w-none">
-                    <div dangerouslySetInnerHTML={{ __html: topic.content || 'No content available.' }} />
+                    <div dangerouslySetInnerHTML={{ __html: topic.content?.substring(0, 150) + '...' || 'No content available.' }} />
                   </AccordionContent>
                 </AccordionItem>
               ))}
@@ -143,6 +158,28 @@ const UserCourseDetailsPage = () => {
       </Card>
 
       <MadeWithDyad />
+
+      {/* Topic Details Dialog */}
+      <Dialog open={isTopicDialogOpen} onOpenChange={setIsTopicDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selectedTopic?.title}</DialogTitle>
+            <DialogDescription>
+              Topic {selectedTopic?.order} of {course?.title}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 prose dark:prose-invert max-w-none">
+            {selectedTopic?.content ? (
+              <div dangerouslySetInnerHTML={{ __html: selectedTopic.content }} />
+            ) : (
+              <p className="text-muted-foreground">No content available for this topic.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsTopicDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

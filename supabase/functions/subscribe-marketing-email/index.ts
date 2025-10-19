@@ -11,6 +11,8 @@ const corsHeaders = {
 };
 
 serve(async (req: Request) => {
+  console.log('Edge Function subscribe-marketing-email invoked.'); // Added this log
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

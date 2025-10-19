@@ -138,10 +138,12 @@ const LandingPage = () => {
 
   const handleMarketingSubscribe = async (values: z.infer<typeof marketingFormSchema>) => {
     setIsSubscribing(true);
+    console.log('Client: Attempting to subscribe marketing email:', values.email); // Client-side log
     try {
       const { data, error } = await supabase.functions.invoke('subscribe-marketing-email', {
         body: { email: values.email },
       });
+      console.log('Client: Supabase function invoke response - data:', data, 'error:', error); // Client-side log
 
       if (error) {
         if (error.status === 409) { // Conflict, email already subscribed
@@ -162,7 +164,7 @@ const LandingPage = () => {
         marketingForm.reset();
       }
     } catch (error: any) {
-      console.error("Marketing subscription error:", error);
+      console.error("Client: Marketing subscription error:", error); // Client-side error log
       toast({
         title: "Subscription Failed",
         description: `Failed to subscribe: ${error.message || 'Unknown error'}`,
@@ -170,6 +172,7 @@ const LandingPage = () => {
       });
     } finally {
       setIsSubscribing(false);
+      console.log('Client: Marketing subscription process finished.'); // Client-side log
     }
   };
 

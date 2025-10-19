@@ -91,7 +91,7 @@ serve(async (req: Request) => {
     console.log('Checking for existing submission...');
     const { data: existingSubmission, error: checkSubmissionError } = await supabaseAdmin
       .from('daily_mcq_submissions')
-      .select('id, is_correct, points_awarded')
+      .select('id, is_correct, points_awarded, selected_option') // Added selected_option here
       .eq('daily_mcq_id', daily_mcq_id)
       .or(user_id ? `user_id.eq.${user_id}` : `guest_email.eq.${guest_email}`);
 
@@ -106,6 +106,7 @@ serve(async (req: Request) => {
         error: 'You have already submitted an answer for today\'s question.',
         is_correct: existingSubmission[0].is_correct,
         points_awarded: existingSubmission[0].points_awarded, // Return points from previous submission
+        selected_option: existingSubmission[0].selected_option, // Added selected_option to response
         total_points: null, // Will be fetched later if user_id exists
         free_month_awarded: false,
       }), {

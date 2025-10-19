@@ -40,6 +40,7 @@ interface SubmissionResult {
   total_points: number | null;
   free_month_awarded: boolean;
   error?: string;
+  selected_option?: string; // Added this property
 }
 
 interface MCQExplanation {
@@ -206,6 +207,7 @@ const QuestionOfTheDayPage = () => {
               points_awarded: existingSubmission.points_awarded,
               total_points: null, // Will fetch separately
               free_month_awarded: false,
+              selected_option: existingSubmission.selected_option, // Populate selected_option
             });
             setSelectedOption(existingSubmission.selected_option);
             if (data.mcq.explanation_id) {
@@ -232,6 +234,7 @@ const QuestionOfTheDayPage = () => {
                 points_awarded: existingGuestSubmission.points_awarded,
                 total_points: null,
                 free_month_awarded: false,
+                selected_option: existingGuestSubmission.selected_option, // Populate selected_option
               });
               setSelectedOption(existingGuestSubmission.selected_option);
               if (data.mcq.explanation_id) {
@@ -297,40 +300,60 @@ const QuestionOfTheDayPage = () => {
         guest_email: guestValues?.guest_email || null,
       };
 
-      const { data, error } = await supabase.functions.invoke('submit-daily-mcq-answer', {
+      const { data: responseData, error: invokeError } = await supabase.functions.invoke('submit-daily-mcq-answer', {
         body: payload,
       });
 
-      if (error) {
-        throw error;
+      if (invokeError) {
+        // Handle 409 Conflict specifically from the invokeError object
+        if (invokeError.status === 409 && invokeError.message?.includes("already submitted")) {
+          // The Edge Function's 409 response body is in invokeError.details
+          const errorDetails = invokeError.details as SubmissionResult;
+          setSubmissionResult({
+            message: errorDetails.error || 'You have already submitted an answer for today\'s question.',
+            is_correct: errorDetails.is_correct,
+            points_awarded: errorDetails.points_awarded,
+            total_points: null, // Will be fetched separately by fetchDailyMcq
+            free_month_awarded: false,
+            error: errorDetails.error,
+            selected_option: errorDetails.selected_option, // Use selected_option from errorDetails
+          });
+          setSelectedOption(errorDetails.selected_option || null); // Set selected option from previous submission
+          if (dailyMcq.mcq.explanation_id) {
+            fetchExplanation(dailyMcq.mcq.explanation_id);
+          }
+          toast({
+            title: "Already Submitted",
+            description: errorDetails.error || 'You have already submitted an answer for today\'s question.',
+            variant: "default",
+          });
+          // Re-fetch daily MCQ to ensure all states (like total points) are updated
+          fetchDailyMcq();
+          return; // Exit early as we've handled the 409
+        }
+        throw invokeError; // Re-throw other errors
       }
 
-      setSubmissionResult(data as SubmissionResult);
-      if (data.total_points !== null) {
-        setUserTotalPoints(data.total_points);
+      setSubmissionResult(responseData as SubmissionResult);
+      if (responseData.total_points !== null) {
+        setUserTotalPoints(responseData.total_points);
       }
       if (dailyMcq.mcq.explanation_id) {
         fetchExplanation(dailyMcq.mcq.explanation_id);
       }
 
-      if (data.free_month_awarded) {
+      if (responseData.free_month_awarded) {
         toast({
           title: "Congratulations!",
           description: "You've earned a free month subscription!",
           variant: "default",
           duration: 5000,
         });
-      } else if (data.error && data.error.includes("already submitted")) {
-        toast({
-          title: "Already Submitted",
-          description: data.error,
-          variant: "default",
-        });
       } else {
         toast({
           title: "Submission Received",
-          description: data.is_correct ? "Correct answer!" : "Incorrect answer.",
-          variant: data.is_correct ? "default" : "destructive",
+          description: responseData.is_correct ? "Correct answer!" : "Incorrect answer.",
+          variant: responseData.is_correct ? "default" : "destructive",
         });
       }
 
@@ -348,10 +371,6 @@ const QuestionOfTheDayPage = () => {
     } catch (error: any) {
       console.error('Error submitting answer:', error);
       const errorMessage = error.message || 'Unknown error';
-      if (errorMessage.includes("already submitted")) {
-        // Re-fetch daily MCQ to get the existing submission status
-        fetchDailyMcq();
-      }
       toast({
         title: "Submission Failed",
         description: `Failed to submit answer: ${errorMessage}`,

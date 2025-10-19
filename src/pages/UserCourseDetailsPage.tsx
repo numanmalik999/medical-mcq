@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { useParams, Link } from 'react-router-dom';
-import { Accordion, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'; // Removed AccordionContent
+import { Accordion, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ArrowLeft, BookOpenText } from 'lucide-react'; // Added BookOpenText icon
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';

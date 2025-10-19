@@ -26,13 +26,23 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Log environment variables for debugging
+  console.log('SUPABASE_URL:', Deno.env.get('SUPABASE_URL') ? 'SET' : 'NOT SET');
+  console.log('SUPABASE_SERVICE_ROLE_KEY:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'SET' : 'NOT SET');
+  console.log('RESEND_API_KEY (from submit-daily-mcq-answer):', Deno.env.get('RESEND_API_KEY') ? 'SET' : 'NOT SET');
+  console.log('ADMIN_EMAIL (from submit-daily-mcq-answer):', Deno.env.get('ADMIN_EMAIL') ? 'SET' : 'NOT SET');
+
+
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
   try {
-    const { daily_mcq_id, mcq_id, selected_option, user_id, guest_name, guest_email } = await req.json();
+    const requestBody = await req.json();
+    console.log('Incoming Request Body to submit-daily-mcq-answer:', requestBody); // Log incoming payload
+
+    const { daily_mcq_id, mcq_id, selected_option, user_id, guest_name, guest_email } = requestBody;
 
     if (!daily_mcq_id || !mcq_id || !selected_option) {
       return new Response(JSON.stringify({ error: 'Missing required fields: daily_mcq_id, mcq_id, or selected_option.' }), {

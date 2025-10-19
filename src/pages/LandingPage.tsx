@@ -152,7 +152,12 @@ const LandingPage = () => {
                     Get Started
                   </Button>
                 </Link>
-                <Link to="/quiz-of-the-day"> {/* Link to new QOD page */}
+                <Link to="/quiz"> {/* New: Try a Free Quiz button */}
+                  <Button size="lg" variant="secondary" className="flex items-center gap-2">
+                    <BookOpenText className="h-5 w-5" /> Try a Free Quiz
+                  </Button>
+                </Link>
+                <Link to="/quiz-of-the-day">
                   <Button size="lg" variant="secondary" className="flex items-center gap-2">
                     <CalendarDays className="h-5 w-5" /> Question of the Day
                   </Button>

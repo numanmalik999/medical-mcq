@@ -108,14 +108,16 @@ const ManageMcqsPage = () => {
 
   const fetchMcqs = async () => {
     setIsPageLoading(true);
-    console.log(`[ManageMcqsPage] STARTING PAGINATED MCQ FETCH with search term: ${searchTerm}`);
+    console.log(`[ManageMcqsPage] STARTING PAGINATED DATA FETCH with search term: ${searchTerm}`);
 
     let allMcqs: any[] = [];
-    let offset = 0;
+    let allMcqCategoryLinks: DbMcqCategoryLink[] = [];
     const limit = 1000; // Fetch 1000 records at a time
-    let hasMore = true;
 
-    while (hasMore) {
+    // --- Fetch all MCQs (paginated) ---
+    let offsetMcqs = 0;
+    let hasMoreMcqs = true;
+    while (hasMoreMcqs) {
       let mcqsQuery = supabase
         .from('mcqs')
         .select(`
@@ -130,25 +132,19 @@ const ManageMcqsPage = () => {
           difficulty,
           is_trial_mcq
         `)
-        .range(offset, offset + limit - 1); // Fetch from offset to offset + limit - 1
+        .range(offsetMcqs, offsetMcqs + limit - 1);
 
       if (searchTerm) {
-        console.log(`[ManageMcqsPage] Applying search term: ${searchTerm} for range ${offset}-${offset + limit - 1}`);
         mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
       }
-      
       mcqsQuery = mcqsQuery.order('created_at', { ascending: true });
 
-      console.log(`[ManageMcqsPage] Executing MCQs query for range ${offset}-${offset + limit - 1}...`);
+      console.log(`[ManageMcqsPage] Executing MCQs query for range ${offsetMcqs}-${offsetMcqs + limit - 1}...`);
       const { data: mcqsData, error: mcqsError } = await mcqsQuery;
 
       if (mcqsError) {
         console.error('[ManageMcqsPage] Error fetching MCQs during pagination:', mcqsError.message, mcqsError.details, mcqsError.hint);
-        toast({
-          title: "Error",
-          description: "Failed to load MCQs. Please try again.",
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: "Failed to load MCQs. Please try again.", variant: "destructive" });
         setRawMcqs([]);
         setIsPageLoading(false);
         return;
@@ -156,48 +152,55 @@ const ManageMcqsPage = () => {
 
       if (mcqsData && mcqsData.length > 0) {
         allMcqs = allMcqs.concat(mcqsData);
-        offset += mcqsData.length; // Increment offset by the actual number of records fetched
-        hasMore = mcqsData.length === limit; // If fewer than 'limit' records, it's the last page
-        console.log(`[ManageMcqsPage] Fetched ${mcqsData.length} MCQs. Total so far: ${allMcqs.length}. Has more: ${hasMore}`);
+        offsetMcqs += mcqsData.length;
+        hasMoreMcqs = mcqsData.length === limit;
+        console.log(`[ManageMcqsPage] Fetched ${mcqsData.length} MCQs. Total MCQs so far: ${allMcqs.length}. Has more MCQs: ${hasMoreMcqs}`);
       } else {
-        hasMore = false; // No more data
+        hasMoreMcqs = false;
       }
     }
-
     console.log('[ManageMcqsPage] All MCQs fetched. Total:', allMcqs.length);
 
-    // 2. Fetch all MCQ category links
-    console.log('[ManageMcqsPage] Executing MCQ category links query...');
-    const { data: mcqCategoryLinksData, error: mcqCategoryLinksError } = await supabase
-      .from('mcq_category_links')
-      .select('mcq_id, category_id');
+    // --- Fetch all MCQ category links (paginated) ---
+    let offsetLinks = 0;
+    let hasMoreLinks = true;
+    while (hasMoreLinks) {
+      const { data: mcqCategoryLinksData, error: mcqCategoryLinksError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id, category_id')
+        .range(offsetLinks, offsetLinks + limit - 1);
 
-    if (mcqCategoryLinksError) {
-      console.error('[ManageMcqsPage] Error fetching MCQ category links:', mcqCategoryLinksError);
-      toast({
-        title: "Error",
-        description: "Failed to load MCQ category links. Please try again.",
-        variant: "destructive",
-      });
-      setRawMcqs([]);
-      setIsPageLoading(false);
-      return;
+      if (mcqCategoryLinksError) {
+        console.error('[ManageMcqsPage] Error fetching MCQ category links during pagination:', mcqCategoryLinksError);
+        toast({ title: "Error", description: "Failed to load MCQ category links. Please try again.", variant: "destructive" });
+        setRawMcqs([]);
+        setIsPageLoading(false);
+        return;
+      }
+
+      if (mcqCategoryLinksData && mcqCategoryLinksData.length > 0) {
+        allMcqCategoryLinks = allMcqCategoryLinks.concat(mcqCategoryLinksData);
+        offsetLinks += mcqCategoryLinksData.length;
+        hasMoreLinks = mcqCategoryLinksData.length === limit;
+        console.log(`[ManageMcqsPage] Fetched ${mcqCategoryLinksData.length} links. Total links so far: ${allMcqCategoryLinks.length}. Has more links: ${hasMoreLinks}`);
+      } else {
+        hasMoreLinks = false;
+      }
     }
-    console.log('[ManageMcqsPage] Full mcqCategoryLinksData:', mcqCategoryLinksData); // Added log
+    console.log('[ManageMcqsPage] All MCQ category links fetched. Total:', allMcqCategoryLinks.length);
 
     // 3. Hydrate MCQs with category names on the client side
     const categoryNameMap = new Map(categories.map(cat => [cat.id, cat.name]));
-    console.log('[ManageMcqsPage] categoryNameMap:', categoryNameMap); // Added log
+    console.log('[ManageMcqsPage] categoryNameMap:', categoryNameMap);
 
     const mcqLinksMap = new Map<string, DbMcqCategoryLink[]>();
-    mcqCategoryLinksData.forEach(link => {
+    allMcqCategoryLinks.forEach(link => { // Use allMcqCategoryLinks here
       if (!mcqLinksMap.has(link.mcq_id)) {
         mcqLinksMap.set(link.mcq_id, []);
       }
       mcqLinksMap.get(link.mcq_id)?.push(link);
     });
-    console.log('[ManageMcqsPage] mcqLinksMap (first 5 entries):', Array.from(mcqLinksMap.entries()).slice(0, 5)); // Added log
-
+    console.log('[ManageMcqsPage] mcqLinksMap (first 5 entries):', Array.from(mcqLinksMap.entries()).slice(0, 5));
 
     const displayMcqs: DisplayMCQ[] = (allMcqs || []).map((mcq: any) => { // Use allMcqs here
       const linksForMcq = mcqLinksMap.get(mcq.id) || [];
@@ -210,7 +213,7 @@ const ManageMcqsPage = () => {
         category_links: hydratedLinks,
       };
     });
-    console.log(`[ManageMcqsPage] Successfully fetched and hydrated ${displayMcqs.length} MCQs. First 5 hydrated MCQs:`, displayMcqs.slice(0, 5)); // Added log
+    console.log(`[ManageMcqsPage] Successfully fetched and hydrated ${displayMcqs.length} MCQs. First 5 hydrated MCQs:`, displayMcqs.slice(0, 5));
     setRawMcqs(displayMcqs || []);
     setIsPageLoading(false);
   };
@@ -406,7 +409,7 @@ const ManageMcqsPage = () => {
           .in('id', explanationIdsToDelete);
 
         if (deleteExplanationsError) {
-          console.warn("Error deleting some explanations:", explanationIdsToDelete);
+          console.warn("Could not delete some explanations:", explanationIdsToDelete);
         }
       }
 

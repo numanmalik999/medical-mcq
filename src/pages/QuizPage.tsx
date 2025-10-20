@@ -58,7 +58,7 @@ interface DbQuizSession {
 // Client-side representation of a loaded session, including full MCQ objects
 interface LoadedQuizSession {
   dbSessionId: string; // The ID from the database
-  categoryId: string;
+  categoryId: string | null; // Changed to allow null
   mcqs: MCQ[]; // Full MCQ objects
   userAnswers: Map<string, UserAnswerData>;
   currentQuestionIndex: number;
@@ -150,7 +150,7 @@ const QuizPage = () => {
         description: `Failed to load explanation: ${error.message || 'Unknown error'}.`,
         variant: "destructive",
       });
-      return null;
+      // Removed setExplanation(null) as it's not a direct state
     } else if (data) {
       setExplanations(prev => new Map(prev).set(explanationId, data));
       return data;
@@ -161,7 +161,7 @@ const QuizPage = () => {
   // Function to save quiz state to the database
   const saveQuizState = useCallback(async (
     dbSessionId: string | null,
-    categoryId: string,
+    categoryId: string | null, // Changed to allow null
     mcqs: MCQ[],
     answers: Map<string, UserAnswerData>,
     index: number,
@@ -290,7 +290,7 @@ const QuizPage = () => {
           const categoryName = categoriesData?.find(c => c.id === dbSession.category_id)?.name || 'Unknown Category';
           return {
             dbSessionId: dbSession.id,
-            categoryId: dbSession.category_id || '', // Should always have a category_id
+            categoryId: dbSession.category_id, // Now correctly matches interface
             mcqs: dbSession.mcq_ids_order.map((id: string) => ({
               id,
               question_text: 'Loading...',
@@ -379,6 +379,7 @@ const QuizPage = () => {
   };
 
   const startQuizSession = async (categoryId: string, mode: 'random' | 'incorrect') => {
+    console.log(`[QuizPage] Starting quiz session for category: ${categoryId}, mode: ${mode}`);
     const isSubscribed = user?.has_active_subscription;
     const hasTakenTrial = user?.trial_taken;
     const isGuest = !user;
@@ -410,6 +411,7 @@ const QuizPage = () => {
     let mcqIdsToFetch: string[] = [];
 
     // Step 1: Get MCQ IDs from mcq_category_links based on category
+    console.log(`[QuizPage] Fetching mcq_ids from mcq_category_links for category: ${categoryId}`);
     let linksQuery = supabase
       .from('mcq_category_links')
       .select('mcq_id')
@@ -418,13 +420,14 @@ const QuizPage = () => {
     const { data: linkedMcqIdsData, error: linksError } = await linksQuery;
 
     if (linksError) {
-      console.error('Error fetching linked MCQ IDs:', linksError);
+      console.error('[QuizPage] Error fetching linked MCQ IDs:', linksError);
       toast({ title: "Error", description: "Failed to load quiz questions data.", variant: "destructive" });
       setIsPageLoading(false);
       return;
     }
 
     mcqIdsToFetch = linkedMcqIdsData?.map(link => link.mcq_id) || [];
+    console.log(`[QuizPage] Retrieved ${mcqIdsToFetch.length} linked MCQ IDs:`, mcqIdsToFetch);
 
     if (mcqIdsToFetch.length === 0) {
       toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
@@ -447,10 +450,12 @@ const QuizPage = () => {
 
     if (!isSubscribed) { // This condition is true for guests and non-subscribed users
       mcqQuery = mcqQuery.eq('is_trial_mcq', true);
+      console.log('[QuizPage] Applying trial MCQ filter.');
     }
 
     // Step 3: Filter by incorrect attempts if mode is 'incorrect'
     if (mode === 'incorrect' && user) { // Only applies to logged-in users
+      console.log('[QuizPage] Fetching incorrect attempts for user.');
       const { data: incorrectAttempts, error: attemptsError } = await supabase
         .from('user_quiz_attempts')
         .select('mcq_id')
@@ -459,13 +464,14 @@ const QuizPage = () => {
         .eq('is_correct', false);
 
       if (attemptsError) {
-        console.error('Error fetching incorrect attempts:', attemptsError);
+        console.error('[QuizPage] Error fetching incorrect attempts:', attemptsError);
         toast({ title: "Feature Restricted", description: "Failed to load incorrect questions.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
 
       const incorrectMcqIds = Array.from(new Set(incorrectAttempts?.map(attempt => attempt.mcq_id) || []));
+      console.log(`[QuizPage] User has ${incorrectMcqIds.length} incorrect MCQs in this category.`);
       
       if (incorrectMcqIds.length === 0) {
         toast({ title: "No Incorrect MCQs", description: "You have no incorrect answers in this category to re-attempt.", variant: "default" });
@@ -480,18 +486,20 @@ const QuizPage = () => {
         return;
       }
       mcqQuery = mcqQuery.in('id', mcqIdsToFetch);
+      console.log(`[QuizPage] Filtered MCQ IDs for 'incorrect' mode: ${mcqIdsToFetch.length}`);
     }
 
     const { data: mcqsData, error: mcqsError } = await mcqQuery;
 
     if (mcqsError) {
-      console.error('Error fetching MCQs data for quiz session:', mcqsError);
+      console.error('[QuizPage] Error fetching MCQs data for quiz session:', mcqsError);
       toast({ title: "Error", description: "Failed to load quiz questions data.", variant: "destructive" });
       setIsPageLoading(false);
       return;
     }
 
     if (!mcqsData || mcqsData.length === 0) {
+      console.log('[QuizPage] No MCQs found after all filters.');
       toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
       setIsPageLoading(false);
       return;
@@ -504,14 +512,17 @@ const QuizPage = () => {
         category_name: link.categories?.name || null,
       })),
     }));
+    console.log(`[QuizPage] Formatted ${formattedMcqs.length} MCQs.`);
 
     let mcqsToLoad: MCQ[] = formattedMcqs.slice(0, Math.min(formattedMcqs.length, (!isSubscribed) ? TRIAL_MCQ_LIMIT : formattedMcqs.length));
 
     if (mcqsToLoad.length === 0) {
+      console.log('[QuizPage] No MCQs to load after trial limit or other slicing.');
       toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
       setIsPageLoading(false);
       return;
     }
+    console.log(`[QuizPage] Final ${mcqsToLoad.length} MCQs selected for quiz.`);
 
     setQuizQuestions(mcqsToLoad);
     setCurrentQuizCategoryId(categoryId); // Set the category for the current quiz
@@ -539,19 +550,40 @@ const QuizPage = () => {
       );
       if (savedSessionResult) {
         const categoryName = categoryStats.find(c => c.id === categoryId)?.name || 'Unknown Category';
-        setActiveSavedQuizzes(prev => [
-          {
-            dbSessionId: savedSessionResult.id,
-            categoryId: categoryId,
-            mcqs: mcqsToLoad, // Store full MCQs for display in saved quizzes list
-            userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
-            currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
-            isTrialActiveSession: isTrialActiveSession,
-            userId: user.id,
-            categoryName: categoryName, // Add for display
-          },
-          ...prev,
-        ]);
+
+        setActiveSavedQuizzes(prev => {
+          const existingIndex = prev.findIndex(session => session.dbSessionId === savedSessionResult.id);
+          if (existingIndex > -1) {
+            // Update existing session in the list
+            const updatedPrev = [...prev];
+            updatedPrev[existingIndex] = {
+              dbSessionId: savedSessionResult.id,
+              categoryId: currentQuizCategoryId,
+              mcqs: quizQuestions,
+              userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
+              currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
+              isTrialActiveSession: isTrialActiveSession,
+              userId: user.id,
+              categoryName: categoryName,
+            };
+            return updatedPrev;
+          } else {
+            // Add new session to the list (should ideally not happen if currentDbSessionId is set)
+            return [
+              {
+                dbSessionId: savedSessionResult.id,
+                categoryId: currentQuizCategoryId,
+                mcqs: quizQuestions,
+                userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
+                currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
+                isTrialActiveSession: isTrialActiveSession,
+                userId: user.id,
+                categoryName: categoryName,
+              },
+              ...prev,
+            ];
+          }
+        });
       }
     }
 
@@ -787,7 +819,7 @@ const QuizPage = () => {
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
       const prevQuestion = quizQuestions[currentQuestionIndex - 1];
-      setCurrentQuestionIndex((prev) => prev - 1);
+      setCurrentQuestionIndex((prev) => prev + 1);
       const prevAnswerData = userAnswers.get(prevQuestion?.id || '');
       setSelectedAnswer(prevAnswerData?.selectedOption || null);
       setFeedback(prevAnswerData?.submitted ? (prevAnswerData.isCorrect ? 'Correct!' : `Incorrect. The correct answer was ${prevQuestion.correct_answer}.`) : null);

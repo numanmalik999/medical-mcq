@@ -40,11 +40,12 @@ const ManageMcqsPage = () => {
   const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
 
   const fetchCategories = async () => {
+    console.log('[ManageMcqsPage] Fetching categories...');
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*');
     if (categoriesError) {
-      console.error('Error fetching categories:', categoriesError);
+      console.error('[ManageMcqsPage] Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories for filter.", variant: "destructive" });
     } else {
       const categoriesWithCounts = await Promise.all(
@@ -56,31 +57,35 @@ const ManageMcqsPage = () => {
             .eq('category_id', category.id);
 
           if (mcqCountError) {
-            console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
+            console.error(`[ManageMcqsPage] Error fetching MCQ count for category ${category.name}:`, mcqCountError);
           }
           return { ...category, mcq_count: count || 0 };
         })
       );
 
       // Calculate count for Uncategorized MCQs
+      console.log('[ManageMcqsPage] Calculating uncategorized MCQ count...');
       const { data: allLinkedMcqIdsData, error: linkedMcqIdsError } = await supabase
         .from('mcq_category_links')
         .select('mcq_id');
 
       if (linkedMcqIdsError) {
-        console.error('Error fetching all linked MCQ IDs for uncategorized count:', linkedMcqIdsError);
+        console.error('[ManageMcqsPage] Error fetching all linked MCQ IDs for uncategorized count:', linkedMcqIdsError);
       }
       const uniqueLinkedMcqIds = new Set(allLinkedMcqIdsData?.map(link => link.mcq_id) || []);
+      console.log(`[ManageMcqsPage] Total unique linked MCQ IDs: ${uniqueLinkedMcqIds.size}`);
 
       const { count: totalMcqCount, error: totalMcqCountError } = await supabase
         .from('mcqs')
         .select('id', { count: 'exact', head: true });
 
       if (totalMcqCountError) {
-        console.error('Error fetching total MCQ count for uncategorized:', totalMcqCountError);
+        console.error('[ManageMcqsPage] Error fetching total MCQ count for uncategorized:', totalMcqCountError);
       }
+      console.log(`[ManageMcqsPage] Total MCQs in 'mcqs' table: ${totalMcqCount}`);
 
       const uncategorizedMcqCount = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
+      console.log(`[ManageMcqsPage] Calculated uncategorized MCQ count: ${uncategorizedMcqCount}`);
 
       setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: Math.max(0, uncategorizedMcqCount) }]);
     }
@@ -88,36 +93,41 @@ const ManageMcqsPage = () => {
 
   const fetchMcqs = async () => {
     setIsPageLoading(true);
+    console.log(`[ManageMcqsPage] Fetching MCQs with filter category: ${selectedFilterCategory}, search term: ${searchTerm}`);
 
     let mcqIdsToFilter: string[] | null = null;
 
     if (selectedFilterCategory === UNCATEGORIZED_ID) {
+      console.log('[ManageMcqsPage] Filtering for uncategorized MCQs.');
       const { data: categorizedMcqLinks, error: linksError } = await supabase
         .from('mcq_category_links')
         .select('mcq_id');
 
       if (linksError) {
-        console.error('Error fetching categorized MCQ links for uncategorized filter:', linksError);
+        console.error('[ManageMcqsPage] Error fetching categorized MCQ links for uncategorized filter:', linksError);
         toast({ title: "Error", description: "Failed to identify uncategorized questions.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
       const categorizedMcqIds = Array.from(new Set(categorizedMcqLinks?.map(link => link.mcq_id) || []));
+      console.log(`[ManageMcqsPage] Found ${categorizedMcqIds.length} categorized MCQ IDs.`);
 
       const { data: allMcqIds, error: allMcqIdsError } = await supabase
         .from('mcqs')
         .select('id');
 
       if (allMcqIdsError) {
-        console.error('Error fetching all MCQ IDs for uncategorized filter:', allMcqIdsError);
+        console.error('[ManageMcqsPage] Error fetching all MCQ IDs for uncategorized filter:', allMcqIdsError);
         toast({ title: "Error", description: "Failed to fetch all MCQs for uncategorized filter.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
       const allMcqIdsSet = new Set(allMcqIds?.map(mcq => mcq.id) || []);
       mcqIdsToFilter = Array.from(allMcqIdsSet).filter(id => !categorizedMcqIds.includes(id));
+      console.log(`[ManageMcqsPage] Identified ${mcqIdsToFilter.length} uncategorized MCQ IDs.`);
 
     } else if (selectedFilterCategory) {
+      console.log(`[ManageMcqsPage] Filtering by specific category ID: ${selectedFilterCategory}`);
       let linksQuery = supabase
         .from('mcq_category_links')
         .select('mcq_id');
@@ -129,12 +139,13 @@ const ManageMcqsPage = () => {
       const { data: filteredLinks, error: linksError } = await linksQuery;
 
       if (linksError) {
-        console.error('Error fetching filtered MCQ links:', linksError);
+        console.error('[ManageMcqsPage] Error fetching filtered MCQ links:', linksError);
         toast({ title: "Error", description: "Failed to filter MCQs by category.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
       mcqIdsToFilter = Array.from(new Set(filteredLinks?.map(link => link.mcq_id) || []));
+      console.log(`[ManageMcqsPage] Found ${mcqIdsToFilter.length} MCQ IDs for category ${selectedFilterCategory}.`);
     }
 
     let mcqsQuery = supabase
@@ -149,6 +160,7 @@ const ManageMcqsPage = () => {
 
     if (mcqIdsToFilter !== null) {
       if (mcqIdsToFilter.length === 0) {
+        console.log('[ManageMcqsPage] No MCQ IDs to query after category filter, setting empty list.');
         setMcqs([]); // No MCQs match the filter
         setIsPageLoading(false);
         return;
@@ -157,13 +169,14 @@ const ManageMcqsPage = () => {
     }
 
     if (searchTerm) {
+      console.log(`[ManageMcqsPage] Applying search term: ${searchTerm}`);
       mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
     }
 
     const { data, error } = await mcqsQuery;
 
     if (error) {
-      console.error('Error fetching MCQs:', error);
+      console.error('[ManageMcqsPage] Error fetching MCQs:', error);
       toast({
         title: "Error",
         description: "Failed to load MCQs. Please try again.",
@@ -178,6 +191,7 @@ const ManageMcqsPage = () => {
           category_name: link.categories?.name || null,
         })),
       }));
+      console.log(`[ManageMcqsPage] Successfully fetched ${displayMcqs.length} MCQs.`);
       setMcqs(displayMcqs || []);
     }
     setIsPageLoading(false);

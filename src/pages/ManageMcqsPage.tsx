@@ -108,49 +108,63 @@ const ManageMcqsPage = () => {
 
   const fetchMcqs = async () => {
     setIsPageLoading(true);
-    console.log(`[ManageMcqsPage] STARTING MCQ FETCH with search term: ${searchTerm}`);
+    console.log(`[ManageMcqsPage] STARTING PAGINATED MCQ FETCH with search term: ${searchTerm}`);
 
-    // 1. Fetch all MCQs without any joins
-    let mcqsQuery = supabase
-      .from('mcqs')
-      .select(`
-        id,
-        question_text,
-        option_a,
-        option_b,
-        option_c,
-        option_d,
-        correct_answer,
-        explanation_id,
-        difficulty,
-        is_trial_mcq
-      `)
-      .limit(100000); // Explicitly set a high limit to fetch all MCQs
+    let allMcqs: any[] = [];
+    let offset = 0;
+    const limit = 1000; // Fetch 1000 records at a time
+    let hasMore = true;
 
-    if (searchTerm) {
-      console.log(`[ManageMcqsPage] Applying search term: ${searchTerm}`);
-      mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
+    while (hasMore) {
+      let mcqsQuery = supabase
+        .from('mcqs')
+        .select(`
+          id,
+          question_text,
+          option_a,
+          option_b,
+          option_c,
+          option_d,
+          correct_answer,
+          explanation_id,
+          difficulty,
+          is_trial_mcq
+        `)
+        .range(offset, offset + limit - 1); // Fetch from offset to offset + limit - 1
+
+      if (searchTerm) {
+        console.log(`[ManageMcqsPage] Applying search term: ${searchTerm} for range ${offset}-${offset + limit - 1}`);
+        mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
+      }
+      
+      mcqsQuery = mcqsQuery.order('created_at', { ascending: true });
+
+      console.log(`[ManageMcqsPage] Executing MCQs query for range ${offset}-${offset + limit - 1}...`);
+      const { data: mcqsData, error: mcqsError } = await mcqsQuery;
+
+      if (mcqsError) {
+        console.error('[ManageMcqsPage] Error fetching MCQs during pagination:', mcqsError.message, mcqsError.details, mcqsError.hint);
+        toast({
+          title: "Error",
+          description: "Failed to load MCQs. Please try again.",
+          variant: "destructive",
+        });
+        setRawMcqs([]);
+        setIsPageLoading(false);
+        return;
+      }
+
+      if (mcqsData && mcqsData.length > 0) {
+        allMcqs = allMcqs.concat(mcqsData);
+        offset += mcqsData.length; // Increment offset by the actual number of records fetched
+        hasMore = mcqsData.length === limit; // If fewer than 'limit' records, it's the last page
+        console.log(`[ManageMcqsPage] Fetched ${mcqsData.length} MCQs. Total so far: ${allMcqs.length}. Has more: ${hasMore}`);
+      } else {
+        hasMore = false; // No more data
+      }
     }
-    
-    mcqsQuery = mcqsQuery.order('created_at', { ascending: true });
 
-    console.log('[ManageMcqsPage] Executing MCQs query...');
-    const { data: mcqsData, error: mcqsError } = await mcqsQuery;
-    console.log('[ManageMcqsPage] Raw response from MCQs query - Data:', mcqsData);
-    console.log('[ManageMcqsPage] Raw response from MCQs query - Error:', mcqsError);
-    console.log('[ManageMcqsPage] mcqsData.length after initial fetch:', mcqsData?.length); // ADDED LOG
-
-    if (mcqsError) {
-      console.error('[ManageMcqsPage] Error fetching MCQs:', mcqsError.message, mcqsError.details, mcqsError.hint); // IMPROVED ERROR LOGGING
-      toast({
-        title: "Error",
-        description: "Failed to load MCQs. Please try again.",
-        variant: "destructive",
-      });
-      setRawMcqs([]);
-      setIsPageLoading(false);
-      return;
-    }
+    console.log('[ManageMcqsPage] All MCQs fetched. Total:', allMcqs.length);
 
     // 2. Fetch all MCQ category links
     console.log('[ManageMcqsPage] Executing MCQ category links query...');
@@ -185,7 +199,7 @@ const ManageMcqsPage = () => {
     console.log('[ManageMcqsPage] mcqLinksMap (first 5 entries):', Array.from(mcqLinksMap.entries()).slice(0, 5)); // Added log
 
 
-    const displayMcqs: DisplayMCQ[] = (mcqsData || []).map((mcq: any) => {
+    const displayMcqs: DisplayMCQ[] = (allMcqs || []).map((mcq: any) => { // Use allMcqs here
       const linksForMcq = mcqLinksMap.get(mcq.id) || [];
       const hydratedLinks = linksForMcq.map(link => ({
         category_id: link.category_id,

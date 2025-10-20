@@ -95,46 +95,46 @@ const ManageMcqsPage = () => {
     setIsPageLoading(true);
     console.log(`[ManageMcqsPage] STARTING MCQ FETCH with filter category: ${selectedFilterCategory}, search term: ${searchTerm}`);
 
-    let mcqsQuery;
+    let mcqsQuery = supabase
+      .from('mcqs')
+      .select(`
+        *,
+        mcq_category_links (
+          category_id,
+          categories (name)
+        )
+      `);
 
     if (selectedFilterCategory === UNCATEGORIZED_ID) {
       console.log('[ManageMcqsPage] Filtering for uncategorized MCQs.');
-      // Select MCQs that do NOT have any entry in mcq_category_links
-      mcqsQuery = supabase
-        .from('mcqs')
-        .select(`
-          *,
-          mcq_category_links!left ( // Use !left to ensure all MCQs are considered, even if no link
-            category_id,
-            categories (name)
-          )
-        `)
-        .is('mcq_category_links.category_id', null); // Filter where the left join finds no category link
+      // First, get all MCQ IDs that ARE categorized
+      const { data: categorizedMcqLinks, error: linksError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id');
+
+      if (linksError) {
+        console.error('[ManageMcqsPage] Error fetching categorized MCQ links for uncategorized filter:', linksError);
+        toast({ title: "Error", description: "Failed to identify uncategorized questions.", variant: "destructive" });
+        setIsPageLoading(false);
+        return;
+      }
+      const categorizedMcqIds = Array.from(new Set(categorizedMcqLinks?.map(link => link.mcq_id) || []));
+      console.log(`[ManageMcqsPage] Found ${categorizedMcqIds.length} categorized MCQ IDs.`);
+
+      // Then, select MCQs whose IDs are NOT in the categorized list
+      if (categorizedMcqIds.length > 0) {
+        mcqsQuery = mcqsQuery.not('id', 'in', `(${categorizedMcqIds.join(',')})`);
+      }
+      // If categorizedMcqIds is empty, it means all MCQs are uncategorized, so no 'not in' filter is needed.
+      // The default select will fetch all, which is correct in that case.
+
     } else if (selectedFilterCategory) {
       console.log(`[ManageMcqsPage] Filtering by specific category ID: ${selectedFilterCategory}`);
-      // Select MCQs that ARE linked to the specific category
-      mcqsQuery = supabase
-        .from('mcqs')
-        .select(`
-          *,
-          mcq_category_links!inner ( // Use !inner to ensure only MCQs with links are returned
-            category_id,
-            categories (name)
-          )
-        `)
-        .eq('mcq_category_links.category_id', selectedFilterCategory);
+      // Filter MCQs that are linked to the specific category
+      mcqsQuery = mcqsQuery.eq('mcq_category_links.category_id', selectedFilterCategory);
     } else {
       console.log('[ManageMcqsPage] No category filter, fetching all MCQs.');
-      // No category filter, fetch all MCQs
-      mcqsQuery = supabase
-        .from('mcqs')
-        .select(`
-          *,
-          mcq_category_links!left ( // Use !left to get all MCQs and their categories if they have one
-            category_id,
-            categories (name)
-          )
-        `);
+      // No additional category filter needed, the default select handles it.
     }
 
     if (searchTerm) {
@@ -161,10 +161,11 @@ const ManageMcqsPage = () => {
     } else {
       const displayMcqs: DisplayMCQ[] = data.map((mcq: any) => ({
         ...mcq,
-        category_links: mcq.mcq_category_links.map((link: any) => ({
+        // Ensure category_links is always an array, even if null from the join
+        category_links: mcq.mcq_category_links ? mcq.mcq_category_links.map((link: any) => ({
           category_id: link.category_id,
           category_name: link.categories?.name || null,
-        })),
+        })) : [],
       }));
       console.log(`[ManageMcqsPage] Successfully fetched ${displayMcqs.length} MCQs.`);
       setMcqs(displayMcqs || []);

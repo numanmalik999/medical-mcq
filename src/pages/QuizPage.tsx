@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
 import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save, Bookmark, BookmarkCheck } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import QuizNavigator from '@/components/QuizNavigator';
@@ -67,7 +67,7 @@ interface LoadedQuizSession {
   categoryName: string; // Added for display
 }
 
-const TRIAL_MCQ_LIMIT = 50; // Changed from 10 to 50
+const TRIAL_MCQ_LIMIT = 50;
 const ALL_TRIAL_MCQS_ID = 'all-trial-mcqs-virtual-id'; // Special ID for fetching all trial MCQs
 
 const QuizPage = () => {
@@ -1322,8 +1322,11 @@ const QuizPage = () => {
                 })}
               </div>
             </CardContent>
-            <CardFooter className="flex justify-center">
+            <CardFooter className="flex justify-center gap-4">
               <Button onClick={() => { setShowCategorySelection(true); fetchQuizOverview(); }}>Back to Categories</Button>
+              <Link to="/user/dashboard">
+                <Button>Go to Dashboard</Button>
+              </Link>
             </CardFooter>
           </Card>
           <QuizNavigator

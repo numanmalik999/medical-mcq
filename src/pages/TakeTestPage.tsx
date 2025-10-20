@@ -765,7 +765,7 @@ const TakeTestPage = () => {
               userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
               currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
               testDurationSeconds: savedSessionResult.sessionData.test_duration_seconds || 0,
-              remainingTimeSeconds: savedSessionResult.sessionData.remaining_time_seconds || 0,
+              remainingTimeSeconds: savedSessionResult.sessionData.remaining_duration_seconds || 0,
               skippedMcqIds: new Set(savedSessionResult.sessionData.skipped_mcq_ids || []),
               userId: user.id,
             };
@@ -1233,8 +1233,8 @@ const TakeTestPage = () => {
                 })}
               </div>
             </CardContent>
-            <CardFooter className="flex justify-center">
-              <Button onClick={() => navigate('/user/dashboard')}>Back to Dashboard</Button>
+            <CardFooter className="flex justify-center gap-4">
+              <Button onClick={() => navigate('/user/dashboard')}>Go to Dashboard</Button>
             </CardFooter>
           </Card>
         </div>
@@ -1248,15 +1248,6 @@ const TakeTestPage = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
       <div className="flex flex-col md:flex-row w-full max-w-6xl">
-        <QuizNavigator
-          mcqs={mcqs}
-          userAnswers={userAnswers}
-          currentQuestionIndex={currentQuestionIndex}
-          goToQuestion={goToQuestion}
-          showResults={false}
-          score={0} // Score is not relevant during test progress
-          skippedMcqIds={skippedMcqIds}
-        />
         <Card className="flex-1">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>

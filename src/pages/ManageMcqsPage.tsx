@@ -104,12 +104,12 @@ const ManageMcqsPage = () => {
         .from('mcqs')
         .select(`
           *,
-          mcq_category_links (
+          mcq_category_links!left ( // Use !left to ensure all MCQs are considered, even if no link
             category_id,
             categories (name)
           )
         `)
-        .is('mcq_category_links.category_id', null); // This implies a LEFT JOIN where the link is null
+        .is('mcq_category_links.category_id', null); // Filter where the left join finds no category link
     } else if (selectedFilterCategory) {
       console.log(`[ManageMcqsPage] Filtering by specific category ID: ${selectedFilterCategory}`);
       // Select MCQs that ARE linked to the specific category
@@ -130,7 +130,7 @@ const ManageMcqsPage = () => {
         .from('mcqs')
         .select(`
           *,
-          mcq_category_links ( // Use regular join for all categories
+          mcq_category_links!left ( // Use !left to get all MCQs and their categories if they have one
             category_id,
             categories (name)
           )
@@ -144,6 +144,7 @@ const ManageMcqsPage = () => {
     
     mcqsQuery = mcqsQuery.order('created_at', { ascending: true }); // Add order here
 
+    console.log('[ManageMcqsPage] Executing query...');
     const { data, error } = await mcqsQuery;
     console.log('[ManageMcqsPage] Raw response from final mcqs query - Data:', data);
     console.log('[ManageMcqsPage] Raw response from final mcqs query - Error:', error);

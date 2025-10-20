@@ -60,12 +60,19 @@ const ManageMcqFeedbackPage = () => {
       setFeedbackItems([]);
     } else {
       const feedbackWithDetails = await Promise.all(data.map(async (feedback) => {
-        // Fetch user email
-        const { data: userData } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', feedback.user_id)
-          .single();
+        // Fetch user email using the new Edge Function
+        let userEmail = 'N/A';
+        if (feedback.user_id) {
+          const { data: emailData, error: emailError } = await supabase.functions.invoke('get-user-email-by-id', {
+            body: { user_id: feedback.user_id },
+          });
+
+          if (emailError) {
+            console.error(`Error fetching email for user ${feedback.user_id}:`, emailError);
+          } else if (emailData?.email) {
+            userEmail = emailData.email;
+          }
+        }
         
         // Fetch MCQ question text
         const { data: mcqData } = await supabase
@@ -76,7 +83,7 @@ const ManageMcqFeedbackPage = () => {
 
         return {
           ...feedback,
-          user_email: userData?.email || 'N/A',
+          user_email: userEmail,
           mcq_question_text: mcqData?.question_text || 'N/A',
         };
       }));

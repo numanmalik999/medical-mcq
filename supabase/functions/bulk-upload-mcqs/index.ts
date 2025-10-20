@@ -114,7 +114,7 @@ serve(async (req: Request) => {
         }
 
         // 2. Insert MCQ
-        const { error: mcqError } = await supabaseAdmin
+        const { data: mcqData, error: mcqError } = await supabaseAdmin // Capture mcqData to get its ID
           .from('mcqs')
           .insert({
             question_text: mcq.question,
@@ -126,7 +126,9 @@ serve(async (req: Request) => {
             explanation_id: explanationData.id,
             difficulty: mcq.difficulty || null,
             is_trial_mcq: mcq.is_trial_mcq ?? false,
-          });
+          })
+          .select('id') // Select the ID of the newly inserted MCQ
+          .single();
 
         if (mcqError) {
           throw new Error(`MCQ insert failed: ${mcqError.message}`);
@@ -137,7 +139,7 @@ serve(async (req: Request) => {
           const { error: linkError } = await supabaseAdmin
             .from('mcq_category_links')
             .insert({
-              mcq_id: explanationData.id, // Link to the newly created MCQ
+              mcq_id: mcqData.id, // CORRECTED: Use mcqData.id here
               category_id: categoryId,
             });
 

@@ -407,55 +407,26 @@ const QuizPage = () => {
     setShowResults(false);
     setCurrentDbSessionId(null); // Reset current DB session ID for a new quiz
 
-    let mcqIdsToFetch: string[] = [];
-
-    // Step 1: Get MCQ IDs from mcq_category_links based on category
-    console.log(`[QuizPage] Step 1: Fetching mcq_ids from mcq_category_links for category: ${categoryId}`);
-    let linksQuery = supabase
-      .from('mcq_category_links')
-      .select('mcq_id')
-      .eq('category_id', categoryId);
-
-    const { data: linkedMcqIdsData, error: linksError } = await linksQuery;
-
-    if (linksError) {
-      console.error('[QuizPage] ERROR in Step 1 (fetching linked MCQ IDs):', linksError);
-      toast({ title: "Error", description: "Failed to load quiz questions data.", variant: "destructive" });
-      setIsPageLoading(false);
-      return;
-    }
-
-    mcqIdsToFetch = linkedMcqIdsData?.map(link => link.mcq_id) || [];
-    console.log(`[QuizPage] Step 1 Result: Retrieved ${mcqIdsToFetch.length} linked MCQ IDs:`, mcqIdsToFetch);
-
-    if (mcqIdsToFetch.length === 0) {
-      console.log('[QuizPage] No MCQ IDs found for the selected category in mcq_category_links.');
-      toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
-      setIsPageLoading(false);
-      return;
-    }
-
-    // Step 2: Filter by trial status if not subscribed (this covers guests too)
     let mcqQuery = supabase
       .from('mcqs')
       .select(`
         *,
-        mcq_category_links (
+        mcq_category_links!inner (
           category_id,
           categories (name)
         )
       `)
-      .in('id', mcqIdsToFetch)
+      .eq('mcq_category_links.category_id', categoryId) // Filter directly on the joined table
       .order('created_at', { ascending: true }); // Ensure sequential order
 
     if (!isSubscribed) { // This condition is true for guests and non-subscribed users
       mcqQuery = mcqQuery.eq('is_trial_mcq', true);
-      console.log('[QuizPage] Step 2: Applying trial MCQ filter.');
+      console.log('[QuizPage] Applying trial MCQ filter.');
     }
 
     // Step 3: Filter by incorrect attempts if mode is 'incorrect'
     if (mode === 'incorrect' && user) { // Only applies to logged-in users
-      console.log('[QuizPage] Step 3: Fetching incorrect attempts for user.');
+      console.log('[QuizPage] Fetching incorrect attempts for user.');
       const { data: incorrectAttempts, error: attemptsError } = await supabase
         .from('user_quiz_attempts')
         .select('mcq_id')
@@ -464,33 +435,24 @@ const QuizPage = () => {
         .eq('is_correct', false);
 
       if (attemptsError) {
-        console.error('[QuizPage] ERROR in Step 3 (fetching incorrect attempts):', attemptsError);
+        console.error('[QuizPage] ERROR in fetching incorrect attempts:', attemptsError);
         toast({ title: "Feature Restricted", description: "Failed to load incorrect questions.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
 
       const incorrectMcqIds = Array.from(new Set(incorrectAttempts?.map(attempt => attempt.mcq_id) || []));
-      console.log(`[QuizPage] Step 3 Result: User has ${incorrectMcqIds.length} incorrect MCQs in this category.`);
+      console.log(`[QuizPage] User has ${incorrectMcqIds.length} incorrect MCQs in this category.`);
       
       if (incorrectMcqIds.length === 0) {
         toast({ title: "No Incorrect MCQs", description: "You have no incorrect answers in this category to re-attempt.", variant: "default" });
         setIsPageLoading(false);
         return;
       }
-      // Intersect mcqIdsToFetch with incorrectMcqIds
-      mcqIdsToFetch = mcqIdsToFetch.filter(id => incorrectMcqIds.includes(id));
-      if (mcqIdsToFetch.length === 0) {
-        console.log('[QuizPage] No MCQs found after intersecting with incorrect attempts.');
-        toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
-        setIsPageLoading(false);
-        return;
-      }
-      mcqQuery = mcqQuery.in('id', mcqIdsToFetch);
-      console.log(`[QuizPage] Step 3 Result: Filtered MCQ IDs for 'incorrect' mode: ${mcqIdsToFetch.length}`);
+      mcqQuery = mcqQuery.in('id', incorrectMcqIds); // Apply 'in' filter for incorrect IDs
+      console.log(`[QuizPage] Filtered MCQ IDs for 'incorrect' mode: ${incorrectMcqIds.length}`);
     }
 
-    console.log(`[QuizPage] Final MCQ IDs to query from 'mcqs' table:`, mcqIdsToFetch);
     const { data: mcqsData, error: mcqsError } = await mcqQuery;
 
     if (mcqsError) {
@@ -1435,6 +1397,32 @@ const QuizPage = () => {
               )}
             </div>
           </CardFooter>
+
+          <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Notes or Feedback for this MCQ</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <p className="text-sm text-muted-foreground">
+                  Your feedback helps us improve the questions and explanations.
+                </p>
+                <Textarea
+                  placeholder="Write your notes or feedback here..."
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  rows={5}
+                  disabled={isSubmittingFeedback}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)} disabled={isSubmittingFeedback}>Cancel</Button>
+                <Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()}>
+                  {isSubmittingFeedback ? "Submitting..." : "Submit Feedback"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </Card>
         <QuizNavigator
           mcqs={quizQuestions}
@@ -1446,33 +1434,6 @@ const QuizPage = () => {
         />
       </div>
       <MadeWithDyad />
-
-      {/* Feedback Dialog - Moved outside the main Card for correct JSX structure */}
-      <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Notes or Feedback for this MCQ</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              Your feedback helps us improve the questions and explanations.
-            </p>
-            <Textarea
-              placeholder="Write your notes or feedback here..."
-              value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
-              rows={5}
-              disabled={isSubmittingFeedback}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)} disabled={isSubmittingFeedback}>Cancel</Button>
-            <Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()}>
-              {isSubmittingFeedback ? "Submitting..." : "Submit Feedback"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

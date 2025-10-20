@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react'; // Import useMemo
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { MadeWithDyad } from '@/components/made-with-dyad';
+import { MadeWithDyad } from '@/components/made-with-dyad'; // Fixed: Removed '='
 import { DataTable } from '@/components/data-table';
 import { createMcqColumns, MCQ } from '@/components/mcq-columns';
 import { useToast } from '@/hooks/use-toast';
@@ -26,8 +26,8 @@ type DisplayMCQ = MCQ;
 const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id'; // Unique ID for the virtual uncategorized category
 
 const ManageMcqsPage = () => {
-  const [mcqs, setMcqs] = useState<DisplayMCQ[]>([]);
-  const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state
+  const [rawMcqs, setRawMcqs] = useState<DisplayMCQ[]>([]); // Store raw fetched MCQs
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const { toast } = useToast();
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -37,7 +37,7 @@ const ManageMcqsPage = () => {
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+  const { hasCheckedInitialSession } = useSession();
 
   const fetchCategories = async () => {
     console.log('[ManageMcqsPage] Fetching categories...');
@@ -93,7 +93,7 @@ const ManageMcqsPage = () => {
 
   const fetchMcqs = async () => {
     setIsPageLoading(true);
-    console.log(`[ManageMcqsPage] STARTING MCQ FETCH with filter category: ${selectedFilterCategory}, search term: ${searchTerm}`);
+    console.log(`[ManageMcqsPage] STARTING MCQ FETCH with search term: ${searchTerm}`);
 
     let mcqsQuery = supabase
       .from('mcqs')
@@ -113,19 +113,6 @@ const ManageMcqsPage = () => {
           categories (name)
         )
       `);
-
-    if (selectedFilterCategory === UNCATEGORIZED_ID) {
-      console.log('[ManageMcqsPage] Filtering for uncategorized MCQs using LEFT JOIN and IS NULL.');
-      mcqsQuery = mcqsQuery.is('mcq_category_links.category_id', null);
-    } else if (selectedFilterCategory) {
-      console.log(`[ManageMcqsPage] Filtering by specific category ID: ${selectedFilterCategory} using .eq on joined table.`);
-      // For a specific category, we only want MCQs that *have* that category.
-      // The .eq filter on the joined table effectively makes it an INNER JOIN for this specific filter.
-      mcqsQuery = mcqsQuery.eq('mcq_category_links.category_id', selectedFilterCategory);
-    } else {
-      console.log('[ManageMcqsPage] No category filter, fetching all MCQs with LEFT JOIN for categories.');
-      // No additional filter needed here, the default select with !left handles it.
-    }
 
     if (searchTerm) {
       console.log(`[ManageMcqsPage] Applying search term: ${searchTerm}`);
@@ -147,18 +134,18 @@ const ManageMcqsPage = () => {
         description: "Failed to load MCQs. Please try again.",
         variant: "destructive",
       });
-      setMcqs([]);
+      setRawMcqs([]);
     } else {
       const displayMcqs: DisplayMCQ[] = data.map((mcq: any) => ({
         ...mcq,
         // Ensure category_links is always an array, even if null from the join
-        category_links: mcq.mcq_category_links.map((link: any) => ({
+        category_links: mcq.mcq_category_links ? mcq.mcq_category_links.map((link: any) => ({
           category_id: link.category_id,
           category_name: link.categories?.name || null,
-        })) || [], // Ensure it's an array even if no links
+        })) : [],
       }));
       console.log(`[ManageMcqsPage] Successfully fetched ${displayMcqs.length} MCQs.`);
-      setMcqs(displayMcqs || []);
+      setRawMcqs(displayMcqs || []);
     }
     setIsPageLoading(false);
   };
@@ -173,7 +160,22 @@ const ManageMcqsPage = () => {
     if (hasCheckedInitialSession) {
       fetchMcqs();
     }
-  }, [selectedFilterCategory, searchTerm, hasCheckedInitialSession]);
+  }, [searchTerm, hasCheckedInitialSession]); // Only searchTerm triggers refetch from DB
+
+  // Client-side filtering based on selectedFilterCategory
+  const filteredMcqs = useMemo(() => {
+    if (!selectedFilterCategory || selectedFilterCategory === "all") {
+      return rawMcqs;
+    }
+
+    if (selectedFilterCategory === UNCATEGORIZED_ID) {
+      return rawMcqs.filter(mcq => mcq.category_links.length === 0);
+    }
+
+    return rawMcqs.filter(mcq =>
+      mcq.category_links.some(link => link.category_id === selectedFilterCategory)
+    );
+  }, [rawMcqs, selectedFilterCategory]);
 
   const handleDeleteMcq = async (mcqId: string, explanationId: string | null) => {
     if (!window.confirm("Are you sure you want to delete this MCQ? This action cannot be undone.")) {
@@ -243,7 +245,7 @@ const ManageMcqsPage = () => {
       return;
     }
 
-    setIsPageLoading(true); // Set loading for this specific fetch
+    setIsPageLoading(true);
     try {
       let mcqIdsToDelete: string[] = [];
 
@@ -352,7 +354,7 @@ const ManageMcqsPage = () => {
         variant: "destructive",
       });
     } finally {
-      setIsPageLoading(false); // Clear loading for this specific fetch
+      setIsPageLoading(false);
     }
   };
 
@@ -363,7 +365,7 @@ const ManageMcqsPage = () => {
 
   const columns = createMcqColumns({ onDelete: handleDeleteMcq, onEdit: handleEditClick });
 
-  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
+  if (!hasCheckedInitialSession || isPageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading MCQs...</p>
@@ -429,9 +431,9 @@ const ManageMcqsPage = () => {
           {isPageLoading ? (
             <p className="text-center text-gray-600 dark:text-gray-400">Loading MCQs...</p>
           ) : (
-            <DataTable columns={columns} data={mcqs} />
+            <DataTable columns={columns} data={filteredMcqs} />
           )}
-          {!isPageLoading && mcqs.length === 0 && (
+          {!isPageLoading && filteredMcqs.length === 0 && (
             <div className="mt-4 text-center">
               <p className="text-gray-600 dark:text-gray-400 mb-2">No MCQs found. Add some using the "Add MCQ" link in the sidebar.</p>
               <Button onClick={fetchMcqs}>Refresh List</Button>

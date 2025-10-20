@@ -10,7 +10,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate, Link } from 'react-router-dom';
-import { TimerIcon, Pause, Play, SkipForward, Save, Bookmark, BookmarkCheck, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
+import { TimerIcon, Pause, Play, SkipForward, Save, Bookmark, BookmarkCheck, ArrowLeft } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { McqCategoryLink } from '@/components/mcq-columns'; // Import McqCategoryLink
@@ -103,7 +103,7 @@ const TakeTestPage = () => {
   const [timer, setTimer] = useState(testDurationMinutes * 60); // Initialize timer with selected duration
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
-  const [explanations, setExplanations] = new Map();
+  const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map()); // Fixed type
 
   const [isPaused, setIsPaused] = useState(false); // New state for pause functionality
   const [skippedMcqIds, setSkippedMcqIds] = useState<Set<string>>(new Set()); // Track skipped MCQs

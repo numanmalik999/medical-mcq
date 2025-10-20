@@ -10,7 +10,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save, Bookmark, BookmarkCheck, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
+import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save, Bookmark, BookmarkCheck, ArrowLeft } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -91,7 +91,7 @@ const QuizPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
-  const [explanations, setExplanations] = new Map();
+  const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map()); // Fixed type
 
   const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
   const [isTrialActiveSession, setIsTrialActiveSession] = useState(false);

@@ -57,15 +57,24 @@ const ManageMcqsPage = () => {
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
           // Count MCQs by querying mcq_category_links table directly
-          const { count, error: mcqCountError } = await supabase
+          const { count: mcqCount, error: mcqCountError } = await supabase
             .from('mcq_category_links')
             .select('mcq_id', { count: 'exact', head: true })
             .eq('category_id', category.id);
 
           if (mcqCountError) {
             console.error(`[ManageMcqsPage] Error fetching MCQ count for category ${category.name}:`, mcqCountError);
+          } else {
+            const { data: linkedMcqIds, error: linkedIdsError } = await supabase
+              .from('mcq_category_links')
+              .select('mcq_id')
+              .eq('category_id', category.id);
+            if (linkedIdsError) {
+              console.error(`[ManageMcqsPage] Error fetching sample linked MCQ IDs for category ${category.name}:`, linkedIdsError);
+            }
+            console.log(`[ManageMcqsPage] Category "${category.name}" (${category.id}) has ${mcqCount} links. Sample linked MCQ IDs:`, linkedMcqIds?.slice(0, 5).map((l:any) => l.mcq_id));
           }
-          return { ...category, mcq_count: count || 0 };
+          return { ...category, mcq_count: mcqCount || 0 };
         })
       );
 
@@ -128,9 +137,10 @@ const ManageMcqsPage = () => {
     const { data: mcqsData, error: mcqsError } = await mcqsQuery;
     console.log('[ManageMcqsPage] Raw response from MCQs query - Data:', mcqsData);
     console.log('[ManageMcqsPage] Raw response from MCQs query - Error:', mcqsError);
+    console.log('[ManageMcqsPage] mcqsData.length after initial fetch:', mcqsData?.length); // ADDED LOG
 
     if (mcqsError) {
-      console.error('[ManageMcqsPage] Error fetching MCQs:', mcqsError);
+      console.error('[ManageMcqsPage] Error fetching MCQs:', mcqsError.message, mcqsError.details, mcqsError.hint); // IMPROVED ERROR LOGGING
       toast({
         title: "Error",
         description: "Failed to load MCQs. Please try again.",
@@ -229,6 +239,7 @@ const ManageMcqsPage = () => {
     if (result.length > 0) {
       console.log('[filteredMcqs Memo] First filtered MCQ category_links:', result[0].category_links); // Added log
     }
+    console.log('[filteredMcqs Memo] Final filteredMcqs length:', result.length); // ADDED LOG
     return result;
   }, [rawMcqs, selectedFilterCategory]);
 

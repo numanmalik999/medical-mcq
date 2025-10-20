@@ -240,6 +240,14 @@ const ManageMcqsPage = () => {
     setIsPageLoading(false);
   };
 
+  // New function to refresh both MCQs and categories
+  const refreshAllData = async () => {
+    setIsPageLoading(true);
+    await fetchCategories(); // Re-fetch categories first to get updated counts
+    await fetchMcqs(); // Then re-fetch MCQs with potentially updated category info
+    setIsPageLoading(false);
+  };
+
   useEffect(() => {
     if (hasCheckedInitialSession) {
       fetchCategories();
@@ -327,8 +335,7 @@ const ManageMcqsPage = () => {
         title: "Success!",
         description: "MCQ deleted successfully.",
       });
-      fetchMcqs(); // Refresh the list
-      fetchCategories(); // Refresh counts
+      refreshAllData(); // Refresh both MCQs and categories
     } catch (error: any) {
       console.error("Error deleting MCQ:", error);
       toast({
@@ -431,7 +438,7 @@ const ManageMcqsPage = () => {
           .in('id', explanationIdsToDelete);
 
         if (deleteExplanationsError) {
-          console.warn("Error deleting some explanations:", explanationIdsToDelete);
+          console.warn("Could not delete some explanations:", explanationIdsToDelete);
         }
       }
 
@@ -449,8 +456,7 @@ const ManageMcqsPage = () => {
         title: "Success!",
         description: `All ${mcqIdsToDelete.length} MCQs and their explanations linked to "${categoryName}" have been deleted.`,
       });
-      fetchMcqs(); // Refresh the list
-      fetchCategories(); // Refresh counts
+      refreshAllData(); // Refresh both MCQs and categories
       setSelectedFilterCategory(null); // Clear filter after mass deletion
     } catch (error: any) {
       console.error("Error deleting all MCQs in category:", error);
@@ -542,7 +548,7 @@ const ManageMcqsPage = () => {
           {!isPageLoading && filteredMcqs.length === 0 && (
             <div className="mt-4 text-center">
               <p className="text-gray-600 dark:text-gray-400 mb-2">No MCQs found. Add some using the "Add MCQ" link in the sidebar.</p>
-              <Button onClick={fetchMcqs}>Refresh List</Button>
+              <Button onClick={refreshAllData}>Refresh List</Button>
             </div>
           )}
         </CardContent>
@@ -554,7 +560,7 @@ const ManageMcqsPage = () => {
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           mcq={selectedMcqForEdit}
-          onSave={fetchMcqs}
+          onSave={refreshAllData}
         />
       )}
     </div>

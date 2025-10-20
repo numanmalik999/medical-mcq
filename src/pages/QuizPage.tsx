@@ -68,7 +68,7 @@ interface LoadedQuizSession {
 }
 
 const TRIAL_MCQ_LIMIT = 10;
-// LOCAL_STORAGE_QUIZ_KEY_PREFIX is no longer used for saving, but kept for potential migration or debugging.
+const ALL_TRIAL_MCQS_ID = 'all-trial-mcqs-virtual-id'; // Special ID for fetching all trial MCQs
 
 const QuizPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
@@ -95,6 +95,7 @@ const QuizPage = () => {
 
   const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
   const [isTrialActiveSession, setIsTrialActiveSession] = useState(false);
+  const [allTrialMcqsCount, setAllTrialMcqsCount] = useState(0); // New state for total trial MCQs
 
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
@@ -179,8 +180,8 @@ const QuizPage = () => {
       user_id: currentUserId,
       category_id: categoryId,
       mcq_ids_order: mcqIdsOrder,
-      current_question_index: index,
       user_answers_json: userAnswersJson,
+      current_question_index: index,
       is_trial_session: isTrial,
     };
 
@@ -271,6 +272,18 @@ const QuizPage = () => {
       return;
     }
 
+    // Fetch total count of trial MCQs
+    const { count: totalTrialMcqsCount, error: totalTrialError } = await supabase
+      .from('mcqs')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_trial_mcq', true);
+
+    if (totalTrialError) {
+      console.error('Error fetching total trial MCQs count:', totalTrialError);
+    } else {
+      setAllTrialMcqsCount(totalTrialMcqsCount || 0);
+    }
+
     // --- Load all saved quiz sessions for the current user from DB ---
     let loadedSavedQuizzes: LoadedQuizSession[] = [];
     if (user) { // Only fetch saved quizzes if a user is logged in
@@ -286,7 +299,9 @@ const QuizPage = () => {
       } else {
         // For each DB session, create a LoadedQuizSession stub for display
         loadedSavedQuizzes = dbSessions.map((dbSession: DbQuizSession) => {
-          const categoryName = categoriesData?.find(c => c.id === dbSession.category_id)?.name || 'Unknown Category';
+          const categoryName = dbSession.category_id === ALL_TRIAL_MCQS_ID
+            ? 'All Trial MCQs'
+            : categoriesData?.find(c => c.id === dbSession.category_id)?.name || 'Unknown Category';
           return {
             dbSessionId: dbSession.id,
             categoryId: dbSession.category_id, // Now correctly matches interface
@@ -377,14 +392,14 @@ const QuizPage = () => {
     setIsPageLoading(false);
   };
 
-  const startQuizSession = async (categoryId: string, mode: 'random' | 'incorrect') => {
-    console.log(`[QuizPage] STARTING QUIZ SESSION for category: ${categoryId}, mode: ${mode}`);
+  const startQuizSession = async (selectedCategoryId: string | null, mode: 'random' | 'incorrect') => {
+    console.log(`[QuizPage] STARTING QUIZ SESSION for category: ${selectedCategoryId}, mode: ${mode}`);
     const isSubscribed = user?.has_active_subscription;
     const hasTakenTrial = user?.trial_taken;
     const isGuest = !user;
 
     // If logged in, not subscribed, and already took trial, show prompt
-    if (!isGuest && !isSubscribed && hasTakenTrial) {
+    if (!isGuest && !isSubscribed && hasTakenTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) {
       setShowSubscriptionPrompt(true);
       return;
     }
@@ -407,78 +422,117 @@ const QuizPage = () => {
     setShowResults(false);
     setCurrentDbSessionId(null); // Reset current DB session ID for a new quiz
 
-    let mcqQuery = supabase
-      .from('mcqs')
-      .select(`
-        *,
-        mcq_category_links!inner (
-          category_id,
-          categories (name)
-        )
-      `)
-      .eq('mcq_category_links.category_id', categoryId) // Filter directly on the joined table
-      .order('created_at', { ascending: true }); // Ensure sequential order
+    let mcqsData: any[] | null = null;
+    let mcqsError: any = null;
+    let finalMcqQuery;
 
-    if (!isSubscribed) { // This condition is true for guests and non-subscribed users
-      mcqQuery = mcqQuery.eq('is_trial_mcq', true);
-      console.log('[QuizPage] Applying trial MCQ filter.');
-    }
+    if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
+      // Fetch a random set of TRIAL_MCQ_LIMIT trial MCQs from *any* category (or uncategorized)
+      finalMcqQuery = supabase
+        .from('mcqs')
+        .select(`
+          id, question_text, option_a, option_b, option_c, option_d,
+          correct_answer, explanation_id, difficulty, is_trial_mcq,
+          mcq_category_links (category_id, categories (name))
+        `)
+        .eq('is_trial_mcq', true)
+        .order('random()')
+        .limit(TRIAL_MCQ_LIMIT);
 
-    // Step 3: Filter by incorrect attempts if mode is 'incorrect'
-    if (mode === 'incorrect' && user) { // Only applies to logged-in users
-      console.log('[QuizPage] Fetching incorrect attempts for user.');
-      const { data: incorrectAttempts, error: attemptsError } = await supabase
-        .from('user_quiz_attempts')
-        .select('mcq_id')
-        .eq('user_id', user!.id)
-        .eq('category_id', categoryId)
-        .eq('is_correct', false);
+      ({ data: mcqsData, error: mcqsError } = await finalMcqQuery);
 
-      if (attemptsError) {
-        console.error('[QuizPage] ERROR in fetching incorrect attempts:', attemptsError);
-        toast({ title: "Feature Restricted", description: "Failed to load incorrect questions.", variant: "destructive" });
+      if (mcqsError) {
+        console.error('[QuizPage] ERROR fetching ALL TRIAL MCQs:', mcqsError);
+        toast({ title: "Error", description: "Failed to load trial questions.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
-
-      const incorrectMcqIds = Array.from(new Set(incorrectAttempts?.map(attempt => attempt.mcq_id) || []));
-      console.log(`[QuizPage] User has ${incorrectMcqIds.length} incorrect MCQs in this category.`);
-      
-      if (incorrectMcqIds.length === 0) {
-        toast({ title: "No Incorrect MCQs", description: "You have no incorrect answers in this category to re-attempt.", variant: "default" });
+      if (!mcqsData || mcqsData.length === 0) {
+        toast({ title: "No Trial MCQs", description: "No trial questions available at the moment.", variant: "default" });
         setIsPageLoading(false);
         return;
       }
-      mcqQuery = mcqQuery.in('id', incorrectMcqIds); // Apply 'in' filter for incorrect IDs
-      console.log(`[QuizPage] Filtered MCQ IDs for 'incorrect' mode: ${incorrectMcqIds.length}`);
+      setCurrentQuizCategoryId(ALL_TRIAL_MCQS_ID); // Mark this session as 'all trial'
+      setIsTrialActiveSession(true); // Explicitly set trial mode
+    } else {
+      // Logic for specific categories
+      finalMcqQuery = supabase
+        .from('mcqs')
+        .select(`
+          *,
+          mcq_category_links!inner (
+            category_id,
+            categories (name)
+          )
+        `)
+        .order('created_at', { ascending: true });
+
+      if (selectedCategoryId) {
+        finalMcqQuery = finalMcqQuery.eq('mcq_category_links.category_id', selectedCategoryId);
+      }
+
+      if (isGuest || (!isSubscribed && !hasTakenTrial)) { // Apply trial filter for guests and non-subscribed users
+        finalMcqQuery = finalMcqQuery.eq('is_trial_mcq', true);
+        setIsTrialActiveSession(true); // Explicitly set trial mode
+      } else {
+        setIsTrialActiveSession(false); // Not a trial session
+      }
+
+      // Step 3: Filter by incorrect attempts if mode is 'incorrect'
+      if (mode === 'incorrect' && user) {
+        const { data: incorrectAttempts, error: attemptsError } = await supabase
+          .from('user_quiz_attempts')
+          .select('mcq_id')
+          .eq('user_id', user!.id)
+          .eq('category_id', selectedCategoryId)
+          .eq('is_correct', false);
+
+        if (attemptsError) {
+          console.error('[QuizPage] ERROR in fetching incorrect attempts:', attemptsError);
+          toast({ title: "Feature Restricted", description: "Failed to load incorrect questions.", variant: "destructive" });
+          setIsPageLoading(false);
+          return;
+        }
+
+        const incorrectMcqIds = Array.from(new Set(incorrectAttempts?.map(attempt => attempt.mcq_id) || []));
+        if (incorrectMcqIds.length === 0) {
+          toast({ title: "No Incorrect MCQs", description: "You have no incorrect answers in this category to re-attempt.", variant: "default" });
+          setIsPageLoading(false);
+          return;
+        }
+        finalMcqQuery = finalMcqQuery.in('id', incorrectMcqIds);
+      }
+
+      ({ data: mcqsData, error: mcqsError } = await finalMcqQuery);
+
+      if (mcqsError) {
+        console.error('[QuizPage] ERROR in final MCQ data fetch for category:', mcqsError);
+        toast({ title: "Error", description: "Failed to load quiz questions data.", variant: "destructive" });
+        setIsPageLoading(false);
+        return;
+      }
+      if (!mcqsData || mcqsData.length === 0) {
+        toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
+        setIsPageLoading(false);
+        return;
+      }
+      setCurrentQuizCategoryId(selectedCategoryId);
     }
 
-    const { data: mcqsData, error: mcqsError } = await mcqQuery;
-
-    if (mcqsError) {
-      console.error('[QuizPage] ERROR in final MCQ data fetch:', mcqsError);
-      toast({ title: "Error", description: "Failed to load quiz questions data.", variant: "destructive" });
-      setIsPageLoading(false);
-      return;
-    }
-
-    if (!mcqsData || mcqsData.length === 0) {
-      console.log('[QuizPage] No MCQs found after all filters in final fetch.');
-      toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
-      setIsPageLoading(false);
-      return;
-    }
-
-    const formattedMcqs: MCQ[] = mcqsData.map((mcq: any) => ({
+    const formattedMcqs: MCQ[] = (mcqsData || []).map((mcq: any) => ({
       ...mcq,
-      category_links: mcq.mcq_category_links.map((link: any) => ({
+      category_links: mcq.mcq_category_links?.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
-      })),
+      })) || [],
     }));
     console.log(`[QuizPage] Formatted ${formattedMcqs.length} MCQs.`);
 
-    let mcqsToLoad: MCQ[] = formattedMcqs.slice(0, Math.min(formattedMcqs.length, (!isSubscribed) ? TRIAL_MCQ_LIMIT : formattedMcqs.length));
+    let mcqsToLoad: MCQ[] = formattedMcqs;
+    // Apply trial limit only if it's a trial session and not the 'all trial MCQs' card
+    if (selectedCategoryId !== ALL_TRIAL_MCQS_ID && isTrialActiveSession) {
+      mcqsToLoad = formattedMcqs.slice(0, Math.min(formattedMcqs.length, TRIAL_MCQ_LIMIT));
+    }
 
     if (mcqsToLoad.length === 0) {
       console.log('[QuizPage] No MCQs to load after trial limit or other slicing.');
@@ -489,7 +543,6 @@ const QuizPage = () => {
     console.log(`[QuizPage] Final ${mcqsToLoad.length} MCQs selected for quiz.`);
 
     setQuizQuestions(mcqsToLoad);
-    setCurrentQuizCategoryId(categoryId); // Set the category for the current quiz
     setShowCategorySelection(false);
     setIsPageLoading(false);
     
@@ -505,7 +558,7 @@ const QuizPage = () => {
     if (user) {
       const savedSessionResult = await saveQuizState(
         null, // No existing session ID
-        categoryId,
+        selectedCategoryId, // Use selectedCategoryId for saving
         mcqsToLoad,
         initialUserAnswers,
         0, // currentQuestionIndex
@@ -513,7 +566,9 @@ const QuizPage = () => {
         user.id
       );
       if (savedSessionResult) {
-        const categoryName = categoryStats.find(c => c.id === categoryId)?.name || 'Unknown Category';
+        const categoryName = selectedCategoryId === ALL_TRIAL_MCQS_ID
+          ? 'All Trial MCQs'
+          : categoryStats.find(c => c.id === selectedCategoryId)?.name || 'Unknown Category';
 
         setActiveSavedQuizzes(prev => {
           const existingIndex = prev.findIndex(session => session.dbSessionId === savedSessionResult.id);
@@ -522,8 +577,8 @@ const QuizPage = () => {
             const updatedPrev = [...prev];
             updatedPrev[existingIndex] = {
               dbSessionId: savedSessionResult.id,
-              categoryId: currentQuizCategoryId,
-              mcqs: quizQuestions,
+              categoryId: selectedCategoryId,
+              mcqs: mcqsToLoad,
               userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
               currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
               isTrialActiveSession: isTrialActiveSession,
@@ -536,8 +591,8 @@ const QuizPage = () => {
             return [
               {
                 dbSessionId: savedSessionResult.id,
-                categoryId: currentQuizCategoryId,
-                mcqs: quizQuestions,
+                categoryId: selectedCategoryId,
+                mcqs: mcqsToLoad,
                 userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
                 currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
                 isTrialActiveSession: isTrialActiveSession,
@@ -572,18 +627,19 @@ const QuizPage = () => {
     setCurrentQuizCategoryId(loadedSession.categoryId);
     setIsTrialActiveSession(loadedSession.isTrialActiveSession);
 
-    // Fetch full MCQ objects based on mcq_ids_order from the loaded session
-    const { data: mcqsData, error: mcqsError } = await supabase
+    let mcqsQuery;
+    // The select statement for mcqs without !inner acts as a LEFT JOIN, which is what we want
+    // to include uncategorized MCQs if they are part of the session.
+    mcqsQuery = supabase
       .from('mcqs')
       .select(`
-        *,
-        mcq_category_links (
-          category_id,
-          categories (name)
-        )
+        id, question_text, option_a, option_b, option_c, option_d,
+        correct_answer, explanation_id, difficulty, is_trial_mcq,
+        mcq_category_links (category_id, categories (name))
       `)
-      .in('id', loadedSession.mcqs.map(m => m.id)) // Use the IDs from the placeholder MCQs
-      .order('created_at', { ascending: true }); // Maintain original order if possible
+      .in('id', loadedSession.mcqs.map(m => m.id));
+
+    const { data: mcqsData, error: mcqsError } = await mcqsQuery;
 
     if (mcqsError) {
       console.error('Error fetching MCQs for resumed session:', mcqsError);
@@ -594,10 +650,10 @@ const QuizPage = () => {
 
     const formattedMcqs: MCQ[] = mcqsData.map((mcq: any) => ({
       ...mcq,
-      category_links: mcq.mcq_category_links.map((link: any) => ({
+      category_links: mcq.mcq_category_links?.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
-      })),
+      })) || [],
     }));
 
     // Reorder fetched MCQs to match mcq_ids_order
@@ -609,7 +665,6 @@ const QuizPage = () => {
     setUserAnswers(loadedSession.userAnswers);
     setCurrentQuestionIndex(loadedSession.currentQuestionIndex);
 
-    // Set selectedAnswer, feedback, and showExplanation for the current question
     const currentMcqFromSaved = orderedMcqs[loadedSession.currentQuestionIndex];
     const currentAnswerDataFromSaved = loadedSession.userAnswers.get(currentMcqFromSaved.id);
     setSelectedAnswer(currentAnswerDataFromSaved?.selectedOption || null);
@@ -856,7 +911,9 @@ const QuizPage = () => {
       );
 
       if (savedSessionResult) {
-        const categoryName = categoryStats.find(c => c.id === currentQuizCategoryId)?.name || 'Unknown Category';
+        const categoryName = currentQuizCategoryId === ALL_TRIAL_MCQS_ID
+          ? 'All Trial MCQs'
+          : categoryStats.find(c => c.id === currentQuizCategoryId)?.name || 'Unknown Category';
 
         setActiveSavedQuizzes(prev => {
           const existingIndex = prev.findIndex(session => session.dbSessionId === savedSessionResult.id);
@@ -1020,7 +1077,9 @@ const QuizPage = () => {
   }
 
   if (showCategorySelection) {
-    const isGuest = !user;
+    const isGuestOrNotSubscribed = isGuest || (!user?.has_active_subscription && !user?.trial_taken);
+    const hasTakenTrial = !isGuest && user?.trial_taken;
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
         <Card className="w-full max-w-4xl">
@@ -1058,6 +1117,27 @@ const QuizPage = () => {
                 </CardContent>
               </Card>
             )}
+
+            {isGuestOrNotSubscribed && allTrialMcqsCount > 0 && (
+              <Card className="mb-6 border-green-500 bg-green-50 dark:bg-green-950">
+                <CardHeader>
+                  <CardTitle className="text-green-700 dark:text-green-300">Start Your Free Trial</CardTitle>
+                  <CardDescription className="text-green-600 dark:text-green-400">
+                    Attempt {TRIAL_MCQ_LIMIT} questions from our entire trial question bank.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-lg font-semibold mb-4">Total Trial MCQs: {allTrialMcqsCount}</p>
+                  <Button
+                    onClick={() => startQuizSession(ALL_TRIAL_MCQS_ID, 'random')}
+                    className="w-full"
+                  >
+                    Start Trial Quiz ({TRIAL_MCQ_LIMIT} Questions)
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             <Input
               placeholder="Search categories..."
               value={searchTerm}
@@ -1071,17 +1151,13 @@ const QuizPage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredCategories.map((cat) => {
-                  // Check if there's a saved session for this category
-                  const savedSessionForCurrentSelection = activeSavedQuizzes.find(
-                    (session) => session.categoryId === cat.id
-                  );
-
+                  const isCategoryDisabledForGuest = isGuest || (!user?.has_active_subscription && cat.total_trial_mcqs === 0);
                   const canStartRegularQuiz = user?.has_active_subscription && cat.total_mcqs > 0;
-                  const canStartTrialQuiz = (isGuest || (!user?.has_active_subscription && !user?.trial_taken)) && cat.total_trial_mcqs > 0;
-                  const hasAlreadyTakenTrial = !isGuest && !user?.has_active_subscription && user?.trial_taken;
+                  const canStartTrialQuiz = isGuestOrNotSubscribed && cat.total_trial_mcqs > 0;
+                  const showSubscribePrompt = hasTakenTrial && !user?.has_active_subscription;
 
                   return (
-                    <Card key={cat.id} className="flex flex-col">
+                    <Card key={cat.id} className={cn("flex flex-col", isCategoryDisabledForGuest && "opacity-70")}>
                       <CardHeader>
                         <CardTitle className="text-lg">{cat.name}</CardTitle>
                         <CardDescription>
@@ -1099,9 +1175,9 @@ const QuizPage = () => {
                         )}
                       </CardContent>
                       <CardFooter className="flex flex-col gap-2">
-                        {savedSessionForCurrentSelection ? (
+                        {activeSavedQuizzes.find(session => session.categoryId === cat.id) ? (
                           <Button
-                            onClick={() => continueQuizSession(savedSessionForCurrentSelection)}
+                            onClick={() => continueQuizSession(activeSavedQuizzes.find(session => session.categoryId === cat.id)!)}
                             className="w-full"
                           >
                             Continue Quiz
@@ -1110,9 +1186,9 @@ const QuizPage = () => {
                           <Button
                             onClick={() => startQuizSession(cat.id, 'random')}
                             className="w-full"
-                            disabled={!canStartRegularQuiz && !canStartTrialQuiz && !hasAlreadyTakenTrial}
+                            disabled={!canStartRegularQuiz && !canStartTrialQuiz || showSubscribePrompt}
                           >
-                            {canStartRegularQuiz ? "Start Quiz" : (canStartTrialQuiz ? "Start Trial Quiz" : (hasAlreadyTakenTrial ? "Subscribe to Start" : "No MCQs Available"))}
+                            {canStartRegularQuiz ? "Start Quiz" : (canStartTrialQuiz ? "Start Trial Quiz" : (showSubscribePrompt ? "Subscribe to Start" : "No MCQs Available"))}
                           </Button>
                         )}
                         <Button
@@ -1128,10 +1204,15 @@ const QuizPage = () => {
                             onClick={() => handleResetProgress(cat.id)}
                             className="w-full"
                             variant="destructive"
-                            disabled={cat.user_attempts === 0}
+                            disabled={cat.user_attempts === 0 || cat.id === ALL_TRIAL_MCQS_ID} // Cannot reset ALL_TRIAL_MCQS_ID
                           >
                             <RotateCcw className="h-4 w-4 mr-2" /> Reset Progress
                           </Button>
+                        )}
+                        {isCategoryDisabledForGuest && (
+                          <p className="text-sm text-red-500 dark:text-red-400 text-center mt-2">
+                            Subscribe to unlock this category.
+                          </p>
                         )}
                       </CardFooter>
                     </Card>

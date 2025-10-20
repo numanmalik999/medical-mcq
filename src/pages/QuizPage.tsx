@@ -67,7 +67,7 @@ interface LoadedQuizSession {
   categoryName: string; // Added for display
 }
 
-const TRIAL_MCQ_LIMIT = 10;
+const TRIAL_MCQ_LIMIT = 50; // Changed from 10 to 50
 const ALL_TRIAL_MCQS_ID = 'all-trial-mcqs-virtual-id'; // Special ID for fetching all trial MCQs
 
 const QuizPage = () => {
@@ -815,7 +815,7 @@ const QuizPage = () => {
 
   const handleNextQuestion = () => {
     if (isTrialActiveSession && currentQuestionIndex + 1 >= TRIAL_MCQ_LIMIT) {
-      toast({ title: "Trial Limit Reached", description: "You have reached the limit for trial questions. Please subscribe to continue.", variant: "default" });
+      toast({ title: "Trial Limit Reached", description: `You have reached the limit of ${TRIAL_MCQ_LIMIT} trial questions. Please subscribe to continue.`, variant: "default" });
       submitFullQuiz();
       return;
     }

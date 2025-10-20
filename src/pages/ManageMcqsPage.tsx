@@ -21,6 +21,12 @@ interface Category {
   mcq_count?: number;
 }
 
+// Define a type for a single MCQ-Category link from the database
+interface DbMcqCategoryLink {
+  mcq_id: string;
+  category_id: string;
+}
+
 type DisplayMCQ = MCQ;
 
 const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id'; // Unique ID for the virtual uncategorized category
@@ -95,6 +101,7 @@ const ManageMcqsPage = () => {
     setIsPageLoading(true);
     console.log(`[ManageMcqsPage] STARTING MCQ FETCH with search term: ${searchTerm}`);
 
+    // 1. Fetch all MCQs without any joins
     let mcqsQuery = supabase
       .from('mcqs')
       .select(`
@@ -107,10 +114,7 @@ const ManageMcqsPage = () => {
         correct_answer,
         explanation_id,
         difficulty,
-        is_trial_mcq,
-        mcq_category_links!left ( // Use LEFT JOIN to get all MCQs, even those without links
-          category_id
-        )
+        is_trial_mcq
       `);
 
     if (searchTerm) {
@@ -120,35 +124,60 @@ const ManageMcqsPage = () => {
     
     mcqsQuery = mcqsQuery.order('created_at', { ascending: true });
 
-    console.log('[ManageMcqsPage] Executing query...');
-    const { data, error } = await mcqsQuery;
-    console.log('[ManageMcqsPage] Raw response from final mcqs query - Data:', data);
-    console.log('[ManageMcqsPage] Raw response from final mcqs query - Error:', error);
+    console.log('[ManageMcqsPage] Executing MCQs query...');
+    const { data: mcqsData, error: mcqsError } = await mcqsQuery;
+    console.log('[ManageMcqsPage] Raw response from MCQs query - Data:', mcqsData);
+    console.log('[ManageMcqsPage] Raw response from MCQs query - Error:', mcqsError);
 
-
-    if (error) {
-      console.error('[ManageMcqsPage] Error fetching MCQs:', error);
+    if (mcqsError) {
+      console.error('[ManageMcqsPage] Error fetching MCQs:', mcqsError);
       toast({
         title: "Error",
         description: "Failed to load MCQs. Please try again.",
         variant: "destructive",
       });
       setRawMcqs([]);
-    } else {
-      // Create a map for quick category name lookup
-      const categoryNameMap = new Map(categories.map(cat => [cat.id, cat.name]));
-
-      const displayMcqs: DisplayMCQ[] = data.map((mcq: any) => ({
-        ...mcq,
-        // Hydrate category_links with names from the categories state
-        category_links: mcq.mcq_category_links ? mcq.mcq_category_links.map((link: any) => ({
-          category_id: link.category_id,
-          category_name: categoryNameMap.get(link.category_id) || null, // Resolve name here
-        })) : [],
-      }));
-      console.log(`[ManageMcqsPage] Successfully fetched ${displayMcqs.length} MCQs.`);
-      setRawMcqs(displayMcqs || []);
+      setIsPageLoading(false);
+      return;
     }
+
+    // 2. Fetch all MCQ category links
+    console.log('[ManageMcqsPage] Executing MCQ category links query...');
+    const { data: mcqCategoryLinksData, error: mcqCategoryLinksError } = await supabase
+      .from('mcq_category_links')
+      .select('mcq_id, category_id');
+
+    if (mcqCategoryLinksError) {
+      console.error('[ManageMcqsPage] Error fetching MCQ category links:', mcqCategoryLinksError);
+      toast({
+        title: "Error",
+        description: "Failed to load MCQ category links. Please try again.",
+        variant: "destructive",
+      });
+      setRawMcqs([]);
+      setIsPageLoading(false);
+      return;
+    }
+
+    // 3. Hydrate MCQs with category names on the client side
+    const categoryNameMap = new Map(categories.map(cat => [cat.id, cat.name]));
+    const mcqLinksMap = new Map<string, DbMcqCategoryLink[]>();
+    mcqCategoryLinksData.forEach(link => {
+      if (!mcqLinksMap.has(link.mcq_id)) {
+        mcqLinksMap.set(link.mcq_id, []);
+      }
+      mcqLinksMap.get(link.mcq_id)?.push(link);
+    });
+
+    const displayMcqs: DisplayMCQ[] = (mcqsData || []).map((mcq: any) => ({
+      ...mcq,
+      category_links: (mcqLinksMap.get(mcq.id) || []).map(link => ({
+        category_id: link.category_id,
+        category_name: categoryNameMap.get(link.category_id) || null,
+      })),
+    }));
+    console.log(`[ManageMcqsPage] Successfully fetched and hydrated ${displayMcqs.length} MCQs.`);
+    setRawMcqs(displayMcqs || []);
     setIsPageLoading(false);
   };
 
@@ -161,10 +190,10 @@ const ManageMcqsPage = () => {
   useEffect(() => {
     // Only fetch MCQs if categories are loaded (or if there are no categories to load)
     // and initial session check is done.
-    if (hasCheckedInitialSession && categories.length > 0 || (hasCheckedInitialSession && categories.length === 0 && !isPageLoading)) {
+    if (hasCheckedInitialSession && (categories.length > 0 || (categories.length === 0 && !isPageLoading))) {
       fetchMcqs();
     }
-  }, [selectedFilterCategory, searchTerm, hasCheckedInitialSession, categories]); // Re-run when categories change
+  }, [searchTerm, hasCheckedInitialSession, categories]); // Re-run when categories change
 
   // Client-side filtering based on selectedFilterCategory
   const filteredMcqs = useMemo(() => {

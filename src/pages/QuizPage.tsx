@@ -1161,7 +1161,7 @@ const QuizPage = () => {
                       <CardHeader>
                         <CardTitle className="text-lg">{cat.name}</CardTitle>
                         <CardDescription>
-                          {user?.has_active_subscription ? `${cat.total_mcqs} MCQs available` : `${cat.total_trial_mcqs} Trial MCQs available`}
+                          {`${cat.total_mcqs} MCQs available`}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="flex-grow space-y-2 text-sm">

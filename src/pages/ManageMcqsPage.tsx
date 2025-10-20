@@ -158,9 +158,12 @@ const ManageMcqsPage = () => {
       setIsPageLoading(false);
       return;
     }
+    console.log('[ManageMcqsPage] Raw mcqCategoryLinksData:', mcqCategoryLinksData); // Added log
 
     // 3. Hydrate MCQs with category names on the client side
     const categoryNameMap = new Map(categories.map(cat => [cat.id, cat.name]));
+    console.log('[ManageMcqsPage] categoryNameMap:', categoryNameMap); // Added log
+
     const mcqLinksMap = new Map<string, DbMcqCategoryLink[]>();
     mcqCategoryLinksData.forEach(link => {
       if (!mcqLinksMap.has(link.mcq_id)) {
@@ -168,15 +171,21 @@ const ManageMcqsPage = () => {
       }
       mcqLinksMap.get(link.mcq_id)?.push(link);
     });
+    console.log('[ManageMcqsPage] mcqLinksMap (first 5 entries):', Array.from(mcqLinksMap.entries()).slice(0, 5)); // Added log
 
-    const displayMcqs: DisplayMCQ[] = (mcqsData || []).map((mcq: any) => ({
-      ...mcq,
-      category_links: (mcqLinksMap.get(mcq.id) || []).map(link => ({
+
+    const displayMcqs: DisplayMCQ[] = (mcqsData || []).map((mcq: any) => {
+      const linksForMcq = mcqLinksMap.get(mcq.id) || [];
+      const hydratedLinks = linksForMcq.map(link => ({
         category_id: link.category_id,
         category_name: categoryNameMap.get(link.category_id) || null,
-      })),
-    }));
-    console.log(`[ManageMcqsPage] Successfully fetched and hydrated ${displayMcqs.length} MCQs.`);
+      }));
+      return {
+        ...mcq,
+        category_links: hydratedLinks,
+      };
+    });
+    console.log(`[ManageMcqsPage] Successfully fetched and hydrated ${displayMcqs.length} MCQs. First 5 hydrated MCQs:`, displayMcqs.slice(0, 5)); // Added log
     setRawMcqs(displayMcqs || []);
     setIsPageLoading(false);
   };
@@ -197,17 +206,30 @@ const ManageMcqsPage = () => {
 
   // Client-side filtering based on selectedFilterCategory
   const filteredMcqs = useMemo(() => {
+    console.log('[filteredMcqs Memo] Recalculating...'); // Added log
+    console.log('[filteredMcqs Memo] rawMcqs length:', rawMcqs.length); // Added log
+    console.log('[filteredMcqs Memo] selectedFilterCategory:', selectedFilterCategory); // Added log
+
     if (!selectedFilterCategory || selectedFilterCategory === "all") {
+      console.log('[filteredMcqs Memo] Returning all rawMcqs.'); // Added log
       return rawMcqs;
     }
 
     if (selectedFilterCategory === UNCATEGORIZED_ID) {
-      return rawMcqs.filter(mcq => mcq.category_links.length === 0);
+      const result = rawMcqs.filter(mcq => mcq.category_links.length === 0);
+      console.log('[filteredMcqs Memo] Filtering for UNCATEGORIZED_ID. Result length:', result.length); // Added log
+      return result;
     }
 
-    return rawMcqs.filter(mcq =>
+    const result = rawMcqs.filter(mcq =>
       mcq.category_links.some(link => link.category_id === selectedFilterCategory)
     );
+    console.log(`[filteredMcqs Memo] Filtering for category ID "${selectedFilterCategory}". Result length:`, result.length); // Added log
+    // Log a sample of filtered MCQs to inspect their category_links
+    if (result.length > 0) {
+      console.log('[filteredMcqs Memo] First filtered MCQ category_links:', result[0].category_links); // Added log
+    }
+    return result;
   }, [rawMcqs, selectedFilterCategory]);
 
   const handleDeleteMcq = async (mcqId: string, explanationId: string | null) => {

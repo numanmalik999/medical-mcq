@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'; // Import useMemo
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { MadeWithDyad } from '@/components/made-with-dyad'; // Fixed: Removed '='
+import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { createMcqColumns, MCQ } from '@/components/mcq-columns';
 import { useToast } from '@/hooks/use-toast';
@@ -108,9 +108,8 @@ const ManageMcqsPage = () => {
         explanation_id,
         difficulty,
         is_trial_mcq,
-        mcq_category_links!left ( // Always use LEFT JOIN for category links
-          category_id,
-          categories (name)
+        mcq_category_links!left ( // Use LEFT JOIN to get all MCQs, even those without links
+          category_id
         )
       `);
 
@@ -136,12 +135,15 @@ const ManageMcqsPage = () => {
       });
       setRawMcqs([]);
     } else {
+      // Create a map for quick category name lookup
+      const categoryNameMap = new Map(categories.map(cat => [cat.id, cat.name]));
+
       const displayMcqs: DisplayMCQ[] = data.map((mcq: any) => ({
         ...mcq,
-        // Ensure category_links is always an array, even if null from the join
+        // Hydrate category_links with names from the categories state
         category_links: mcq.mcq_category_links ? mcq.mcq_category_links.map((link: any) => ({
           category_id: link.category_id,
-          category_name: link.categories?.name || null,
+          category_name: categoryNameMap.get(link.category_id) || null, // Resolve name here
         })) : [],
       }));
       console.log(`[ManageMcqsPage] Successfully fetched ${displayMcqs.length} MCQs.`);
@@ -157,10 +159,12 @@ const ManageMcqsPage = () => {
   }, [hasCheckedInitialSession]);
 
   useEffect(() => {
-    if (hasCheckedInitialSession) {
+    // Only fetch MCQs if categories are loaded (or if there are no categories to load)
+    // and initial session check is done.
+    if (hasCheckedInitialSession && categories.length > 0 || (hasCheckedInitialSession && categories.length === 0 && !isPageLoading)) {
       fetchMcqs();
     }
-  }, [searchTerm, hasCheckedInitialSession]); // Only searchTerm triggers refetch from DB
+  }, [selectedFilterCategory, searchTerm, hasCheckedInitialSession, categories]); // Re-run when categories change
 
   // Client-side filtering based on selectedFilterCategory
   const filteredMcqs = useMemo(() => {

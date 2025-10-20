@@ -10,7 +10,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate, Link } from 'react-router-dom';
-import { TimerIcon, Pause, Play, SkipForward, Save, Bookmark, BookmarkCheck } from 'lucide-react'; // Added Save icon and bookmark icons
+import { TimerIcon, Pause, Play, SkipForward, Save, Bookmark, BookmarkCheck, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { McqCategoryLink } from '@/components/mcq-columns'; // Import McqCategoryLink
@@ -103,7 +103,7 @@ const TakeTestPage = () => {
   const [timer, setTimer] = useState(testDurationMinutes * 60); // Initialize timer with selected duration
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
-  const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
+  const [explanations, setExplanations] = new Map();
 
   const [isPaused, setIsPaused] = useState(false); // New state for pause functionality
   const [skippedMcqIds, setSkippedMcqIds] = useState<Set<string>>(new Set()); // Track skipped MCQs
@@ -765,7 +765,7 @@ const TakeTestPage = () => {
               userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
               currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
               testDurationSeconds: savedSessionResult.sessionData.test_duration_seconds || 0,
-              remainingTimeSeconds: savedSessionResult.sessionData.remaining_duration_seconds || 0,
+              remainingTimeSeconds: savedSessionResult.sessionData.remaining_time_seconds || 0,
               skippedMcqIds: new Set(savedSessionResult.sessionData.skipped_mcq_ids || []),
               userId: user.id,
             };
@@ -936,6 +936,32 @@ const TakeTestPage = () => {
     setShowInstructions(false);
     setCurrentDbSessionId(null);
     fetchTestOverview(); // Refresh saved tests list
+  };
+
+  const handleGoToDashboard = () => {
+    const isCurrentTestSaved = currentDbSessionId && activeSavedTests.some(session => session.dbSessionId === currentDbSessionId);
+
+    if (!isCurrentTestSaved && mcqs.length > 0 && !isTestSubmitted) {
+      if (!window.confirm("Are you sure you want to leave this test session? Your current unsaved progress will be lost.")) {
+        return; // User cancelled
+      }
+    }
+
+    // If we reach here, either it was saved, or the user confirmed to lose unsaved progress
+    setMcqs([]);
+    setUserAnswers(new Map());
+    setCurrentQuestionIndex(0);
+    setIsTestSubmitted(false);
+    setTimer(testDurationMinutes * 60);
+    setScore(0);
+    setExplanations(new Map());
+    setIsPaused(false);
+    setSkippedMcqIds(new Set());
+    setShowResults(false);
+    setShowConfiguration(true);
+    setShowInstructions(false);
+    setCurrentDbSessionId(null);
+    navigate('/user/dashboard');
   };
 
   if (!hasCheckedInitialSession || isPageLoading) {
@@ -1297,13 +1323,18 @@ const TakeTestPage = () => {
             </RadioGroup>
           </CardContent>
           <CardFooter className="flex justify-between gap-2">
-            <Button onClick={handleBackToConfiguration} variant="outline" disabled={isPaused}>
-              Back to Configuration
-            </Button>
             <div className="flex gap-2">
+              <Button onClick={handleBackToConfiguration} variant="outline" disabled={isPaused}>
+                Back to Configuration
+              </Button>
+              <Button onClick={handleGoToDashboard} variant="outline" disabled={isPaused}>
+                <ArrowLeft className="h-4 w-4 mr-2" /> Go to Dashboard
+              </Button>
               <Button onClick={handleSaveProgress} variant="secondary" disabled={isPaused || !currentDbSessionId || !user}>
                 <Save className="h-4 w-4 mr-2" /> Save Progress
               </Button>
+            </div>
+            <div className="flex gap-2">
               <Button onClick={handlePrevious} disabled={currentQuestionIndex === 0 || isPaused} variant="outline">
                 Previous
               </Button>

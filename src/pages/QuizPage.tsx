@@ -10,7 +10,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save, Bookmark, BookmarkCheck } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save, Bookmark, BookmarkCheck, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
 import { useNavigate, Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -91,7 +91,7 @@ const QuizPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
-  const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
+  const [explanations, setExplanations] = new Map();
 
   const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
   const [isTrialActiveSession, setIsTrialActiveSession] = useState(false);
@@ -1039,6 +1039,31 @@ const QuizPage = () => {
     fetchQuizOverview(); // Refresh overview data
   };
 
+  const handleGoToDashboard = () => {
+    const isCurrentQuizSaved = currentDbSessionId && activeSavedQuizzes.some(session => session.dbSessionId === currentDbSessionId);
+
+    if (!isCurrentQuizSaved && quizQuestions.length > 0 && !showResults) {
+      if (!window.confirm("Are you sure you want to leave this quiz session? Your current unsaved progress will be lost.")) {
+        return; // User cancelled
+      }
+    }
+
+    // If we reach here, either it was saved, or the user confirmed to lose unsaved progress
+    setQuizQuestions([]);
+    setUserAnswers(new Map());
+    setCurrentQuestionIndex(0);
+    setSelectedAnswer(null);
+    setFeedback(null);
+    setShowExplanation(false);
+    setScore(0);
+    setExplanations(new Map());
+    setShowResults(false);
+    setShowCategorySelection(true);
+    setCurrentQuizCategoryId(null); // Reset current quiz category
+    setCurrentDbSessionId(null); // Reset DB session ID
+    navigate('/user/dashboard');
+  };
+
   const filteredCategories = categoryStats.filter(cat =>
     cat.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -1461,6 +1486,9 @@ const QuizPage = () => {
             <div className="flex gap-2">
               <Button onClick={handleBackToSelection} variant="outline" disabled={isSubmittingAnswer}>
                 Back to Selection
+              </Button>
+              <Button onClick={handleGoToDashboard} variant="outline" disabled={isSubmittingAnswer}>
+                <ArrowLeft className="h-4 w-4 mr-2" /> Go to Dashboard
               </Button>
               <Button onClick={handleSaveProgress} variant="secondary" disabled={isSubmittingAnswer || !currentQuizCategoryId || !user}>
                 <Save className="h-4 w-4 mr-2" /> Save Progress

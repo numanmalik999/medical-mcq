@@ -93,7 +93,7 @@ const ManageMcqsPage = () => {
 
   const fetchMcqs = async () => {
     setIsPageLoading(true);
-    console.log(`[ManageMcqsPage] Fetching MCQs with filter category: ${selectedFilterCategory}, search term: ${searchTerm}`);
+    console.log(`[ManageMcqsPage] STARTING MCQ FETCH with filter category: ${selectedFilterCategory}, search term: ${searchTerm}`);
 
     let mcqIdsToFilter: string[] | null = null;
 
@@ -148,6 +148,8 @@ const ManageMcqsPage = () => {
       console.log(`[ManageMcqsPage] Found ${mcqIdsToFilter.length} MCQ IDs for category ${selectedFilterCategory}.`);
     }
 
+    console.log(`[ManageMcqsPage] MCQ IDs to query from 'mcqs' table (after category filter):`, mcqIdsToFilter);
+
     let mcqsQuery = supabase
       .from('mcqs')
       .select(`
@@ -174,6 +176,9 @@ const ManageMcqsPage = () => {
     }
 
     const { data, error } = await mcqsQuery;
+    console.log('[ManageMcqsPage] Raw response from final mcqs query - Data:', data);
+    console.log('[ManageMcqsPage] Raw response from final mcqs query - Error:', error);
+
 
     if (error) {
       console.error('[ManageMcqsPage] Error fetching MCQs:', error);

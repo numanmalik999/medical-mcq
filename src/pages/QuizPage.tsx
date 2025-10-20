@@ -150,7 +150,6 @@ const QuizPage = () => {
         description: `Failed to load explanation: ${error.message || 'Unknown error'}.`,
         variant: "destructive",
       });
-      // Removed setExplanation(null) as it's not a direct state
     } else if (data) {
       setExplanations(prev => new Map(prev).set(explanationId, data));
       return data;
@@ -379,7 +378,7 @@ const QuizPage = () => {
   };
 
   const startQuizSession = async (categoryId: string, mode: 'random' | 'incorrect') => {
-    console.log(`[QuizPage] Starting quiz session for category: ${categoryId}, mode: ${mode}`);
+    console.log(`[QuizPage] STARTING QUIZ SESSION for category: ${categoryId}, mode: ${mode}`);
     const isSubscribed = user?.has_active_subscription;
     const hasTakenTrial = user?.trial_taken;
     const isGuest = !user;
@@ -411,7 +410,7 @@ const QuizPage = () => {
     let mcqIdsToFetch: string[] = [];
 
     // Step 1: Get MCQ IDs from mcq_category_links based on category
-    console.log(`[QuizPage] Fetching mcq_ids from mcq_category_links for category: ${categoryId}`);
+    console.log(`[QuizPage] Step 1: Fetching mcq_ids from mcq_category_links for category: ${categoryId}`);
     let linksQuery = supabase
       .from('mcq_category_links')
       .select('mcq_id')
@@ -420,16 +419,17 @@ const QuizPage = () => {
     const { data: linkedMcqIdsData, error: linksError } = await linksQuery;
 
     if (linksError) {
-      console.error('[QuizPage] Error fetching linked MCQ IDs:', linksError);
+      console.error('[QuizPage] ERROR in Step 1 (fetching linked MCQ IDs):', linksError);
       toast({ title: "Error", description: "Failed to load quiz questions data.", variant: "destructive" });
       setIsPageLoading(false);
       return;
     }
 
     mcqIdsToFetch = linkedMcqIdsData?.map(link => link.mcq_id) || [];
-    console.log(`[QuizPage] Retrieved ${mcqIdsToFetch.length} linked MCQ IDs:`, mcqIdsToFetch);
+    console.log(`[QuizPage] Step 1 Result: Retrieved ${mcqIdsToFetch.length} linked MCQ IDs:`, mcqIdsToFetch);
 
     if (mcqIdsToFetch.length === 0) {
+      console.log('[QuizPage] No MCQ IDs found for the selected category in mcq_category_links.');
       toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
       setIsPageLoading(false);
       return;
@@ -450,12 +450,12 @@ const QuizPage = () => {
 
     if (!isSubscribed) { // This condition is true for guests and non-subscribed users
       mcqQuery = mcqQuery.eq('is_trial_mcq', true);
-      console.log('[QuizPage] Applying trial MCQ filter.');
+      console.log('[QuizPage] Step 2: Applying trial MCQ filter.');
     }
 
     // Step 3: Filter by incorrect attempts if mode is 'incorrect'
     if (mode === 'incorrect' && user) { // Only applies to logged-in users
-      console.log('[QuizPage] Fetching incorrect attempts for user.');
+      console.log('[QuizPage] Step 3: Fetching incorrect attempts for user.');
       const { data: incorrectAttempts, error: attemptsError } = await supabase
         .from('user_quiz_attempts')
         .select('mcq_id')
@@ -464,14 +464,14 @@ const QuizPage = () => {
         .eq('is_correct', false);
 
       if (attemptsError) {
-        console.error('[QuizPage] Error fetching incorrect attempts:', attemptsError);
+        console.error('[QuizPage] ERROR in Step 3 (fetching incorrect attempts):', attemptsError);
         toast({ title: "Feature Restricted", description: "Failed to load incorrect questions.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
 
       const incorrectMcqIds = Array.from(new Set(incorrectAttempts?.map(attempt => attempt.mcq_id) || []));
-      console.log(`[QuizPage] User has ${incorrectMcqIds.length} incorrect MCQs in this category.`);
+      console.log(`[QuizPage] Step 3 Result: User has ${incorrectMcqIds.length} incorrect MCQs in this category.`);
       
       if (incorrectMcqIds.length === 0) {
         toast({ title: "No Incorrect MCQs", description: "You have no incorrect answers in this category to re-attempt.", variant: "default" });
@@ -481,25 +481,27 @@ const QuizPage = () => {
       // Intersect mcqIdsToFetch with incorrectMcqIds
       mcqIdsToFetch = mcqIdsToFetch.filter(id => incorrectMcqIds.includes(id));
       if (mcqIdsToFetch.length === 0) {
+        console.log('[QuizPage] No MCQs found after intersecting with incorrect attempts.');
         toast({ title: "No MCQs", description: "No MCQs found for the selected criteria.", variant: "default" });
         setIsPageLoading(false);
         return;
       }
       mcqQuery = mcqQuery.in('id', mcqIdsToFetch);
-      console.log(`[QuizPage] Filtered MCQ IDs for 'incorrect' mode: ${mcqIdsToFetch.length}`);
+      console.log(`[QuizPage] Step 3 Result: Filtered MCQ IDs for 'incorrect' mode: ${mcqIdsToFetch.length}`);
     }
 
+    console.log(`[QuizPage] Final MCQ IDs to query from 'mcqs' table:`, mcqIdsToFetch);
     const { data: mcqsData, error: mcqsError } = await mcqQuery;
 
     if (mcqsError) {
-      console.error('[QuizPage] Error fetching MCQs data for quiz session:', mcqsError);
+      console.error('[QuizPage] ERROR in final MCQ data fetch:', mcqsError);
       toast({ title: "Error", description: "Failed to load quiz questions data.", variant: "destructive" });
       setIsPageLoading(false);
       return;
     }
 
     if (!mcqsData || mcqsData.length === 0) {
-      console.log('[QuizPage] No MCQs found after all filters.');
+      console.log('[QuizPage] No MCQs found after all filters in final fetch.');
       toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
       setIsPageLoading(false);
       return;
@@ -819,7 +821,7 @@ const QuizPage = () => {
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
       const prevQuestion = quizQuestions[currentQuestionIndex - 1];
-      setCurrentQuestionIndex((prev) => prev + 1);
+      setCurrentQuestionIndex((prev) => prev - 1);
       const prevAnswerData = userAnswers.get(prevQuestion?.id || '');
       setSelectedAnswer(prevAnswerData?.selectedOption || null);
       setFeedback(prevAnswerData?.submitted ? (prevAnswerData.isCorrect ? 'Correct!' : `Incorrect. The correct answer was ${prevQuestion.correct_answer}.`) : null);
@@ -1217,8 +1219,8 @@ const QuizPage = () => {
   if (showResults) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
-        <div className="flex flex-col md:flex-row w-full max-w-6xl"> {/* Added flex-col md:flex-row */}
-          <Card className="flex-1 order-first md:order-last"> {/* Added order-first md:order-last */}
+        <div className="flex flex-col md:flex-row w-full max-w-6xl">
+          <Card className="flex-1 order-first md:order-last">
             <CardHeader>
               <CardTitle className="text-3xl">Quiz Results</CardTitle>
               <CardDescription>Review your performance on this quiz session.</CardDescription>
@@ -1287,7 +1289,7 @@ const QuizPage = () => {
             currentQuestionIndex={currentQuestionIndex}
             goToQuestion={goToQuestion}
             showResults={true}
-            score={score}
+            score={0}
           />
         </div>
         <MadeWithDyad />
@@ -1311,8 +1313,8 @@ const QuizPage = () => {
           </Card>
         </div>
       )}
-      <div className="flex flex-col md:flex-row w-full max-w-6xl"> {/* Changed to flex-col md:flex-row */}
-        <Card className="flex-1 order-first md:order-last"> {/* Added order-first md:order-last */}
+      <div className="flex flex-col md:flex-row w-full max-w-6xl">
+        <Card className="flex-1 order-first md:order-last">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-xl">Question {currentQuestionIndex + 1} / {quizQuestions.length}</CardTitle>
@@ -1433,32 +1435,6 @@ const QuizPage = () => {
               )}
             </div>
           </CardFooter>
-
-          <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Notes or Feedback for this MCQ</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <p className="text-sm text-muted-foreground">
-                  Your feedback helps us improve the questions and explanations.
-                </p>
-                <Textarea
-                  placeholder="Write your notes or feedback here..."
-                  value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
-                  rows={5}
-                  disabled={isSubmittingFeedback}
-                />
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)} disabled={isSubmittingFeedback}>Cancel</Button>
-                <Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()}>
-                  {isSubmittingFeedback ? "Submitting..." : "Submit Feedback"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </Card>
         <QuizNavigator
           mcqs={quizQuestions}
@@ -1470,6 +1446,33 @@ const QuizPage = () => {
         />
       </div>
       <MadeWithDyad />
+
+      {/* Feedback Dialog - Moved outside the main Card for correct JSX structure */}
+      <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Notes or Feedback for this MCQ</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Your feedback helps us improve the questions and explanations.
+            </p>
+            <Textarea
+              placeholder="Write your notes or feedback here..."
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              rows={5}
+              disabled={isSubmittingFeedback}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)} disabled={isSubmittingFeedback}>Cancel</Button>
+            <Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()}>
+              {isSubmittingFeedback ? "Submitting..." : "Submit Feedback"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

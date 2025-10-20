@@ -35,7 +35,7 @@ const ManageCategoriesPage = () => {
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState('');
 
-  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+  const { hasCheckedInitialSession } = useSession();
 
   useEffect(() => {
     if (hasCheckedInitialSession) { // Only fetch if initial session check is done
@@ -56,7 +56,7 @@ const ManageCategoriesPage = () => {
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
           // Count MCQs by querying mcq_category_links table directly
-          const { count, error: mcqCountError } = await supabase
+          const { count: mcqCount, error: mcqCountError } = await supabase // Renamed 'count' to 'mcqCount'
             .from('mcq_category_links')
             .select('mcq_id', { count: 'exact', head: true })
             .eq('category_id', category.id);
@@ -64,7 +64,7 @@ const ManageCategoriesPage = () => {
           if (mcqCountError) {
             console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
           }
-          return { ...category, mcq_count: count || 0 };
+          return { ...category, mcq_count: mcqCount || 0 };
         })
       );
       setCategories(categoriesWithCounts || []);

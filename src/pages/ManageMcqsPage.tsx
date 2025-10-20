@@ -57,7 +57,7 @@ const ManageMcqsPage = () => {
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
           // Count MCQs by querying mcq_category_links table directly
-          const { count: mcqCount, error: mcqCountError } = await supabase
+          const { count: mcqCount, error: mcqCountError } = await supabase // Renamed 'count' to 'mcqCount'
             .from('mcq_category_links')
             .select('mcq_id', { count: 'exact', head: true })
             .eq('category_id', category.id);
@@ -168,7 +168,7 @@ const ManageMcqsPage = () => {
       setIsPageLoading(false);
       return;
     }
-    console.log('[ManageMcqsPage] Raw mcqCategoryLinksData:', mcqCategoryLinksData); // Added log
+    console.log('[ManageMcqsPage] Full mcqCategoryLinksData:', mcqCategoryLinksData); // Added log
 
     // 3. Hydrate MCQs with category names on the client side
     const categoryNameMap = new Map(categories.map(cat => [cat.id, cat.name]));

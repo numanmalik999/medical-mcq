@@ -57,7 +57,7 @@ const ManageMcqsPage = () => {
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
           // Count MCQs by querying mcq_category_links table directly
-          const { count: mcqCount, error: mcqCountError } = await supabase // Renamed 'count' to 'mcqCount'
+          const { count: mcqCount, error: mcqCountError } = await supabase
             .from('mcq_category_links')
             .select('mcq_id', { count: 'exact', head: true })
             .eq('category_id', category.id);
@@ -124,7 +124,8 @@ const ManageMcqsPage = () => {
         explanation_id,
         difficulty,
         is_trial_mcq
-      `);
+      `)
+      .limit(100000); // Explicitly set a high limit to fetch all MCQs
 
     if (searchTerm) {
       console.log(`[ManageMcqsPage] Applying search term: ${searchTerm}`);

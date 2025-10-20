@@ -80,13 +80,35 @@ const ManageMcqsPage = () => {
 
       // Calculate count for Uncategorized MCQs
       console.log('[ManageMcqsPage] Calculating uncategorized MCQ count...');
-      const { data: allLinkedMcqIdsData, error: linkedMcqIdsError } = await supabase
-        .from('mcq_category_links')
-        .select('mcq_id');
+      
+      // --- START MODIFICATION FOR PAGINATION OF ALL LINKED MCQ IDs ---
+      let allLinkedMcqIdsData: { mcq_id: string }[] = [];
+      let offsetLinkedIds = 0;
+      const limitLinkedIds = 1000;
+      let hasMoreLinkedIds = true;
 
-      if (linkedMcqIdsError) {
-        console.error('[ManageMcqsPage] Error fetching all linked MCQ IDs for uncategorized count:', linkedMcqIdsError);
+      while (hasMoreLinkedIds) {
+        const { data: chunkData, error: linkedMcqIdsError } = await supabase
+          .from('mcq_category_links')
+          .select('mcq_id')
+          .range(offsetLinkedIds, offsetLinkedIds + limitLinkedIds - 1);
+
+        if (linkedMcqIdsError) {
+          console.error('[ManageMcqsPage] Error fetching all linked MCQ IDs for uncategorized count during pagination:', linkedMcqIdsError);
+          // Decide if this error should halt the process or just log a warning
+          break; // Exit loop on error
+        }
+
+        if (chunkData && chunkData.length > 0) {
+          allLinkedMcqIdsData = allLinkedMcqIdsData.concat(chunkData);
+          offsetLinkedIds += chunkData.length;
+          hasMoreLinkedIds = chunkData.length === limitLinkedIds;
+        } else {
+          hasMoreLinkedIds = false;
+        }
       }
+      // --- END MODIFICATION ---
+
       const uniqueLinkedMcqIds = new Set(allLinkedMcqIdsData?.map(link => link.mcq_id) || []);
       console.log(`[ManageMcqsPage] Total unique linked MCQ IDs: ${uniqueLinkedMcqIds.size}`);
 
@@ -409,7 +431,7 @@ const ManageMcqsPage = () => {
           .in('id', explanationIdsToDelete);
 
         if (deleteExplanationsError) {
-          console.warn("Could not delete some explanations:", explanationIdsToDelete);
+          console.warn("Error deleting some explanations:", explanationIdsToDelete);
         }
       }
 

@@ -18,7 +18,6 @@ import QuizNavigator from '@/components/QuizNavigator';
 import { MCQ } from '@/components/mcq-columns';
 import { cn } from '@/lib/utils'; // Import cn utility for conditional class names
 import { useBookmark } from '@/hooks/use-bookmark'; // Import useBookmark hook
-import { PostgrestError } from '@supabase/supabase-js'; // Import PostgrestError
 
 interface MCQExplanation {
   id: string;
@@ -66,14 +65,6 @@ interface LoadedQuizSession {
   isTrialActiveSession: boolean;
   userId: string;
   categoryName: string; // Added for display
-}
-
-// New interface for the data returned from mcq_category_links with nested mcqs
-interface McqCategoryLinkWithMcqData {
-  category_id: string;
-  mcq_id: {
-    is_trial_mcq: boolean;
-  };
 }
 
 const TRIAL_MCQ_LIMIT = 50;
@@ -309,8 +300,8 @@ const QuizPage = () => {
       .from('mcq_category_links')
       .select(`
         category_id,
-        mcq_id!inner(is_trial_mcq)
-      `) as { data: McqCategoryLinkWithMcqData[] | null; error: PostgrestError | null }; // Explicitly cast here
+        mcqs (is_trial_mcq)
+      `);
 
     if (linksError) {
       console.error('Error fetching all MCQ category links:', linksError);
@@ -340,9 +331,9 @@ const QuizPage = () => {
     const categoryUserAttempts = new Map<string, { total: number; correct: number }>();
 
     // Populate categoryMcqCounts
-    allMcqCategoryLinks?.forEach(link => { // Use optional chaining here
+    allMcqCategoryLinks.forEach(link => {
       const categoryId = link.category_id;
-      const isTrialMcq = link.mcq_id.is_trial_mcq; // Corrected access
+      const isTrialMcq = link.mcqs?.[0]?.is_trial_mcq; // Access nested mcqs data correctly
 
       if (!categoryMcqCounts.has(categoryId)) {
         categoryMcqCounts.set(categoryId, { total: 0, trial: 0 });
@@ -381,7 +372,7 @@ const QuizPage = () => {
         ...category,
         total_mcqs: mcqCounts.total,
         total_trial_mcqs: mcqCounts.trial,
-        user_attempts: totalAttempts,
+        user_attempts: userAttempts.total,
         user_correct: correctAttempts,
         user_incorrect: incorrectAttempts,
         user_accuracy: `${accuracy}%`,
@@ -1238,13 +1229,13 @@ const QuizPage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredCategories.map((cat) => {
-                  const isCategoryDisabledForGuest = isGuest || (!user?.has_active_subscription && cat.total_trial_mcqs === 0);
+                  // Removed unused 'isCategoryDisabledForGuest' variable
                   const canStartRegularQuiz = user?.has_active_subscription && cat.total_mcqs > 0;
                   const canStartTrialQuiz = isGuestOrNotSubscribed && cat.total_trial_mcqs > 0;
                   const showSubscribePrompt = hasTakenTrial && !user?.has_active_subscription;
 
                   return (
-                    <Card key={cat.id} className={cn("flex flex-col", isCategoryDisabledForGuest && "opacity-70")}>
+                    <Card key={cat.id} className="flex flex-col">
                       <CardHeader>
                         <CardTitle className="text-lg">{cat.name}</CardTitle>
                         <CardDescription>
@@ -1286,6 +1277,13 @@ const QuizPage = () => {
                         >
                           Attempt Incorrect ({cat.user_incorrect})
                         </Button>
+                        {(!canStartRegularQuiz && !canStartTrialQuiz || showSubscribePrompt) && (
+                          <Link to="/user/subscriptions" className="w-full">
+                            <Button variant="link" className="w-full text-red-500 dark:text-red-400 hover:underline">
+                              Subscribe to unlock this category.
+                            </Button>
+                          </Link>
+                        )}
                         {!isGuest && ( // Only show reset progress for logged-in users
                           <Button
                             onClick={() => handleResetProgress(cat.id)}
@@ -1295,13 +1293,6 @@ const QuizPage = () => {
                           >
                             <RotateCcw className="h-4 w-4 mr-2" /> Reset Progress
                           </Button>
-                        )}
-                        {isCategoryDisabledForGuest && (
-                          <Link to="/user/subscriptions" className="block text-center mt-2">
-                            <Button variant="link" className="text-red-500 dark:text-red-400 hover:underline">
-                              Subscribe to unlock this category.
-                            </Button>
-                          </Link>
                         )}
                       </CardFooter>
                     </Card>

@@ -18,6 +18,7 @@ import QuizNavigator from '@/components/QuizNavigator';
 import { MCQ } from '@/components/mcq-columns';
 import { cn } from '@/lib/utils'; // Import cn utility for conditional class names
 import { useBookmark } from '@/hooks/use-bookmark'; // Import useBookmark hook
+import { PostgrestError } from '@supabase/supabase-js'; // Import PostgrestError
 
 interface MCQExplanation {
   id: string;
@@ -65,6 +66,14 @@ interface LoadedQuizSession {
   isTrialActiveSession: boolean;
   userId: string;
   categoryName: string; // Added for display
+}
+
+// New interface for the data returned from mcq_category_links with nested mcqs
+interface McqCategoryLinkWithMcqData {
+  category_id: string;
+  mcq_id: {
+    is_trial_mcq: boolean;
+  };
 }
 
 const TRIAL_MCQ_LIMIT = 50;
@@ -300,8 +309,8 @@ const QuizPage = () => {
       .from('mcq_category_links')
       .select(`
         category_id,
-        mcqs (is_trial_mcq)
-      `);
+        mcq_id!inner(is_trial_mcq)
+      `) as { data: McqCategoryLinkWithMcqData[] | null; error: PostgrestError | null }; // Explicitly cast here
 
     if (linksError) {
       console.error('Error fetching all MCQ category links:', linksError);
@@ -331,9 +340,9 @@ const QuizPage = () => {
     const categoryUserAttempts = new Map<string, { total: number; correct: number }>();
 
     // Populate categoryMcqCounts
-    allMcqCategoryLinks.forEach(link => {
+    allMcqCategoryLinks?.forEach(link => { // Use optional chaining here
       const categoryId = link.category_id;
-      const isTrialMcq = link.mcqs?.is_trial_mcq; // Access nested mcqs data
+      const isTrialMcq = link.mcq_id.is_trial_mcq; // Corrected access
 
       if (!categoryMcqCounts.has(categoryId)) {
         categoryMcqCounts.set(categoryId, { total: 0, trial: 0 });
@@ -372,8 +381,8 @@ const QuizPage = () => {
         ...category,
         total_mcqs: mcqCounts.total,
         total_trial_mcqs: mcqCounts.trial,
-        user_attempts: userAttempts.total,
-        user_correct: userAttempts.correct,
+        user_attempts: totalAttempts,
+        user_correct: correctAttempts,
         user_incorrect: incorrectAttempts,
         user_accuracy: `${accuracy}%`,
       });
@@ -1288,9 +1297,11 @@ const QuizPage = () => {
                           </Button>
                         )}
                         {isCategoryDisabledForGuest && (
-                          <p className="text-sm text-red-500 dark:text-red-400 text-center mt-2">
-                            Subscribe to unlock this category.
-                          </p>
+                          <Link to="/user/subscriptions" className="block text-center mt-2">
+                            <Button variant="link" className="text-red-500 dark:text-red-400 hover:underline">
+                              Subscribe to unlock this category.
+                            </Button>
+                          </Link>
                         )}
                       </CardFooter>
                     </Card>

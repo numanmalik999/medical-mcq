@@ -275,7 +275,7 @@ const QuizPage = () => {
     // 1. Fetch all categories
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
-      .select('id, name'); // Only select necessary fields
+      .select('id, name');
 
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
@@ -284,8 +284,11 @@ const QuizPage = () => {
       return;
     }
     const categoriesMap = new Map(categoriesData?.map(cat => [cat.id, cat]) || []);
+    // Add UNCATEGORIZED_ID to the map for consistent lookup
+    categoriesMap.set(UNCATEGORIZED_ID, { id: UNCATEGORIZED_ID, name: 'Uncategorized' });
 
-    // 2. Fetch total count of all trial MCQs (already efficient)
+
+    // 2. Fetch total count of all trial MCQs
     const { count: totalTrialMcqsCount, error: totalTrialError } = await supabase
       .from('mcqs')
       .select('id', { count: 'exact', head: true })
@@ -296,21 +299,70 @@ const QuizPage = () => {
     }
     setAllTrialMcqsCount(totalTrialMcqsCount || 0);
 
-    // 3. Fetch all MCQ category links with mcq trial status
-    // Fetch all mcqs with their category links to accurately count total and trial mcqs per category
-    const { data: allMcqsWithLinks, error: mcqsWithLinksError } = await supabase
-      .from('mcqs')
+    // 3. Fetch all MCQ category links with mcq trial status for accurate counts per category
+    const { data: mcqCategoryCountsData, error: mcqCategoryCountsError } = await supabase
+      .from('mcq_category_links')
       .select(`
-        id,
-        is_trial_mcq,
-        mcq_category_links (category_id)
+        category_id,
+        mcqs (id, is_trial_mcq)
       `);
 
-    if (mcqsWithLinksError) {
-      console.error('Error fetching all MCQs with category links:', mcqsWithLinksError);
-      toast({ title: "Error", description: "Failed to load MCQ link data for overview.", variant: "destructive" });
+    if (mcqCategoryCountsError) {
+      console.error('Error fetching MCQ category counts:', mcqCategoryCountsError);
+      toast({ title: "Error", description: "Failed to load category MCQ counts.", variant: "destructive" });
       setIsPageLoading(false);
       return;
+    }
+
+    const categoryMcqCounts = new Map<string, { total: number; trial: number }>();
+    mcqCategoryCountsData.forEach(link => {
+      // Corrected: Access the first element of the mcqs array
+      const isTrialMcq = link.mcqs?.[0]?.is_trial_mcq; 
+      const categoryId = link.category_id;
+
+      if (!categoryMcqCounts.has(categoryId)) {
+        categoryMcqCounts.set(categoryId, { total: 0, trial: 0 });
+      }
+      const counts = categoryMcqCounts.get(categoryId)!;
+      counts.total++;
+      if (isTrialMcq) {
+        counts.trial++;
+      }
+    });
+
+    // Calculate uncategorized MCQs counts
+    const { count: totalMcqCount, error: totalMcqCountError } = await supabase
+      .from('mcqs')
+      .select('id', { count: 'exact', head: true });
+    if (totalMcqCountError) {
+      console.error('Error fetching total MCQ count for uncategorized:', totalMcqCountError);
+    }
+
+    const { data: allLinkedMcqIdsData, error: linkedIdsError } = await supabase
+      .from('mcq_category_links')
+      .select('mcq_id');
+    if (linkedIdsError) {
+      console.error('Error fetching all linked MCQ IDs for uncategorized count:', linkedIdsError);
+    }
+    const uniqueLinkedMcqIds = new Set(allLinkedMcqIdsData?.map(link => link.mcq_id) || []);
+
+    const uncategorizedTotal = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
+
+    let uncategorizedTrial = 0;
+    if (uncategorizedTotal > 0) {
+      const { count: uncategorizedTrialCount, error: uncategorizedTrialError } = await supabase
+        .from('mcqs')
+        .select('id', { count: 'exact', head: true })
+        .not('id', 'in', `(${Array.from(uniqueLinkedMcqIds).join(',')})`) // Select MCQs not in any category
+        .eq('is_trial_mcq', true);
+      if (uncategorizedTrialError) {
+        console.error('Error fetching uncategorized trial MCQ count:', uncategorizedTrialError);
+      }
+      uncategorizedTrial = uncategorizedTrialCount || 0;
+    }
+
+    if (uncategorizedTotal > 0) {
+      categoryMcqCounts.set(UNCATEGORIZED_ID, { total: uncategorizedTotal, trial: uncategorizedTrial });
     }
 
     // 4. Fetch all user quiz attempts (if logged in)
@@ -330,36 +382,7 @@ const QuizPage = () => {
 
     // 5. Process data client-side to build categoryStats
     const categoriesWithStats: CategoryStat[] = [];
-    const categoryMcqCounts = new Map<string, { total: number; trial: number }>();
     const categoryUserAttempts = new Map<string, { total: number; correct: number }>();
-
-    // Populate categoryMcqCounts from allMcqsWithLinks
-    allMcqsWithLinks.forEach(mcq => {
-      const isTrialMcq = mcq.is_trial_mcq;
-      if (mcq.mcq_category_links && mcq.mcq_category_links.length > 0) {
-        mcq.mcq_category_links.forEach(link => {
-          const categoryId = link.category_id;
-          if (!categoryMcqCounts.has(categoryId)) {
-            categoryMcqCounts.set(categoryId, { total: 0, trial: 0 });
-          }
-          const counts = categoryMcqCounts.get(categoryId)!;
-          counts.total++;
-          if (isTrialMcq) {
-            counts.trial++;
-          }
-        });
-      } else {
-        // Handle uncategorized MCQs
-        if (!categoryMcqCounts.has(UNCATEGORIZED_ID)) {
-          categoryMcqCounts.set(UNCATEGORIZED_ID, { total: 0, trial: 0 });
-        }
-        const counts = categoryMcqCounts.get(UNCATEGORIZED_ID)!;
-        counts.total++;
-        if (isTrialMcq) {
-          counts.trial++;
-        }
-      }
-    });
 
     // Populate categoryUserAttempts
     userAttemptsData.forEach(attempt => {
@@ -396,8 +419,8 @@ const QuizPage = () => {
     });
 
     // Add a virtual 'Uncategorized' category to the stats list if it has MCQs
-    const uncategorizedCounts = categoryMcqCounts.get(UNCATEGORIZED_ID) || { total: 0, trial: 0 };
-    if (uncategorizedCounts.total > 0) {
+    const uncategorizedStats = categoryMcqCounts.get(UNCATEGORIZED_ID);
+    if (uncategorizedStats && uncategorizedStats.total > 0) {
       const uncategorizedUserAttempts = categoryUserAttempts.get(UNCATEGORIZED_ID) || { total: 0, correct: 0 };
       const uncategorizedIncorrectAttempts = uncategorizedUserAttempts.total - uncategorizedUserAttempts.correct;
       const uncategorizedAccuracy = uncategorizedUserAttempts.total > 0 ? ((uncategorizedUserAttempts.correct / uncategorizedUserAttempts.total) * 100).toFixed(2) : '0.00';
@@ -405,8 +428,8 @@ const QuizPage = () => {
       categoriesWithStats.push({
         id: UNCATEGORIZED_ID,
         name: 'Uncategorized',
-        total_mcqs: uncategorizedCounts.total,
-        total_trial_mcqs: uncategorizedCounts.trial,
+        total_mcqs: uncategorizedStats.total,
+        total_trial_mcqs: uncategorizedStats.trial,
         user_attempts: uncategorizedUserAttempts.total,
         user_correct: uncategorizedUserAttempts.correct,
         user_incorrect: uncategorizedIncorrectAttempts,
@@ -414,8 +437,7 @@ const QuizPage = () => {
       });
     }
 
-    // 6. Load saved quiz sessions (already efficient enough, uses `eq('user_id')`)
-    // This part needs to be after categoriesData is available to resolve categoryName
+    // 6. Load saved quiz sessions
     let loadedSavedQuizzes: LoadedQuizSession[] = [];
     if (user) {
       const { data: dbSessions, error: dbSessionsError } = await supabase
@@ -462,14 +484,22 @@ const QuizPage = () => {
     const hasTakenTrial = user?.trial_taken;
     const isGuest = !user;
 
-    // If logged in, not subscribed, and already took trial, show prompt
-    if (!isGuest && !isSubscribed && hasTakenTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) {
+    // Determine if this session *should* be a trial session
+    let sessionIsTrial = false;
+    if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
+      sessionIsTrial = true;
+    } else if (isGuest || (!isSubscribed && !hasTakenTrial)) {
+      sessionIsTrial = true;
+    }
+    
+    // If logged in, not subscribed, and already took trial, and it's NOT a trial session, show prompt
+    if (!isGuest && !isSubscribed && hasTakenTrial && !sessionIsTrial) {
       setShowSubscriptionPrompt(true);
       return;
     }
 
-    // If it's a guest or a logged-in trial user, and mode is 'incorrect', restrict it.
-    if ((isGuest || (!isSubscribed && !hasTakenTrial)) && mode === 'incorrect') {
+    // If it's a trial session and mode is 'incorrect', restrict it.
+    if (sessionIsTrial && mode === 'incorrect') {
       toast({ title: "Feature Restricted", description: "This feature is only available for subscribed users.", variant: "default" });
       setIsPageLoading(false);
       return;
@@ -487,130 +517,65 @@ const QuizPage = () => {
     setShowResults(false);
     setCurrentDbSessionId(null); // Reset current DB session ID for a new quiz
 
-    let mcqIdsToFetch: string[] = [];
-    let isSessionTrial = false;
+    let mcqIdsToConsider: string[] = [];
+    let baseMcqQuery = supabase.from('mcqs').select('id, is_trial_mcq');
 
-    // Step 1: Determine the base set of MCQ IDs based on category selection
     if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
-      const { data: allTrialMcqIdsData, error: allIdsError } = await supabase
-        .from('mcqs')
-        .select('id')
-        .eq('is_trial_mcq', true);
-      if (allIdsError) {
-        console.error('[QuizPage] ERROR fetching all TRIAL MCQ IDs:', allIdsError);
-        toast({ title: "Error", description: "Failed to load trial questions (step 1).", variant: "destructive" });
-        setIsPageLoading(false);
-        return;
-      }
-      mcqIdsToFetch = allTrialMcqIdsData?.map(m => m.id) || [];
-      isSessionTrial = true;
+      baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
     } else if (selectedCategoryId === UNCATEGORIZED_ID) {
-      const { data: categorizedMcqLinks, error: linksError } = await supabase
+      // Get all MCQs that are NOT linked to any category
+      const { data: linkedMcqIdsData, error: linkedIdsError } = await supabase
         .from('mcq_category_links')
         .select('mcq_id');
-      if (linksError) {
-        console.error('Error fetching categorized MCQ links:', linksError);
+      if (linkedIdsError) {
+        console.error('Error fetching linked MCQ IDs for uncategorized filter:', linkedIdsError);
         toast({ title: "Error", description: "Failed to identify uncategorized questions.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
-      const categorizedMcqIds = Array.from(new Set(categorizedMcqLinks?.map(link => link.mcq_id) || []));
-
-      const { data: allMcqIds, error: allMcqIdsError } = await supabase
-        .from('mcqs')
-        .select('id');
-      if (allMcqIdsError) {
-        console.error('Error fetching all MCQ IDs for uncategorized filter:', allMcqIdsError);
-        toast({ title: "Error", description: "Failed to fetch all MCQs for uncategorized filter.", variant: "destructive" });
-        setIsPageLoading(false);
-        return;
-      }
-      const allMcqIdsSet = new Set(allMcqIds?.map(mcq => mcq.id) || []);
-      mcqIdsToFetch = Array.from(allMcqIdsSet).filter(id => !categorizedMcqIds.includes(id));
-
-      // Apply trial filter if user is guest/not subscribed
-      if (isGuest || (!isSubscribed && !hasTakenTrial)) {
-        const { data: trialUncategorizedMcqIds, error: trialError } = await supabase
-          .from('mcqs')
-          .select('id')
-          .in('id', mcqIdsToFetch)
-          .eq('is_trial_mcq', true);
-        if (trialError) {
-          console.error('Error fetching trial uncategorized MCQs:', trialError);
-          toast({ title: "Error", description: "Failed to filter trial uncategorized questions.", variant: "destructive" });
-          setIsPageLoading(false);
-          return;
-        }
-        mcqIdsToFetch = trialUncategorizedMcqIds?.map(m => m.id) || [];
-        isSessionTrial = true;
-      }
-    } else if (selectedCategoryId) {
-      const { data: categoryMcqLinks, error: linksError } = await supabase
+      const categorizedMcqIds = Array.from(new Set(linkedMcqIdsData?.map(link => link.mcq_id) || []));
+      
+      baseMcqQuery = baseMcqQuery.not('id', 'in', `(${categorizedMcqIds.join(',')})`);
+    } else if (selectedCategoryId) { // Specific category selected
+      const { data: categoryLinkedMcqIdsData, error: categoryLinkedIdsError } = await supabase
         .from('mcq_category_links')
         .select('mcq_id')
         .eq('category_id', selectedCategoryId);
-      if (linksError) {
-        console.error('Error fetching category MCQ links:', linksError);
+      if (categoryLinkedIdsError) {
+        console.error('Error fetching category linked MCQ IDs:', categoryLinkedIdsError);
         toast({ title: "Error", description: "Failed to filter MCQs by category.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
-      mcqIdsToFetch = categoryMcqLinks?.map(link => link.mcq_id) || [];
+      const categoryLinkedMcqIds = Array.from(new Set(categoryLinkedMcqIdsData?.map(link => link.mcq_id) || []));
+      
+      baseMcqQuery = baseMcqQuery.in('id', categoryLinkedMcqIds);
+    }
+    // If no category selected, baseMcqQuery remains as 'select all IDs'
 
-      // Apply trial filter if user is guest/not subscribed
-      if (isGuest || (!isSubscribed && !hasTakenTrial)) {
-        const { data: trialCategoryMcqIds, error: trialError } = await supabase
-          .from('mcqs')
-          .select('id')
-          .in('id', mcqIdsToFetch)
-          .eq('is_trial_mcq', true);
-        if (trialError) {
-          console.error('Error fetching trial category MCQs:', trialError);
-          toast({ title: "Error", description: "Failed to filter trial category questions.", variant: "destructive" });
-          setIsPageLoading(false);
-          return;
-        }
-        mcqIdsToFetch = trialCategoryMcqIds?.map(m => m.id) || [];
-        isSessionTrial = true;
-      }
-    } else {
-      // No category selected (all categories)
-      const { data: allMcqIds, error: allMcqIdsError } = await supabase
-        .from('mcqs')
-        .select('id');
-      if (allMcqIdsError) {
-        console.error('Error fetching all MCQ IDs:', allMcqIdsError);
-        toast({ title: "Error", description: "Failed to fetch all MCQs.", variant: "destructive" });
-        setIsPageLoading(false);
-        return;
-      }
-      mcqIdsToFetch = allMcqIds?.map(mcq => mcq.id) || [];
-
-      // Apply trial filter if user is guest/not subscribed
-      if (isGuest || (!isSubscribed && !hasTakenTrial)) {
-        const { data: trialAllMcqIds, error: trialError } = await supabase
-          .from('mcqs')
-          .select('id')
-          .in('id', mcqIdsToFetch)
-          .eq('is_trial_mcq', true);
-        if (trialError) {
-          console.error('Error fetching trial all MCQs:', trialError);
-          toast({ title: "Error", description: "Failed to filter trial questions from all categories.", variant: "destructive" });
-          setIsPageLoading(false);
-          return;
-        }
-        mcqIdsToFetch = trialAllMcqIds?.map(m => m.id) || [];
-        isSessionTrial = true;
-      }
+    // IMPORTANT: Apply trial filter *after* category filtering, if the session is a trial session
+    // and it's not the 'All Trial MCQs' special category (which already filtered for trial).
+    if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) {
+      baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
     }
 
-    // Handle 'incorrect' mode filter
-    if (mode === 'incorrect' && user) {
+    // Execute base query to get initial set of MCQ IDs
+    const { data: initialMcqIdsData, error: initialMcqIdsError } = await baseMcqQuery;
+    if (initialMcqIdsError) {
+      console.error('Error fetching initial MCQ IDs:', initialMcqIdsError);
+      toast({ title: "Error", description: "Failed to load initial question set.", variant: "destructive" });
+      setIsPageLoading(false);
+      return;
+    }
+    mcqIdsToConsider = initialMcqIdsData?.map(m => m.id) || [];
+
+    // Handle 'incorrect' mode filter (only for subscribed users)
+    if (mode === 'incorrect' && user && isSubscribed) {
       const { data: incorrectAttempts, error: attemptsError } = await supabase
         .from('user_quiz_attempts')
         .select('mcq_id')
         .eq('user_id', user.id)
-        .in('mcq_id', mcqIdsToFetch) // Filter only within the already selected set
+        .in('mcq_id', mcqIdsToConsider)
         .eq('is_correct', false);
       if (attemptsError) {
         console.error('[QuizPage] ERROR in fetching incorrect attempts:', attemptsError);
@@ -624,16 +589,26 @@ const QuizPage = () => {
         setIsPageLoading(false);
         return;
       }
-      mcqIdsToFetch = incorrectMcqIds;
+      mcqIdsToConsider = incorrectMcqIds;
     }
 
-    if (mcqIdsToFetch.length === 0) {
+    if (mcqIdsToConsider.length === 0) {
       toast({ title: "No MCQs", description: "No MCQs available for the selected criteria.", variant: "default" });
       setIsPageLoading(false);
       return;
     }
 
-    // Now fetch the full MCQ objects using the filtered IDs
+    // Shuffle and apply trial limit if applicable
+    let finalMcqIdsForQuiz = shuffleArray(mcqIdsToConsider);
+    if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) { // ALL_TRIAL_MCQS_ID already limited by initial fetch
+      finalMcqIdsForQuiz = finalMcqIdsForQuiz.slice(0, Math.min(finalMcqIdsForQuiz.length, TRIAL_MCQ_LIMIT));
+    } else if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
+      // For ALL_TRIAL_MCQS_ID, the initial fetch already limited to TRIAL_MCQ_LIMIT
+      // so `finalMcqIdsForQuiz` is already the correct size.
+    }
+
+
+    // Now fetch the full MCQ objects using the final filtered and limited IDs
     const { data: mcqsData, error: mcqsError } = await supabase
       .from('mcqs')
       .select(`
@@ -643,7 +618,7 @@ const QuizPage = () => {
           categories (name)
         )
       `)
-      .in('id', mcqIdsToFetch); // Fetch only the relevant MCQs
+      .in('id', finalMcqIdsForQuiz);
 
     if (mcqsError) {
       console.error('[QuizPage] ERROR in final MCQ data fetch:', mcqsError);
@@ -665,8 +640,8 @@ const QuizPage = () => {
       })) || [],
     }));
 
-    const shuffledMcqs = shuffleArray(formattedMcqs);
-    const mcqsToLoad = shuffledMcqs.slice(0, Math.min(shuffledMcqs.length, TRIAL_MCQ_LIMIT)); // Apply trial limit here if it's a trial session
+    // Reorder formattedMcqs to match the shuffled order of finalMcqIdsForQuiz
+    const mcqsToLoad = finalMcqIdsForQuiz.map(id => formattedMcqs.find(mcq => mcq.id === id)).filter((mcq): mcq is MCQ => mcq !== undefined);
 
     if (mcqsToLoad.length === 0) {
       console.log('[QuizPage] No MCQs to load after trial limit or other slicing.');
@@ -696,7 +671,7 @@ const QuizPage = () => {
         mcqsToLoad,
         initialUserAnswers,
         0, // currentQuestionIndex
-        isSessionTrial, // Use the determined session trial status
+        sessionIsTrial, // Use the determined session trial status
         user.id
       );
       if (savedSessionResult) {
@@ -717,7 +692,7 @@ const QuizPage = () => {
               mcqs: mcqsToLoad,
               userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
               currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
-              isTrialActiveSession: isSessionTrial,
+              isTrialActiveSession: sessionIsTrial,
               userId: user.id,
               categoryName: categoryName,
             };
@@ -731,7 +706,7 @@ const QuizPage = () => {
                 mcqs: mcqsToLoad,
                 userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
                 currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
-                isTrialActiveSession: isSessionTrial,
+                isTrialActiveSession: sessionIsTrial,
                 userId: user.id,
                 categoryName: categoryName,
               },
@@ -743,7 +718,7 @@ const QuizPage = () => {
     }
 
     // Mark trial_taken only if a logged-in user starts a trial
-    if (user && isSessionTrial && !hasTakenTrial) {
+    if (user && sessionIsTrial && !hasTakenTrial) {
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ trial_taken: true })
@@ -755,7 +730,7 @@ const QuizPage = () => {
         toast({ title: "Trial Started!", description: `You have started your free trial. Enjoy ${TRIAL_MCQ_LIMIT} trial questions!`, variant: "default" });
       }
     }
-    setIsTrialActiveSession(isSessionTrial); // Set the session trial status
+    setIsTrialActiveSession(sessionIsTrial); // Set the session trial status
     setCurrentQuizCategoryId(selectedCategoryId); // Keep track of the selected category
   };
 
@@ -1360,7 +1335,7 @@ const QuizPage = () => {
                           onClick={() => startQuizSession(cat.id, 'incorrect')}
                           className="w-full"
                           variant="secondary"
-                          disabled={cat.user_incorrect === 0 || !user?.has_active_subscription} // Only subscribed users can attempt incorrect
+                          disabled={cat.user_incorrect === 0 || !user?.has_active_subscription || isTrialActiveSession} // Disable for trial sessions
                         >
                           Attempt Incorrect ({cat.user_incorrect})
                         </Button>

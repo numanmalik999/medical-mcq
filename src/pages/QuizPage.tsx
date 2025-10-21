@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react'; // Removed useRef as it's unused
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -427,31 +427,56 @@ const QuizPage = () => {
     let finalMcqQuery;
 
     if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
-      // Fetch a random set of TRIAL_MCQ_LIMIT trial MCQs from *any* category (or uncategorized)
-      finalMcqQuery = supabase
+      // Step 1: Fetch a random set of TRIAL_MCQ_LIMIT trial MCQ IDs
+      const { data: randomMcqIdsData, error: randomIdsError } = await supabase
+        .from('mcqs')
+        .select('id')
+        .eq('is_trial_mcq', true)
+        .order('random()')
+        .limit(TRIAL_MCQ_LIMIT);
+
+      if (randomIdsError) {
+        console.error('[QuizPage] ERROR fetching random TRIAL MCQ IDs:', randomIdsError);
+        toast({ title: "Error", description: "Failed to load trial questions (step 1).", variant: "destructive" });
+        setIsPageLoading(false);
+        return;
+      }
+
+      const mcqIds = randomMcqIdsData?.map(m => m.id) || [];
+
+      if (mcqIds.length === 0) {
+        toast({ title: "No Trial MCQs", description: "No trial questions available at the moment.", variant: "default" });
+        setIsPageLoading(false);
+        return;
+      }
+
+      // Step 2: Fetch the full MCQ objects and their category links using the fetched IDs
+      const { data: fullMcqsData, error: fullMcqsError } = await supabase
         .from('mcqs')
         .select(`
           id, question_text, option_a, option_b, option_c, option_d,
           correct_answer, explanation_id, difficulty, is_trial_mcq,
           mcq_category_links (category_id, categories (name))
         `)
-        .eq('is_trial_mcq', true)
-        .order('random()')
-        .limit(TRIAL_MCQ_LIMIT);
+        .in('id', mcqIds); // Use .in() to fetch specific MCQs
 
-      ({ data: mcqsData, error: mcqsError } = await finalMcqQuery);
-
-      if (mcqsError) {
-        console.error('[QuizPage] ERROR fetching ALL TRIAL MCQs:', mcqsError);
-        toast({ title: "Error", description: "Failed to load trial questions.", variant: "destructive" });
+      if (fullMcqsError) {
+        console.error('[QuizPage] ERROR fetching full TRIAL MCQs:', fullMcqsError);
+        toast({ title: "Error", description: "Failed to load trial questions (step 2).", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
-      if (!mcqsData || mcqsData.length === 0) {
-        toast({ title: "No Trial MCQs", description: "No trial questions available at the moment.", variant: "default" });
+
+      if (!fullMcqsData || fullMcqsData.length === 0) {
+        toast({ title: "No Trial MCQs", description: "No trial questions available after fetching details.", variant: "default" });
         setIsPageLoading(false);
         return;
       }
+      
+      // Reorder fullMcqsData to match the random order of mcqIds
+      mcqsData = mcqIds.map(id => fullMcqsData.find(mcq => mcq.id === id)).filter((mcq): mcq is any => mcq !== undefined);
+      mcqsError = null; // Clear any potential error from the second fetch if it was just empty data
+
       setCurrentQuizCategoryId(ALL_TRIAL_MCQS_ID); // Mark this session as 'all trial'
       setIsTrialActiveSession(true); // Explicitly set trial mode
     } else {

@@ -73,8 +73,13 @@ const QuizNavigator = ({ mcqs, userAnswers, currentQuestionIndex, goToQuestion, 
           } else {
             // Logic for quiz/test in progress
             if (isAnswered) {
-              buttonClass += " !bg-blue-100 !text-blue-700 dark:!bg-blue-900 dark:!text-blue-300"; // Answered
-              icon = <CheckCircle2 className="h-4 w-4" />;
+              if (isCorrect) { // Answered correctly
+                buttonClass += " !bg-green-100 !text-green-700 dark:!bg-green-900 dark:!text-green-300";
+                icon = <CheckCircle2 className="h-4 w-4" />;
+              } else { // Answered incorrectly
+                buttonClass += " !bg-red-100 !text-red-700 dark:!bg-red-900 dark:!text-red-300";
+                icon = <XCircle className="h-4 w-4" />;
+              }
             } else if (isSkipped) {
               buttonClass += " !bg-yellow-100 !text-yellow-700 dark:!bg-yellow-900 dark:!text-yellow-300"; // Skipped
               icon = <SkipForward className="h-4 w-4" />;

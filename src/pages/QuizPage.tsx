@@ -373,7 +373,7 @@ const QuizPage = () => {
         total_mcqs: mcqCounts.total,
         total_trial_mcqs: mcqCounts.trial,
         user_attempts: userAttempts.total,
-        user_correct: correctAttempts,
+        user_correct: userAttempts.correct, // Corrected: use userAttempts.correct
         user_incorrect: incorrectAttempts,
         user_accuracy: `${accuracy}%`,
       });
@@ -1229,7 +1229,6 @@ const QuizPage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredCategories.map((cat) => {
-                  // Removed unused 'isCategoryDisabledForGuest' variable
                   const canStartRegularQuiz = user?.has_active_subscription && cat.total_mcqs > 0;
                   const canStartTrialQuiz = isGuestOrNotSubscribed && cat.total_trial_mcqs > 0;
                   const showSubscribePrompt = hasTakenTrial && !user?.has_active_subscription;

@@ -270,9 +270,11 @@ const QuizPage = () => {
 
   const fetchQuizOverview = async () => {
     setIsPageLoading(true);
+
+    // 1. Fetch all categories
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
-      .select('*');
+      .select('id, name'); // Only select necessary fields
 
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
@@ -280,8 +282,9 @@ const QuizPage = () => {
       setIsPageLoading(false);
       return;
     }
+    const categoriesMap = new Map(categoriesData?.map(cat => [cat.id, cat]) || []);
 
-    // Fetch total count of trial MCQs
+    // 2. Fetch total count of all trial MCQs (already efficient)
     const { count: totalTrialMcqsCount, error: totalTrialError } = await supabase
       .from('mcqs')
       .select('id', { count: 'exact', head: true })
@@ -289,13 +292,97 @@ const QuizPage = () => {
 
     if (totalTrialError) {
       console.error('Error fetching total trial MCQs count:', totalTrialError);
-    } else {
-      setAllTrialMcqsCount(totalTrialMcqsCount || 0);
+    }
+    setAllTrialMcqsCount(totalTrialMcqsCount || 0);
+
+    // 3. Fetch all MCQ category links with mcq trial status
+    const { data: allMcqCategoryLinks, error: linksError } = await supabase
+      .from('mcq_category_links')
+      .select(`
+        category_id,
+        mcqs (is_trial_mcq)
+      `);
+
+    if (linksError) {
+      console.error('Error fetching all MCQ category links:', linksError);
+      toast({ title: "Error", description: "Failed to load MCQ link data.", variant: "destructive" });
+      setIsPageLoading(false);
+      return;
     }
 
-    // --- Load all saved quiz sessions for the current user from DB ---
+    // 4. Fetch all user quiz attempts (if logged in)
+    let userAttemptsData: any[] = [];
+    if (user) {
+      const { data, error: attemptsError } = await supabase
+        .from('user_quiz_attempts')
+        .select('is_correct, category_id')
+        .eq('user_id', user.id);
+      if (attemptsError) {
+        console.error('Error fetching user attempts:', attemptsError);
+        toast({ title: "Error", description: "Failed to load user attempts.", variant: "destructive" });
+      } else {
+        userAttemptsData = data || [];
+      }
+    }
+
+    // 5. Process data client-side to build categoryStats
+    const categoriesWithStats: CategoryStat[] = [];
+    const categoryMcqCounts = new Map<string, { total: number; trial: number }>();
+    const categoryUserAttempts = new Map<string, { total: number; correct: number }>();
+
+    // Populate categoryMcqCounts
+    allMcqCategoryLinks.forEach(link => {
+      const categoryId = link.category_id;
+      const isTrialMcq = link.mcqs?.is_trial_mcq; // Access nested mcqs data
+
+      if (!categoryMcqCounts.has(categoryId)) {
+        categoryMcqCounts.set(categoryId, { total: 0, trial: 0 });
+      }
+      const counts = categoryMcqCounts.get(categoryId)!;
+      counts.total++;
+      if (isTrialMcq) {
+        counts.trial++;
+      }
+    });
+
+    // Populate categoryUserAttempts
+    userAttemptsData.forEach(attempt => {
+      const categoryId = attempt.category_id;
+      if (categoryId) {
+        if (!categoryUserAttempts.has(categoryId)) {
+          categoryUserAttempts.set(categoryId, { total: 0, correct: 0 });
+        }
+        const attempts = categoryUserAttempts.get(categoryId)!;
+        attempts.total++;
+        if (attempt.is_correct) {
+          attempts.correct++;
+        }
+      }
+    });
+
+    // Build final categoriesWithStats
+    categoriesData?.forEach(category => {
+      const mcqCounts = categoryMcqCounts.get(category.id) || { total: 0, trial: 0 };
+      const userAttempts = categoryUserAttempts.get(category.id) || { total: 0, correct: 0 };
+
+      const incorrectAttempts = userAttempts.total - userAttempts.correct;
+      const accuracy = userAttempts.total > 0 ? ((userAttempts.correct / userAttempts.total) * 100).toFixed(2) : '0.00';
+
+      categoriesWithStats.push({
+        ...category,
+        total_mcqs: mcqCounts.total,
+        total_trial_mcqs: mcqCounts.trial,
+        user_attempts: userAttempts.total,
+        user_correct: userAttempts.correct,
+        user_incorrect: incorrectAttempts,
+        user_accuracy: `${accuracy}%`,
+      });
+    });
+
+    // 6. Load saved quiz sessions (already efficient enough, uses `eq('user_id')`)
+    // This part needs to be after categoriesData is available to resolve categoryName
     let loadedSavedQuizzes: LoadedQuizSession[] = [];
-    if (user) { // Only fetch saved quizzes if a user is logged in
+    if (user) {
       const { data: dbSessions, error: dbSessionsError } = await supabase
         .from('user_quiz_sessions')
         .select('*')
@@ -306,96 +393,27 @@ const QuizPage = () => {
         console.error('Error fetching saved quiz sessions from DB:', dbSessionsError);
         toast({ title: "Error", description: "Failed to load saved quiz sessions.", variant: "destructive" });
       } else {
-        // For each DB session, create a LoadedQuizSession stub for display
         loadedSavedQuizzes = dbSessions.map((dbSession: DbQuizSession) => {
           const categoryName = dbSession.category_id === ALL_TRIAL_MCQS_ID
             ? 'All Trial MCQs'
-            : categoriesData?.find(c => c.id === dbSession.category_id)?.name || 'Unknown Category';
+            : categoriesMap.get(dbSession.category_id || '')?.name || 'Unknown Category'; // Use categoriesMap
           return {
             dbSessionId: dbSession.id,
-            categoryId: dbSession.category_id, // Now correctly matches interface
+            categoryId: dbSession.category_id,
             mcqs: dbSession.mcq_ids_order.map((id: string) => ({
-              id,
-              question_text: 'Loading...',
-              option_a: '', // Placeholder
-              option_b: '', // Placeholder
-              option_c: '', // Placeholder
-              option_d: '', // Placeholder
-              correct_answer: 'A', // Placeholder
-              explanation_id: null,
-              difficulty: null,
-              is_trial_mcq: null,
-              category_links: [],
-            })), // Placeholder MCQs
+              id, question_text: 'Loading...', option_a: '', option_b: '', option_c: '', option_d: '',
+              correct_answer: 'A', explanation_id: null, difficulty: null, is_trial_mcq: null, category_links: [],
+            })),
             userAnswers: new Map(Object.entries(dbSession.user_answers_json)),
             currentQuestionIndex: dbSession.current_question_index,
             isTrialActiveSession: dbSession.is_trial_session,
             userId: user.id,
-            categoryName: categoryName, // Add for display
+            categoryName: categoryName,
           } as LoadedQuizSession;
         });
       }
     }
     setActiveSavedQuizzes(loadedSavedQuizzes);
-    // --- End New ---
-
-    const categoriesWithStats: CategoryStat[] = [];
-
-    for (const category of categoriesData || []) {
-      // Count total MCQs for the category by querying mcq_category_links table directly
-      const { count: mcqCount, error: mcqCountError } = await supabase
-        .from('mcq_category_links')
-        .select('mcq_id', { count: 'exact', head: true })
-        .eq('category_id', category.id);
-
-      if (mcqCountError) {
-        console.error(`Error fetching total MCQ count for category ${category.name}:`, mcqCountError);
-      }
-
-      // Count trial MCQs for the category by joining mcq_category_links with mcqs
-      const { count: trialMcqCount, error: trialMcqCountError } = await supabase
-        .from('mcq_category_links')
-        .select(`
-          mcq_id!inner(is_trial_mcq)
-        `, { count: 'exact', head: true })
-        .eq('category_id', category.id)
-        .eq('mcq_id.is_trial_mcq', true); // Filter on the joined table's column
-
-      if (trialMcqCountError) {
-        console.error(`Error fetching trial MCQ count for category ${category.name}:`, trialMcqCountError);
-      }
-
-      let totalAttempts = 0;
-      let correctAttempts = 0;
-
-      if (user) { // Only fetch user attempts if a user is logged in
-        const { data: userAttemptsData, error: userAttemptsError } = await supabase
-          .from('user_quiz_attempts')
-          .select('is_correct, category_id') // Removed subcategory_id
-          .eq('user_id', user.id)
-          .eq('category_id', category.id);
-
-        if (userAttemptsError) {
-          console.error(`Error fetching user attempts for category ${category.name}:`, userAttemptsError);
-        } else {
-          totalAttempts = userAttemptsData.length;
-          correctAttempts = userAttemptsData.filter(attempt => attempt.is_correct).length;
-        }
-      }
-
-      const incorrectAttempts = totalAttempts - correctAttempts;
-      const accuracy = totalAttempts > 0 ? ((correctAttempts / totalAttempts) * 100).toFixed(2) : '0.00';
-
-      categoriesWithStats.push({
-        ...category,
-        total_mcqs: mcqCount || 0,
-        total_trial_mcqs: trialMcqCount || 0,
-        user_attempts: totalAttempts,
-        user_correct: correctAttempts,
-        user_incorrect: incorrectAttempts,
-        user_accuracy: `${accuracy}%`,
-      });
-    }
 
     setCategoryStats(categoriesWithStats);
     setIsPageLoading(false);

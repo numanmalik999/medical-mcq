@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react'; // Removed useRef as it's unused
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,6 +69,15 @@ interface LoadedQuizSession {
 
 const TRIAL_MCQ_LIMIT = 50;
 const ALL_TRIAL_MCQS_ID = 'all-trial-mcqs-virtual-id'; // Special ID for fetching all trial MCQs
+
+// Helper function for client-side shuffling
+function shuffleArray<T>(array: T[]): T[] {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
 
 const QuizPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
@@ -427,30 +436,31 @@ const QuizPage = () => {
     let finalMcqQuery;
 
     if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
-      // Step 1: Fetch a random set of TRIAL_MCQ_LIMIT trial MCQ IDs
-      const { data: randomMcqIdsData, error: randomIdsError } = await supabase
+      // Step 1: Fetch all trial MCQ IDs
+      const { data: allTrialMcqIdsData, error: allIdsError } = await supabase
         .from('mcqs')
         .select('id')
-        .eq('is_trial_mcq', true)
-        .order('random()')
-        .limit(TRIAL_MCQ_LIMIT);
+        .eq('is_trial_mcq', true);
 
-      if (randomIdsError) {
-        console.error('[QuizPage] ERROR fetching random TRIAL MCQ IDs:', randomIdsError);
+      if (allIdsError) {
+        console.error('[QuizPage] ERROR fetching all TRIAL MCQ IDs:', allIdsError);
         toast({ title: "Error", description: "Failed to load trial questions (step 1).", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
 
-      const mcqIds = randomMcqIdsData?.map(m => m.id) || [];
+      const allMcqIds = allTrialMcqIdsData?.map(m => m.id) || [];
 
-      if (mcqIds.length === 0) {
+      if (allMcqIds.length === 0) {
         toast({ title: "No Trial MCQs", description: "No trial questions available at the moment.", variant: "default" });
         setIsPageLoading(false);
         return;
       }
 
-      // Step 2: Fetch the full MCQ objects and their category links using the fetched IDs
+      // Shuffle IDs client-side and take the limit
+      const shuffledMcqIds = shuffleArray(allMcqIds).slice(0, TRIAL_MCQ_LIMIT);
+
+      // Step 2: Fetch the full MCQ objects and their category links using the shuffled IDs
       const { data: fullMcqsData, error: fullMcqsError } = await supabase
         .from('mcqs')
         .select(`
@@ -458,7 +468,7 @@ const QuizPage = () => {
           correct_answer, explanation_id, difficulty, is_trial_mcq,
           mcq_category_links (category_id, categories (name))
         `)
-        .in('id', mcqIds); // Use .in() to fetch specific MCQs
+        .in('id', shuffledMcqIds); // Use .in() to fetch specific MCQs
 
       if (fullMcqsError) {
         console.error('[QuizPage] ERROR fetching full TRIAL MCQs:', fullMcqsError);
@@ -473,8 +483,8 @@ const QuizPage = () => {
         return;
       }
       
-      // Reorder fullMcqsData to match the random order of mcqIds
-      mcqsData = mcqIds.map(id => fullMcqsData.find(mcq => mcq.id === id)).filter((mcq): mcq is any => mcq !== undefined);
+      // Reorder fullMcqsData to match the shuffled order of mcqIds
+      mcqsData = shuffledMcqIds.map(id => fullMcqsData.find(mcq => mcq.id === id)).filter((mcq): mcq is any => mcq !== undefined);
       mcqsError = null; // Clear any potential error from the second fetch if it was just empty data
 
       setCurrentQuizCategoryId(ALL_TRIAL_MCQS_ID); // Mark this session as 'all trial'

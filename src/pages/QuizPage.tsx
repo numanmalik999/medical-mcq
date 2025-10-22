@@ -1229,8 +1229,8 @@ const QuizPage = () => {
   if (showCategorySelection) {
     const isSubscribed = user?.has_active_subscription;
     const isGuestOrNotSubscribed = isGuest || (!isSubscribed && !user?.trial_taken);
-    // Removed unused hasTakenTrial variable
-    
+    const hasTakenTrial = !isGuest && user?.trial_taken;
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
         <Card className="w-full max-w-4xl">
@@ -1306,19 +1306,15 @@ const QuizPage = () => {
                 {filteredCategories.map((cat) => {
                   const isSubscribed = user?.has_active_subscription;
                   const isGuestOrNotSubscribed = isGuest || (!isSubscribed && !user?.trial_taken);
-                  const hasTakenTrial = !isGuest && user?.trial_taken;
-
-                  const canStartRegularQuiz = isSubscribed && cat.total_mcqs > 0;
-                  const canStartTrialQuiz = isGuestOrNotSubscribed && cat.total_trial_mcqs > 0;
                   const showSubscribePrompt = hasTakenTrial && !isSubscribed;
 
                   // Determine the displayed count
-                  const accessibleCount = isSubscribed ? cat.total_mcqs : cat.total_trial_mcqs;
                   const totalCount = cat.total_mcqs;
+                  const accessibleCount = cat.total_trial_mcqs;
                   
-                  let descriptionText = `${accessibleCount} MCQs available`;
+                  let descriptionText = `${totalCount} MCQs available`;
                   if (!isSubscribed && totalCount > accessibleCount) {
-                    descriptionText += ` (${totalCount - accessibleCount} premium locked)`;
+                    descriptionText += ` (${accessibleCount} trial, ${totalCount - accessibleCount} premium locked)`;
                   }
 
                   // Determine the button text and disabled state
@@ -1328,10 +1324,10 @@ const QuizPage = () => {
                   if (showSubscribePrompt) {
                     buttonText = "Subscribe to Start";
                     buttonDisabled = true;
-                  } else if (canStartRegularQuiz) {
+                  } else if (isSubscribed && totalCount > 0) {
                     buttonText = "Start Quiz";
                     buttonDisabled = false;
-                  } else if (canStartTrialQuiz) {
+                  } else if (isGuestOrNotSubscribed && accessibleCount > 0) {
                     buttonText = "Start Trial Quiz";
                     buttonDisabled = false;
                   } else {
@@ -1352,7 +1348,12 @@ const QuizPage = () => {
                       <CardHeader>
                         <CardTitle className="text-lg">{cat.name}</CardTitle>
                         <CardDescription>
-                          {descriptionText}
+                          {totalCount} MCQs available
+                          {!isSubscribed && totalCount > accessibleCount && (
+                            <span className="text-red-500 dark:text-red-400 ml-2">
+                              ({totalCount - accessibleCount} premium locked)
+                            </span>
+                          )}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="flex-grow space-y-2 text-sm">

@@ -299,26 +299,53 @@ const QuizPage = () => {
     }
     setAllTrialMcqsCount(totalTrialMcqsCount || 0);
 
-    // 3. Fetch all MCQ category links with mcq trial status for accurate counts per category
-    const { data: mcqCategoryCountsData, error: mcqCategoryCountsError } = await supabase
-      .from('mcq_category_links')
-      .select(`
-        category_id,
-        mcqs (id, is_trial_mcq)
-      `);
+    // --- 3 & 4. Fetch all MCQ category links (paginated) and calculate counts ---
+    const limit = 1000;
+    let allMcqCategoryCountsData: any[] = [];
+    let offset = 0;
+    let hasMore = true;
 
-    if (mcqCategoryCountsError) {
-      console.error('Error fetching MCQ category counts:', mcqCategoryCountsError);
-      toast({ title: "Error", description: "Failed to load category MCQ counts.", variant: "destructive" });
+    try {
+      while (hasMore) {
+        const { data: chunkData, error: chunkError } = await supabase
+          .from('mcq_category_links')
+          .select(`
+            category_id,
+            mcq_id, // Need mcq_id for uncategorized calculation
+            mcqs (id, is_trial_mcq)
+          `)
+          .range(offset, offset + limit - 1);
+
+        if (chunkError) {
+          console.error('Error fetching paginated MCQ category links:', chunkError);
+          throw new Error('Failed to load category link data.');
+        }
+
+        if (chunkData && chunkData.length > 0) {
+          allMcqCategoryCountsData = allMcqCategoryCountsData.concat(chunkData);
+          offset += chunkData.length;
+          hasMore = chunkData.length === limit;
+        } else {
+          hasMore = false;
+        }
+      }
+    } catch (e: any) {
+      console.error('Error during paginated fetch:', e);
+      toast({ title: "Error", description: `Failed to load category link data: ${e.message}`, variant: "destructive" });
       setIsPageLoading(false);
       return;
     }
-
+    
+    // 3. Process data client-side to build categoryMcqCounts and uniqueLinkedMcqIds
     const categoryMcqCounts = new Map<string, { total: number; trial: number }>();
-    mcqCategoryCountsData.forEach(link => {
-      // Corrected: Access the first element of the mcqs array
+    const uniqueLinkedMcqIds = new Set<string>();
+
+    allMcqCategoryCountsData.forEach(link => {
+      const mcqId = link.mcq_id;
       const isTrialMcq = link.mcqs?.[0]?.is_trial_mcq; 
       const categoryId = link.category_id;
+
+      uniqueLinkedMcqIds.add(mcqId);
 
       if (!categoryMcqCounts.has(categoryId)) {
         categoryMcqCounts.set(categoryId, { total: 0, trial: 0 });
@@ -334,29 +361,22 @@ const QuizPage = () => {
     const { count: totalMcqCount, error: totalMcqCountError } = await supabase
       .from('mcqs')
       .select('id', { count: 'exact', head: true });
+      
     if (totalMcqCountError) {
       console.error('Error fetching total MCQ count for uncategorized:', totalMcqCountError);
     }
-
-    const { data: allLinkedMcqIdsData, error: linkedIdsError } = await supabase
-      .from('mcq_category_links')
-      .select('mcq_id');
-    if (linkedIdsError) {
-      console.error('Error fetching all linked MCQ IDs for uncategorized count:', linkedIdsError);
-    }
-    const uniqueLinkedMcqIds = new Set(allLinkedMcqIdsData?.map(link => link.mcq_id) || []);
 
     const uncategorizedTotal = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
 
     let uncategorizedTrial = 0;
     if (uncategorizedTotal > 0) {
+      // Fetch all MCQs that are NOT linked AND are trial MCQs
+      // Note: We must handle the case where uniqueLinkedMcqIds is empty to avoid a Supabase error.
       let trialQuery = supabase
         .from('mcqs')
         .select('id', { count: 'exact', head: true })
         .eq('is_trial_mcq', true);
-
-      // FIX: Only apply the NOT IN filter if there are linked MCQs to exclude.
-      // This prevents a database error if the IN clause is empty.
+      
       if (uniqueLinkedMcqIds.size > 0) {
         trialQuery = trialQuery.not('id', 'in', `(${Array.from(uniqueLinkedMcqIds).join(',')})`);
       }
@@ -372,6 +392,8 @@ const QuizPage = () => {
     if (uncategorizedTotal > 0) {
       categoryMcqCounts.set(UNCATEGORIZED_ID, { total: uncategorizedTotal, trial: uncategorizedTrial });
     }
+    // --- End of count calculation ---
+
 
     // 5. Fetch all user quiz attempts (if logged in)
     let userAttemptsData: any[] = [];
@@ -1348,12 +1370,7 @@ const QuizPage = () => {
                       <CardHeader>
                         <CardTitle className="text-lg">{cat.name}</CardTitle>
                         <CardDescription>
-                          {totalCount} MCQs available
-                          {!isSubscribed && totalCount > accessibleCount && (
-                            <span className="text-red-500 dark:text-red-400 ml-2">
-                              ({totalCount - accessibleCount} premium locked)
-                            </span>
-                          )}
+                          {descriptionText}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="flex-grow space-y-2 text-sm">

@@ -350,11 +350,19 @@ const QuizPage = () => {
 
     let uncategorizedTrial = 0;
     if (uncategorizedTotal > 0) {
-      const { count: uncategorizedTrialCount, error: uncategorizedTrialError } = await supabase
+      let trialQuery = supabase
         .from('mcqs')
         .select('id', { count: 'exact', head: true })
-        .not('id', 'in', `(${Array.from(uniqueLinkedMcqIds).join(',')})`) // Select MCQs not in any category
         .eq('is_trial_mcq', true);
+
+      // FIX: Only apply the NOT IN filter if there are linked MCQs to exclude.
+      // This prevents a database error if the IN clause is empty.
+      if (uniqueLinkedMcqIds.size > 0) {
+        trialQuery = trialQuery.not('id', 'in', `(${Array.from(uniqueLinkedMcqIds).join(',')})`);
+      }
+      
+      const { count: uncategorizedTrialCount, error: uncategorizedTrialError } = await trialQuery;
+      
       if (uncategorizedTrialError) {
         console.error('Error fetching uncategorized trial MCQ count:', uncategorizedTrialError);
       }
@@ -535,7 +543,9 @@ const QuizPage = () => {
       }
       const categorizedMcqIds = Array.from(new Set(linkedMcqIdsData?.map(link => link.mcq_id) || []));
       
-      baseMcqQuery = baseMcqQuery.not('id', 'in', `(${categorizedMcqIds.join(',')})`);
+      if (categorizedMcqIds.length > 0) {
+        baseMcqQuery = baseMcqQuery.not('id', 'in', `(${categorizedMcqIds.join(',')})`);
+      }
     } else if (selectedCategoryId) { // Specific category selected
       const { data: categoryLinkedMcqIdsData, error: categoryLinkedIdsError } = await supabase
         .from('mcq_category_links')

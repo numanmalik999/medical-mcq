@@ -330,7 +330,7 @@ const QuizPage = () => {
       }
     });
 
-    // Calculate uncategorized MCQs counts
+    // 4. Calculate uncategorized MCQs counts
     const { count: totalMcqCount, error: totalMcqCountError } = await supabase
       .from('mcqs')
       .select('id', { count: 'exact', head: true });
@@ -373,7 +373,7 @@ const QuizPage = () => {
       categoryMcqCounts.set(UNCATEGORIZED_ID, { total: uncategorizedTotal, trial: uncategorizedTrial });
     }
 
-    // 4. Fetch all user quiz attempts (if logged in)
+    // 5. Fetch all user quiz attempts (if logged in)
     let userAttemptsData: any[] = [];
     if (user) {
       const { data, error: attemptsError } = await supabase
@@ -388,7 +388,7 @@ const QuizPage = () => {
       }
     }
 
-    // 5. Process data client-side to build categoryStats
+    // 6. Process data client-side to build categoryStats
     const categoriesWithStats: CategoryStat[] = [];
     const categoryUserAttempts = new Map<string, { total: number; correct: number }>();
 
@@ -445,7 +445,7 @@ const QuizPage = () => {
       });
     }
 
-    // 6. Load saved quiz sessions
+    // 7. Load saved quiz sessions
     let loadedSavedQuizzes: LoadedQuizSession[] = [];
     if (user) {
       const { data: dbSessions, error: dbSessionsError } = await supabase
@@ -1227,9 +1227,10 @@ const QuizPage = () => {
   }
 
   if (showCategorySelection) {
-    const isGuestOrNotSubscribed = isGuest || (!user?.has_active_subscription && !user?.trial_taken);
-    const hasTakenTrial = !isGuest && user?.trial_taken;
-
+    const isSubscribed = user?.has_active_subscription;
+    const isGuestOrNotSubscribed = isGuest || (!isSubscribed && !user?.trial_taken);
+    // Removed unused hasTakenTrial variable
+    
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
         <Card className="w-full max-w-4xl">
@@ -1277,12 +1278,14 @@ const QuizPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-lg font-semibold mb-4">Total Trial MCQs: {allTrialMcqsCount}</p>
+                  <p className="text-lg font-semibold mb-4">
+                    Total Trial MCQs Available: {Math.min(allTrialMcqsCount, TRIAL_MCQ_LIMIT)}
+                  </p>
                   <Button
                     onClick={() => startQuizSession(ALL_TRIAL_MCQS_ID, 'random')}
                     className="w-full"
                   >
-                    Start Trial Quiz ({TRIAL_MCQ_LIMIT} Questions)
+                    Start Trial Quiz ({Math.min(allTrialMcqsCount, TRIAL_MCQ_LIMIT)} Questions)
                   </Button>
                 </CardContent>
               </Card>
@@ -1301,17 +1304,55 @@ const QuizPage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredCategories.map((cat) => {
-                  const canStartRegularQuiz = user?.has_active_subscription && cat.total_mcqs > 0;
+                  const isSubscribed = user?.has_active_subscription;
+                  const isGuestOrNotSubscribed = isGuest || (!isSubscribed && !user?.trial_taken);
+                  const hasTakenTrial = !isGuest && user?.trial_taken;
+
+                  const canStartRegularQuiz = isSubscribed && cat.total_mcqs > 0;
                   const canStartTrialQuiz = isGuestOrNotSubscribed && cat.total_trial_mcqs > 0;
-                  const showSubscribePrompt = hasTakenTrial && !user?.has_active_subscription;
+                  const showSubscribePrompt = hasTakenTrial && !isSubscribed;
+
+                  // Determine the displayed count
+                  const accessibleCount = isSubscribed ? cat.total_mcqs : cat.total_trial_mcqs;
+                  const totalCount = cat.total_mcqs;
+                  
+                  let descriptionText = `${accessibleCount} MCQs available`;
+                  if (!isSubscribed && totalCount > accessibleCount) {
+                    descriptionText += ` (${totalCount - accessibleCount} premium locked)`;
+                  }
+
+                  // Determine the button text and disabled state
+                  let buttonText = "Start Quiz";
+                  let buttonDisabled = false;
+                  
+                  if (showSubscribePrompt) {
+                    buttonText = "Subscribe to Start";
+                    buttonDisabled = true;
+                  } else if (canStartRegularQuiz) {
+                    buttonText = "Start Quiz";
+                    buttonDisabled = false;
+                  } else if (canStartTrialQuiz) {
+                    buttonText = "Start Trial Quiz";
+                    buttonDisabled = false;
+                  } else {
+                    buttonText = "No MCQs Available";
+                    buttonDisabled = true;
+                  }
+                  
+                  // If there is a saved quiz, override the button logic
+                  const savedQuiz = activeSavedQuizzes.find(session => session.categoryId === cat.id);
+                  if (savedQuiz) {
+                      buttonText = "Continue Quiz";
+                      buttonDisabled = false;
+                  }
+
 
                   return (
                     <Card key={cat.id} className="flex flex-col">
                       <CardHeader>
                         <CardTitle className="text-lg">{cat.name}</CardTitle>
                         <CardDescription>
-                          {`${cat.total_mcqs} MCQs available`}
-                          {cat.total_trial_mcqs > 0 && ` (${cat.total_trial_mcqs} trial)`}
+                          {descriptionText}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="flex-grow space-y-2 text-sm">
@@ -1325,9 +1366,9 @@ const QuizPage = () => {
                         )}
                       </CardContent>
                       <CardFooter className="flex flex-col gap-2">
-                        {activeSavedQuizzes.find(session => session.categoryId === cat.id) ? (
+                        {savedQuiz ? (
                           <Button
-                            onClick={() => continueQuizSession(activeSavedQuizzes.find(session => session.categoryId === cat.id)!)}
+                            onClick={() => continueQuizSession(savedQuiz)}
                             className="w-full"
                           >
                             Continue Quiz
@@ -1336,20 +1377,20 @@ const QuizPage = () => {
                           <Button
                             onClick={() => startQuizSession(cat.id, 'random')}
                             className="w-full"
-                            disabled={!canStartRegularQuiz && !canStartTrialQuiz || showSubscribePrompt}
+                            disabled={buttonDisabled}
                           >
-                            {canStartRegularQuiz ? "Start Quiz" : (canStartTrialQuiz ? "Start Trial Quiz" : (showSubscribePrompt ? "Subscribe to Start" : "No MCQs Available"))}
+                            {buttonText}
                           </Button>
                         )}
                         <Button
                           onClick={() => startQuizSession(cat.id, 'incorrect')}
                           className="w-full"
                           variant="secondary"
-                          disabled={cat.user_incorrect === 0 || !user?.has_active_subscription || isTrialActiveSession} // Disable for trial sessions
+                          disabled={cat.user_incorrect === 0 || !isSubscribed || isTrialActiveSession} // Disable for trial sessions
                         >
                           Attempt Incorrect ({cat.user_incorrect})
                         </Button>
-                        {(!canStartRegularQuiz && !canStartTrialQuiz || showSubscribePrompt) && (
+                        {showSubscribePrompt && (
                           <Link to="/user/subscriptions" className="w-full">
                             <Button variant="link" className="w-full text-red-500 dark:text-red-400 hover:underline">
                               Subscribe to unlock this category.

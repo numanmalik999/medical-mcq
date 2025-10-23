@@ -174,12 +174,12 @@ const ManageUsersPage = () => {
       cell: ({ row }) => (row.original.is_admin ? 'Yes' : 'No'),
     },
     {
-      accessorKey: 'has_active_subscription',
+      accessorKey: 'subscription_end_date', // Use end date as accessor for sorting/filtering
       header: 'Subscription',
       cell: ({ row }) => {
-        const { has_active_subscription, subscription_end_date } = row.original;
+        const { subscription_end_date } = row.original;
         
-        if (!has_active_subscription || !subscription_end_date) {
+        if (!subscription_end_date) {
           return <Badge variant="secondary">Inactive</Badge>;
         }
 
@@ -187,6 +187,10 @@ const ManageUsersPage = () => {
         const today = new Date();
         const daysRemaining = differenceInDays(endDate, today);
         
+        if (daysRemaining <= 0) {
+          return <Badge variant="secondary">Expired</Badge>;
+        }
+
         let variant: "default" | "secondary" | "destructive" | "outline" = "default";
         if (daysRemaining <= 7) {
           variant = "destructive";

@@ -18,10 +18,10 @@ import { useSession } from '@/components/SessionContextProvider'; // Import useS
 interface Category {
   id: string;
   name: string;
-  mcq_count?: number;
+  mcq_count?: number; // Added mcq_count
 }
 
-// Define a type for a single MCQ-Category link from the database
+// Define a type for a single MCQ-Category-Subcategory link from the database
 interface DbMcqCategoryLink {
   mcq_id: string;
   category_id: string;
@@ -54,34 +54,8 @@ const ManageMcqsPage = () => {
       console.error('[ManageMcqsPage] Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories for filter.", variant: "destructive" });
     } else {
-      const categoriesWithCounts = await Promise.all(
-        (categoriesData || []).map(async (category) => {
-          // Count MCQs by querying mcq_category_links table directly
-          const { count: mcqCount, error: mcqCountError } = await supabase
-            .from('mcq_category_links')
-            .select('mcq_id', { count: 'exact', head: true })
-            .eq('category_id', category.id);
-
-          if (mcqCountError) {
-            console.error(`[ManageMcqsPage] Error fetching MCQ count for category ${category.name}:`, mcqCountError);
-          } else {
-            const { data: linkedMcqIds, error: linkedIdsError } = await supabase
-              .from('mcq_category_links')
-              .select('mcq_id')
-              .eq('category_id', category.id);
-            if (linkedIdsError) {
-              console.error(`[ManageMcqsPage] Error fetching sample linked MCQ IDs for category ${category.name}:`, linkedIdsError);
-            }
-            console.log(`[ManageMcqsPage] Category "${category.name}" (${category.id}) has ${mcqCount} links. Sample linked MCQ IDs:`, linkedMcqIds?.slice(0, 5).map((l:any) => l.mcq_id));
-          }
-          return { ...category, mcq_count: mcqCount || 0 };
-        })
-      );
-
-      // Calculate count for Uncategorized MCQs
-      console.log('[ManageMcqsPage] Calculating uncategorized MCQ count...');
       
-      // --- START MODIFICATION FOR PAGINATION OF ALL LINKED MCQ IDs ---
+      // --- START: Fetch all linked MCQ IDs (paginated) ---
       let allLinkedMcqIdsData: { mcq_id: string }[] = [];
       let offsetLinkedIds = 0;
       const limitLinkedIds = 1000;
@@ -95,7 +69,6 @@ const ManageMcqsPage = () => {
 
         if (linkedMcqIdsError) {
           console.error('[ManageMcqsPage] Error fetching all linked MCQ IDs for uncategorized count during pagination:', linkedMcqIdsError);
-          // Decide if this error should halt the process or just log a warning
           break; // Exit loop on error
         }
 
@@ -107,11 +80,28 @@ const ManageMcqsPage = () => {
           hasMoreLinkedIds = false;
         }
       }
-      // --- END MODIFICATION ---
+      const allLinkedMcqIds = allLinkedMcqIdsData.map(link => link.mcq_id);
+      const uniqueLinkedMcqIds = new Set(allLinkedMcqIds);
+      // --- END: Fetch all linked MCQ IDs ---
 
-      const uniqueLinkedMcqIds = new Set(allLinkedMcqIdsData?.map(link => link.mcq_id) || []);
-      console.log(`[ManageMcqsPage] Total unique linked MCQ IDs: ${uniqueLinkedMcqIds.size}`);
+      const categoriesWithCounts = await Promise.all(
+        (categoriesData || []).map(async (category) => {
+          // Count MCQs by querying mcq_category_links table directly
+          const { count: mcqCount, error: mcqCountError } = await supabase
+            .from('mcq_category_links')
+            .select('mcq_id', { count: 'exact', head: true })
+            .eq('category_id', category.id);
 
+          if (mcqCountError) {
+            console.error(`[ManageMcqsPage] Error fetching MCQ count for category ${category.name}:`, mcqCountError);
+          }
+          return { ...category, mcq_count: mcqCount || 0 };
+        })
+      );
+
+      // Calculate count for Uncategorized MCQs
+      console.log('[ManageMcqsPage] Calculating uncategorized MCQ count...');
+      
       const { count: totalMcqCount, error: totalMcqCountError } = await supabase
         .from('mcqs')
         .select('id', { count: 'exact', head: true });

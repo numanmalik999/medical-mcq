@@ -332,25 +332,44 @@ const QuizPage = () => {
       return;
     }
     
-    // 4. Collect all unique MCQ IDs and fetch their trial status
+    // 4. Collect all unique MCQ IDs and fetch their trial status (using batching)
     const uniqueLinkedMcqIds = Array.from(new Set(allMcqCategoryLinks.map(link => link.mcq_id)));
     
     let mcqTrialStatusMap = new Map<string, boolean>();
-    if (uniqueLinkedMcqIds.length > 0) {
-        // Fetch trial status for all linked MCQs
-        const { data: mcqStatusData, error: mcqStatusError } = await supabase
-            .from('mcqs')
-            .select('id, is_trial_mcq')
-            .in('id', uniqueLinkedMcqIds);
+    
+    // --- START BATCH FETCH FOR TRIAL STATUS ---
+    const chunkSize = 500;
+    const fetchPromises = [];
 
-        if (mcqStatusError) {
-            console.error('Error fetching MCQ trial status:', mcqStatusError);
-            throw new Error('Failed to load MCQ trial status.');
-        }
-        mcqStatusData.forEach(mcq => {
-            mcqTrialStatusMap.set(mcq.id, mcq.is_trial_mcq || false);
-        });
+    for (let i = 0; i < uniqueLinkedMcqIds.length; i += chunkSize) {
+        const chunk = uniqueLinkedMcqIds.slice(i, i + chunkSize);
+        
+        fetchPromises.push(
+            supabase
+                .from('mcqs')
+                .select('id, is_trial_mcq')
+                .in('id', chunk)
+        );
     }
+
+    try {
+      const results = await Promise.all(fetchPromises);
+
+      for (const result of results) {
+          if (result.error) {
+              console.error('Error fetching MCQ trial status chunk:', result.error);
+              throw new Error('Failed to load MCQ trial status.');
+          }
+          result.data.forEach(mcq => {
+              mcqTrialStatusMap.set(mcq.id, mcq.is_trial_mcq || false);
+          });
+      }
+    } catch (e: any) {
+      console.error('Error during batch fetch for trial status:', e);
+      throw new Error('Failed to load MCQ trial status.');
+    }
+    // --- END BATCH FETCH FOR TRIAL STATUS ---
+
 
     // 5. Process data client-side to build categoryMcqCounts
     const categoryMcqCounts = new Map<string, { total: number; trial: number }>();
@@ -379,7 +398,6 @@ const QuizPage = () => {
       console.error('Error fetching total MCQ count for uncategorized:', totalMcqCountError);
     }
 
-    // FIX 1: Use .length instead of .size
     const uncategorizedTotal = (totalMcqCount || 0) - uniqueLinkedMcqIds.length;
 
     let uncategorizedTrial = 0;
@@ -389,7 +407,6 @@ const QuizPage = () => {
         .select('id', { count: 'exact', head: true })
         .eq('is_trial_mcq', true);
 
-      // FIX 2: Use .length instead of .size
       if (uniqueLinkedMcqIds.length > 0) {
         trialQuery = trialQuery.not('id', 'in', `(${Array.from(uniqueLinkedMcqIds).join(',')})`);
       }

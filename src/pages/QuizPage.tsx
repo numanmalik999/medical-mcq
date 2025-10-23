@@ -1394,6 +1394,9 @@ const QuizPage = () => {
                       buttonDisabled = false;
                   }
 
+                  // Determine if the subscription CTA should be shown
+                  const showSubscriptionCTA = !isSubscribed && totalCount > accessibleCount;
+
 
                   return (
                     <Card key={cat.id} className="flex flex-col">
@@ -1411,6 +1414,15 @@ const QuizPage = () => {
                             <p>Incorrect: {cat.user_incorrect}</p>
                             <p>Accuracy: {cat.user_accuracy}</p>
                           </>
+                        )}
+                        {showSubscriptionCTA && (
+                          <div className="pt-2">
+                            <Link to="/subscription">
+                              <Button variant="link" className="p-0 h-auto text-red-500 dark:text-red-400 hover:underline text-sm">
+                                Subscribe to get full access!
+                              </Button>
+                            </Link>
+                          </div>
                         )}
                       </CardContent>
                       <CardFooter className="flex flex-col gap-2">

@@ -15,10 +15,12 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { User } from '@supabase/supabase-js';
 import EditUserDialog from '@/components/EditUserDialog';
+import AddUserDialog from '@/components/AddUserDialog'; // Import new component
 import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/SessionContextProvider';
 import { differenceInDays, parseISO } from 'date-fns'; // Import date-fns helpers
@@ -45,6 +47,7 @@ const ManageUsersPage = () => {
   const [isPageLoading, setIsPageLoading] = useState(true);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false); // New state for Add User dialog
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserProfile | null>(null);
 
   const { hasCheckedInitialSession } = useSession();
@@ -133,6 +136,36 @@ const ManageUsersPage = () => {
   const handleEditClick = (userProfile: UserProfile) => {
     setSelectedUserForEdit(userProfile);
     setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteUser = async (userId: string, email: string | null) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the user: ${email || userId}? This action cannot be undone.`)) {
+      return;
+    }
+
+    const loadingToastId = toast({
+      title: "Deleting User...",
+      description: `Attempting to delete user ${email || userId}...`,
+      duration: 999999,
+    });
+
+    try {
+      const { error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: userId },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({ title: "Success", description: `User ${email || userId} deleted successfully.` });
+      fetchUsers(); // Refresh the list
+    } catch (error: any) {
+      console.error("Error deleting user:", error);
+      toast({ title: "Error", description: `Failed to delete user: ${error.message || 'Unknown error'}`, variant: "destructive" });
+    } finally {
+      supabase.dismissToast(loadingToastId.id);
+    }
   };
 
   const columns: ColumnDef<UserProfile>[] = [
@@ -227,7 +260,13 @@ const ManageUsersPage = () => {
               <DropdownMenuItem onClick={() => handleEditClick(userProfile)}>
                 Edit User
               </DropdownMenuItem>
-              {/* Future: Add Delete User, Reset Password, etc. */}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => handleDeleteUser(userProfile.id, userProfile.email)}
+                className="text-red-600"
+              >
+                Delete User
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -248,10 +287,11 @@ const ManageUsersPage = () => {
       <h1 className="text-3xl font-bold">Manage Users</h1>
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Registered Users</CardTitle>
-          <CardDescription>View and manage user profiles.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-xl">All Registered Users</CardTitle>
+          <Button onClick={() => setIsAddDialogOpen(true)}>Add New User</Button>
         </CardHeader>
+        <CardDescription className="px-6">View, edit, and manage user profiles and subscriptions.</CardDescription>
         <CardContent>
           <DataTable columns={columns} data={users} />
         </CardContent>
@@ -267,6 +307,12 @@ const ManageUsersPage = () => {
           onSave={fetchUsers} // Refresh the list after saving
         />
       )}
+
+      <AddUserDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSave={fetchUsers}
+      />
     </div>
   );
 };

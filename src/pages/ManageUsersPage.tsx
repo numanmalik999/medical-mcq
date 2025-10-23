@@ -24,6 +24,7 @@ import AddUserDialog from '@/components/AddUserDialog'; // Import new component
 import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/SessionContextProvider';
 import { differenceInDays, parseISO } from 'date-fns'; // Import date-fns helpers
+import { dismissToast } from '@/utils/toast'; // Import dismissToast
 
 interface UserProfile {
   id: string;
@@ -164,7 +165,7 @@ const ManageUsersPage = () => {
       console.error("Error deleting user:", error);
       toast({ title: "Error", description: `Failed to delete user: ${error.message || 'Unknown error'}`, variant: "destructive" });
     } finally {
-      supabase.dismissToast(loadingToastId.id);
+      dismissToast(loadingToastId.id);
     }
   };
 

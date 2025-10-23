@@ -12,7 +12,17 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User as UserIcon } from 'lucide-react';
+import { User as UserIcon, CalendarIcon, Loader2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format, addDays, parseISO, differenceInDays } from 'date-fns';
+import { cn } from '@/lib/utils';
+
+// Define a minimal Subscription Tier structure needed for default duration calculation
+interface SubscriptionTier {
+  id: string;
+  duration_in_months: number;
+}
 
 interface UserProfile {
   id: string;
@@ -23,7 +33,10 @@ interface UserProfile {
   is_admin: boolean;
   phone_number: string | null;
   whatsapp_number: string | null;
-  has_active_subscription: boolean; // Added
+  has_active_subscription: boolean;
+  // NEW FIELDS
+  subscription_status: string | null;
+  subscription_end_date: string | null;
 }
 
 const formSchema = z.object({
@@ -34,7 +47,9 @@ const formSchema = z.object({
   is_admin: z.boolean(),
   phone_number: z.string().optional().or(z.literal('')),
   whatsapp_number: z.string().optional().or(z.literal('')),
-  has_active_subscription: z.boolean(), // Added
+  has_active_subscription: z.boolean(),
+  // NEW FIELD for admin control
+  subscriptionEndDate: z.date().nullable().optional(),
 });
 
 interface EditUserDialogProps {
@@ -47,6 +62,8 @@ interface EditUserDialogProps {
 const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDialogProps) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeSubscriptionId, setActiveSubscriptionId] = useState<string | null>(null);
+  const [defaultSubscriptionTier, setDefaultSubscriptionTier] = useState<SubscriptionTier | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -58,13 +75,51 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
       is_admin: userProfile.is_admin,
       phone_number: userProfile.phone_number || "",
       whatsapp_number: userProfile.whatsapp_number || "",
-      has_active_subscription: userProfile.has_active_subscription, // Added
+      has_active_subscription: userProfile.has_active_subscription,
+      subscriptionEndDate: userProfile.subscription_end_date ? parseISO(userProfile.subscription_end_date) : null,
     },
   });
 
-  // Reset form values when userProfile prop changes or dialog opens
+  // Fetch default subscription tier (e.g., Monthly Basic) and active subscription ID
   useEffect(() => {
+    const fetchData = async () => {
+      // 1. Fetch default tier (needed for creating new subscription records)
+      const { data: tierData, error: tierError } = await supabase
+        .from('subscription_tiers')
+        .select('id, duration_in_months')
+        .eq('name', 'Monthly Basic')
+        .single();
+
+      if (tierError && tierError.code !== 'PGRST116') {
+        console.error('Error fetching default subscription tier:', tierError);
+      } else if (tierData) {
+        setDefaultSubscriptionTier(tierData);
+      }
+
+      // 2. Fetch the ID of the current active subscription for this user
+      if (userProfile.has_active_subscription) {
+        const { data: subData, error: subError } = await supabase
+          .from('user_subscriptions')
+          .select('id')
+          .eq('user_id', userProfile.id)
+          .eq('status', 'active')
+          .order('end_date', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (subError && subError.code !== 'PGRST116') {
+          console.error('Error fetching active subscription ID:', subError);
+        } else if (subData) {
+          setActiveSubscriptionId(subData.id);
+        }
+      } else {
+        setActiveSubscriptionId(null);
+      }
+    };
+
     if (open) {
+      fetchData();
+      // Reset form values when userProfile prop changes or dialog opens
       form.reset({
         id: userProfile.id,
         first_name: userProfile.first_name || "",
@@ -73,7 +128,8 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
         is_admin: userProfile.is_admin,
         phone_number: userProfile.phone_number || "",
         whatsapp_number: userProfile.whatsapp_number || "",
-        has_active_subscription: userProfile.has_active_subscription, // Added
+        has_active_subscription: userProfile.has_active_subscription,
+        subscriptionEndDate: userProfile.subscription_end_date ? parseISO(userProfile.subscription_end_date) : null,
       });
     }
   }, [userProfile, open, form]);
@@ -81,7 +137,8 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      const updates = {
+      // --- 1. Update User Profile (Admin status, names, contacts) ---
+      const profileUpdates = {
         id: values.id,
         first_name: values.first_name || null,
         last_name: values.last_name || null,
@@ -89,27 +146,71 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
         is_admin: values.is_admin,
         phone_number: values.phone_number || null,
         whatsapp_number: values.whatsapp_number || null,
-        has_active_subscription: values.has_active_subscription, // Added
+        has_active_subscription: values.has_active_subscription,
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
-        .upsert(updates, { onConflict: 'id' });
+        .upsert(profileUpdates, { onConflict: 'id' });
 
-      if (error) {
-        throw error;
+      if (profileError) {
+        throw profileError;
+      }
+
+      // --- 2. Handle Subscription Update ---
+      const newEndDate = values.subscriptionEndDate ? format(values.subscriptionEndDate, 'yyyy-MM-dd') : null;
+      const isCurrentlyActive = userProfile.has_active_subscription;
+      const shouldBeActive = values.has_active_subscription;
+
+      if (isCurrentlyActive && !shouldBeActive) {
+        // Case A: Deactivate existing subscription
+        if (activeSubscriptionId) {
+          const { error } = await supabase
+            .from('user_subscriptions')
+            .update({ status: 'inactive', end_date: new Date().toISOString() })
+            .eq('id', activeSubscriptionId);
+          if (error) throw error;
+        }
+      } else if (shouldBeActive) {
+        if (activeSubscriptionId) {
+          // Case B: Update existing active subscription end date
+          if (newEndDate) {
+            const { error } = await supabase
+              .from('user_subscriptions')
+              .update({ end_date: newEndDate, status: 'active' })
+              .eq('id', activeSubscriptionId);
+            if (error) throw error;
+          }
+        } else if (defaultSubscriptionTier) {
+          // Case C: Create a new subscription (if none exists but admin marked as active)
+          const calculatedEndDate = newEndDate || format(addDays(new Date(), 30), 'yyyy-MM-dd'); // Default to 30 days if no date provided
+          
+          const { error } = await supabase
+            .from('user_subscriptions')
+            .insert({
+              user_id: values.id,
+              subscription_tier_id: defaultSubscriptionTier.id,
+              start_date: new Date().toISOString(),
+              end_date: calculatedEndDate,
+              status: 'active',
+            });
+          if (error) throw error;
+        } else {
+          // Should not happen if default tier fetch was successful
+          console.warn("Cannot create new subscription: Default tier not found.");
+        }
       }
 
       toast({
         title: "Success!",
-        description: "User profile updated successfully.",
+        description: "User profile and subscription status updated successfully.",
       });
-      // Add a small delay before calling onSave to allow database changes to propagate
+      
       setTimeout(() => {
         onSave(); // Refresh data in parent component
-      }, 500); // 500ms delay
-      onOpenChange(false); // Close dialog
+      }, 500);
+      onOpenChange(false);
     } catch (error: any) {
       console.error("Error updating user profile:", error);
       toast({
@@ -121,6 +222,8 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
       setIsSubmitting(false);
     }
   };
+
+  const subscriptionEndDate = form.watch('subscriptionEndDate');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -261,10 +364,54 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
               )}
             />
 
+            {form.watch('has_active_subscription') && (
+              <FormField
+                control={form.control}
+                name="subscriptionEndDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Subscription End Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Set end date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value || undefined}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormDescription>
+                      {subscriptionEndDate && `Days remaining: ${differenceInDays(subscriptionEndDate, new Date())}`}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)} type="button">Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Save Changes"}
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>

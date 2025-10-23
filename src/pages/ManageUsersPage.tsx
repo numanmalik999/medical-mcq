@@ -20,7 +20,8 @@ import { Button } from '@/components/ui/button';
 import { User } from '@supabase/supabase-js';
 import EditUserDialog from '@/components/EditUserDialog';
 import { Badge } from '@/components/ui/badge';
-import { useSession } from '@/components/SessionContextProvider'; // Import useSession
+import { useSession } from '@/components/SessionContextProvider';
+import { differenceInDays, parseISO } from 'date-fns'; // Import date-fns helpers
 
 interface UserProfile {
   id: string;
@@ -33,26 +34,29 @@ interface UserProfile {
   phone_number: string | null;
   whatsapp_number: string | null;
   has_active_subscription: boolean;
+  // NEW FIELDS
+  subscription_status: string | null;
+  subscription_end_date: string | null;
 }
 
 const ManageUsersPage = () => {
   const { toast } = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [isPageLoading, setIsPageLoading] = useState(true); // New combined loading state
+  const [isPageLoading, setIsPageLoading] = useState(true);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserProfile | null>(null);
 
-  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+  const { hasCheckedInitialSession } = useSession();
 
   useEffect(() => {
-    if (hasCheckedInitialSession) { // Only fetch if initial session check is done
+    if (hasCheckedInitialSession) {
       fetchUsers();
     }
-  }, [hasCheckedInitialSession]); // Dependency changed
+  }, [hasCheckedInitialSession]);
 
   const fetchUsers = async () => {
-    setIsPageLoading(true); // Set loading for this specific fetch
+    setIsPageLoading(true);
 
     // 1. Fetch all users from Supabase Auth via Edge Function
     const { data: authUsersResponse, error: edgeFunctionError } = await supabase.functions.invoke('list-users');
@@ -75,14 +79,36 @@ const ManageUsersPage = () => {
     if (profilesError) {
       console.error('Error fetching user profiles:', profilesError);
       toast({ title: "Error", description: "Failed to load user profiles.", variant: "destructive" });
-      // We can still proceed with authUsersData even if profiles fail
     }
 
     const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile]) || []);
 
+    // 2.5 Fetch all active subscriptions (latest end date first)
+    const { data: activeSubscriptions, error: subsError } = await supabase
+        .from('user_subscriptions')
+        .select('user_id, end_date, status')
+        .eq('status', 'active')
+        .order('end_date', { ascending: false });
+
+    const activeSubsMap = new Map<string, { end_date: string, status: string }>();
+    if (!subsError && activeSubscriptions) {
+        // Only keep the first (latest) active subscription per user
+        activeSubscriptions.forEach(sub => {
+            if (!activeSubsMap.has(sub.user_id)) {
+                activeSubsMap.set(sub.user_id, { end_date: sub.end_date, status: sub.status });
+            }
+        });
+    } else if (subsError) {
+        console.error('Error fetching active subscriptions:', subsError);
+        toast({ title: "Error", description: "Failed to load active subscriptions.", variant: "destructive" });
+    }
+
+
     // 3. Combine the data: Iterate through authUsersData and merge with profile data
     const combinedUsers: UserProfile[] = authUsersData.map(authUser => {
       const profile = profilesMap.get(authUser.id);
+      const activeSub = activeSubsMap.get(authUser.id);
+
       return {
         id: authUser.id,
         email: authUser.email || null,
@@ -94,11 +120,14 @@ const ManageUsersPage = () => {
         phone_number: profile?.phone_number || null,
         whatsapp_number: profile?.whatsapp_number || null,
         has_active_subscription: profile?.has_active_subscription || false,
+        // NEW MAPPING
+        subscription_status: activeSub?.status || null,
+        subscription_end_date: activeSub?.end_date || null,
       };
     });
 
     setUsers(combinedUsers);
-    setIsPageLoading(false); // Clear loading for this specific fetch
+    setIsPageLoading(false);
   };
 
   const handleEditClick = (userProfile: UserProfile) => {
@@ -147,11 +176,35 @@ const ManageUsersPage = () => {
     {
       accessorKey: 'has_active_subscription',
       header: 'Subscription',
-      cell: ({ row }) => (
-        <Badge variant={row.original.has_active_subscription ? "default" : "secondary"}>
-          {row.original.has_active_subscription ? 'Active' : 'Inactive'}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const { has_active_subscription, subscription_end_date } = row.original;
+        
+        if (!has_active_subscription || !subscription_end_date) {
+          return <Badge variant="secondary">Inactive</Badge>;
+        }
+
+        const endDate = parseISO(subscription_end_date);
+        const today = new Date();
+        const daysRemaining = differenceInDays(endDate, today);
+        
+        let variant: "default" | "secondary" | "destructive" | "outline" = "default";
+        if (daysRemaining <= 7) {
+          variant = "destructive";
+        } else if (daysRemaining <= 30) {
+          variant = "outline";
+        }
+
+        return (
+          <div className="flex flex-col space-y-1">
+            <Badge variant={variant}>
+              Active
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {daysRemaining} day{daysRemaining === 1 ? '' : 's'} left
+            </span>
+          </div>
+        );
+      },
     },
     {
       id: "actions",
@@ -178,7 +231,7 @@ const ManageUsersPage = () => {
     },
   ];
 
-  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
+  if (!hasCheckedInitialSession || isPageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading users...</p>

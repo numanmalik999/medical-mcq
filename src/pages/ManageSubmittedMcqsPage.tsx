@@ -68,19 +68,27 @@ const ManageSubmittedMcqsPage = () => {
       toast({ title: "Error", description: "Failed to load submitted MCQs.", variant: "destructive" });
       setSubmittedMcqs([]);
     } else {
-      const mcqsWithEmails = await Promise.all(data.map(async (mcq) => {
-        const { data: userData } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', mcq.user_id)
-          .single();
+      const feedbackWithDetails = await Promise.all(data.map(async (mcq) => {
+        // Fetch user email using the secure Edge Function
+        let userEmail = 'N/A';
+        if (mcq.user_id) {
+          const { data: emailData, error: emailError } = await supabase.functions.invoke('get-user-email-by-id', {
+            body: { user_id: mcq.user_id },
+          });
+
+          if (emailError) {
+            console.error(`Error fetching email for user ${mcq.user_id}:`, emailError);
+          } else if (emailData?.email) {
+            userEmail = emailData.email;
+          }
+        }
         
         return {
           ...mcq,
-          user_email: userData?.email || 'N/A',
+          user_email: userEmail,
         };
       }));
-      setSubmittedMcqs(mcqsWithEmails || []);
+      setSubmittedMcqs(feedbackWithDetails || []);
     }
     setIsPageLoading(false); // Clear loading for this specific fetch
   };

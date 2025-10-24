@@ -210,32 +210,32 @@ const LandingPage = () => {
           <p className="text-lg md:text-xl mb-10 max-w-3xl mx-auto opacity-90 animate-fade-in-up delay-200">
             Your ultimate platform for interactive quizzes, simulated tests, and AI-powered explanations to ace your Prometric MCQs.
           </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4 animate-fade-in-up delay-400">
+          <div className="flex flex-col justify-center gap-4 max-w-sm mx-auto sm:flex-row sm:max-w-none animate-fade-in-up delay-400">
             {user ? (
-              <Link to={user.is_admin ? "/admin/dashboard" : "/user/dashboard"}>
-                <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+              <Link to={user.is_admin ? "/admin/dashboard" : "/user/dashboard"} className="w-full sm:w-auto">
+                <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full">
                   Go to Dashboard
                 </Button>
               </Link>
             ) : (
               <>
-                <Link to="/subscription">
-                  <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+                <Link to="/subscription" className="w-full sm:w-auto">
+                  <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full">
                     Get Started
                   </Button>
                 </Link>
-                <Link to="/quiz">
-                  <Button size="lg" variant="secondary" className="flex items-center gap-2">
+                <Link to="/quiz" className="w-full sm:w-auto">
+                  <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full">
                     <BookOpenText className="h-5 w-5" /> Take a Free Quiz
                   </Button>
                 </Link>
-                <Link to="/quiz-of-the-day">
-                  <Button size="lg" variant="secondary" className="flex items-center gap-2">
+                <Link to="/quiz-of-the-day" className="w-full sm:w-auto">
+                  <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full">
                     <CalendarDays className="h-5 w-5" /> Question of the Day
                   </Button>
                 </Link>
-                <Link to="/user/courses">
-                  <Button size="lg" variant="secondary" className="flex items-center gap-2">
+                <Link to="/user/courses" className="w-full sm:w-auto">
+                  <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full">
                     <GraduationCap className="h-5 w-5" /> Browse Courses
                   </Button>
                 </Link>
@@ -299,7 +299,7 @@ const LandingPage = () => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" size="lg" className="h-12 text-lg" disabled={isSubscribing}>
+              <Button type="submit" size="lg" className="h-12 text-lg w-full sm:w-auto" disabled={isSubscribing}>
                 {isSubscribing ? "Subscribing..." : "Subscribe"}
               </Button>
             </form>

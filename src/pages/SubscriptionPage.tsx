@@ -104,7 +104,7 @@ const SubscriptionPage = () => {
               const isPreselected = preselectedTierId === tier.id;
 
               return (
-                <Card key={tier.id} className={`flex flex-col ${isPreselected ? 'ring-2 ring-primary' : ''}`}>
+                <Card key={tier.id} className={`flex flex-col ${isPreselected ? 'ring-4 ring-primary shadow-lg' : ''}`}>
                   <CardHeader>
                     <CardTitle className="2xl">{tier.name}</CardTitle>
                     <CardDescription>{tier.description}</CardDescription>
@@ -138,7 +138,7 @@ const SubscriptionPage = () => {
                         </Button>
                       )
                     ) : ( // User is not logged in
-                      <Link to={`/signup?tierId=${tier.id}`}>
+                      <Link to={`/signup?tierId=${tier.id}`} className="w-full">
                         <Button className="w-full">Sign Up to Subscribe</Button>
                       </Link>
                     )}

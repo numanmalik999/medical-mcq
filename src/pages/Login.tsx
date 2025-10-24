@@ -52,7 +52,7 @@ const Login = () => {
         />
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Don't have an account?{" "}
-          <Link to="/signup" className="text-primary hover:underline">
+          <Link to="/subscription" className="text-primary hover:underline">
             Sign Up
           </Link>
         </p>

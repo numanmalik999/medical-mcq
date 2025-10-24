@@ -10,7 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export interface StaticPage {
   id: string;
@@ -18,13 +19,18 @@ export interface StaticPage {
   title: string;
   content: string | null;
   updated_at: string;
+  location: string[] | null; // Added location field
 }
+
+const LocationEnum = z.enum(["header", "footer"]);
+type LocationType = z.infer<typeof LocationEnum>;
 
 const formSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().min(1, "Slug is required."),
   title: z.string().min(1, "Title is required."),
   content: z.string().optional().or(z.literal('')),
+  location: z.array(LocationEnum).optional(), // Use LocationEnum
 });
 
 interface EditStaticPageDialogProps {
@@ -33,6 +39,11 @@ interface EditStaticPageDialogProps {
   page: StaticPage | null; // Null for adding, object for editing
   onSave: () => void; // Callback to refresh data after save
 }
+
+const locationOptions: { id: LocationType; label: string }[] = [
+  { id: "header", label: "Header Navigation" },
+  { id: "footer", label: "Footer Links" },
+];
 
 const EditStaticPageDialog = ({ open, onOpenChange, page, onSave }: EditStaticPageDialogProps) => {
   const { toast } = useToast();
@@ -44,16 +55,21 @@ const EditStaticPageDialog = ({ open, onOpenChange, page, onSave }: EditStaticPa
       slug: "",
       title: "",
       content: "",
+      location: ["footer"] as LocationType[], // Ensure default is correctly typed
     },
   });
 
   useEffect(() => {
     if (page && open) {
+      // Cast page.location to the expected type for form.reset
+      const initialLocation = (page.location || ["footer"]).filter((loc): loc is LocationType => LocationEnum.options.includes(loc as LocationType));
+      
       form.reset({
         id: page.id,
         slug: page.slug,
         title: page.title,
         content: page.content || "",
+        location: initialLocation,
       });
     } else if (!open) {
       form.reset(); // Reset form when dialog closes
@@ -67,6 +83,7 @@ const EditStaticPageDialog = ({ open, onOpenChange, page, onSave }: EditStaticPa
         slug: values.slug,
         title: values.title,
         content: values.content || null,
+        location: values.location && values.location.length > 0 ? values.location : null,
       };
 
       if (page?.id) {
@@ -147,6 +164,55 @@ const EditStaticPageDialog = ({ open, onOpenChange, page, onSave }: EditStaticPa
                   <FormControl>
                     <Textarea placeholder="Enter page content here (supports basic HTML/Markdown)" rows={10} {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field: _field }) => ( // Renamed to _field to avoid TS6133
+                <FormItem className="space-y-3">
+                  <FormLabel>Link Location</FormLabel>
+                  <FormDescription>
+                    Select where this page should appear in the navigation.
+                  </FormDescription>
+                  <div className="flex flex-col space-y-2">
+                    {locationOptions.map((item) => (
+                      <FormField
+                        key={item.id}
+                        control={form.control}
+                        name="location"
+                        render={({ field: innerField }) => {
+                          return (
+                            <FormItem
+                              key={item.id}
+                              className="flex flex-row items-start space-x-3 space-y-0"
+                            >
+                              <FormControl>
+                                <Checkbox
+                                  checked={innerField.value?.includes(item.id)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? innerField.onChange([...(innerField.value || []), item.id])
+                                      : innerField.onChange(
+                                          innerField.value?.filter(
+                                            (value) => value !== item.id
+                                          )
+                                        );
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                {item.label}
+                              </FormLabel>
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

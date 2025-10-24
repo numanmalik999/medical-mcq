@@ -2,9 +2,42 @@
 
 import { Link } from 'react-router-dom';
 import { MadeWithDyad } from './made-with-dyad';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+interface StaticPageLink {
+  slug: string;
+  title: string;
+}
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const { toast } = useToast();
+  const [footerLinks, setFooterLinks] = useState<StaticPageLink[]>([]);
+
+  useEffect(() => {
+    const fetchFooterLinks = async () => {
+      const { data, error } = await supabase
+        .from('static_pages')
+        .select('slug, title, location')
+        .contains('location', ['footer'])
+        .order('title', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching footer links:', error);
+        toast({ title: "Error", description: "Failed to load footer links.", variant: "destructive" });
+        setFooterLinks([]);
+      } else {
+        setFooterLinks(data || []);
+      }
+    };
+    fetchFooterLinks();
+  }, [toast]);
+
+  // Separate links into Quick Links and Legal based on title keywords for organization
+  const quickLinks = footerLinks.filter(link => !link.title.toLowerCase().includes('policy') && !link.title.toLowerCase().includes('terms'));
+  const legalLinks = footerLinks.filter(link => link.title.toLowerCase().includes('policy') || link.title.toLowerCase().includes('terms'));
 
   return (
     <footer className="bg-card text-card-foreground py-8 border-t border-border mt-12">
@@ -22,9 +55,11 @@ const Footer = () => {
           <div className="space-y-2">
             <h4 className="text-lg font-semibold">Quick Links</h4>
             <nav className="flex flex-col space-y-1 text-sm">
-              <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">About Us</Link>
-              <Link to="/faq" className="text-muted-foreground hover:text-foreground transition-colors">FAQ</Link>
-              <Link to="/contact" className="text-muted-foreground hover:text-foreground transition-colors">Contact</Link>
+              {quickLinks.map((link) => (
+                <Link key={link.slug} to={`/${link.slug}`} className="text-muted-foreground hover:text-foreground transition-colors">
+                  {link.title}
+                </Link>
+              ))}
             </nav>
           </div>
 
@@ -32,8 +67,11 @@ const Footer = () => {
           <div className="space-y-2">
             <h4 className="text-lg font-semibold">Legal</h4>
             <nav className="flex flex-col space-y-1 text-sm">
-              <Link to="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</Link>
-              <Link to="/terms" className="text-muted-foreground hover:text-foreground transition-colors">Terms of Service</Link>
+              {legalLinks.map((link) => (
+                <Link key={link.slug} to={`/${link.slug}`} className="text-muted-foreground hover:text-foreground transition-colors">
+                  {link.title}
+                </Link>
+              ))}
             </nav>
           </div>
         </div>

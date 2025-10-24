@@ -57,7 +57,7 @@ import { useGoogleAnalytics } from "@/hooks/use-google-analytics"; // Import use
 const queryClient = new QueryClient();
 
 const AppContent = () => {
-  const { user } = useSession();
+  useSession();
   useGoogleAnalytics(); // Call the hook here to track page views
 
   return (
@@ -121,7 +121,7 @@ const AppContent = () => {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
-        {!user && <Footer />} {/* Conditionally render Footer only if user is NOT logged in */}
+        <Footer /> {/* Always render Footer */}
       </div>
     </>
   );

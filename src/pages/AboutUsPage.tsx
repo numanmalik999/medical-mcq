@@ -5,17 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
 
 const defaultContent = `
-<p>
-  At Study Prometric MCQs, we are passionate about empowering medical students and professionals to achieve their academic and career goals. We understand the challenges of preparing for rigorous medical exams, and our platform is designed to simplify and enhance your study process.
-</p>
-<p>
-  Our mission is to provide a comprehensive, interactive, and intelligent learning environment. We leverage cutting-edge technology, including AI-powered explanations, to offer a personalized and effective study experience. Our extensive question bank, curated by experts, ensures you have access to high-quality, relevant content.
-</p>
-<p>
-  We believe in continuous improvement and community contribution. That's why we enable users to submit their own MCQs and provide feedback, helping us grow and refine our resources for everyone. Join us on your journey to medical excellence!
-</p>
+# About Study Prometric MCQs
+
+At Study Prometric MCQs, we are passionate about empowering medical students and professionals to achieve their academic and career goals. We understand the challenges of preparing for rigorous medical exams, and our platform is designed to simplify and enhance your study process.
+
+Our mission is to provide a comprehensive, interactive, and intelligent learning environment. We leverage cutting-edge technology, including AI-powered explanations, to offer a personalized and effective study experience. Our extensive question bank, curated by experts, ensures you have access to high-quality, relevant content.
+
+We believe in continuous improvement and community contribution. That's why we enable users to submit their own MCQs and provide feedback, helping us grow and refine our resources for everyone. Join us on your journey to medical excellence!
 `;
 
 const AboutUsPage = () => {
@@ -31,7 +30,7 @@ const AboutUsPage = () => {
       const { data, error } = await supabase
         .from('static_pages')
         .select('title, content')
-        .eq('slug', 'about-us')
+        .eq('slug', 'about')
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
@@ -66,7 +65,7 @@ const AboutUsPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 text-lg text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none">
-          <div dangerouslySetInnerHTML={{ __html: pageContent }} />
+          <ReactMarkdown>{pageContent}</ReactMarkdown>
         </CardContent>
       </Card>
       <MadeWithDyad />

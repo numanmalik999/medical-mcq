@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,59 +80,61 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
     },
   });
 
-  // Fetch default subscription tier (e.g., Monthly Basic) and active subscription ID
-  useEffect(() => {
-    const fetchData = async () => {
-      // 1. Fetch default tier (needed for creating new subscription records)
-      const { data: tierData, error: tierError } = await supabase
-        .from('subscription_tiers')
-        .select('id, duration_in_months')
-        .eq('name', 'Monthly Basic')
-        .single();
+  const fetchSubscriptionData = useCallback(async () => {
+    // 1. Fetch default tier (needed for creating new subscription records)
+    const { data: tierData, error: tierError } = await supabase
+      .from('subscription_tiers')
+      .select('id, duration_in_months')
+      .eq('name', 'Monthly Basic')
+      .single();
 
-      if (tierError && tierError.code !== 'PGRST116') {
-        console.error('Error fetching default subscription tier:', tierError);
-      } else if (tierData) {
-        setDefaultSubscriptionTier(tierData);
-      }
-
-      // 2. Fetch the ID of the current active subscription for this user
-      if (userProfile.has_active_subscription) {
-        const { data: subData, error: subError } = await supabase
-          .from('user_subscriptions')
-          .select('id')
-          .eq('user_id', userProfile.id)
-          .eq('status', 'active')
-          .order('end_date', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (subError && subError.code !== 'PGRST116') {
-          console.error('Error fetching active subscription ID:', subError);
-        } else if (subData) {
-          setActiveSubscriptionId(subData.id);
-        }
-      } else {
-        setActiveSubscriptionId(null);
-      }
-    };
-
-    if (open) {
-      fetchData();
-      // Reset form values when userProfile prop changes or dialog opens
-      form.reset({
-        id: userProfile.id,
-        first_name: userProfile.first_name || "",
-        last_name: userProfile.last_name || "",
-        avatar_url: userProfile.avatar_url || "",
-        is_admin: userProfile.is_admin,
-        phone_number: userProfile.phone_number || "",
-        whatsapp_number: userProfile.whatsapp_number || "",
-        has_active_subscription: userProfile.has_active_subscription,
-        subscriptionEndDate: userProfile.subscription_end_date ? parseISO(userProfile.subscription_end_date) : null,
-      });
+    if (tierError && tierError.code !== 'PGRST116') {
+      console.error('Error fetching default subscription tier:', tierError);
+    } else if (tierData) {
+      setDefaultSubscriptionTier(tierData);
     }
-  }, [userProfile, open, form]);
+
+    // 2. Fetch the ID and end date of the current active subscription for this user
+    let currentActiveSubId: string | null = null;
+    let currentEndDate: string | null = null;
+
+    const { data: subData, error: subError } = await supabase
+      .from('user_subscriptions')
+      .select('id, end_date')
+      .eq('user_id', userProfile.id)
+      .eq('status', 'active')
+      .order('end_date', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (subError && subError.code !== 'PGRST116') {
+      console.error('Error fetching active subscription ID:', subError);
+    } else if (subData) {
+      currentActiveSubId = subData.id;
+      currentEndDate = subData.end_date;
+    }
+    
+    setActiveSubscriptionId(currentActiveSubId);
+
+    // 3. Reset form values based on the latest fetched data
+    form.reset({
+      id: userProfile.id,
+      first_name: userProfile.first_name || "",
+      last_name: userProfile.last_name || "",
+      avatar_url: userProfile.avatar_url || "",
+      is_admin: userProfile.is_admin,
+      phone_number: userProfile.phone_number || "",
+      whatsapp_number: userProfile.whatsapp_number || "",
+      has_active_subscription: !!currentActiveSubId, // Use fetched sub status as source of truth
+      subscriptionEndDate: currentEndDate ? parseISO(currentEndDate) : null,
+    });
+  }, [userProfile, form]);
+
+  useEffect(() => {
+    if (open) {
+      fetchSubscriptionData();
+    }
+  }, [open, fetchSubscriptionData]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
@@ -146,7 +148,8 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
         is_admin: values.is_admin,
         phone_number: values.phone_number || null,
         whatsapp_number: values.whatsapp_number || null,
-        has_active_subscription: values.has_active_subscription,
+        // Note: We update has_active_subscription based on the form value
+        has_active_subscription: values.has_active_subscription, 
         updated_at: new Date().toISOString(),
       };
 
@@ -159,12 +162,11 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
       }
 
       // --- 2. Handle Subscription Update ---
-      const newEndDate = values.subscriptionEndDate ? format(values.subscriptionEndDate, 'yyyy-MM-dd') : null;
-      const isCurrentlyActive = userProfile.has_active_subscription;
+      const newEndDate = values.subscriptionEndDate ? format(values.subscriptionEndDate, 'yyyy-MM-dd HH:mm:ss.SSSxxx') : null;
       const shouldBeActive = values.has_active_subscription;
 
-      if (isCurrentlyActive && !shouldBeActive) {
-        // Case A: Deactivate existing subscription
+      if (!shouldBeActive) {
+        // Case A: Deactivate existing subscription if one exists
         if (activeSubscriptionId) {
           const { error } = await supabase
             .from('user_subscriptions')
@@ -172,7 +174,7 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
             .eq('id', activeSubscriptionId);
           if (error) throw error;
         }
-      } else if (shouldBeActive) {
+      } else { // shouldBeActive is true
         if (activeSubscriptionId) {
           // Case B: Update existing active subscription end date
           if (newEndDate) {
@@ -184,7 +186,7 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
           }
         } else if (defaultSubscriptionTier) {
           // Case C: Create a new subscription (if none exists but admin marked as active)
-          const calculatedEndDate = newEndDate || format(addDays(new Date(), 30), 'yyyy-MM-dd'); // Default to 30 days if no date provided
+          const calculatedEndDate = newEndDate || format(addDays(new Date(), 30), 'yyyy-MM-dd HH:mm:ss.SSSxxx');
           
           const { error } = await supabase
             .from('user_subscriptions')
@@ -198,7 +200,11 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
           if (error) throw error;
         } else {
           // Should not happen if default tier fetch was successful
-          console.warn("Cannot create new subscription: Default tier not found.");
+          toast({
+            title: "Warning",
+            description: "Could not create new subscription record: Default tier not found.",
+            variant: "destructive",
+          });
         }
       }
 

@@ -52,16 +52,34 @@ const ManageSubscriptionsPage = () => {
   };
 
   const handleDeleteTier = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this subscription tier? This action cannot be undone.")) {
+    if (!window.confirm("Are you sure you want to delete this subscription tier? This action cannot be undone and will delete all associated user subscription records.")) {
       return;
     }
     try {
-      const { error } = await supabase
+      // 1. Delete all associated user_subscriptions records first
+      const { error: deleteSubsError } = await supabase
+        .from('user_subscriptions')
+        .delete()
+        .eq('subscription_tier_id', id);
+
+      if (deleteSubsError) {
+        console.warn("Warning: Failed to delete associated user subscriptions. Proceeding with tier deletion, but data integrity might be affected:", deleteSubsError);
+        // We don't throw here, as the tier deletion might still fail if the FK constraint is set to RESTRICT/NO ACTION
+      }
+
+      // 2. Delete the subscription tier
+      const { error: deleteTierError } = await supabase
         .from('subscription_tiers')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (deleteTierError) {
+        throw deleteTierError;
+      }
+
+      // 3. Optionally, update profiles that might have been linked to this tier (though profiles only track has_active_subscription)
+      // This step is complex and often unnecessary if the user_subscriptions table is the source of truth for active status.
+
       toast({ title: "Success", description: "Subscription tier deleted successfully." });
       fetchSubscriptionTiers();
     } catch (error: any) {

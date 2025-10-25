@@ -5,7 +5,7 @@ import { MadeWithDyad } from './made-with-dyad';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { SquareWhatsapp, MapPin } from 'lucide-react'; // Corrected import from Whatsapp to SquareWhatsapp
+import { MessageSquare, MapPin } from 'lucide-react'; // Using MessageSquare as a fallback for Whatsapp
 
 interface StaticPageLink {
   slug: string;
@@ -56,7 +56,7 @@ const Footer = () => {
             
             {/* WhatsApp Contact */}
             <div className="flex items-center justify-center md:justify-start space-x-2 text-sm text-muted-foreground">
-              <SquareWhatsapp className="h-4 w-4 text-green-500 flex-shrink-0" />
+              <MessageSquare className="h-4 w-4 text-green-500 flex-shrink-0 fill-green-500" /> {/* Using MessageSquare with green styling */}
               <a 
                 href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}`} 
                 target="_blank" 

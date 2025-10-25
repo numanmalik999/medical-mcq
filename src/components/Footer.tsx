@@ -5,6 +5,7 @@ import { MadeWithDyad } from './made-with-dyad';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { SquareWhatsapp, MapPin } from 'lucide-react'; // Corrected import from Whatsapp to SquareWhatsapp
 
 interface StaticPageLink {
   slug: string;
@@ -39,6 +40,9 @@ const Footer = () => {
   const quickLinks = footerLinks.filter(link => !link.title.toLowerCase().includes('policy') && !link.title.toLowerCase().includes('terms'));
   const legalLinks = footerLinks.filter(link => link.title.toLowerCase().includes('policy') || link.title.toLowerCase().includes('terms'));
 
+  const whatsappNumber = "+923146616970";
+  const address = "Muhalla Boarding House Chawinda, Sialkot";
+
   return (
     <footer className="bg-card text-card-foreground py-8 border-t border-border mt-12">
       <div className="container mx-auto px-4">
@@ -46,9 +50,28 @@ const Footer = () => {
           {/* Company Info */}
           <div className="space-y-2">
             <h4 className="text-lg font-semibold">Study Prometric MCQs</h4>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mb-4">
               Your partner in medical education excellence.
             </p>
+            
+            {/* WhatsApp Contact */}
+            <div className="flex items-center justify-center md:justify-start space-x-2 text-sm text-muted-foreground">
+              <SquareWhatsapp className="h-4 w-4 text-green-500 flex-shrink-0" />
+              <a 
+                href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition-colors"
+              >
+                {whatsappNumber}
+              </a>
+            </div>
+
+            {/* Address */}
+            <div className="flex items-start justify-center md:justify-start space-x-2 text-sm text-muted-foreground pt-1">
+              <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <p>{address}</p>
+            </div>
           </div>
 
           {/* Quick Links */}

@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 export default defineConfig(() => ({
+  base: "/", // Crucial for Capacitor to load assets correctly
   server: {
     host: "::",
     port: 8080,

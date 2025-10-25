@@ -8,8 +8,8 @@ const AdminProtectedRoute = () => {
 
   if (!hasCheckedInitialSession) { // Show loading only until initial session check is done
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-gray-700 dark:text-gray-300">Loading user session...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <p className="text-gray-700">Loading user session...</p>
       </div>
     );
   }

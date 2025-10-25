@@ -92,6 +92,7 @@ const UserDashboardPage = () => {
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories for recommendations.", variant: "destructive" });
+      setAllCategories([]);
     } else {
       setAllCategories(categoriesData || []);
     }
@@ -226,10 +227,10 @@ const UserDashboardPage = () => {
     }
   };
 
-  if (!hasCheckedInitialSession || isFetchingData) { // Use hasCheckedInitialSession for initial loading
+  if (!hasCheckedInitialSession || isFetchingData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-gray-700 dark:text-gray-300">Loading user dashboard...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <p className="text-gray-700">Loading user dashboard...</p>
       </div>
     );
   }
@@ -237,7 +238,7 @@ const UserDashboardPage = () => {
   // If user is null and not in guest mode (shouldn't happen with UserProtectedRoute, but as a fallback)
   if (!user && !isGuestMode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <p className="text-red-500">You must be logged in to view your dashboard.</p>
       </div>
     );
@@ -252,15 +253,15 @@ const UserDashboardPage = () => {
       <h1 className="text-3xl font-bold">Welcome, {userEmail}!</h1>
 
       {isGuestMode && (
-        <Card className="border-blue-500 bg-blue-50 dark:bg-blue-950">
+        <Card className="border-blue-500 bg-blue-50">
           <CardHeader>
-            <CardTitle className="text-blue-700 dark:text-blue-300">Guest Mode Active</CardTitle>
-            <CardDescription className="text-blue-600 dark:text-blue-400">
+            <CardTitle className="text-blue-700">Guest Mode Active</CardTitle>
+            <CardDescription className="text-blue-600">
               You are currently browsing as a guest. Some features are limited.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-blue-800 dark:text-blue-200">
+            <p className="text-blue-800">
               <Link to="/user/subscriptions" className="font-semibold underline">Sign up and subscribe</Link> to unlock full access, track your progress, and personalize your learning experience.
             </p>
           </CardContent>
@@ -272,10 +273,10 @@ const UserDashboardPage = () => {
           <CardTitle>Your Dashboard</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-gray-700 dark:text-gray-300">
+          <p className="text-gray-700">
             This is your personal space. Here you can find your quiz progress, profile settings, and more.
           </p>
-          <p className="mt-4 text-gray-700 dark:text-gray-300">
+          <p className="mt-4 text-gray-700">
             Use the sidebar to navigate.
           </p>
         </CardContent>
@@ -386,7 +387,7 @@ const UserDashboardPage = () => {
         </CardHeader>
         <CardContent>
           {isGuestMode ? (
-            <p className="text-center text-gray-600 dark:text-gray-400">
+            <p className="text-center text-gray-600">
               <Link to="/user/subscriptions" className="font-semibold underline">Sign up</Link> to track your performance and get personalized recommendations here!
             </p>
           ) : areasForImprovement.length > 0 ? (
@@ -401,7 +402,7 @@ const UserDashboardPage = () => {
               ))}
             </div>
           ) : (
-            <p className="text-center text-gray-600 dark:text-gray-400">
+            <p className="text-center text-gray-600">
               Keep taking quizzes to get personalized recommendations here!
             </p>
           )}
@@ -416,7 +417,7 @@ const UserDashboardPage = () => {
         </CardHeader>
         <CardContent>
           {isGuestMode ? (
-            <p className="text-center text-gray-600 dark:text-gray-400">
+            <p className="text-center text-gray-600">
               <Link to="/user/subscriptions" className="font-semibold underline">Sign up</Link> to get personalized practice suggestions here!
             </p>
           ) : suggestedPractice.length > 0 ? (
@@ -431,7 +432,7 @@ const UserDashboardPage = () => {
               ))}
             </div>
           ) : (
-            <p className="text-center text-gray-600 dark:text-gray-400">
+            <p className="text-center text-gray-600">
               No specific suggestions at the moment. Keep up the great work!
             </p>
           )}
@@ -446,17 +447,17 @@ const UserDashboardPage = () => {
         </CardHeader>
         <CardContent>
           {isGuestMode ? (
-            <p className="text-center text-gray-600 dark:text-gray-400">
+            <p className="text-center text-gray-600">
               <Link to="/user/subscriptions" className="font-semibold underline">Sign up</Link> to see your quiz activity here!
             </p>
           ) : recentAttempts.length > 0 ? (
             <div className="space-y-4">
               {recentAttempts.map((attempt) => (
                 <div key={attempt.id} className="border-b pb-3 last:border-b-0 last:pb-0">
-                  <p className="font-semibold text-gray-900 dark:text-white line-clamp-2">
+                  <p className="font-semibold text-gray-900 line-clamp-2">
                     Q: {attempt.question_text}
                   </p>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                  <p className="text-sm text-gray-700 mt-1">
                     Your Answer: {attempt.selected_option}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
@@ -471,7 +472,7 @@ const UserDashboardPage = () => {
               ))}
             </div>
           ) : (
-            <p className="text-center text-gray-600 dark:text-gray-400">
+            <p className="text-center text-gray-600">
               No recent quiz attempts found. Start a quiz to see your activity here!
             </p>
           )}

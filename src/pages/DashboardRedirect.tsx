@@ -24,8 +24,8 @@ const DashboardRedirect = () => {
   }, [user, hasCheckedInitialSession, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
-      <p className="text-gray-700 dark:text-gray-300">Redirecting...</p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 pt-16">
+      <p className="text-gray-700">Redirecting...</p>
     </div>
   );
 };

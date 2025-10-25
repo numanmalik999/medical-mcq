@@ -5,7 +5,6 @@ import { useSession } from '@/components/SessionContextProvider';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
-import { ThemeToggle } from './ThemeToggle';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -84,7 +83,6 @@ const Header = () => {
           </nav>
         </div>
         <div className="flex justify-end items-center gap-2">
-          <ThemeToggle />
           {hasCheckedInitialSession && !user && (
             <Link to="/login">
               <Button variant="secondary" size="sm" className="text-primary">

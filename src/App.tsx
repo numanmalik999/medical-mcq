@@ -50,7 +50,6 @@ import UserCourseDetailsPage from "./pages/UserCourseDetailsPage";
 import QuestionOfTheDayPage from "./pages/QuestionOfTheDayPage"; // Import new page
 import ManageDailyMcqsPage from "./pages/ManageDailyMcqsPage"; // Import new page
 
-import { ThemeProvider } from "@/components/theme-provider"; // Import ThemeProvider
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics"; // Import useGoogleAnalytics hook
 
 
@@ -129,17 +128,15 @@ const AppContent = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <SessionContextProvider>
-            <AppContent />
-          </SessionContextProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <SessionContextProvider>
+          <AppContent />
+        </SessionContextProvider>
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

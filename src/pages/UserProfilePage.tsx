@@ -94,8 +94,8 @@ const UserProfilePage = () => {
 
   if (!hasCheckedInitialSession || isFetchingProfile) { // Use hasCheckedInitialSession for initial loading
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-gray-700 dark:text-gray-300">Loading profile...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <p className="text-gray-700">Loading profile...</p>
       </div>
     );
   }
@@ -105,15 +105,15 @@ const UserProfilePage = () => {
       <h1 className="text-3xl font-bold">Your Profile</h1>
 
       {isGuestMode && (
-        <Card className="border-blue-500 bg-blue-50 dark:bg-blue-950">
+        <Card className="border-blue-500 bg-blue-50">
           <CardHeader>
-            <CardTitle className="text-blue-700 dark:text-blue-300">Guest Mode Active</CardTitle>
-            <CardDescription className="text-blue-600 dark:text-blue-400">
+            <CardTitle className="text-blue-700">Guest Mode Active</CardTitle>
+            <CardDescription className="text-blue-600">
               You are currently browsing as a guest. Profile editing is disabled.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-blue-800 dark:text-blue-200">
+            <p className="text-blue-800">
               <Link to="/user/subscriptions" className="font-semibold underline">Sign up and subscribe</Link> to create your personal profile and unlock all features.
             </p>
           </CardContent>

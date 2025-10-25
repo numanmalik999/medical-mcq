@@ -12,16 +12,16 @@ const Login = () => {
 
   if (!hasCheckedInitialSession) { // Show loading only until initial session check is done
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
-        <p className="text-gray-700 dark:text-gray-300">Loading login page...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 pt-16">
+        <p className="text-gray-700">Loading login page...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
-        <h1 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-6">Login</h1>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4 pt-16">
+      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
+        <h1 className="text-3xl font-bold text-center text-gray-900 mb-6">Login</h1>
         <Auth
           supabaseClient={supabase}
           providers={[]}

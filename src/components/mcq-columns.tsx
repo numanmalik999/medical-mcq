@@ -32,6 +32,10 @@ export type MCQ = {
   is_trial_mcq: boolean | null;
   // New: Array of category links
   category_links: McqCategoryLink[];
+  
+  // Optional fields used when loading from local SQLite database
+  explanation_text?: string;
+  image_url?: string | null;
 };
 
 // DisplayMCQ is now the same as MCQ as category_links contains display names

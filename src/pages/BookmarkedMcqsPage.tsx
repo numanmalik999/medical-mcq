@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
-import { Bookmark, BookmarkCheck } from 'lucide-react'; // Removed Loader2
+import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { differenceInDays, parseISO } from 'date-fns'; // Added missing date-fns imports
 import { MCQ } from '@/components/mcq-columns';
-import { useBookmark } from '@/hooks/use-bookmark'; // Import useBookmark hook
+import { useBookmark } from '@/hooks/use-bookmark';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { Link } from 'react-router-dom'; // Added missing Link import
+import { Link } from 'react-router-dom';
 
 interface MCQExplanation {
   id: string;
@@ -83,6 +84,7 @@ const BookmarkedMcqsPage = () => {
         return;
       }
 
+      // Fetch MCQs and their category links
       const { data: mcqsData, error: mcqsError } = await supabase
         .from('mcqs')
         .select(`
@@ -161,9 +163,13 @@ const BookmarkedMcqsPage = () => {
       await toggleBookmark();
       // After toggling, re-fetch bookmarks to update the list if it was removed
       if (isBookmarked) { // If it was bookmarked and now removed
-        fetchBookmarkedMcqs();
+        // Use a slight delay to allow DB to update before refetching
+        setTimeout(() => fetchBookmarkedMcqs(), 300);
       } else { // If it was not bookmarked and now added
-        fetchBookmarkedMcqs();
+        // No need to refetch the whole list if we just added one, but we do it for simplicity here
+        // In a real app, you might just update the local state if the list order doesn't matter.
+        // Since we rely on the fetched order, we refetch.
+        setTimeout(() => fetchBookmarkedMcqs(), 300);
       }
     }
   };

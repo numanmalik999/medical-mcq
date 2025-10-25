@@ -17,6 +17,7 @@
     "cap:open:ios": "npx cap open ios"
   },
   "dependencies": {
+    "@capacitor-community/sqlite": "^7.0.2",
     "@capacitor/android": "^6.1.0",
     "@capacitor/core": "^6.1.0",
     "@capacitor/ios": "^6.1.0",

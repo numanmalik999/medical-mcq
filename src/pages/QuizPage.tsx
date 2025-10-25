@@ -10,14 +10,16 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save, Bookmark, BookmarkCheck, ArrowLeft } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RotateCcw, MessageSquareText, Save, Bookmark, BookmarkCheck, ArrowLeft, WifiOff } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import QuizNavigator from '@/components/QuizNavigator';
 import { MCQ } from '@/components/mcq-columns';
-import { cn } from '@/lib/utils'; // Import cn utility for conditional class names
-import { useBookmark } from '@/hooks/use-bookmark'; // Import useBookmark hook
+import { cn } from '@/lib/utils';
+import { useBookmark } from '@/hooks/use-bookmark';
+import useOfflineMcqs from '@/hooks/useOfflineMcqs'; // Import offline hook
+import { Separator } from '@/components/ui/separator'; // Import Separator
 
 interface MCQExplanation {
   id: string;
@@ -34,6 +36,7 @@ interface CategoryStat {
   user_correct: number;
   user_incorrect: number;
   user_accuracy: string;
+  offline_count: number; // New field for offline count
 }
 
 interface UserAnswerData {
@@ -65,6 +68,7 @@ interface LoadedQuizSession {
   isTrialActiveSession: boolean;
   userId: string;
   categoryName: string; // Added for display
+  isOffline: boolean; // New flag
 }
 
 const TRIAL_MCQ_LIMIT = 50;
@@ -84,6 +88,7 @@ const QuizPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isNative, isDbInitialized, getOfflineCategoryCounts, getOfflineMcqIdsByCategory, getOfflineMcqs } = useOfflineMcqs();
 
   const [quizQuestions, setQuizQuestions] = useState<MCQ[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -101,17 +106,18 @@ const QuizPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
-  const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map()); // Fixed type
+  const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
 
   const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
   const [isTrialActiveSession, setIsTrialActiveSession] = useState(false);
-  const [allTrialMcqsCount, setAllTrialMcqsCount] = useState(0); // New state for total trial MCQs
+  const [allTrialMcqsCount, setAllTrialMcqsCount] = useState(0);
+  const [isOfflineQuiz, setIsOfflineQuiz] = useState(false); // New state for offline mode
 
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
-  const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<LoadedQuizSession[]>([]); // Changed to array of LoadedQuizSession
+  const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<LoadedQuizSession[]>([]);
 
   // New states for current quiz accuracy
   const [currentCorrectCount, setCurrentCorrectCount] = useState(0);
@@ -119,7 +125,7 @@ const QuizPage = () => {
 
   const currentMcq = quizQuestions[currentQuestionIndex];
   const { isBookmarked, toggleBookmark, isLoading: isBookmarkLoading } = useBookmark(currentMcq?.id || null);
-  const isGuest = !user; // Define isGuest here
+  const isGuest = !user;
 
   // Effect to calculate current quiz accuracy
   useEffect(() => {
@@ -145,6 +151,21 @@ const QuizPage = () => {
   }, [userAnswers, quizQuestions]);
 
   const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
+    if (isOfflineQuiz) {
+      // For offline quizzes, explanation text is embedded in the MCQ object
+      const localMcq = quizQuestions.find(q => q.id === explanationId);
+      if (localMcq && (localMcq as any).explanation_text) {
+        const localExplanation: MCQExplanation = {
+          id: localMcq.id,
+          explanation_text: (localMcq as any).explanation_text,
+          image_url: (localMcq as any).image_url || null,
+        };
+        setExplanations(prev => new Map(prev).set(explanationId, localExplanation));
+        return localExplanation;
+      }
+      return null;
+    }
+
     if (explanations.has(explanationId)) {
       return explanations.get(explanationId)!;
     }
@@ -166,21 +187,28 @@ const QuizPage = () => {
       return data;
     }
     return null;
-  }, [explanations, toast]);
+  }, [explanations, toast, isOfflineQuiz, quizQuestions]);
 
   // Function to save quiz state to the database
   const saveQuizState = useCallback(async (
     dbSessionId: string | null,
-    categoryId: string | null, // Changed to allow null
+    categoryId: string | null,
     mcqs: MCQ[],
     answers: Map<string, UserAnswerData>,
     index: number,
     isTrial: boolean,
-    currentUserId: string
+    currentUserId: string,
+    isOffline: boolean
   ): Promise<{ id: string; sessionData: DbQuizSession } | null> => {
     if (!currentUserId) {
       console.warn("Cannot save quiz state: User not logged in.");
       return null;
+    }
+    
+    // Do not save offline quizzes to the remote database
+    if (isOffline) {
+        console.warn("Skipping remote save: Quiz is running in offline mode.");
+        return null;
     }
 
     const mcqIdsOrder = mcqs.map(m => m.id);
@@ -267,7 +295,7 @@ const QuizPage = () => {
         fetchQuizOverview();
       }
     }
-  }, [user, hasCheckedInitialSession]);
+  }, [user, hasCheckedInitialSession, isDbInitialized]); // Added isDbInitialized dependency
 
   const fetchQuizOverview = async () => {
     setIsPageLoading(true);
@@ -284,9 +312,7 @@ const QuizPage = () => {
       return;
     }
     const categoriesMap = new Map(categoriesData?.map(cat => [cat.id, cat]) || []);
-    // Add UNCATEGORIZED_ID to the map for consistent lookup
     categoriesMap.set(UNCATEGORIZED_ID, { id: UNCATEGORIZED_ID, name: 'Uncategorized' });
-
 
     // 2. Fetch total count of all trial MCQs
     const { count: totalTrialMcqsCount, error: totalTrialError } = await supabase
@@ -309,7 +335,7 @@ const QuizPage = () => {
       while (hasMore) {
         const { data: chunkData, error: chunkError } = await supabase
           .from('mcq_category_links')
-          .select('category_id, mcq_id') // Simplified select
+          .select('category_id, mcq_id')
           .range(offset, offset + limit - 1);
 
         if (chunkError) {
@@ -327,9 +353,7 @@ const QuizPage = () => {
       }
     } catch (e: any) {
       console.error('Error during paginated fetch:', e);
-      toast({ title: "Error", description: `Failed to load category link data: ${e.message}`, variant: "destructive" });
-      setIsPageLoading(false);
-      return;
+      // Don't fail the whole load, just log and continue with partial data
     }
     
     // 4. Collect all unique MCQ IDs and fetch their trial status (using batching)
@@ -337,7 +361,6 @@ const QuizPage = () => {
     
     let mcqTrialStatusMap = new Map<string, boolean>();
     
-    // --- START BATCH FETCH FOR TRIAL STATUS ---
     const chunkSize = 500;
     const fetchPromises = [];
 
@@ -366,10 +389,8 @@ const QuizPage = () => {
       }
     } catch (e: any) {
       console.error('Error during batch fetch for trial status:', e);
-      throw new Error('Failed to load MCQ trial status.');
+      // Don't fail the whole load, just log and continue
     }
-    // --- END BATCH FETCH FOR TRIAL STATUS ---
-
 
     // 5. Process data client-side to build categoryMcqCounts
     const categoryMcqCounts = new Map<string, { total: number; trial: number }>();
@@ -459,6 +480,12 @@ const QuizPage = () => {
       }
     });
 
+    // 9. Fetch offline counts if native platform is initialized
+    let offlineCounts = new Map<string, number>();
+    if (isNative && isDbInitialized) {
+        offlineCounts = await getOfflineCategoryCounts();
+    }
+
     // Build final categoriesWithStats
     categoriesData?.forEach(category => {
       const mcqCounts = categoryMcqCounts.get(category.id) || { total: 0, trial: 0 };
@@ -475,6 +502,7 @@ const QuizPage = () => {
         user_correct: userAttempts.correct,
         user_incorrect: incorrectAttempts,
         user_accuracy: `${accuracy}%`,
+        offline_count: offlineCounts.get(category.id) || 0, // Set offline count
       });
     });
 
@@ -494,16 +522,18 @@ const QuizPage = () => {
         user_correct: uncategorizedUserAttempts.correct,
         user_incorrect: uncategorizedIncorrectAttempts,
         user_accuracy: `${uncategorizedAccuracy}%`,
+        offline_count: offlineCounts.get(UNCATEGORIZED_ID) || 0, // Set offline count
       });
     }
 
-    // 9. Load saved quiz sessions
+    // 10. Load saved quiz sessions
     let loadedSavedQuizzes: LoadedQuizSession[] = [];
     if (user) {
       const { data: dbSessions, error: dbSessionsError } = await supabase
         .from('user_quiz_sessions')
         .select('*')
         .eq('user_id', user.id)
+        .is('test_duration_seconds', null) // Filter out test sessions
         .order('updated_at', { ascending: false });
 
       if (dbSessionsError) {
@@ -528,6 +558,7 @@ const QuizPage = () => {
             isTrialActiveSession: dbSession.is_trial_session,
             userId: user.id,
             categoryName: categoryName,
+            isOffline: false, // Saved sessions are always online
           } as LoadedQuizSession;
         });
       }
@@ -538,8 +569,11 @@ const QuizPage = () => {
     setIsPageLoading(false);
   };
 
-  const startQuizSession = async (selectedCategoryId: string | null, mode: 'random' | 'incorrect') => {
-    console.log(`[QuizPage] STARTING QUIZ SESSION for category: ${selectedCategoryId}, mode: ${mode}`);
+  const startQuizSession = async (selectedCategoryId: string | null, mode: 'random' | 'incorrect', isOffline: boolean) => {
+    console.log(`[QuizPage] STARTING QUIZ SESSION for category: ${selectedCategoryId}, mode: ${mode}, offline: ${isOffline}`);
+    
+    setIsOfflineQuiz(isOffline);
+    
     const isSubscribed = user?.has_active_subscription;
     const hasTakenTrial = user?.trial_taken;
     const isGuest = !user;
@@ -553,7 +587,7 @@ const QuizPage = () => {
     }
     
     // If logged in, not subscribed, and already took trial, and it's NOT a trial session, show prompt
-    if (!isGuest && !isSubscribed && hasTakenTrial && !sessionIsTrial) {
+    if (!isGuest && !isSubscribed && hasTakenTrial && !sessionIsTrial && !isOffline) {
       setShowSubscriptionPrompt(true);
       return;
     }
@@ -578,163 +612,150 @@ const QuizPage = () => {
     setCurrentDbSessionId(null); // Reset current DB session ID for a new quiz
 
     let mcqIdsToConsider: string[] = [];
-    let baseMcqQuery = supabase.from('mcqs').select('id, is_trial_mcq');
+    let mcqsToLoad: MCQ[] = [];
 
-    if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
-      baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
-    } else if (selectedCategoryId === UNCATEGORIZED_ID) {
-      // Get all MCQs that are NOT linked to any category
-      const { data: linkedMcqIdsData, error: linkedIdsError } = await supabase
-        .from('mcq_category_links')
-        .select('mcq_id');
-      if (linkedIdsError) {
-        console.error('Error fetching linked MCQ IDs for uncategorized filter:', linkedIdsError);
-        toast({ title: "Error", description: "Failed to identify uncategorized questions.", variant: "destructive" });
+    if (isOffline) {
+      // --- OFFLINE MODE ---
+      if (!isNative || !isDbInitialized) {
+        toast({ title: "Error", description: "Offline database is not ready.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
-      const categorizedMcqIds = Array.from(new Set(linkedMcqIdsData?.map(link => link.mcq_id) || []));
       
-      if (categorizedMcqIds.length > 0) {
-        baseMcqQuery = baseMcqQuery.not('id', 'in', `(${categorizedMcqIds.join(',')})`);
-      }
-    } else if (selectedCategoryId) { // Specific category selected
-      const { data: categoryLinkedMcqIdsData, error: categoryLinkedIdsError } = await supabase
-        .from('mcq_category_links')
-        .select('mcq_id')
-        .eq('category_id', selectedCategoryId);
-      if (categoryLinkedIdsError) {
-        console.error('Error fetching category linked MCQ IDs:', categoryLinkedIdsError);
-        toast({ title: "Error", description: "Failed to filter MCQs by category.", variant: "destructive" });
+      if (selectedCategoryId) {
+        mcqIdsToConsider = await getOfflineMcqIdsByCategory(selectedCategoryId);
+      } else {
+        // Fetch all offline MCQs if no category selected (not supported by current offline hook, so we'll skip for now)
+        toast({ title: "Error", description: "Please select a category for offline quiz.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
-      const categoryLinkedMcqIds = Array.from(new Set(categoryLinkedMcqIdsData?.map(link => link.mcq_id) || []));
       
-      baseMcqQuery = baseMcqQuery.in('id', categoryLinkedMcqIds);
-    }
-    // If no category selected, baseMcqQuery remains as 'select all IDs'
-
-    // IMPORTANT: Apply trial filter *after* category filtering, if the session is a trial session
-    // and it's not the 'All Trial MCQs' special category (which already filtered for trial).
-    if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) {
-      baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
-    }
-
-    // Execute base query to get initial set of MCQ IDs
-    const { data: initialMcqIdsData, error: initialMcqIdsError } = await baseMcqQuery;
-    if (initialMcqIdsError) {
-      console.error('Error fetching initial MCQ IDs:', initialMcqIdsError);
-      toast({ title: "Error", description: "Failed to load initial question set.", variant: "destructive" });
-      setIsPageLoading(false);
-      return;
-    }
-    mcqIdsToConsider = initialMcqIdsData?.map(m => m.id) || [];
-
-    // Handle 'incorrect' mode filter (only for subscribed users)
-    if (mode === 'incorrect' && user && isSubscribed) {
-      const { data: incorrectAttempts, error: attemptsError } = await supabase
-        .from('user_quiz_attempts')
-        .select('mcq_id')
-        .eq('user_id', user.id)
-        .in('mcq_id', mcqIdsToConsider)
-        .eq('is_correct', false);
-      if (attemptsError) {
-        console.error('[QuizPage] ERROR in fetching incorrect attempts:', attemptsError);
-        toast({ title: "Feature Restricted", description: "Failed to load incorrect questions.", variant: "destructive" });
+      if (mcqIdsToConsider.length === 0) {
+        toast({ title: "No MCQs", description: "No MCQs found locally for the selected category.", variant: "default" });
         setIsPageLoading(false);
         return;
       }
-      const incorrectMcqIds = Array.from(new Set(incorrectAttempts?.map(attempt => attempt.mcq_id) || []));
-      if (incorrectMcqIds.length === 0) {
-        toast({ title: "No Incorrect MCQs", description: "You have no incorrect answers in this selection to re-attempt.", variant: "default" });
+      
+      // Shuffle and fetch full MCQ objects from local DB
+      const finalMcqIdsForQuiz = shuffleArray(mcqIdsToConsider);
+      mcqsToLoad = await getOfflineMcqs(finalMcqIdsForQuiz);
+      
+      // Note: Offline mode does not support 'incorrect' mode filtering yet.
+      if (mode === 'incorrect') {
+        toast({ title: "Feature Restricted", description: "Attempt Incorrect is not supported in offline mode.", variant: "default" });
         setIsPageLoading(false);
         return;
       }
-      mcqIdsToConsider = incorrectMcqIds;
+
+    } else {
+      // --- ONLINE MODE ---
+      let baseMcqQuery = supabase.from('mcqs').select('id, is_trial_mcq');
+
+      if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
+        baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
+      } else if (selectedCategoryId === UNCATEGORIZED_ID) {
+        const { data: linkedMcqIdsData } = await supabase.from('mcq_category_links').select('mcq_id');
+        const categorizedMcqIds = Array.from(new Set(linkedMcqIdsData?.map(link => link.mcq_id) || []));
+        if (categorizedMcqIds.length > 0) {
+          baseMcqQuery = baseMcqQuery.not('id', 'in', `(${categorizedMcqIds.join(',')})`);
+        }
+      } else if (selectedCategoryId) {
+        const { data: categoryLinkedMcqIdsData, error: categoryLinkedIdsError } = await supabase
+          .from('mcq_category_links')
+          .select('mcq_id')
+          .eq('category_id', selectedCategoryId);
+        if (categoryLinkedIdsError) throw categoryLinkedIdsError;
+        const categoryLinkedMcqIds = Array.from(new Set(categoryLinkedMcqIdsData?.map(link => link.mcq_id) || []));
+        baseMcqQuery = baseMcqQuery.in('id', categoryLinkedMcqIds);
+      }
+
+      if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) {
+        baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
+      }
+
+      const { data: initialMcqIdsData, error: initialMcqIdsError } = await baseMcqQuery;
+      if (initialMcqIdsError) throw initialMcqIdsError;
+      mcqIdsToConsider = initialMcqIdsData?.map(m => m.id) || [];
+
+      if (mode === 'incorrect' && user && isSubscribed) {
+        const { data: incorrectAttempts } = await supabase
+          .from('user_quiz_attempts')
+          .select('mcq_id')
+          .eq('user_id', user.id)
+          .in('mcq_id', mcqIdsToConsider)
+          .eq('is_correct', false);
+        const incorrectMcqIds = Array.from(new Set(incorrectAttempts?.map(attempt => attempt.mcq_id) || []));
+        if (incorrectMcqIds.length === 0) {
+          toast({ title: "No Incorrect MCQs", description: "You have no incorrect answers in this selection to re-attempt.", variant: "default" });
+          setIsPageLoading(false);
+          return;
+        }
+        mcqIdsToConsider = incorrectMcqIds;
+      }
+
+      if (mcqIdsToConsider.length === 0) {
+        toast({ title: "No MCQs", description: "No MCQs available for the selected criteria.", variant: "default" });
+        setIsPageLoading(false);
+        return;
+      }
+
+      let finalMcqIdsForQuiz = shuffleArray(mcqIdsToConsider);
+      if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) {
+        finalMcqIdsForQuiz = finalMcqIdsForQuiz.slice(0, Math.min(finalMcqIdsForQuiz.length, TRIAL_MCQ_LIMIT));
+      }
+
+      const { data: mcqsData, error: mcqsError } = await supabase
+        .from('mcqs')
+        .select(`
+          *,
+          mcq_category_links (
+            category_id,
+            categories (name)
+          )
+        `)
+        .in('id', finalMcqIdsForQuiz);
+
+      if (mcqsError) throw mcqsError;
+      
+      mcqsToLoad = (mcqsData || []).map((mcq: any) => ({
+        ...mcq,
+        category_links: mcq.mcq_category_links?.map((link: any) => ({
+          category_id: link.category_id,
+          category_name: link.categories?.name || null,
+        })) || [],
+      }));
+      
+      mcqsToLoad = finalMcqIdsForQuiz.map(id => mcqsToLoad.find(mcq => mcq.id === id)).filter((mcq): mcq is MCQ => mcq !== undefined);
     }
-
-    if (mcqIdsToConsider.length === 0) {
-      toast({ title: "No MCQs", description: "No MCQs available for the selected criteria.", variant: "default" });
-      setIsPageLoading(false);
-      return;
-    }
-
-    // Shuffle and apply trial limit if applicable
-    let finalMcqIdsForQuiz = shuffleArray(mcqIdsToConsider);
-    if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) { // ALL_TRIAL_MCQS_ID already limited by initial fetch
-      finalMcqIdsForQuiz = finalMcqIdsForQuiz.slice(0, Math.min(finalMcqIdsForQuiz.length, TRIAL_MCQ_LIMIT));
-    } else if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
-      // For ALL_TRIAL_MCQS_ID, the initial fetch already limited to TRIAL_MCQ_LIMIT
-      // so `finalMcqIdsForQuiz` is already the correct size.
-    }
-
-
-    // Now fetch the full MCQ objects using the final filtered and limited IDs
-    const { data: mcqsData, error: mcqsError } = await supabase
-      .from('mcqs')
-      .select(`
-        *,
-        mcq_category_links (
-          category_id,
-          categories (name)
-        )
-      `)
-      .in('id', finalMcqIdsForQuiz);
-
-    if (mcqsError) {
-      console.error('[QuizPage] ERROR in final MCQ data fetch:', mcqsError);
-      toast({ title: "Error", description: "Failed to load quiz questions data.", variant: "destructive" });
-      setIsPageLoading(false);
-      return;
-    }
-    if (!mcqsData || mcqsData.length === 0) {
-      toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
-      setIsPageLoading(false);
-      return;
-    }
-
-    const formattedMcqs: MCQ[] = (mcqsData || []).map((mcq: any) => ({
-      ...mcq,
-      category_links: mcq.mcq_category_links?.map((link: any) => ({
-        category_id: link.category_id,
-        category_name: link.categories?.name || null,
-      })) || [],
-    }));
-
-    // Reorder formattedMcqs to match the shuffled order of finalMcqIdsForQuiz
-    const mcqsToLoad = finalMcqIdsForQuiz.map(id => formattedMcqs.find(mcq => mcq.id === id)).filter((mcq): mcq is MCQ => mcq !== undefined);
 
     if (mcqsToLoad.length === 0) {
-      console.log('[QuizPage] No MCQs to load after trial limit or other slicing.');
       toast({ title: "No MCQs", description: "No questions available for this quiz session.", variant: "default" });
       setIsPageLoading(false);
       return;
     }
-    console.log(`[QuizPage] Final ${mcqsToLoad.length} MCQs selected for quiz.`);
 
     setQuizQuestions(mcqsToLoad);
     setShowCategorySelection(false);
     setIsPageLoading(false);
     
-    // Initialize userAnswers for all questions
     const initialUserAnswers = new Map<string, UserAnswerData>();
     mcqsToLoad.forEach(mcq => {
       initialUserAnswers.set(mcq.id, { selectedOption: null, isCorrect: null, submitted: false });
     });
     setUserAnswers(initialUserAnswers);
-    setSelectedAnswer(null); // No answer selected initially for the first question
+    setSelectedAnswer(null);
 
-    // Create a new session in the database (only if user is logged in)
-    if (user) {
+    if (user && !isOffline) {
       const savedSessionResult = await saveQuizState(
-        null, // No existing session ID
-        selectedCategoryId, // Use selectedCategoryId for saving
+        null,
+        selectedCategoryId,
         mcqsToLoad,
         initialUserAnswers,
-        0, // currentQuestionIndex
-        sessionIsTrial, // Use the determined session trial status
-        user.id
+        0,
+        sessionIsTrial,
+        user.id,
+        false
       );
       if (savedSessionResult) {
         const categoryName = selectedCategoryId === ALL_TRIAL_MCQS_ID
@@ -743,43 +764,23 @@ const QuizPage = () => {
             ? 'Uncategorized'
             : categoryStats.find(c => c.id === selectedCategoryId)?.name || 'Unknown Category';
 
-        setActiveSavedQuizzes(prev => {
-          const existingIndex = prev.findIndex(session => session.dbSessionId === savedSessionResult.id);
-          if (existingIndex > -1) {
-            // Update existing session in the list
-            const updatedPrev = [...prev];
-            updatedPrev[existingIndex] = {
-              dbSessionId: savedSessionResult.id,
-              categoryId: selectedCategoryId,
-              mcqs: mcqsToLoad,
-              userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
-              currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
-              isTrialActiveSession: sessionIsTrial,
-              userId: user.id,
-              categoryName: categoryName,
-            };
-            return updatedPrev;
-          } else {
-            // Add new session to the list (should ideally not happen if currentDbSessionId is set)
-            return [
-              {
-                dbSessionId: savedSessionResult.id,
-                categoryId: selectedCategoryId,
-                mcqs: mcqsToLoad,
-                userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
-                currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
-                isTrialActiveSession: sessionIsTrial,
-                userId: user.id,
-                categoryName: categoryName,
-              },
-              ...prev,
-            ];
-          }
-        });
+        setActiveSavedQuizzes(prev => [
+          {
+            dbSessionId: savedSessionResult.id,
+            categoryId: selectedCategoryId,
+            mcqs: mcqsToLoad,
+            userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
+            currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
+            isTrialActiveSession: sessionIsTrial,
+            userId: user.id,
+            categoryName: categoryName,
+            isOffline: false,
+          },
+          ...prev,
+        ]);
       }
     }
 
-    // Mark trial_taken only if a logged-in user starts a trial
     if (user && sessionIsTrial && !hasTakenTrial) {
       const { error: updateError } = await supabase
         .from('profiles')
@@ -792,8 +793,8 @@ const QuizPage = () => {
         toast({ title: "Trial Started!", description: `You have started your free trial. Enjoy ${TRIAL_MCQ_LIMIT} trial questions!`, variant: "default" });
       }
     }
-    setIsTrialActiveSession(sessionIsTrial); // Set the session trial status
-    setCurrentQuizCategoryId(selectedCategoryId); // Keep track of the selected category
+    setIsTrialActiveSession(sessionIsTrial);
+    setCurrentQuizCategoryId(selectedCategoryId);
   };
 
   const continueQuizSession = useCallback(async (loadedSession: LoadedQuizSession) => {
@@ -801,46 +802,64 @@ const QuizPage = () => {
     setCurrentDbSessionId(loadedSession.dbSessionId);
     setCurrentQuizCategoryId(loadedSession.categoryId);
     setIsTrialActiveSession(loadedSession.isTrialActiveSession);
+    setIsOfflineQuiz(loadedSession.isOffline);
 
-    let mcqsQuery;
-    // The select statement for mcqs without !inner acts as a LEFT JOIN, which is what we want
-    // to include uncategorized MCQs if they are part of the session.
-    mcqsQuery = supabase
-      .from('mcqs')
-      .select(`
-        id, question_text, option_a, option_b, option_c, option_d,
-        correct_answer, explanation_id, difficulty, is_trial_mcq,
-        mcq_category_links (category_id, categories (name))
-      `)
-      .in('id', loadedSession.mcqs.map(m => m.id));
+    let mcqsData: MCQ[] = [];
+    
+    if (loadedSession.isOffline) {
+        // --- OFFLINE RESUME ---
+        const mcqIds = loadedSession.mcqs.map(m => m.id);
+        mcqsData = await getOfflineMcqs(mcqIds);
+        
+        if (mcqsData.length === 0) {
+            toast({ title: "Error", description: "Failed to load offline questions. They might have been deleted.", variant: "destructive" });
+            setIsPageLoading(false);
+            return;
+        }
+        // Reorder fetched MCQs to match mcq_ids_order
+        mcqsData = loadedSession.mcqs.map(loadedMcq => 
+            mcqsData.find(fetchedMcq => fetchedMcq.id === loadedMcq.id)
+        ).filter((mcq): mcq is MCQ => mcq !== undefined);
 
-    const { data: mcqsData, error: mcqsError } = await mcqsQuery;
+    } else {
+        // --- ONLINE RESUME ---
+        let mcqsQuery = supabase
+          .from('mcqs')
+          .select(`
+            id, question_text, option_a, option_b, option_c, option_d,
+            correct_answer, explanation_id, difficulty, is_trial_mcq,
+            mcq_category_links (category_id, categories (name))
+          `)
+          .in('id', loadedSession.mcqs.map(m => m.id));
 
-    if (mcqsError) {
-      console.error('Error fetching MCQs for resumed session:', mcqsError);
-      toast({ title: "Error", description: "Failed to load quiz questions for your saved session.", variant: "destructive" });
-      setIsPageLoading(false);
-      return;
+        const { data: onlineMcqsData, error: mcqsError } = await mcqsQuery;
+
+        if (mcqsError) {
+          console.error('Error fetching MCQs for resumed session:', mcqsError);
+          toast({ title: "Error", description: "Failed to load quiz questions for your saved session.", variant: "destructive" });
+          setIsPageLoading(false);
+          return;
+        }
+
+        const formattedMcqs: MCQ[] = (onlineMcqsData || []).map((mcq: any) => ({
+          ...mcq,
+          category_links: mcq.mcq_category_links?.map((link: any) => ({
+            category_id: link.category_id,
+            category_name: link.categories?.name || null,
+          })) || [],
+        }));
+
+        // Reorder fetched MCQs to match mcq_ids_order
+        mcqsData = loadedSession.mcqs.map(loadedMcq => 
+          formattedMcqs.find(fetchedMcq => fetchedMcq.id === loadedMcq.id)
+        ).filter((mcq): mcq is MCQ => mcq !== undefined);
     }
 
-    const formattedMcqs: MCQ[] = mcqsData.map((mcq: any) => ({
-      ...mcq,
-      category_links: mcq.mcq_category_links?.map((link: any) => ({
-        category_id: link.category_id,
-        category_name: link.categories?.name || null,
-      })) || [],
-    }));
-
-    // Reorder fetched MCQs to match mcq_ids_order
-    const orderedMcqs = loadedSession.mcqs.map(loadedMcq => 
-      formattedMcqs.find(fetchedMcq => fetchedMcq.id === loadedMcq.id)
-    ).filter((mcq): mcq is MCQ => mcq !== undefined);
-
-    setQuizQuestions(orderedMcqs);
+    setQuizQuestions(mcqsData);
     setUserAnswers(loadedSession.userAnswers);
     setCurrentQuestionIndex(loadedSession.currentQuestionIndex);
 
-    const currentMcqFromSaved = orderedMcqs[loadedSession.currentQuestionIndex];
+    const currentMcqFromSaved = mcqsData[loadedSession.currentQuestionIndex];
     const currentAnswerDataFromSaved = loadedSession.userAnswers.get(currentMcqFromSaved.id);
     setSelectedAnswer(currentAnswerDataFromSaved?.selectedOption || null);
     setFeedback(currentAnswerDataFromSaved?.submitted ? (currentAnswerDataFromSaved.isCorrect ? 'Correct!' : `Incorrect. The correct answer was ${currentMcqFromSaved.correct_answer}.`) : null);
@@ -856,11 +875,11 @@ const QuizPage = () => {
       description: "Continuing from where you left off.",
       duration: 3000,
     });
-  }, [fetchExplanation, toast]);
+  }, [fetchExplanation, toast, getOfflineMcqs, isDbInitialized]);
 
   // Effect to update database whenever quiz state changes
   useEffect(() => {
-    if (user && currentDbSessionId && !showCategorySelection && quizQuestions.length > 0 && !showResults && currentQuizCategoryId) {
+    if (user && currentDbSessionId && !showCategorySelection && quizQuestions.length > 0 && !showResults && currentQuizCategoryId && !isOfflineQuiz) {
       saveQuizState(
         currentDbSessionId,
         currentQuizCategoryId,
@@ -868,10 +887,11 @@ const QuizPage = () => {
         userAnswers,
         currentQuestionIndex,
         isTrialActiveSession,
-        user.id
+        user.id,
+        isOfflineQuiz
       );
     }
-  }, [quizQuestions, userAnswers, currentQuestionIndex, isTrialActiveSession, showCategorySelection, showResults, saveQuizState, user, currentQuizCategoryId, currentDbSessionId]);
+  }, [quizQuestions, userAnswers, currentQuestionIndex, isTrialActiveSession, showCategorySelection, showResults, saveQuizState, user, currentQuizCategoryId, currentDbSessionId, isOfflineQuiz]);
 
 
   const handleResetProgress = async (categoryId: string) => {
@@ -949,10 +969,8 @@ const QuizPage = () => {
       return newMap;
     });
 
-    if (user) { // Only record attempts if user is logged in
+    if (user && !isOfflineQuiz) { // Only record attempts if user is logged in AND online
       try {
-        // For recording attempts, we need a single category_id.
-        // We'll use the first one from category_links if available.
         const firstCategoryLink = currentMcq.category_links?.[0];
         const { error } = await supabase.from('user_quiz_attempts').insert({
           user_id: user.id,
@@ -979,7 +997,7 @@ const QuizPage = () => {
         });
       }
     } else {
-      console.log("Guest user, not recording quiz attempt.");
+      console.log(isOfflineQuiz ? "Offline quiz, skipping remote attempt recording." : "Guest user, not recording quiz attempt.");
     }
     
     setIsSubmittingAnswer(false);
@@ -1045,7 +1063,7 @@ const QuizPage = () => {
 
     for (const mcq of quizQuestions) {
       const userAnswerData = userAnswers.get(mcq.id);
-      const isCorrect = userAnswerData?.isCorrect; // Use stored correctness
+      const isCorrect = userAnswerData?.isCorrect;
       if (isCorrect) {
         correctCount++;
       }
@@ -1059,8 +1077,9 @@ const QuizPage = () => {
     await Promise.all(explanationPromises);
     setShowResults(true);
     setIsPageLoading(false);
-    if (currentDbSessionId) {
-      clearSpecificQuizState(currentDbSessionId); // Clear saved state after quiz submission
+    
+    if (currentDbSessionId && !isOfflineQuiz) {
+      clearSpecificQuizState(currentDbSessionId);
     }
   };
 
@@ -1074,6 +1093,17 @@ const QuizPage = () => {
       });
       return;
     }
+    
+    if (isOfflineQuiz) {
+        toast({
+            title: "Offline Quiz",
+            description: "Offline quiz progress is not saved remotely. It persists locally until you finish the quiz.",
+            variant: "default",
+            duration: 3000,
+        });
+        return;
+    }
+
     if (currentQuizCategoryId && quizQuestions.length > 0) {
       const savedSessionResult = await saveQuizState(
         currentDbSessionId,
@@ -1082,7 +1112,8 @@ const QuizPage = () => {
         userAnswers,
         currentQuestionIndex,
         isTrialActiveSession,
-        user.id
+        user.id,
+        isOfflineQuiz
       );
 
       if (savedSessionResult) {
@@ -1094,35 +1125,24 @@ const QuizPage = () => {
 
         setActiveSavedQuizzes(prev => {
           const existingIndex = prev.findIndex(session => session.dbSessionId === savedSessionResult.id);
+          const newSession: LoadedQuizSession = {
+            dbSessionId: savedSessionResult.id,
+            categoryId: currentQuizCategoryId,
+            mcqs: quizQuestions,
+            userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
+            currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
+            isTrialActiveSession: isTrialActiveSession,
+            userId: user.id,
+            categoryName: categoryName,
+            isOffline: isOfflineQuiz,
+          };
+          
           if (existingIndex > -1) {
-            // Update existing session in the list
             const updatedPrev = [...prev];
-            updatedPrev[existingIndex] = {
-              dbSessionId: savedSessionResult.id,
-              categoryId: currentQuizCategoryId,
-              mcqs: quizQuestions,
-              userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
-              currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
-              isTrialActiveSession: isTrialActiveSession,
-              userId: user.id,
-              categoryName: categoryName,
-            };
+            updatedPrev[existingIndex] = newSession;
             return updatedPrev;
           } else {
-            // Add new session to the list (should ideally not happen if currentDbSessionId is set)
-            return [
-              {
-                dbSessionId: savedSessionResult.id,
-                categoryId: currentQuizCategoryId,
-                mcqs: quizQuestions,
-                userAnswers: new Map(Object.entries(savedSessionResult.sessionData.user_answers_json)),
-                currentQuestionIndex: savedSessionResult.sessionData.current_question_index,
-                isTrialActiveSession: isTrialActiveSession,
-                userId: user.id,
-                categoryName: categoryName,
-              },
-              ...prev,
-            ];
+            return [newSession, ...prev];
           }
         });
 
@@ -1146,6 +1166,11 @@ const QuizPage = () => {
     if (!user || !currentMcq || !feedbackText.trim()) {
       toast({ title: "Error", description: "Feedback cannot be empty.", variant: "destructive" });
       return;
+    }
+    
+    if (isOfflineQuiz) {
+        toast({ title: "Offline Restriction", description: "Feedback submission is not available in offline mode.", variant: "destructive" });
+        return;
     }
 
     setIsSubmittingFeedback(true);
@@ -1191,16 +1216,14 @@ const QuizPage = () => {
   };
 
   const handleBackToSelection = () => {
-    // Check if the current quiz session is saved in the database
     const isCurrentQuizSaved = currentDbSessionId && activeSavedQuizzes.some(session => session.dbSessionId === currentDbSessionId);
 
-    if (!isCurrentQuizSaved) { // Only show warning if not explicitly saved
+    if (!isCurrentQuizSaved && quizQuestions.length > 0 && !showResults) {
       if (!window.confirm("Are you sure you want to end this quiz session and go back to category selection? Your current progress will be lost.")) {
-        return; // User cancelled
+        return;
       }
     }
 
-    // If we reach here, either it was saved, or the user confirmed to lose unsaved progress
     setQuizQuestions([]);
     setUserAnswers(new Map());
     setCurrentQuestionIndex(0);
@@ -1211,9 +1234,10 @@ const QuizPage = () => {
     setExplanations(new Map());
     setShowResults(false);
     setShowCategorySelection(true);
-    setCurrentQuizCategoryId(null); // Reset current quiz category
-    setCurrentDbSessionId(null); // Reset DB session ID
-    fetchQuizOverview(); // Refresh overview data
+    setCurrentQuizCategoryId(null);
+    setCurrentDbSessionId(null);
+    setIsOfflineQuiz(false); // Reset offline flag
+    fetchQuizOverview();
   };
 
   const handleGoToDashboard = () => {
@@ -1221,11 +1245,10 @@ const QuizPage = () => {
 
     if (!isCurrentQuizSaved && quizQuestions.length > 0 && !showResults) {
       if (!window.confirm("Are you sure you want to leave this quiz session? Your current unsaved progress will be lost.")) {
-        return; // User cancelled
+        return;
       }
     }
 
-    // If we reach here, either it was saved, or the user confirmed to lose unsaved progress
     setQuizQuestions([]);
     setUserAnswers(new Map());
     setCurrentQuestionIndex(0);
@@ -1236,8 +1259,9 @@ const QuizPage = () => {
     setExplanations(new Map());
     setShowResults(false);
     setShowCategorySelection(true);
-    setCurrentQuizCategoryId(null); // Reset current quiz category
-    setCurrentDbSessionId(null); // Reset DB session ID
+    setCurrentQuizCategoryId(null);
+    setCurrentDbSessionId(null);
+    setIsOfflineQuiz(false); // Reset offline flag
     navigate('/user/dashboard');
   };
 
@@ -1291,7 +1315,7 @@ const QuizPage = () => {
             <CardDescription>Choose a category to start your quiz and view your performance.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {activeSavedQuizzes.length > 0 && !isGuest && ( // Only show saved quizzes for logged-in users
+            {activeSavedQuizzes.length > 0 && !isGuest && (
               <Card className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-950">
                 <CardHeader>
                   <CardTitle className="text-blue-700 dark:text-blue-300">Continue Your Quizzes</CardTitle>
@@ -1307,12 +1331,14 @@ const QuizPage = () => {
                     return (
                       <div key={savedState.dbSessionId} className="flex flex-col sm:flex-row items-center justify-between p-3 border rounded-md bg-white dark:bg-gray-800">
                         <div>
-                          <p className="font-semibold">{savedState.categoryName}</p>
+                          <p className="font-semibold">{savedState.categoryName} {savedState.isOffline && <WifiOff className="h-4 w-4 inline ml-1 text-muted-foreground" />}</p>
                           <p className="text-sm text-muted-foreground">Question {progress} of {total}</p>
                         </div>
                         <div className="flex gap-2 mt-2 sm:mt-0">
                           <Button onClick={() => continueQuizSession(savedState)} size="sm">Continue</Button>
-                          <Button onClick={() => clearSpecificQuizState(savedState.dbSessionId)} variant="outline" size="sm">Clear</Button>
+                          {!savedState.isOffline && ( // Only allow clearing remote sessions
+                            <Button onClick={() => clearSpecificQuizState(savedState.dbSessionId)} variant="outline" size="sm">Clear</Button>
+                          )}
                         </div>
                       </div>
                     );
@@ -1334,7 +1360,7 @@ const QuizPage = () => {
                     Total Trial MCQs Available: {Math.min(allTrialMcqsCount, TRIAL_MCQ_LIMIT)}
                   </p>
                   <Button
-                    onClick={() => startQuizSession(ALL_TRIAL_MCQS_ID, 'random')}
+                    onClick={() => startQuizSession(ALL_TRIAL_MCQS_ID, 'random', false)}
                     className="w-full"
                   >
                     Start Trial Quiz ({Math.min(allTrialMcqsCount, TRIAL_MCQ_LIMIT)} Questions)
@@ -1360,16 +1386,15 @@ const QuizPage = () => {
                   const isGuestOrNotSubscribed = isGuest || (!isSubscribed && !user?.trial_taken);
                   const showSubscribePrompt = hasTakenTrial && !isSubscribed;
 
-                  // Determine the displayed count
                   const totalCount = cat.total_mcqs;
                   const accessibleCount = cat.total_trial_mcqs;
+                  const offlineCount = cat.offline_count;
                   
                   let descriptionText = `${totalCount} MCQs available`;
                   if (!isSubscribed && totalCount > accessibleCount) {
                     descriptionText += ` (${accessibleCount} trial, ${totalCount - accessibleCount} premium locked)`;
                   }
 
-                  // Determine the button text and disabled state
                   let buttonText = "Start Quiz";
                   let buttonDisabled = false;
                   
@@ -1387,14 +1412,12 @@ const QuizPage = () => {
                     buttonDisabled = true;
                   }
                   
-                  // If there is a saved quiz, override the button logic
                   const savedQuiz = activeSavedQuizzes.find(session => session.categoryId === cat.id);
                   if (savedQuiz) {
                       buttonText = "Continue Quiz";
                       buttonDisabled = false;
                   }
 
-                  // Determine if the subscription CTA should be shown
                   const showSubscriptionCTA = !isSubscribed && totalCount > accessibleCount;
 
 
@@ -1407,13 +1430,18 @@ const QuizPage = () => {
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="flex-grow space-y-2 text-sm">
-                        {!isGuest && ( // Only show user stats for logged-in users
+                        {!isGuest && (
                           <>
                             <p>Attempts: {cat.user_attempts}</p>
                             <p>Correct: {cat.user_correct}</p>
                             <p>Incorrect: {cat.user_incorrect}</p>
                             <p>Accuracy: {cat.user_accuracy}</p>
                           </>
+                        )}
+                        {isNative && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <WifiOff className="h-3 w-3" /> Offline MCQs: {offlineCount}
+                            </p>
                         )}
                         {showSubscriptionCTA && (
                           <div className="pt-2">
@@ -1435,7 +1463,7 @@ const QuizPage = () => {
                           </Button>
                         ) : (
                           <Button
-                            onClick={() => startQuizSession(cat.id, 'random')}
+                            onClick={() => startQuizSession(cat.id, 'random', false)}
                             className="w-full"
                             disabled={buttonDisabled}
                           >
@@ -1443,13 +1471,25 @@ const QuizPage = () => {
                           </Button>
                         )}
                         <Button
-                          onClick={() => startQuizSession(cat.id, 'incorrect')}
+                          onClick={() => startQuizSession(cat.id, 'incorrect', false)}
                           className="w-full"
                           variant="secondary"
-                          disabled={cat.user_incorrect === 0 || !isSubscribed || isTrialActiveSession} // Disable for trial sessions
+                          disabled={cat.user_incorrect === 0 || !isSubscribed || isTrialActiveSession}
                         >
                           Attempt Incorrect ({cat.user_incorrect})
                         </Button>
+                        
+                        {/* OFFLINE BUTTON */}
+                        {isNative && offlineCount > 0 && (
+                            <Button
+                                onClick={() => startQuizSession(cat.id, 'random', true)}
+                                className="w-full"
+                                variant="outline"
+                            >
+                                <WifiOff className="h-4 w-4 mr-2" /> Start Offline Quiz ({offlineCount})
+                            </Button>
+                        )}
+
                         {showSubscribePrompt && (
                           <Link to="/user/subscriptions" className="w-full">
                             <Button variant="link" className="w-full text-red-500 dark:text-red-400 hover:underline">
@@ -1457,12 +1497,12 @@ const QuizPage = () => {
                             </Button>
                           </Link>
                         )}
-                        {!isGuest && ( // Only show reset progress for logged-in users
+                        {!isGuest && (
                           <Button
                             onClick={() => handleResetProgress(cat.id)}
                             className="w-full"
                             variant="destructive"
-                            disabled={cat.user_attempts === 0 || cat.id === ALL_TRIAL_MCQS_ID} // Cannot reset ALL_TRIAL_MCQS_ID
+                            disabled={cat.user_attempts === 0 || cat.id === ALL_TRIAL_MCQS_ID}
                           >
                             <RotateCcw className="h-4 w-4 mr-2" /> Reset Progress
                           </Button>
@@ -1530,6 +1570,8 @@ const QuizPage = () => {
                   const userAnswerData = userAnswers.get(mcq.id);
                   const userAnswer = userAnswerData?.selectedOption;
                   const isCorrect = userAnswerData?.isCorrect;
+                  
+                  // Get explanation from local state (which includes offline data if applicable)
                   const explanation = explanations.get(mcq.explanation_id || '');
 
                   return (
@@ -1607,7 +1649,7 @@ const QuizPage = () => {
         <div className="w-full max-w-6xl mb-4 text-center">
           <Card className="p-4">
             <p className="text-lg font-semibold">
-              Current Accuracy: {currentCorrectnessPercentage} ({currentCorrectCount} / {quizQuestions.length} Correct)
+              Current Accuracy: {currentCorrectnessPercentage} ({currentCorrectCount} / {quizQuestions.length} Answered Correctly)
             </p>
           </Card>
         </div>
@@ -1622,13 +1664,18 @@ const QuizPage = () => {
                   Trial Mode ({currentQuestionIndex + 1} / {TRIAL_MCQ_LIMIT} questions)
                 </CardDescription>
               )}
+              {isOfflineQuiz && (
+                <CardDescription className="text-sm text-red-500 dark:text-red-400 flex items-center gap-1">
+                  <WifiOff className="h-4 w-4" /> OFFLINE MODE
+                </CardDescription>
+              )}
               {currentMcq?.difficulty && (
                 <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
                   Difficulty: {currentMcq.difficulty}
                 </CardDescription>
               )}
             </div>
-            {!isGuest && (
+            {!isGuest && !isOfflineQuiz && ( // Disable bookmarking in offline mode
               <Button
                 variant="ghost"
                 size="icon"
@@ -1647,7 +1694,7 @@ const QuizPage = () => {
               onValueChange={handleOptionSelect}
               value={selectedAnswer || ""}
               className="space-y-2"
-              disabled={isSubmitted} // Disable radio group if already submitted
+              disabled={isSubmitted}
             >
               {['A', 'B', 'C', 'D'].map((optionKey) => {
                 const optionText = currentMcq?.[`option_${optionKey.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'];
@@ -1698,7 +1745,7 @@ const QuizPage = () => {
                 {explanations.get(currentMcq.explanation_id || '')?.image_url && (
                   <img src={explanations.get(currentMcq.explanation_id || '')?.image_url || ''} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
                 )}
-                {user && ( // Only show feedback button for logged-in users
+                {user && !isOfflineQuiz && (
                   <Button
                     variant="outline"
                     className="mt-4 w-full"
@@ -1718,7 +1765,7 @@ const QuizPage = () => {
               <Button onClick={handleGoToDashboard} variant="outline" disabled={isSubmittingAnswer}>
                 <ArrowLeft className="h-4 w-4 mr-2" /> Go to Dashboard
               </Button>
-              <Button onClick={handleSaveProgress} variant="secondary" disabled={isSubmittingAnswer || !currentQuizCategoryId || !user}>
+              <Button onClick={handleSaveProgress} variant="secondary" disabled={isSubmittingAnswer || !currentQuizCategoryId || !user || isOfflineQuiz}>
                 <Save className="h-4 w-4 mr-2" /> Save Progress
               </Button>
             </div>

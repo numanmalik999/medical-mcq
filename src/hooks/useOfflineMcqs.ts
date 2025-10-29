@@ -2,10 +2,32 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { CapacitorSQLite, SQLiteDBConnection, SQLiteHook } from '@capacitor-community/sqlite';
-import { McqCategoryLink, MCQ } from '@/components/mcq-columns';
+import { CapacitorSQLite, SQLiteDBConnection } from '@capacitor-community/sqlite';
+import { MCQ } from '@/components/mcq-columns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
+import { dismissToast } from '@/utils/toast'; // Fix Error 23, 24
+
+// Define the structure of the nested MCQ data from Supabase join
+interface SupabaseMcqData {
+  id: string;
+  question_text: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_answer: 'A' | 'B' | 'C' | 'D';
+  explanation_id: string | null;
+  difficulty: string | null;
+  is_trial_mcq: boolean | null;
+}
+
+// Define the structure of the links data from Supabase join
+interface SupabaseLinkData {
+  mcq_id: string;
+  category_id: string;
+  mcqs: SupabaseMcqData | null;
+}
 
 // Define the structure of the data stored locally
 interface LocalMCQ extends Omit<MCQ, 'category_links'> {
@@ -14,7 +36,8 @@ interface LocalMCQ extends Omit<MCQ, 'category_links'> {
   image_url: string | null;
 }
 
-const useSQLite: SQLiteHook = CapacitorSQLite;
+// Fix Error 1: Removed explicit SQLiteHook type as it's not exported directly
+const useSQLite = CapacitorSQLite;
 
 export const useOfflineMcqs = () => {
   const { toast } = useToast();
@@ -30,7 +53,7 @@ export const useOfflineMcqs = () => {
 
     try {
       const dbName = "offline_mcqs_db";
-      const ret = await useSQLite.checkConnectionsConsistency();
+      const _ret = await useSQLite.checkConnectionsConsistency(); // Fix Error 3
       const isConn = (await useSQLite.isConnection(dbName, false)).result;
       
       let database: SQLiteDBConnection;
@@ -107,26 +130,29 @@ export const useOfflineMcqs = () => {
         .in('category_id', categoryIds)
         .limit(limit);
 
-      const { data: linksData, error: linksError } = await mcqsQuery;
+      const { data: linksData, error: linksError } = await mcqsQuery as { data: SupabaseLinkData[] | null, error: any };
 
       if (linksError) throw linksError;
 
       const uniqueMcqIds = Array.from(new Set(linksData.map(link => link.mcq_id)));
       if (uniqueMcqIds.length === 0) {
+        dismissToast(loadingToastId.id);
         toast({ title: "Info", description: "No MCQs found for the selected categories.", variant: "default" });
         return { success: true, count: 0 };
       }
 
-      // 2. Fetch explanations for all unique MCQs
+      // 2. Fetch explanations for all unique MCQs (Fixes Errors 4, 5)
+      const explanationIdsToFetch = Array.from(new Set(linksData.map(l => l.mcqs?.explanation_id).filter((id): id is string => !!id)));
+      
       const { data: explanationsData, error: expError } = await supabase
         .from('mcq_explanations')
         .select('*')
-        .in('id', uniqueMcqIds.map(id => linksData.find(l => l.mcqs?.explanation_id === id)?.mcqs?.explanation_id).filter(Boolean) as string[]);
+        .in('id', explanationIdsToFetch);
 
       if (expError) throw expError;
       const explanationMap = new Map(explanationsData.map(exp => [exp.id, exp]));
 
-      // 3. Prepare data for local storage
+      // 3. Prepare data for local storage (Fixes Errors 6-22)
       const mcqMap = new Map<string, LocalMCQ>();
       const mcqCategoryMap = new Map<string, string[]>();
 
@@ -150,6 +176,7 @@ export const useOfflineMcqs = () => {
               option_c: mcq.option_c,
               option_d: mcq.option_d,
               correct_answer: mcq.correct_answer,
+              explanation_id: mcq.id, // Use MCQ ID as explanation ID for local data
               difficulty: mcq.difficulty,
               is_trial_mcq: mcq.is_trial_mcq,
               explanation_text: explanation?.explanation_text || "No explanation available offline.",
@@ -226,7 +253,8 @@ export const useOfflineMcqs = () => {
       
       const result = await db.query(query);
       
-      return result.values.map((row: any) => ({
+      // Fix Error 25
+      return (result.values || []).map((row: any) => ({
         id: row.id,
         question_text: row.question_text,
         option_a: row.option_a,
@@ -263,7 +291,8 @@ export const useOfflineMcqs = () => {
       const result = await db.query(query);
       
       const matchingIds: string[] = [];
-      result.values.forEach((row: any) => {
+      // Fix Error 26
+      (result.values || []).forEach((row: any) => {
         try {
           const categoryIds = JSON.parse(row.category_ids_json);
           if (Array.isArray(categoryIds) && categoryIds.includes(categoryId)) {
@@ -289,7 +318,8 @@ export const useOfflineMcqs = () => {
       const result = await db.query(query);
       
       const counts = new Map<string, number>();
-      result.values.forEach((row: any) => {
+      // Fix Error 27
+      (result.values || []).forEach((row: any) => {
         try {
           const categoryIds = JSON.parse(row.category_ids_json);
           if (Array.isArray(categoryIds)) {

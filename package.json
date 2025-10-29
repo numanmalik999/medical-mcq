@@ -18,9 +18,10 @@
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^7.0.2",
-    "@capacitor/android": "^6.1.0",
-    "@capacitor/core": "^6.1.0",
-    "@capacitor/ios": "^6.1.0",
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/ios": "^7.4.4",
     "@hookform/resolvers": "^3.9.0",
     "@paypal/react-paypal-js": "^8.9.2",
     "@radix-ui/react-accordion": "^1.2.0",
@@ -60,6 +61,7 @@
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.3.0",
+    "exceljs": "^4.4.0",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
@@ -81,7 +83,6 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.1.0",
     "@dyad-sh/react-vite-component-tagger": "^0.8.0",
     "@eslint/js": "^9.9.0",
     "@tailwindcss/typography": "^0.5.15",

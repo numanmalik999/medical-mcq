@@ -18,6 +18,15 @@ import {
 import EditStaticPageDialog, { StaticPage } from '@/components/EditStaticPageDialog';
 import { useSession } from '@/components/SessionContextProvider';
 
+const defaultPages = [
+  { slug: 'about', title: 'About Us', content: '# About Study Prometric MCQs...', location: ['footer'] },
+  { slug: 'contact', title: 'Contact Us', content: '# Contact Us...', location: ['footer'] },
+  { slug: 'privacy', title: 'Privacy Policy', content: '# Privacy Policy...', location: ['footer'] },
+  { slug: 'terms', title: 'Terms of Service', content: '# Terms of Service...', location: ['footer'] },
+  { slug: 'faq', title: 'FAQ', content: '# Frequently Asked Questions...', location: ['footer'] },
+  { slug: 'refund', title: 'Return & Refund Policy', content: '# Return and Refund Policy...', location: ['footer'] },
+];
+
 const AdminSettingsPage = () => {
   const { toast } = useToast();
   const [staticPages, setStaticPages] = useState<StaticPage[]>([]);
@@ -28,14 +37,28 @@ const AdminSettingsPage = () => {
 
   const { hasCheckedInitialSession } = useSession();
 
-  useEffect(() => {
-    if (hasCheckedInitialSession) {
-      fetchStaticPages();
-    }
-  }, [hasCheckedInitialSession]);
+  const ensureDefaultStaticPages = async () => {
+    const existingSlugs = new Set(staticPages.map(p => p.slug));
+    const pagesToInsert = defaultPages.filter(p => !existingSlugs.has(p.slug));
 
-  const fetchStaticPages = async () => {
-    setIsPageLoading(true);
+    if (pagesToInsert.length > 0) {
+      console.log(`Inserting ${pagesToInsert.length} default static pages.`);
+      const { error } = await supabase
+        .from('static_pages')
+        .insert(pagesToInsert);
+
+      if (error) {
+        console.error('Error inserting default static pages:', error);
+        toast({ title: "Error", description: "Failed to initialize default pages.", variant: "destructive" });
+      } else {
+        // If successful, re-fetch all pages
+        await fetchStaticPages(false); // Fetch without setting loading state again
+      }
+    }
+  };
+
+  const fetchStaticPages = async (setLoading = true) => {
+    if (setLoading) setIsPageLoading(true);
     const { data, error } = await supabase
       .from('static_pages')
       .select('*')
@@ -48,8 +71,26 @@ const AdminSettingsPage = () => {
     } else {
       setStaticPages(data || []);
     }
-    setIsPageLoading(false);
+    if (setLoading) setIsPageLoading(false);
   };
+
+  useEffect(() => {
+    if (hasCheckedInitialSession) {
+      // First, fetch existing pages
+      fetchStaticPages().then(() => {
+        // Then, ensure defaults exist (this relies on the state being updated, so we call it after the initial fetch)
+        // We call it here to ensure it runs after the initial fetch completes and populates `staticPages` state.
+      });
+    }
+  }, [hasCheckedInitialSession]);
+
+  // Separate effect to run default page check after initial fetch completes
+  useEffect(() => {
+    if (hasCheckedInitialSession && !isPageLoading) {
+        ensureDefaultStaticPages();
+    }
+  }, [isPageLoading, hasCheckedInitialSession]);
+
 
   const handleDeletePage = async (id: string) => {
     if (!window.confirm("Are you sure you want to delete this static page? This action cannot be undone.")) {
@@ -78,6 +119,11 @@ const AdminSettingsPage = () => {
   const columns: ColumnDef<StaticPage>[] = [
     { accessorKey: 'title', header: 'Page Title' },
     { accessorKey: 'slug', header: 'Slug' },
+    {
+      accessorKey: 'location',
+      header: 'Location',
+      cell: ({ row }) => (row.original.location || []).join(', ') || 'None',
+    },
     {
       accessorKey: 'updated_at',
       header: 'Last Updated',
@@ -127,7 +173,7 @@ const AdminSettingsPage = () => {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         page={selectedPageForEdit}
-        onSave={fetchStaticPages}
+        onSave={() => fetchStaticPages()}
       />
     </div>
   );

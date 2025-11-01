@@ -57,14 +57,14 @@ const AboutUsPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16 pb-12">
-      <Card className="w-full max-w-3xl">
+      <Card className="w-full max-w-4xl">
         <CardHeader>
           <CardTitle className="text-3xl text-center">{pageTitle}</CardTitle>
           <CardDescription className="text-center mt-2">
             {pageDescription}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 text-lg text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none">
+        <CardContent className="space-y-6 text-base text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none">
           <ReactMarkdown>{pageContent}</ReactMarkdown>
         </CardContent>
       </Card>

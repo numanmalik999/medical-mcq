@@ -166,7 +166,7 @@ const FAQPage = () => {
                   {category.questions.map((item, qIndex) => (
                     <AccordionItem key={qIndex} value={`item-${catIndex}-${qIndex}`}>
                       <AccordionTrigger className="text-left font-medium">{item.question}</AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground">
+                      <AccordionContent className="text-muted-foreground text-base">
                         {item.answer}
                       </AccordionContent>
                     </AccordionItem>

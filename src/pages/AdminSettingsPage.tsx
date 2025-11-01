@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import EditStaticPageDialog, { StaticPage } from '@/components/EditStaticPageDialog';
 import { useSession } from '@/components/SessionContextProvider';
+import { Badge } from '@/components/ui/badge'; // Import Badge
 
 const defaultPages = [
   { slug: 'about', title: 'About Us', content: '# About Study Prometric MCQs...', location: ['footer'] },
@@ -122,7 +123,19 @@ const AdminSettingsPage = () => {
     {
       accessorKey: 'location',
       header: 'Location',
-      cell: ({ row }) => (row.original.location || []).join(', ') || 'None',
+      cell: ({ row }) => (
+        <div className="flex flex-wrap gap-1">
+          {(row.original.location || []).length > 0 ? (
+            (row.original.location || []).map((loc, index) => (
+              <Badge key={index} variant="secondary">
+                {loc.charAt(0).toUpperCase() + loc.slice(1)}
+              </Badge>
+            ))
+          ) : (
+            <span className="text-muted-foreground">None</span>
+          )}
+        </div>
+      ),
     },
     {
       accessorKey: 'updated_at',

@@ -9,9 +9,8 @@ const UserLayout = () => {
 
   return (
     <div className="flex min-h-screen bg-background text-foreground pt-16"> {/* Added pt-16 for header */}
-      {!isMobile && <UserSidebar />}
+      <UserSidebar />
       <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
-        {isMobile && <UserSidebar />} {/* Render mobile sidebar trigger */}
         <Outlet /> {/* Render nested routes here */}
       </main>
     </div>

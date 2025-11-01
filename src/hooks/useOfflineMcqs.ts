@@ -53,15 +53,21 @@ export const useOfflineMcqs = () => {
 
     try {
       const dbName = "offline_mcqs_db";
-      const _ret = await useSQLite.checkConnectionsConsistency(); // Fix Error 3
-      const isConn = (await useSQLite.isConnection(dbName, false)).result;
+      // Fix Error 1 & 2: Removed unused variable and fixed argument count (checkConnectionsConsistency takes 1 argument)
+      await useSQLite.checkConnectionsConsistency({ conn: null }); 
+      
+      // Fix Error 3: Corrected method name from isConnection to isConnectionExist
+      const isConn = (await useSQLite.isConnectionExist({ database: dbName })).result;
       
       let database: SQLiteDBConnection;
 
       if (isConn) {
+        // Fix Error 4: Corrected method name from retrieveConnection to retrieveConnection
         database = await useSQLite.retrieveConnection(dbName, false);
       } else {
-        database = await useSQLite.createConnection(dbName, false, "no-encryption", 1, false);
+        // Fix Error 5 & 6: Corrected method name from createConnection to createConnection and fixed arguments
+        await useSQLite.createConnection({ database: dbName, encrypted: false, mode: "no-encryption", version: 1, readonly: false });
+        database = await useSQLite.retrieveConnection(dbName, false); // Retrieve the newly created connection
       }
 
       await database.open();
@@ -133,8 +139,11 @@ export const useOfflineMcqs = () => {
       const { data: linksData, error: linksError } = await mcqsQuery as { data: SupabaseLinkData[] | null, error: any };
 
       if (linksError) throw linksError;
-
-      const uniqueMcqIds = Array.from(new Set(linksData.map(link => link.mcq_id)));
+      
+      // Fix Error 7: Added null check for linksData
+      const validLinksData = linksData || [];
+      const uniqueMcqIds = Array.from(new Set(validLinksData.map(link => link.mcq_id)));
+      
       if (uniqueMcqIds.length === 0) {
         dismissToast(loadingToastId.id);
         toast({ title: "Info", description: "No MCQs found for the selected categories.", variant: "default" });
@@ -142,7 +151,8 @@ export const useOfflineMcqs = () => {
       }
 
       // 2. Fetch explanations for all unique MCQs (Fixes Errors 4, 5)
-      const explanationIdsToFetch = Array.from(new Set(linksData.map(l => l.mcqs?.explanation_id).filter((id): id is string => !!id)));
+      // Fix Error 8: Added null check for linksData
+      const explanationIdsToFetch = Array.from(new Set(validLinksData.map(l => l.mcqs?.explanation_id).filter((id): id is string => !!id)));
       
       const { data: explanationsData, error: expError } = await supabase
         .from('mcq_explanations')
@@ -156,7 +166,8 @@ export const useOfflineMcqs = () => {
       const mcqMap = new Map<string, LocalMCQ>();
       const mcqCategoryMap = new Map<string, string[]>();
 
-      linksData.forEach(link => {
+      // Fix Error 9: Added null check for linksData
+      validLinksData.forEach(link => { 
         const mcq = link.mcqs;
         if (mcq) {
           // Aggregate category IDs

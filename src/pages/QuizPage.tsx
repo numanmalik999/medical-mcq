@@ -19,7 +19,7 @@ import { MCQ } from '@/components/mcq-columns';
 import { cn } from '@/lib/utils';
 import { useBookmark } from '@/hooks/use-bookmark';
 import useOfflineMcqs from '@/hooks/useOfflineMcqs'; // Import offline hook
-import { Separator } from '@/components/ui/separator'; // Import Separator
+
 
 interface MCQExplanation {
   id: string;

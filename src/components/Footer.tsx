@@ -1,6 +1,6 @@
 "use client";
 
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { MadeWithDyad } from './made-with-dyad';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +27,7 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
   const { toast } = useToast();
   const [footerLinks, setFooterLinks] = useState<StaticPageLink[]>([]);
+  const location = useLocation();
 
   useEffect(() => {
     const fetchFooterLinks = async () => {
@@ -44,8 +45,9 @@ const Footer = () => {
         setFooterLinks(data || []);
       }
     };
+    // Re-fetch whenever the route changes (to reflect potential slug changes made in admin panel)
     fetchFooterLinks();
-  }, [toast]);
+  }, [location.pathname, toast]);
 
   // Separate links into Quick Links and Legal based on title keywords for organization
   const quickLinks = footerLinks.filter(link => !link.title.toLowerCase().includes('policy') && !link.title.toLowerCase().includes('terms'));

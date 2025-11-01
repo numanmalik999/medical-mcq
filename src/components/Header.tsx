@@ -1,6 +1,6 @@
 "use client";
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,7 @@ const Header = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [headerLinks, setHeaderLinks] = useState<StaticPageLink[]>([]);
+  const location = useLocation();
 
   useEffect(() => {
     const fetchHeaderLinks = async () => {
@@ -36,8 +37,9 @@ const Header = () => {
         setHeaderLinks(data || []);
       }
     };
+    // Re-fetch whenever the route changes (to reflect potential slug changes made in admin panel)
     fetchHeaderLinks();
-  }, [toast]);
+  }, [location.pathname, toast]);
 
   const handleAppTitleClick = () => {
     if (!hasCheckedInitialSession) {

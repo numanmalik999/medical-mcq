@@ -148,7 +148,7 @@ const EditStaticPageDialog = ({ open, onOpenChange, page, onSave }: EditStaticPa
                 <FormItem>
                   <FormLabel>Page Slug (Unique Identifier)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., about-us, faq" {...field} disabled={!!page?.id} />
+                    <Input placeholder="e.g., about-us, faq" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

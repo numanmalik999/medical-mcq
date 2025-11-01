@@ -12,6 +12,17 @@ interface StaticPageLink {
   title: string;
 }
 
+// Helper to map database slugs to simplified routes
+const getRouteFromSlug = (slug: string): string => {
+  if (slug.includes('privacy')) return '/privacy';
+  if (slug.includes('terms')) return '/terms';
+  if (slug.includes('refund')) return '/refund';
+  if (slug.includes('about')) return '/about';
+  if (slug.includes('contact')) return '/contact';
+  if (slug.includes('faq')) return '/faq';
+  return `/${slug}`;
+};
+
 const Footer = () => {
   const currentYear = new Date().getFullYear();
   const { toast } = useToast();
@@ -79,7 +90,7 @@ const Footer = () => {
             <h4 className="text-lg font-semibold">Quick Links</h4>
             <nav className="flex flex-col space-y-1 text-sm">
               {quickLinks.map((link) => (
-                <Link key={link.slug} to={`/${link.slug}`} className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-foreground transition-colors">
                   {link.title}
                 </Link>
               ))}
@@ -91,7 +102,7 @@ const Footer = () => {
             <h4 className="text-lg font-semibold">Legal</h4>
             <nav className="flex flex-col space-y-1 text-sm">
               {legalLinks.map((link) => (
-                <Link key={link.slug} to={`/${link.slug}`} className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-foreground transition-colors">
                   {link.title}
                 </Link>
               ))}

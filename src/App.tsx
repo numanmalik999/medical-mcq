@@ -51,6 +51,7 @@ import QuestionOfTheDayPage from "./pages/QuestionOfTheDayPage"; // Import new p
 import ManageDailyMcqsPage from "./pages/ManageDailyMcqsPage"; // Import new page
 
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics"; // Import useGoogleAnalytics hook
+import ReturnRefundPolicyPage from "./pages/ReturnRefundPolicyPage"; // Import new page
 
 
 const queryClient = new QueryClient();
@@ -79,6 +80,7 @@ const AppContent = () => {
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/terms" element={<TermsOfServicePage />} />
             <Route path="/faq" element={<FAQPage />} />
+            <Route path="/refund" element={<ReturnRefundPolicyPage />} /> {/* New route */}
 
             {/* Admin Routes - Protected */}
             <Route path="/admin" element={<AdminProtectedRoute />}>

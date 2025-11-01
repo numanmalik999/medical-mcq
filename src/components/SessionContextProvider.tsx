@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { isPast, parseISO } from 'date-fns'; // Import date-fns helpers
 
 // Extend the User type to include profile fields
 interface AuthUser extends User {
@@ -45,7 +46,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         trial_taken: false,
       } as AuthUser;
     }
-    console.log(`[fetchUserProfile] START: Fetching profile for user ID: ${supabaseUser.id}`);
+    console.log(`[fetchUserProfile] START: Fetching profile and subscription for user ID: ${supabaseUser.id}`);
 
     let profileData = null;
     let fetchError = null;
@@ -58,6 +59,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     );
 
     try {
+      // 1. Fetch Profile Data
       const { data: profileDataArray, error: selectError } = await Promise.race([
         supabase
           .from('profiles')
@@ -73,23 +75,81 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } else if (profileDataArray && profileDataArray[0]) {
         profileData = profileDataArray[0];
       }
+
+      let currentHasActiveSubscription = profileData?.has_active_subscription || false;
+
+      // 2. Check Subscription Status (Only if profile claims to be active)
+      if (currentHasActiveSubscription) {
+        const { data: latestSub, error: subError } = await supabase
+          .from('user_subscriptions')
+          .select('end_date, status')
+          .eq('user_id', supabaseUser.id)
+          .eq('status', 'active')
+          .order('end_date', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (subError && subError.code !== 'PGRST116') {
+            console.error('[fetchUserProfile] ERROR: fetching latest active subscription:', subError);
+        } else if (latestSub && latestSub.end_date) {
+            const endDate = parseISO(latestSub.end_date);
+            if (isPast(endDate)) {
+                console.log(`[fetchUserProfile] Subscription expired for user ${supabaseUser.id}. End Date: ${latestSub.end_date}`);
+                currentHasActiveSubscription = false;
+                
+                // Update the database profile flag via Edge Function (Service Role)
+                const { error: updateError } = await supabase.functions.invoke('update-expired-subscription-status', {
+                    body: { user_id: supabaseUser.id, is_active: false },
+                });
+                
+                if (updateError) {
+                    console.error('[fetchUserProfile] ERROR: Failed to update expired status via Edge Function:', updateError);
+                }
+            } else {
+                console.log(`[fetchUserProfile] Subscription is active for user ${supabaseUser.id}. Expires: ${latestSub.end_date}`);
+            }
+        } else {
+            // No active subscription found in user_subscriptions table, despite profile flag being true
+            if (profileData?.has_active_subscription) {
+                console.warn(`[fetchUserProfile] Profile flag mismatch: profile.has_active_subscription=TRUE but no active record found. Setting to FALSE.`);
+                currentHasActiveSubscription = false;
+                
+                // Update the database profile flag via Edge Function (Service Role)
+                const { error: updateError } = await supabase.functions.invoke('update-expired-subscription-status', {
+                    body: { user_id: supabaseUser.id, is_active: false },
+                });
+                
+                if (updateError) {
+                    console.error('[fetchUserProfile] ERROR: Failed to correct profile flag via Edge Function:', updateError);
+                }
+            }
+        }
+      }
+    
+      const hydratedUser: AuthUser = {
+        ...supabaseUser,
+        is_admin: profileData?.is_admin || false,
+        first_name: profileData?.first_name || null,
+        last_name: profileData?.last_name || null,
+        phone_number: profileData?.phone_number || null,
+        whatsapp_number: profileData?.whatsapp_number || null,
+        has_active_subscription: currentHasActiveSubscription, // Use the verified status
+        trial_taken: profileData?.trial_taken || false,
+      };
+      console.log('[fetchUserProfile] END: Hydrated user object:', hydratedUser);
+      return hydratedUser;
     } catch (e: any) {
       console.error(`[fetchUserProfile] UNEXPECTED EXCEPTION during Supabase profile fetch:`, e.message || e);
       fetchError = { message: e.message || 'Unknown error during fetch', code: 'UNEXPECTED_EXCEPTION' }; 
+      
+      // Return a default user object on catastrophic failure
+      return {
+        ...supabaseUser,
+        is_admin: profileData?.is_admin || false,
+        has_active_subscription: profileData?.has_active_subscription || false,
+        trial_taken: profileData?.trial_taken || false,
+      } as AuthUser;
     }
-    
-    const hydratedUser: AuthUser = {
-      ...supabaseUser,
-      is_admin: profileData?.is_admin || false,
-      first_name: profileData?.first_name || null,
-      last_name: profileData?.last_name || null,
-      phone_number: profileData?.phone_number || null,
-      whatsapp_number: profileData?.whatsapp_number || null,
-      has_active_subscription: profileData?.has_active_subscription || false,
-      trial_taken: profileData?.trial_taken || false,
-    };
-    console.log('[fetchUserProfile] END: Hydrated user object:', hydratedUser);
-    return hydratedUser;
   }, []);
 
   // This function will be called on initial load and on auth state changes

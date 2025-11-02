@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
+// Removed unused ReactMarkdown import
 
 const defaultContent = `
 # Privacy Policy
@@ -157,7 +157,7 @@ const PrivacyPolicyPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 text-base text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none">
-          <ReactMarkdown>{pageContent}</ReactMarkdown>
+          <div dangerouslySetInnerHTML={{ __html: pageContent }} />
         </CardContent>
       </Card>
       <MadeWithDyad />

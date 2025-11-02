@@ -6,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+// Removed unused ReactMarkdown import
 
 // Define a type for FAQ items
 interface FaqItem {
   question: string;
-  answer: string;
+  answer: string; // This answer can now contain HTML
 }
 
 // Define a type for FAQ categories
@@ -133,7 +134,7 @@ const FAQPage = () => {
           }
         } catch (parseError) {
           console.error("Error parsing FAQ content from DB:", parseError);
-          setFaqItems(defaultFaqItems);
+          setFaqItems(defaultFagItems);
         }
       }
       setIsLoading(false);
@@ -167,7 +168,8 @@ const FAQPage = () => {
                     <AccordionItem key={qIndex} value={`item-${catIndex}-${qIndex}`}>
                       <AccordionTrigger className="text-left font-medium">{item.question}</AccordionTrigger>
                       <AccordionContent className="text-muted-foreground text-base">
-                        {item.answer}
+                        {/* Render answer as raw HTML */}
+                        <div dangerouslySetInnerHTML={{ __html: item.answer }} />
                       </AccordionContent>
                     </AccordionItem>
                   ))}

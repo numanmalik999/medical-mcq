@@ -57,7 +57,7 @@ const AboutUsPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16 pb-12">
-      <Card className="w-full max-w-4xl">
+      <Card className="w-full max-w-6xl">
         <CardHeader>
           <CardTitle className="text-3xl text-center">{pageTitle}</CardTitle>
           <CardDescription className="text-center mt-2">

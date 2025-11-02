@@ -134,7 +134,7 @@ const FAQPage = () => {
           }
         } catch (parseError) {
           console.error("Error parsing FAQ content from DB:", parseError);
-          setFaqItems(defaultFaqItems); // Fixed typo here
+          setFaqItems(defaultFaqItems);
         }
       }
       setIsLoading(false);
@@ -153,7 +153,7 @@ const FAQPage = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground pt-16 pb-12">
-      <div className="container mx-auto px-4 max-w-4xl">
+      <div className="container mx-auto px-4 max-w-6xl">
         <h1 className="text-4xl font-bold text-center mb-12">{pageTitle}</h1>
 
         <div className="space-y-8">

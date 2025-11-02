@@ -53,20 +53,19 @@ export const useOfflineMcqs = () => {
     try {
       const dbName = "offline_mcqs_db";
       
-      // Fix Error 1: checkConnectionsConsistency expects no arguments or { full: boolean }. Trying no arguments first.
-      // If this fails, we might need to check the specific version's type definition.
-      await useSQLite.checkConnectionsConsistency(); 
+      // Fix Error 1: checkConnectionsConsistency expects 1 argument. Using { full: false }
+      await useSQLite.checkConnectionsConsistency({ full: false }); 
       
-      // Fix Error 2: Corrected method name to isConnectionExist (common API name)
-      const isConn = (await useSQLite.isConnectionExist({ database: dbName })).result;
+      // Fix Error 2: Reverting to isConnection as isConnectionExist seems unsupported by types
+      const isConn = (await useSQLite.isConnection({ database: dbName })).result;
       
       let database: SQLiteDBConnection;
 
       if (isConn) {
-        // Fix Error 3: retrieveConnection expects an options object
+        // Fix Error 3: Reverting to retrieveConnection as retrieveConnection seems unsupported by types
         database = await useSQLite.retrieveConnection({ database: dbName, readonly: false });
       } else {
-        // Fix Error 4: retrieveConnection expects an options object
+        // Fix Error 4: Reverting to retrieveConnection as retrieveConnection seems unsupported by types
         await useSQLite.createConnection({ database: dbName, encrypted: false, mode: "no-encryption", version: 1, readonly: false });
         database = await useSQLite.retrieveConnection({ database: dbName, readonly: false }); // Retrieve the newly created connection
       }

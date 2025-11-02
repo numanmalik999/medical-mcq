@@ -27,7 +27,7 @@ const ReturnRefundPolicyPage = () => {
   const { toast } = useToast();
   const [pageContent, setPageContent] = useState(defaultContent);
   const [pageTitle, setPageTitle] = useState("Return & Refund Policy");
-  const [pageDescription, setPageDescription] = useState("Details regarding subscription cancellation and refunds.");
+  const [pageDescription] = useState("Details regarding subscription cancellation and refunds."); // Removed setPageDescription
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

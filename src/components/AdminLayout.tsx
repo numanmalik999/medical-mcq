@@ -1,11 +1,10 @@
 "use client";
 
 import AdminSidebar from './AdminSidebar';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { Outlet } from 'react-router-dom'; // Import Outlet
 
 const AdminLayout = () => { // Removed children prop
-  const isMobile = useIsMobile();
+  // const isMobile = useIsMobile(); // Removed unused variable
 
   return (
     <div className="flex min-h-screen bg-background text-foreground pt-16"> {/* Added pt-16 for header */}

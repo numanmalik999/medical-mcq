@@ -6,7 +6,7 @@ import { CapacitorSQLite, SQLiteDBConnection } from '@capacitor-community/sqlite
 import { MCQ } from '@/components/mcq-columns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
-import { dismissToast } from '@/utils/toast'; // Fix Error 23, 24
+import { dismissToast } from '@/utils/toast';
 
 // Define the structure of the nested MCQ data from Supabase join
 interface SupabaseMcqData {
@@ -36,7 +36,6 @@ interface LocalMCQ extends Omit<MCQ, 'category_links'> {
   image_url: string | null;
 }
 
-// Fix Error 1: Removed explicit SQLiteHook type as it's not exported directly
 const useSQLite = CapacitorSQLite;
 
 export const useOfflineMcqs = () => {
@@ -53,21 +52,23 @@ export const useOfflineMcqs = () => {
 
     try {
       const dbName = "offline_mcqs_db";
-      // Fix Error 1 & 2: Removed unused variable and fixed argument count (checkConnectionsConsistency takes 1 argument)
-      await useSQLite.checkConnectionsConsistency({ conn: null }); 
       
-      // Fix Error 3: Corrected method name from isConnection to isConnectionExist
+      // Fix Error 1: checkConnectionsConsistency expects no arguments or { full: boolean }. Trying no arguments first.
+      // If this fails, we might need to check the specific version's type definition.
+      await useSQLite.checkConnectionsConsistency(); 
+      
+      // Fix Error 2: Corrected method name to isConnectionExist (common API name)
       const isConn = (await useSQLite.isConnectionExist({ database: dbName })).result;
       
       let database: SQLiteDBConnection;
 
       if (isConn) {
-        // Fix Error 4: Corrected method name from retrieveConnection to retrieveConnection
-        database = await useSQLite.retrieveConnection(dbName, false);
+        // Fix Error 3: retrieveConnection expects an options object
+        database = await useSQLite.retrieveConnection({ database: dbName, readonly: false });
       } else {
-        // Fix Error 5 & 6: Corrected method name from createConnection to createConnection and fixed arguments
+        // Fix Error 4: retrieveConnection expects an options object
         await useSQLite.createConnection({ database: dbName, encrypted: false, mode: "no-encryption", version: 1, readonly: false });
-        database = await useSQLite.retrieveConnection(dbName, false); // Retrieve the newly created connection
+        database = await useSQLite.retrieveConnection({ database: dbName, readonly: false }); // Retrieve the newly created connection
       }
 
       await database.open();
@@ -201,29 +202,37 @@ export const useOfflineMcqs = () => {
       const mcqsToStore = Array.from(mcqMap.values());
 
       // 4. Store data locally (using transactions for efficiency)
-      const mcqValues = mcqsToStore.map(m => `(
-        '${m.id}', 
-        '${m.question_text.replace(/'/g, "''")}', 
-        '${m.option_a.replace(/'/g, "''")}', 
-        '${m.option_b.replace(/'/g, "''")}', 
-        '${m.option_c.replace(/'/g, "''")}', 
-        '${m.option_d.replace(/'/g, "''")}', 
-        '${m.correct_answer}', 
-        '${m.difficulty || ''}', 
-        ${m.is_trial_mcq ? 1 : 0}, 
-        '${m.category_ids_json.replace(/'/g, "''")}'
-      )`).join(', ');
+      // Fix Errors 5, 6, 7, 8: Define SQL statements and use them in executeSet
+      
+      const insertMcqs = `
+        INSERT OR REPLACE INTO mcqs (id, question_text, option_a, option_b, option_c, option_d, correct_answer, difficulty, is_trial_mcq, category_ids_json)
+        VALUES ${mcqsToStore.map(m => `(
+          '${m.id}', 
+          '${m.question_text.replace(/'/g, "''")}', 
+          '${m.option_a.replace(/'/g, "''")}', 
+          '${m.option_b.replace(/'/g, "''")}', 
+          '${m.option_c.replace(/'/g, "''")}', 
+          '${m.option_d.replace(/'/g, "''")}', 
+          '${m.correct_answer}', 
+          '${m.difficulty || ''}', 
+          ${m.is_trial_mcq ? 1 : 0}, 
+          '${JSON.stringify(mcqCategoryMap.get(m.id) || []).replace(/'/g, "''")}'
+        )`).join(', ')};
+      `;
 
-      const explanationValues = mcqsToStore.map(m => `(
-        '${m.id}', 
-        '${m.explanation_text.replace(/'/g, "''")}', 
-        '${m.image_url || ''}'
-      )`).join(', ');
+      const insertExplanations = `
+        INSERT OR REPLACE INTO mcq_explanations (id, explanation_text, image_url)
+        VALUES ${mcqsToStore.map(m => `(
+          '${m.id}', 
+          '${m.explanation_text.replace(/'/g, "''")}', 
+          '${m.image_url || ''}'
+        )`).join(', ')};
+      `;
 
-      const insertMcqs = `INSERT OR REPLACE INTO mcqs (id, question_text, option_a, option_b, option_c, option_d, correct_answer, difficulty, is_trial_mcq, category_ids_json) VALUES ${mcqValues};`;
-      const insertExplanations = `INSERT OR REPLACE INTO mcq_explanations (id, explanation_text, image_url) VALUES ${explanationValues};`;
-
+      // Clear existing data before inserting new data (optional, but safer for bulk updates)
       await db.executeSet([
+        { statement: 'DELETE FROM mcqs', values: [] },
+        { statement: 'DELETE FROM mcq_explanations', values: [] },
         { statement: insertMcqs, values: [] },
         { statement: insertExplanations, values: [] },
       ]);

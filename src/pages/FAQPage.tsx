@@ -134,7 +134,7 @@ const FAQPage = () => {
           }
         } catch (parseError) {
           console.error("Error parsing FAQ content from DB:", parseError);
-          setFaqItems(defaultFagItems);
+          setFaqItems(defaultFaqItems); // Fixed typo here
         }
       }
       setIsLoading(false);

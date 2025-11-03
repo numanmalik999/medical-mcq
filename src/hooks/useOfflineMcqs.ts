@@ -50,34 +50,31 @@ export const useOfflineMcqs = () => {
       return;
     }
 
-    try {
-      const dbName = "offline_mcqs_db";
-      
-      // Fix Error 1: Use @ts-ignore to bypass strict type checking for argument count/type mismatch
-      // @ts-ignore
-      await useSQLite.checkConnectionsConsistency(); 
-      
-      // Fix Error 2: Use isConnectionExist, ignoring TS error due to type mismatch
-      // @ts-ignore
-      const isConn = (await useSQLite.isConnectionExist({ database: dbName })).result;
-      
-      let database: SQLiteDBConnection;
+    const dbName = "offline_mcqs_db";
+    let database: SQLiteDBConnection | null = null;
 
+    try {
+      // 1. Check if the database connection already exists
+      const isConn = (await (useSQLite as any).isConnectionExist({ database: dbName })).result;
+      
       if (isConn) {
-        // Fix Error 3: Use retrieveConnection, ignoring TS error due to type mismatch
-        // @ts-ignore
-        database = await useSQLite.retrieveConnection({ database: dbName, readonly: false });
+        // 2. Retrieve existing connection
+        database = await (useSQLite as any).retrieveConnection({ database: dbName, readonly: false });
       } else {
-        // Fix Error 4: Use retrieveConnection, ignoring TS error due to type mismatch
+        // 3. Create a new connection
         await useSQLite.createConnection({ database: dbName, encrypted: false, mode: "no-encryption", version: 1, readonly: false });
-        // @ts-ignore
-        database = await useSQLite.retrieveConnection({ database: dbName, readonly: false }); // Retrieve the newly created connection
+        database = await (useSQLite as any).retrieveConnection({ database: dbName, readonly: false });
       }
 
+      if (!database) {
+        throw new Error("Failed to retrieve or create database connection.");
+      }
+
+      // 4. Open the connection
       await database.open();
       setDb(database);
 
-      // Define the schema for MCQs and Explanations
+      // 5. Define and execute the schema
       const schema = `
         CREATE TABLE IF NOT EXISTS mcqs (
           id TEXT PRIMARY KEY NOT NULL,
@@ -104,9 +101,17 @@ export const useOfflineMcqs = () => {
       console.error("Error initializing SQLite DB:", e);
       toast({
         title: "Offline Error",
-        description: "Failed to initialize local database for offline study.",
+        description: `Failed to initialize local database for offline study: ${e.message || 'Unknown error'}`,
         variant: "destructive",
       });
+      setIsDbInitialized(false);
+      if (database) {
+        try {
+          await database.close();
+        } catch (closeError) {
+          console.error("Failed to close database after initialization error:", closeError);
+        }
+      }
     }
   }, [toast]);
 
@@ -144,7 +149,6 @@ export const useOfflineMcqs = () => {
 
       if (linksError) throw linksError;
       
-      // Fix Error 7: Added null check for linksData
       const validLinksData = linksData || [];
       const uniqueMcqIds = Array.from(new Set(validLinksData.map(link => link.mcq_id)));
       
@@ -154,8 +158,7 @@ export const useOfflineMcqs = () => {
         return { success: true, count: 0 };
       }
 
-      // 2. Fetch explanations for all unique MCQs (Fixes Errors 4, 5)
-      // Fix Error 8: Added null check for linksData
+      // 2. Fetch explanations for all unique MCQs
       const explanationIdsToFetch = Array.from(new Set(validLinksData.map(l => l.mcqs?.explanation_id).filter((id): id is string => !!id)));
       
       const { data: explanationsData, error: expError } = await supabase
@@ -166,11 +169,10 @@ export const useOfflineMcqs = () => {
       if (expError) throw expError;
       const explanationMap = new Map(explanationsData.map(exp => [exp.id, exp]));
 
-      // 3. Prepare data for local storage (Fixes Errors 6-22)
+      // 3. Prepare data for local storage
       const mcqMap = new Map<string, LocalMCQ>();
       const mcqCategoryMap = new Map<string, string[]>();
 
-      // Fix Error 9: Added null check for linksData
       validLinksData.forEach(link => { 
         const mcq = link.mcqs;
         if (mcq) {
@@ -190,7 +192,7 @@ export const useOfflineMcqs = () => {
               option_b: mcq.option_b,
               option_c: mcq.option_c,
               option_d: mcq.option_d,
-              correct_answer: mcq.correct_answer,
+              correct_answer: mcq.correct_answer as 'A' | 'B' | 'C' | 'D',
               explanation_id: mcq.id, // Use MCQ ID as explanation ID for local data
               difficulty: mcq.difficulty,
               is_trial_mcq: mcq.is_trial_mcq,
@@ -205,39 +207,44 @@ export const useOfflineMcqs = () => {
       const mcqsToStore = Array.from(mcqMap.values());
 
       // 4. Store data locally (using transactions for efficiency)
-      // Fix Errors 5, 6, 7, 8: Define SQL statements and use them in executeSet
       
-      const insertMcqs = `
-        INSERT OR REPLACE INTO mcqs (id, question_text, option_a, option_b, option_c, option_d, correct_answer, difficulty, is_trial_mcq, category_ids_json)
-        VALUES ${mcqsToStore.map(m => `(
-          '${m.id}', 
-          '${m.question_text.replace(/'/g, "''")}', 
-          '${m.option_a.replace(/'/g, "''")}', 
-          '${m.option_b.replace(/'/g, "''")}', 
-          '${m.option_c.replace(/'/g, "''")}', 
-          '${m.option_d.replace(/'/g, "''")}', 
-          '${m.correct_answer}', 
-          '${m.difficulty || ''}', 
-          ${m.is_trial_mcq ? 1 : 0}, 
-          '${JSON.stringify(mcqCategoryMap.get(m.id) || []).replace(/'/g, "''")}'
-        )`).join(', ')};
-      `;
+      const insertMcqsStatements = mcqsToStore.map(m => ({
+        statement: `
+          INSERT OR REPLACE INTO mcqs (id, question_text, option_a, option_b, option_c, option_d, correct_answer, difficulty, is_trial_mcq, category_ids_json)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        `,
+        values: [
+          m.id, 
+          m.question_text, 
+          m.option_a, 
+          m.option_b, 
+          m.option_c, 
+          m.option_d, 
+          m.correct_answer, 
+          m.difficulty || '', 
+          m.is_trial_mcq ? 1 : 0, 
+          JSON.stringify(mcqCategoryMap.get(m.id) || [])
+        ]
+      }));
 
-      const insertExplanations = `
-        INSERT OR REPLACE INTO mcq_explanations (id, explanation_text, image_url)
-        VALUES ${mcqsToStore.map(m => `(
-          '${m.id}', 
-          '${m.explanation_text.replace(/'/g, "''")}', 
-          '${m.image_url || ''}'
-        )`).join(', ')};
-      `;
+      const insertExplanationsStatements = mcqsToStore.map(m => ({
+        statement: `
+          INSERT OR REPLACE INTO mcq_explanations (id, explanation_text, image_url)
+          VALUES (?, ?, ?);
+        `,
+        values: [
+          m.id, 
+          m.explanation_text, 
+          m.image_url || ''
+        ]
+      }));
 
       // Clear existing data before inserting new data (optional, but safer for bulk updates)
       await db.executeSet([
         { statement: 'DELETE FROM mcqs', values: [] },
         { statement: 'DELETE FROM mcq_explanations', values: [] },
-        { statement: insertMcqs, values: [] },
-        { statement: insertExplanations, values: [] },
+        ...insertMcqsStatements,
+        ...insertExplanationsStatements,
       ]);
 
       dismissToast(loadingToastId.id);
@@ -263,7 +270,8 @@ export const useOfflineMcqs = () => {
     if (!db || !isDbInitialized) return [];
 
     try {
-      const idsString = mcqIds.map(id => `'${id}'`).join(',');
+      // Use parameterized query for safety and correctness
+      const placeholders = mcqIds.map(() => '?').join(',');
       const query = `
         SELECT 
           m.*, 
@@ -271,12 +279,11 @@ export const useOfflineMcqs = () => {
           e.image_url 
         FROM mcqs m
         JOIN mcq_explanations e ON m.id = e.id
-        WHERE m.id IN (${idsString});
+        WHERE m.id IN (${placeholders});
       `;
       
-      const result = await db.query(query);
+      const result = await db.query(query, mcqIds);
       
-      // Fix Error 25
       return (result.values || []).map((row: any) => ({
         id: row.id,
         question_text: row.question_text,
@@ -311,10 +318,9 @@ export const useOfflineMcqs = () => {
         SELECT id, category_ids_json FROM mcqs;
       `;
       
-      const result = await db.query(query);
+      const result = await db.query(query, []);
       
       const matchingIds: string[] = [];
-      // Fix Error 26
       (result.values || []).forEach((row: any) => {
         try {
           const categoryIds = JSON.parse(row.category_ids_json);
@@ -338,10 +344,9 @@ export const useOfflineMcqs = () => {
 
     try {
       const query = `SELECT category_ids_json FROM mcqs;`;
-      const result = await db.query(query);
+      const result = await db.query(query, []);
       
       const counts = new Map<string, number>();
-      // Fix Error 27
       (result.values || []).forEach((row: any) => {
         try {
           const categoryIds = JSON.parse(row.category_ids_json);

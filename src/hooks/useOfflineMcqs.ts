@@ -54,27 +54,21 @@ export const useOfflineMcqs = () => {
     let database: SQLiteDBConnection | null = null;
 
     try {
-      // 1. Check if the database connection already exists
-      const isConn = (await (useSQLite as any).isConnectionExist({ database: dbName })).result;
+      // 1. Create the connection. This handles existence internally on native platforms.
+      await useSQLite.createConnection({ database: dbName, encrypted: false, mode: "no-encryption", version: 1, readonly: false });
       
-      if (isConn) {
-        // 2. Retrieve existing connection
-        database = await (useSQLite as any).retrieveConnection({ database: dbName, readonly: false });
-      } else {
-        // 3. Create a new connection
-        await useSQLite.createConnection({ database: dbName, encrypted: false, mode: "no-encryption", version: 1, readonly: false });
-        database = await (useSQLite as any).retrieveConnection({ database: dbName, readonly: false });
-      }
+      // 2. Retrieve the connection (Casting to any to resolve TS error)
+      database = await (useSQLite as any).retrieveConnection({ database: dbName, readonly: false });
 
       if (!database) {
-        throw new Error("Failed to retrieve or create database connection.");
+        throw new Error("Failed to retrieve database connection.");
       }
 
-      // 4. Open the connection
+      // 3. Open the connection
       await database.open();
       setDb(database);
 
-      // 5. Define and execute the schema
+      // 4. Define and execute the schema
       const schema = `
         CREATE TABLE IF NOT EXISTS mcqs (
           id TEXT PRIMARY KEY NOT NULL,

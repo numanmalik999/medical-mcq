@@ -169,7 +169,7 @@ const FAQPage = () => {
                       <AccordionTrigger className="text-left font-medium">{item.question}</AccordionTrigger>
                       <AccordionContent className="text-muted-foreground text-base">
                         {/* Render answer as raw HTML */}
-                        <div dangerouslySetInnerHTML={{ __html: item.answer }} />
+                        <div className="prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: item.answer }} />
                       </AccordionContent>
                     </AccordionItem>
                   ))}

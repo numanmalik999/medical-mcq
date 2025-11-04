@@ -68,7 +68,7 @@ const ContactPage = () => {
             {pageDescription}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 text-base text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none">
+        <CardContent className="space-y-6 prose dark:prose-invert max-w-none">
           <div dangerouslySetInnerHTML={{ __html: pageContent }} />
         </CardContent>
       </Card>

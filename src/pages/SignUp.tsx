@@ -86,7 +86,7 @@ const SignUpForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
-  const [tierFetchError, setTierFetchError] = useState<string | null>(null); // New state for fetch error
+  const [tierFetchError, setTierFetchError] = useState<string | null>(null);
 
   const { hasCheckedInitialSession } = useSession();
   const [searchParams] = useSearchParams();

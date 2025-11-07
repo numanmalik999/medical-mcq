@@ -26,7 +26,6 @@ serve(async (req: Request) => {
   try {
     console.log("--- create-user-and-subscription invoked ---");
 
-    // Check for all required secrets at the beginning
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
@@ -82,6 +81,26 @@ serve(async (req: Request) => {
       throw new Error(`Failed to create user account: ${authError.message}`);
     }
     const newUserId = userData.user.id;
+
+    // --- 1.5. Manually create the profile ---
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .insert({
+        id: newUserId,
+        first_name: first_name || null,
+        last_name: last_name || null,
+        phone_number: phone_number || null,
+        whatsapp_number: whatsapp_number || null,
+        is_admin: false, // Default to false for new signups
+      });
+
+    if (profileError) {
+      console.error('Error creating profile manually:', profileError);
+      // If profile creation fails, delete the auth user to keep things clean.
+      await supabaseAdmin.auth.admin.deleteUser(newUserId);
+      throw new Error(`Failed to create user profile: ${profileError.message}`);
+    }
+
     const userName = `${first_name || ''} ${last_name || ''}`.trim();
 
     // --- 2. Create Stripe Customer ---

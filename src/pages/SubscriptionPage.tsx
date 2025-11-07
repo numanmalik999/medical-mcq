@@ -77,9 +77,6 @@ const SubscriptionPage = () => {
   const handleSubscriptionSuccess = () => {
     // This callback is primarily for UI updates if needed, but Stripe handles the redirect.
     // We rely on the useEffect hook above to catch the redirect status.
-    // We can trigger a refresh here if we want to ensure the local state is updated immediately, 
-    // but the redirect usually causes a full app reload anyway.
-    // For now, we rely on the redirect handling.
   };
 
   if (!hasCheckedInitialSession || isFetchingData) {

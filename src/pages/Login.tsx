@@ -4,11 +4,18 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Link } from 'react-router-dom';
-import { useSession } from '@/components/SessionContextProvider'; // Import useSession
+import { Link, useSearchParams } from 'react-router-dom'; // Import useSearchParams
+import { useSession } from '@/components/SessionContextProvider';
 
 const Login = () => {
-  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+  const { hasCheckedInitialSession } = useSession();
+  const [searchParams] = useSearchParams();
+  const tierId = searchParams.get('tierId');
+
+  // Determine the redirect URL based on whether a tierId is present
+  const redirectToUrl = tierId 
+    ? `${window.location.origin}/subscription?tierId=${tierId}`
+    : `${window.location.origin}/redirect`; // Use /redirect for default dashboard routing
 
   if (!hasCheckedInitialSession) { // Show loading only until initial session check is done
     return (
@@ -38,7 +45,7 @@ const Login = () => {
           }}
           theme="light"
           view="sign_in"
-          redirectTo={window.location.origin + '/'}
+          redirectTo={redirectToUrl} // Use the determined redirect URL
           localization={{
             variables: {
               sign_in: {
@@ -52,7 +59,7 @@ const Login = () => {
         />
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Don't have an account?{" "}
-          <Link to="/subscription" className="text-primary hover:underline">
+          <Link to={`/signup${tierId ? `?tierId=${tierId}` : ''}`} className="text-primary hover:underline">
             Sign Up
           </Link>
         </p>

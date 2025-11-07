@@ -151,9 +151,10 @@ const SignUp = () => {
         // Email confirmation required
         toast({
           title: "Check your email",
-          description: "Please check your email for a confirmation link to activate your account.",
+          description: "Please check your email for a confirmation link to activate your account. You will be redirected to payment after logging in.",
         });
-        navigate('/login');
+        // Ensure tierId is preserved when navigating to login
+        navigate(`/login${tierId ? `?tierId=${tierId}` : ''}`);
       }
     } catch (error: any) {
       console.error("Sign Up Error:", error);

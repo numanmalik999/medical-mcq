@@ -12,7 +12,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Mail, User, MessageSquare, Send, Loader2, Phone, MapPin } from 'lucide-react';
+import { Mail, User, MessageSquare, Send, Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -34,10 +34,6 @@ const ContactPage = () => {
       message: "",
     },
   });
-
-  const whatsappNumber = "+923146616970";
-  const address = "Muhalla Boarding House Chawinda, Sialkot";
-  const supportEmail = "support@example.com"; // Placeholder, assuming admin email is used for sending
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
@@ -83,55 +79,13 @@ const ContactPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16 pb-12">
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="w-full max-w-3xl">
         
-        {/* Contact Information Card (Left Column) */}
-        <Card className="lg:col-span-1 h-full flex flex-col justify-between bg-primary text-primary-foreground shadow-xl">
+        {/* Contact Form Card (Full Width) */}
+        <Card className="shadow-xl">
           <CardHeader>
-            <CardTitle className="text-3xl">Get in Touch</CardTitle>
-            <CardDescription className="text-primary-foreground/80">
-              We are here to answer your questions and provide support.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center space-x-4">
-              <Mail className="h-6 w-6 flex-shrink-0" />
-              <div>
-                <p className="font-semibold">Email Support</p>
-                <a href={`mailto:${supportEmail}`} className="text-primary-foreground/90 hover:underline">
-                  {supportEmail}
-                </a>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Phone className="h-6 w-6 flex-shrink-0" />
-              <div>
-                <p className="font-semibold">WhatsApp / Phone</p>
-                <a 
-                  href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-primary-foreground/90 hover:underline"
-                >
-                  {whatsappNumber}
-                </a>
-              </div>
-            </div>
-            <div className="flex items-start space-x-4">
-              <MapPin className="h-6 w-6 flex-shrink-0 mt-1" />
-              <div>
-                <p className="font-semibold">Address</p>
-                <p className="text-primary-foreground/90">{address}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Contact Form Card (Right Column) */}
-        <Card className="lg:col-span-2 shadow-xl">
-          <CardHeader>
-            <CardTitle className="text-2xl">Send Us a Message</CardTitle>
-            <CardDescription>Fill out the form below and we will get back to you as soon as possible.</CardDescription>
+            <CardTitle className="text-2xl text-center">Contact Us</CardTitle>
+            <CardDescription className="text-center">Fill out the form below and we will get back to you as soon as possible.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>

@@ -236,9 +236,12 @@ const SignUpForm = () => {
       
       let detailedError = "An unexpected error occurred. Please check the console for details.";
       
-      // Check if the error is a FunctionsHttpError and has a context with the actual response
-      if (error.context && typeof error.context.error === 'string') {
+      // Updated error handling to parse the new detailed error response
+      if (error.context && error.context.error) {
         detailedError = error.context.error;
+        if (error.context.details) {
+          detailedError += ` (Details: ${error.context.details})`;
+        }
       } else if (error.message) {
         detailedError = error.message;
       }

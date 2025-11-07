@@ -24,19 +24,13 @@ serve(async (req: Request) => {
   }
 
   try {
-    console.log("--- create-user-and-subscription invoked ---");
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
 
-    if (!supabaseUrl || !serviceRoleKey) {
-      throw new Error('Server configuration error: Supabase environment variables are missing.');
+    if (!supabaseUrl || !serviceRoleKey || !stripeSecretKey) {
+      throw new Error('Server configuration error: Missing environment variables.');
     }
-    if (!stripeSecretKey) {
-      throw new Error('Server configuration error: STRIPE_SECRET_KEY is not set in Edge Function secrets.');
-    }
-    console.log("All required secrets are present.");
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const stripe = new Stripe(stripeSecretKey, {
@@ -68,16 +62,10 @@ serve(async (req: Request) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: {
-        first_name: first_name || null,
-        last_name: last_name || null,
-        phone_number: phone_number || null,
-        whatsapp_number: whatsapp_number || null,
-      },
+      user_metadata: { first_name, last_name, phone_number, whatsapp_number },
     });
 
     if (authError) {
-      console.error('Error creating user:', authError);
       throw new Error(`Failed to create user account: ${authError.message}`);
     }
     const newUserId = userData.user.id;
@@ -91,12 +79,10 @@ serve(async (req: Request) => {
         last_name: last_name || null,
         phone_number: phone_number || null,
         whatsapp_number: whatsapp_number || null,
-        is_admin: false, // Default to false for new signups
+        is_admin: false,
       });
 
     if (profileError) {
-      console.error('Error creating profile manually:', profileError);
-      // If profile creation fails, delete the auth user to keep things clean.
       await supabaseAdmin.auth.admin.deleteUser(newUserId);
       throw new Error(`Failed to create user profile: ${profileError.message}`);
     }
@@ -122,8 +108,7 @@ serve(async (req: Request) => {
     const latestInvoice = subscription.latest_invoice as Stripe.Invoice;
     const paymentIntent = latestInvoice.payment_intent as Stripe.PaymentIntent;
 
-    // --- 4. Handle Subscription Fulfillment (Update Supabase DB) ---
-    
+    // --- 4. Handle Subscription Fulfillment ---
     let requiresAction = false;
     let clientSecret = null;
     let subscriptionStatus = subscription.status;
@@ -132,21 +117,10 @@ serve(async (req: Request) => {
       requiresAction = true;
       clientSecret = paymentIntent.client_secret;
     } else if (subscriptionStatus === 'active' || subscriptionStatus === 'trialing') {
-      const currentPeriodEnd = subscription.current_period_end;
-      const endDate = new Date(currentPeriodEnd * 1000).toISOString();
+      const endDate = new Date(subscription.current_period_end * 1000).toISOString();
       const startDate = new Date(subscription.current_period_start * 1000).toISOString();
 
-      const { error: deactivateError } = await supabaseAdmin
-        .from('user_subscriptions')
-        .update({ status: 'inactive' })
-        .eq('user_id', newUserId)
-        .eq('status', 'active');
-
-      if (deactivateError) {
-        console.warn('Failed to deactivate previous user subscriptions:', deactivateError);
-      }
-
-      const { error: insertError } = await supabaseAdmin
+      await supabaseAdmin
         .from('user_subscriptions')
         .insert({
           user_id: newUserId,
@@ -159,18 +133,10 @@ serve(async (req: Request) => {
           stripe_status: subscriptionStatus,
         });
 
-      if (insertError) {
-        console.error('Error inserting new user subscription:', insertError);
-      }
-
-      const { error: profileUpdateError } = await supabaseAdmin
+      await supabaseAdmin
         .from('profiles')
         .update({ has_active_subscription: true, paypal_customer_id: customer.id })
         .eq('id', newUserId);
-
-      if (profileUpdateError) {
-        console.error('Error updating user profile for active subscription:', profileUpdateError);
-      }
     }
 
     return new Response(JSON.stringify({
@@ -183,9 +149,29 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
-    console.error('Error in create-user-and-subscription Edge Function:', error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
+  } catch (error: any) {
+    console.error('--- FATAL ERROR in create-user-and-subscription ---');
+    console.error(error); // Log the raw error to Supabase logs
+
+    let responseError = {
+      message: 'An internal server error occurred.',
+      details: 'No specific details available.'
+    };
+
+    if (error && error.type) { // Check if it looks like a Stripe error
+      responseError.message = error.message || 'A payment processing error occurred.';
+      responseError.details = `Stripe Error Type: ${error.type}`;
+    } else if (error instanceof Error) {
+      responseError.message = error.message;
+    } else {
+      try {
+        responseError.details = JSON.stringify(error);
+      } catch {
+        responseError.details = 'Could not serialize error object.';
+      }
+    }
+
+    return new Response(JSON.stringify({ error: responseError.message, details: responseError.details }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -3,7 +3,6 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
-import OfflineDownloadButton from '@/components/OfflineDownloadButton'; // Import the new component
 
 const AdminDashboardPage = () => {
   const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
@@ -30,19 +29,6 @@ const AdminDashboardPage = () => {
         </CardContent>
       </Card>
       
-      {/* Offline Management Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Offline Content Management</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Use this button on a native mobile device to download MCQs for offline testing.
-          </p>
-          <OfflineDownloadButton />
-        </CardContent>
-      </Card>
-
       {/* Future sections for analytics, quick stats, etc. */}
       <MadeWithDyad />
     </div>

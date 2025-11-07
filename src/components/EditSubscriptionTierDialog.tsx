@@ -5,8 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-// Removed unused 'Label' import
-// import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
@@ -23,6 +21,7 @@ export interface SubscriptionTier {
   duration_in_months: number;
   description: string | null;
   features: string[] | null; // Stored as JSONB in DB, handled as string[] here
+  stripe_price_id: string | null; // Updated field
 }
 
 const formSchema = z.object({
@@ -39,6 +38,7 @@ const formSchema = z.object({
   ),
   description: z.string().optional().or(z.literal('')),
   features: z.string().optional().or(z.literal('')), // Comma-separated string for input
+  stripe_price_id: z.string().optional().or(z.literal('')), // New field
 });
 
 interface EditSubscriptionTierDialogProps {
@@ -61,6 +61,7 @@ const EditSubscriptionTierDialog = ({ open, onOpenChange, tier, onSave }: EditSu
       duration_in_months: 1,
       description: "",
       features: "",
+      stripe_price_id: "", // Default value for new field
     },
   });
 
@@ -74,6 +75,7 @@ const EditSubscriptionTierDialog = ({ open, onOpenChange, tier, onSave }: EditSu
         duration_in_months: tier.duration_in_months,
         description: tier.description || "",
         features: tier.features ? tier.features.join(', ') : "", // Convert array to comma-separated string
+        stripe_price_id: tier.stripe_price_id || "", // Set new field value
       });
     } else if (!open) {
       form.reset(); // Reset form when dialog closes
@@ -94,6 +96,7 @@ const EditSubscriptionTierDialog = ({ open, onOpenChange, tier, onSave }: EditSu
         duration_in_months: values.duration_in_months,
         description: values.description || null,
         features: featuresArray,
+        stripe_price_id: values.stripe_price_id || null, // Include new field
       };
 
       if (tier?.id) {
@@ -196,6 +199,20 @@ const EditSubscriptionTierDialog = ({ open, onOpenChange, tier, onSave }: EditSu
                   <FormLabel>Duration (in months)</FormLabel>
                   <FormControl>
                     <Input type="number" min="1" placeholder="e.g., 1 for monthly, 12 for yearly" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="stripe_price_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Stripe Price ID (Required for payment)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., price_xxxxxxxxxxxxxx" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

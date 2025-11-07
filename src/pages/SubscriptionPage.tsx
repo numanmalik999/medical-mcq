@@ -7,11 +7,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
-import { PayPalScriptProvider } from '@paypal/react-paypal-js';
-import PayPalSubscribeButton from '@/components/PayPalSubscribeButton';
+import StripeSubscribeButton from '@/components/StripeSubscribeButton';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-// Removed unused 'Loader2' import
-// import { Loader2 } from 'lucide-react';
 
 interface SubscriptionTier {
   id: string;
@@ -21,7 +18,7 @@ interface SubscriptionTier {
   duration_in_months: number;
   description: string | null;
   features: string[] | null;
-  paypal_plan_id: string | null;
+  stripe_price_id: string | null; // Updated field
 }
 
 const SubscriptionPage = () => {
@@ -29,16 +26,8 @@ const SubscriptionPage = () => {
   const { toast } = useToast();
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
   const [isFetchingData, setIsFetchingData] = useState(true);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  // PayPal script options
-  const initialPayPalOptions = {
-    // @ts-ignore
-    clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "YOUR_PAYPAL_CLIENT_ID",
-    vault: true,
-    intent: "subscription",
-  };
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
@@ -46,11 +35,33 @@ const SubscriptionPage = () => {
     }
   }, [hasCheckedInitialSession]);
 
+  // Handle Stripe redirect status messages
+  useEffect(() => {
+    const status = searchParams.get('status');
+    const subId = searchParams.get('subId');
+
+    if (status === 'success') {
+      toast({ title: "Subscription Activated!", description: `Your subscription (ID: ${subId}) is now active.`, variant: "default" });
+      // Redirect to user dashboard after successful payment
+      navigate('/user/dashboard', { replace: true });
+    } else if (status === 'cancelled') {
+      toast({ title: "Subscription Cancelled", description: "You cancelled the checkout process.", variant: "default" });
+    } else if (status === 'failure') {
+      toast({ title: "Payment Failed", description: "There was an issue processing your payment. Please try again.", variant: "destructive" });
+    }
+
+    // Clear search params after displaying toast
+    if (status) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, toast, setSearchParams, navigate]);
+
+
   const fetchSubscriptionTiers = async () => {
     setIsFetchingData(true);
     const { data: tiersData, error: tiersError } = await supabase
       .from('subscription_tiers')
-      .select('*')
+      .select('*, stripe_price_id') // Select new Stripe field
       .order('price', { ascending: true });
 
     if (tiersError) {
@@ -64,13 +75,11 @@ const SubscriptionPage = () => {
   };
 
   const handleSubscriptionSuccess = () => {
-    toast({ title: "Success!", description: "Your subscription has been activated.", variant: "default" });
-    // Redirect to user dashboard or subscriptions page after successful payment
-    navigate('/user/dashboard');
-    // Optionally, force a full page reload to ensure session context is updated
-    setTimeout(() => {
-      window.location.reload();
-    }, 1000);
+    // This callback is primarily for UI updates if needed, but Stripe handles the redirect.
+    // We rely on the useEffect hook above to catch the redirect status.
+    // We can trigger a refresh here if we want to ensure the local state is updated immediately, 
+    // but the redirect usually causes a full app reload anyway.
+    // For now, we rely on the redirect handling.
   };
 
   if (!hasCheckedInitialSession || isFetchingData) {
@@ -84,74 +93,72 @@ const SubscriptionPage = () => {
   const preselectedTierId = searchParams.get('tierId');
 
   return (
-    <PayPalScriptProvider options={initialPayPalOptions}>
-      <div className="space-y-6 p-4 md:p-8">
-        <h1 className="text-3xl font-bold text-center">Choose Your Plan</h1>
-        <p className="text-center text-muted-foreground max-w-2xl mx-auto">
-          Select a subscription plan to unlock full access to all content and features.
-        </p>
+    <div className="space-y-6 p-4 md:p-8">
+      <h1 className="text-3xl font-bold text-center">Choose Your Plan</h1>
+      <p className="text-center text-muted-foreground max-w-2xl mx-auto">
+        Select a subscription plan to unlock full access to all content and features.
+      </p>
 
-        {subscriptionTiers.length === 0 ? (
-          <Card className="max-w-2xl mx-auto">
-            <CardContent className="p-6 text-center text-muted-foreground">
-              No subscription plans available at the moment. Please check back later.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {subscriptionTiers.map((tier) => {
-              const isPayPalPlanAvailable = !!tier.paypal_plan_id;
-              const isPreselected = preselectedTierId === tier.id;
+      {subscriptionTiers.length === 0 ? (
+        <Card className="max-w-2xl mx-auto">
+          <CardContent className="p-6 text-center text-muted-foreground">
+            No subscription plans available at the moment. Please check back later.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          {subscriptionTiers.map((tier) => {
+            const isStripePlanAvailable = !!tier.stripe_price_id;
+            const isPreselected = preselectedTierId === tier.id;
 
-              return (
-                <Card key={tier.id} className={`flex flex-col ${isPreselected ? 'ring-4 ring-primary shadow-lg' : ''}`}>
-                  <CardHeader>
-                    <CardTitle className="2xl">{tier.name}</CardTitle>
-                    <CardDescription>{tier.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-grow space-y-4">
-                    <p className="text-4xl font-bold">
-                      {tier.currency} {tier.price.toFixed(2)}
-                      <span className="text-lg font-normal text-muted-foreground"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
-                    </p>
-                    {tier.features && tier.features.length > 0 && (
-                      <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                        {tier.features.map((feature, index) => (
-                          <li key={index}>{feature}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                  <CardFooter>
-                    {user ? ( // User is logged in
-                      isPayPalPlanAvailable ? (
-                        <div className="w-full">
-                          <PayPalSubscribeButton
-                            tierId={tier.id}
-                            paypalPlanId={tier.paypal_plan_id!}
-                            onSubscriptionSuccess={handleSubscriptionSuccess}
-                          />
-                        </div>
-                      ) : (
-                        <Button className="w-full" disabled>
-                          Payment Not Configured
-                        </Button>
-                      )
-                    ) : ( // User is not logged in
-                      <Link to={`/signup?tierId=${tier.id}`} className="w-full">
-                        <Button className="w-full">Sign Up to Subscribe</Button>
-                      </Link>
-                    )}
-                  </CardFooter>
-                </Card>
-              );
-            })}
-          </div>
-        )}
+            return (
+              <Card key={tier.id} className={`flex flex-col ${isPreselected ? 'ring-4 ring-primary shadow-lg' : ''}`}>
+                <CardHeader>
+                  <CardTitle className="2xl">{tier.name}</CardTitle>
+                  <CardDescription>{tier.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow space-y-4">
+                  <p className="text-4xl font-bold">
+                    {tier.currency} {tier.price.toFixed(2)}
+                    <span className="text-lg font-normal text-muted-foreground"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
+                  </p>
+                  {tier.features && tier.features.length > 0 && (
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      {tier.features.map((feature, index) => (
+                        <li key={index}>{feature}</li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+                <CardFooter>
+                  {user ? ( // User is logged in
+                    isStripePlanAvailable ? (
+                      <div className="w-full">
+                        <StripeSubscribeButton
+                          tierId={tier.id}
+                          stripePriceId={tier.stripe_price_id!}
+                          onSubscriptionSuccess={handleSubscriptionSuccess}
+                        />
+                      </div>
+                    ) : (
+                      <Button className="w-full" disabled>
+                        Payment Not Configured
+                      </Button>
+                    )
+                  ) : ( // User is not logged in
+                    <Link to={`/signup?tierId=${tier.id}`} className="w-full">
+                      <Button className="w-full">Sign Up to Subscribe</Button>
+                    </Link>
+                  )}
+                </CardFooter>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
-        <MadeWithDyad />
-      </div>
-    </PayPalScriptProvider>
+      <MadeWithDyad />
+    </div>
   );
 };
 

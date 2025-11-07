@@ -140,6 +140,14 @@ const SignUpForm = () => {
   }, [hasCheckedInitialSession, tierId, fetchTierDetails]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    // --- DEBUGGING LOGS ---
+    console.log('--- Submitting Form ---');
+    console.log('Stripe Ready:', !!stripe);
+    console.log('Elements Ready:', !!elements);
+    console.log('Selected Tier:', selectedTier);
+    console.log('Stripe Price ID from Tier:', selectedTier?.stripe_price_id);
+    // --- END DEBUGGING LOGS ---
+
     // Check for Stripe initialization and selected tier before proceeding
     if (!stripe || !elements || !selectedTier || !selectedTier.stripe_price_id) {
       toast({ 

@@ -24,16 +24,22 @@ serve(async (req: Request) => {
   }
 
   try {
-    // MOVED INITIALIZATION INSIDE TRY BLOCK
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    console.log("--- create-user-and-subscription invoked ---");
 
+    // Check for all required secrets at the beginning
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
-    if (!stripeSecretKey) {
-      throw new Error('Stripe secret key is not set in Edge Function secrets.');
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('Server configuration error: Supabase environment variables are missing.');
     }
+    if (!stripeSecretKey) {
+      throw new Error('Server configuration error: STRIPE_SECRET_KEY is not set in Edge Function secrets.');
+    }
+    console.log("All required secrets are present.");
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2024-06-20',
       httpClient: Stripe.createFetchHttpClient(),

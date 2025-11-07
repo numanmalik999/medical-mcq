@@ -140,15 +140,6 @@ const SignUpForm = () => {
   }, [hasCheckedInitialSession, tierId, fetchTierDetails]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    // --- DEBUGGING LOGS ---
-    console.log('--- Submitting Form ---');
-    console.log('Stripe Ready:', !!stripe);
-    console.log('Elements Ready:', !!elements);
-    console.log('Selected Tier:', selectedTier);
-    console.log('Stripe Price ID from Tier:', selectedTier?.stripe_price_id);
-    // --- END DEBUGGING LOGS ---
-
-    // Check for Stripe initialization and selected tier before proceeding
     if (!stripe || !elements || !selectedTier || !selectedTier.stripe_price_id) {
       toast({ 
         title: "Initialization Error", 
@@ -168,14 +159,12 @@ const SignUpForm = () => {
     let loadingToastId: ToastReturn | undefined;
 
     try {
-      // 1. Show initial loading toast
       loadingToastId = toast({
         title: "Processing Payment...",
         description: "Creating account and subscription. Please wait.",
         duration: 999999,
       }) as ToastReturn;
 
-      // 2. Create Payment Method
       const { paymentMethod, error: paymentMethodError } = await stripe.createPaymentMethod({
         type: 'card',
         card: cardElement,
@@ -195,10 +184,9 @@ const SignUpForm = () => {
         throw new Error(paymentMethodError.message || "Failed to create payment method.");
       }
 
-      // 3. Call Edge Function to create user and subscription
       const { data: edgeFunctionData, error: invokeError } = await supabase.functions.invoke('create-user-and-subscription', {
         body: {
-          ...values, // user details (email, password, profile fields)
+          ...values,
           payment_method_id: paymentMethod.id,
           price_id: selectedTier.stripe_price_id,
           tier_id: selectedTier.id,
@@ -209,7 +197,6 @@ const SignUpForm = () => {
         throw invokeError;
       }
 
-      // 4. Handle response (3D Secure confirmation if required)
       if (edgeFunctionData.requires_action && edgeFunctionData.client_secret) {
         if (loadingToastId) dismissToast(loadingToastId.id);
         
@@ -226,46 +213,34 @@ const SignUpForm = () => {
         }
       }
 
-      // 5. Final Success
       if (loadingToastId) dismissToast(loadingToastId.id);
       
       if (edgeFunctionData.user_id && edgeFunctionData.subscription_status === 'active') {
-        // If payment was successful and user is logged in (or will be logged in via magic link/session update)
         toast({
           title: "Signup & Subscription Complete!",
           description: "Welcome! You now have full access to all features.",
           variant: "default",
         });
-        // Redirect to dashboard
         navigate('/user/dashboard', { replace: true });
       } else {
-        // If email confirmation is required (no session returned by auth.admin.createUser)
         toast({
           title: "Check your email",
           description: "Account created and payment processed. Please check your email for a confirmation link to activate your account and log in.",
         });
-        // Redirect to login page
         navigate(`/login?tierId=${tierId}`, { replace: true });
       }
 
     } catch (error: any) {
       if (loadingToastId) dismissToast(loadingToastId.id);
-      console.error("Signup/Payment Error:", error);
+      console.error("Full Signup/Payment Error Object:", error);
       
-      // Improved error message parsing
-      let detailedError = "An unexpected error occurred during signup and payment.";
-      if (error.message) {
-        // Try to parse the JSON from the error message if it's a stringified object
-        try {
-          const parsedError = JSON.parse(error.message);
-          if (parsedError.error) {
-            detailedError = parsedError.error;
-          } else {
-            detailedError = error.message;
-          }
-        } catch (e) {
-          detailedError = error.message;
-        }
+      let detailedError = "An unexpected error occurred. Please check the console for details.";
+      
+      // Check if the error is a FunctionsHttpError and has a context with the actual response
+      if (error.context && typeof error.context.error === 'string') {
+        detailedError = error.context.error;
+      } else if (error.message) {
+        detailedError = error.message;
       }
 
       toast({
@@ -309,14 +284,12 @@ const SignUpForm = () => {
     );
   }
   
-  // Determine if Stripe elements are ready
   const isStripeReady = !!stripe && !!elements;
   const isButtonDisabled = isSubmitting || !isStripeReady;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4 pt-16">
       <div className="w-full max-w-4xl flex flex-col md:flex-row gap-6">
-        {/* Left Side: Sign Up Form */}
         <Card className="w-full md:flex-1">
           <CardHeader>
             <CardTitle className="text-2xl text-center">
@@ -484,7 +457,6 @@ const SignUpForm = () => {
 
                 <h3 className="text-lg font-semibold border-b pb-2 pt-4">Payment Details</h3>
                 
-                {/* Stripe Card Element */}
                 <div className="space-y-2">
                   <FormLabel>Card Information</FormLabel>
                   <div className="p-4 border border-input bg-white rounded-md shadow-sm">
@@ -516,7 +488,6 @@ const SignUpForm = () => {
           </CardContent>
         </Card>
 
-        {/* Right Side: Subscription Details */}
         {selectedTier && (
           <Card className="w-full md:w-80 flex-shrink-0 h-max">
             <CardHeader className="bg-primary text-primary-foreground rounded-t-lg">
@@ -561,7 +532,6 @@ const SignUp = () => {
     );
   }
 
-  // Check if the publishable key is available before rendering Elements
   if (!STRIPE_PUBLISHABLE_KEY) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 pt-16">
@@ -570,7 +540,6 @@ const SignUp = () => {
     );
   }
 
-  // Only render Elements if we have a tierId, otherwise the form will handle the redirect
   if (tierId) {
     return (
       <Elements stripe={stripePromise}>
@@ -579,7 +548,6 @@ const SignUp = () => {
     );
   }
 
-  // If no tierId, render the form directly (it will redirect to /subscription)
   return <SignUpForm />;
 };
 

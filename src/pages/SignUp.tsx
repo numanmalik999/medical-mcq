@@ -17,6 +17,7 @@ import { Loader2, CheckCircle2 } from 'lucide-react';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { dismissToast } from '@/utils/toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address.").min(1, "Email is required."),
@@ -25,6 +26,11 @@ const formSchema = z.object({
   last_name: z.string().min(1, "Last name is required."),
   phone_number: z.string().optional().or(z.literal('')),
   whatsapp_number: z.string().optional().or(z.literal('')),
+  // New Billing Fields
+  billing_address_line1: z.string().min(1, "Address Line 1 is required."),
+  billing_address_city: z.string().min(1, "City is required."),
+  billing_address_postal_code: z.string().min(1, "Postal Code is required."),
+  billing_address_country: z.string().min(1, "Country is required."),
 });
 
 interface SubscriptionTier {
@@ -57,6 +63,23 @@ const CARD_ELEMENT_OPTIONS = {
   },
 };
 
+const COUNTRIES = [
+  { code: 'US', name: 'United States' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'QA', name: 'Qatar' },
+  { code: 'KW', name: 'Kuwait' },
+  { code: 'OM', name: 'Oman' },
+  { code: 'BH', name: 'Bahrain' },
+  { code: 'IN', name: 'India' },
+  { code: 'PK', name: 'Pakistan' },
+];
+
 const SignUpForm = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -80,6 +103,11 @@ const SignUpForm = () => {
       last_name: "",
       phone_number: "",
       whatsapp_number: "",
+      // New Billing Defaults
+      billing_address_line1: "",
+      billing_address_city: "",
+      billing_address_postal_code: "",
+      billing_address_country: "US",
     },
   });
 
@@ -135,7 +163,16 @@ const SignUpForm = () => {
       const { paymentMethod, error: paymentMethodError } = await stripe.createPaymentMethod({
         type: 'card',
         card: cardElement,
-        billing_details: { email: values.email, name: `${values.first_name} ${values.last_name}`.trim() || undefined },
+        billing_details: { 
+          email: values.email, 
+          name: `${values.first_name} ${values.last_name}`.trim() || undefined,
+          address: {
+            line1: values.billing_address_line1,
+            city: values.billing_address_city,
+            postal_code: values.billing_address_postal_code,
+            country: values.billing_address_country,
+          }
+        },
       });
 
       if (paymentMethodError) {
@@ -255,6 +292,7 @@ const SignUpForm = () => {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <h3 className="text-lg font-semibold border-b pb-2">Account Details</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -305,7 +343,7 @@ const SignUpForm = () => {
                       <FormControl>
                         <Input type="password" placeholder="••••••••" {...field} />
                       </FormControl>
-                        <FormMessage />
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -338,10 +376,81 @@ const SignUpForm = () => {
                   />
                 </div>
 
+                <h3 className="text-lg font-semibold border-b pb-2 pt-4">Billing Information</h3>
+                
+                <FormField
+                  control={form.control}
+                  name="billing_address_line1"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address Line 1</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Street address, P.O. Box" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="billing_address_city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>City</FormLabel>
+                        <FormControl>
+                          <Input placeholder="City" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="billing_address_postal_code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Postal Code</FormLabel>
+                        <FormControl>
+                          <Input placeholder="10001" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="billing_address_country"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Country</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select Country" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="max-h-60 overflow-y-auto">
+                            {COUNTRIES.map((country) => (
+                              <SelectItem key={country.code} value={country.code}>
+                                {country.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <h3 className="text-lg font-semibold border-b pb-2 pt-4">Payment Details</h3>
+                
                 {/* Stripe Card Element */}
                 <div className="space-y-2">
-                  <FormLabel>Card Details</FormLabel>
-                  <div className="p-3 border rounded-md bg-white">
+                  <FormLabel>Card Information</FormLabel>
+                  <div className="p-4 border border-input bg-white rounded-md shadow-sm">
                     <CardElement options={CARD_ELEMENT_OPTIONS} />
                   </div>
                 </div>

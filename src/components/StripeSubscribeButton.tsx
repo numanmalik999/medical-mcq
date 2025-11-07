@@ -18,7 +18,7 @@ interface StripeSubscribeButtonProps {
 // @ts-ignore
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-const StripeSubscribeButton = ({ tierId, stripePriceId, onSubscriptionSuccess }: StripeSubscribeButtonProps) => {
+const StripeSubscribeButton = ({ tierId: _tierId, stripePriceId, onSubscriptionSuccess: _onSubscriptionSuccess }: StripeSubscribeButtonProps) => {
   const { user } = useSession();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +52,8 @@ const StripeSubscribeButton = ({ tierId, stripePriceId, onSubscriptionSuccess }:
         throw new Error("Failed to load Stripe library.");
       }
 
-      const { error: redirectError } = await stripe.redirectToCheckout({
+      // The correct method for client-side redirection after creating a session
+      const { error: redirectError } = await (stripe as any).redirectToCheckout({
         sessionId: sessionId,
       });
 

@@ -251,9 +251,26 @@ const SignUpForm = () => {
     } catch (error: any) {
       if (loadingToastId) dismissToast(loadingToastId.id);
       console.error("Signup/Payment Error:", error);
+      
+      // Improved error message parsing
+      let detailedError = "An unexpected error occurred during signup and payment.";
+      if (error.message) {
+        // Try to parse the JSON from the error message if it's a stringified object
+        try {
+          const parsedError = JSON.parse(error.message);
+          if (parsedError.error) {
+            detailedError = parsedError.error;
+          } else {
+            detailedError = error.message;
+          }
+        } catch (e) {
+          detailedError = error.message;
+        }
+      }
+
       toast({
         title: "Signup/Payment Failed",
-        description: error.message || "An unexpected error occurred during signup and payment.",
+        description: detailedError,
         variant: "destructive",
       });
     } finally {

@@ -4,15 +4,17 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Link, useSearchParams } from 'react-router-dom'; // Import useSearchParams
+import { Link, useSearchParams } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 
 const Login = () => {
   const { hasCheckedInitialSession } = useSession();
   const [searchParams] = useSearchParams();
-  const tierId = searchParams.get('tierId');
+  const tierId = searchParams.get('tierId'); // Keep tierId check for redirection to signup/subscription page
 
   // Determine the redirect URL based on whether a tierId is present
+  // If tierId is present, redirect to subscription page after login so they can pay (if they haven't already).
+  // If not, redirect to the general dashboard redirector.
   const redirectToUrl = tierId 
     ? `${window.location.origin}/subscription?tierId=${tierId}`
     : `${window.location.origin}/redirect`; // Use /redirect for default dashboard routing

@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
@@ -11,6 +13,13 @@ type ToasterToast = ToastProps & {
   description?: React.ReactNode;
   action?: ToastActionElement;
 };
+
+// Define the return type of the toast function
+export interface ToastReturn {
+  id: string;
+  dismiss: () => void;
+  update: (props: Partial<ToasterToast>) => void;
+}
 
 const _actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -136,10 +145,10 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">;
 
-function toast({ ...props }: Toast) {
+function toast({ ...props }: Toast): ToastReturn {
   const id = genId();
 
-  const update = (props: ToasterToast) =>
+  const update = (props: Partial<ToasterToast>) => // FIX: Accept Partial<ToasterToast>
     dispatch({
       type: "UPDATE_TOAST",
       toast: { ...props, id },
@@ -185,4 +194,4 @@ function useToast() {
   };
 }
 
-export { useToast, toast };
+export { useToast, toast }; // FIX: Removed ToastReturn from this export

@@ -24,10 +24,11 @@ interface SubscriptionTier {
 const SubscriptionPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
-  const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
-  const [isFetchingData, setIsFetchingData] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  
+  const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
+  const [isFetchingData, setIsFetchingData] = useState(true);
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
@@ -72,11 +73,6 @@ const SubscriptionPage = () => {
       setSubscriptionTiers(tiersData || []);
     }
     setIsFetchingData(false);
-  };
-
-  const handleSubscriptionSuccess = () => {
-    // This callback is primarily for UI updates if needed, but Stripe handles the redirect.
-    // We rely on the useEffect hook above to catch the redirect status.
   };
 
   if (!hasCheckedInitialSession || isFetchingData) {
@@ -131,10 +127,11 @@ const SubscriptionPage = () => {
                   {user ? ( // User is logged in
                     isStripePlanAvailable ? (
                       <div className="w-full">
+                        {/* Note: StripeSubscribeButton uses hosted checkout for existing users */}
                         <StripeSubscribeButton
                           tierId={tier.id}
                           stripePriceId={tier.stripe_price_id!}
-                          onSubscriptionSuccess={handleSubscriptionSuccess}
+                          onSubscriptionSuccess={() => { /* Handled by redirect */ }}
                         />
                       </div>
                     ) : (

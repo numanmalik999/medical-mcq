@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-// Removed unused ReactMarkdown import
+import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
 
 // Define a type for FAQ items
 interface FaqItem {
@@ -167,9 +167,10 @@ const FAQPage = () => {
                   {category.questions.map((item, qIndex) => (
                     <AccordionItem key={qIndex} value={`item-${catIndex}-${qIndex}`}>
                       <AccordionTrigger className="text-left font-medium">{item.question}</AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground text-base">
-                        {/* Render answer as raw HTML */}
-                        <div className="prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: item.answer }} />
+                      <AccordionContent className="text-base"> {/* Removed text-muted-foreground */}
+                        <div className="prose dark:prose-invert max-w-none">
+                          <ReactMarkdown>{item.answer}</ReactMarkdown>
+                        </div>
                       </AccordionContent>
                     </AccordionItem>
                   ))}

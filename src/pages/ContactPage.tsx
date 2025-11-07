@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-// Removed unused ReactMarkdown import
+import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
 
 const defaultContent = `
 # Contact Us
@@ -69,7 +69,7 @@ const ContactPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 prose dark:prose-invert max-w-none">
-          <div dangerouslySetInnerHTML={{ __html: pageContent }} />
+          <ReactMarkdown>{pageContent}</ReactMarkdown>
         </CardContent>
       </Card>
       <MadeWithDyad />

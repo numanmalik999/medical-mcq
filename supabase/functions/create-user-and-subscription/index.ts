@@ -23,21 +23,22 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseAdmin = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  );
-
-  const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
-  if (!stripeSecretKey) {
-    return new Response(JSON.stringify({ error: 'Stripe secret key is not set.' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  }
-  const stripe = new Stripe(stripeSecretKey, {
-    apiVersion: '2024-06-20',
-    httpClient: Stripe.createFetchHttpClient(),
-  });
-
   try {
+    // MOVED INITIALIZATION INSIDE TRY BLOCK
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    if (!stripeSecretKey) {
+      throw new Error('Stripe secret key is not set in Edge Function secrets.');
+    }
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2024-06-20',
+      httpClient: Stripe.createFetchHttpClient(),
+    });
+
     const { 
       email, 
       password, 
@@ -58,11 +59,10 @@ serve(async (req: Request) => {
     }
 
     // --- 1. Create User in Supabase Auth ---
-    // Note: We rely on the 'handle_new_user' trigger to create the basic profile.
     const { data: userData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Requires user to confirm email
+      email_confirm: true,
       user_metadata: {
         first_name: first_name || null,
         last_name: last_name || null,
@@ -107,14 +107,10 @@ serve(async (req: Request) => {
       requiresAction = true;
       clientSecret = paymentIntent.client_secret;
     } else if (subscriptionStatus === 'active' || subscriptionStatus === 'trialing') {
-      // Payment was successful immediately (or trial started)
-      
-      // Calculate end date based on Stripe's current_period_end (timestamp in seconds)
       const currentPeriodEnd = subscription.current_period_end;
       const endDate = new Date(currentPeriodEnd * 1000).toISOString();
       const startDate = new Date(subscription.current_period_start * 1000).toISOString();
 
-      // Deactivate any existing active subscriptions for the user in our DB
       const { error: deactivateError } = await supabaseAdmin
         .from('user_subscriptions')
         .update({ status: 'inactive' })
@@ -125,7 +121,6 @@ serve(async (req: Request) => {
         console.warn('Failed to deactivate previous user subscriptions:', deactivateError);
       }
 
-      // Insert new subscription into user_subscriptions table
       const { error: insertError } = await supabaseAdmin
         .from('user_subscriptions')
         .insert({
@@ -141,10 +136,8 @@ serve(async (req: Request) => {
 
       if (insertError) {
         console.error('Error inserting new user subscription:', insertError);
-        // Note: We don't throw here, as the Stripe subscription is active. We log the DB error.
       }
 
-      // Update user's profile to mark as active and store customer ID
       const { error: profileUpdateError } = await supabaseAdmin
         .from('profiles')
         .update({ has_active_subscription: true, paypal_customer_id: customer.id })
@@ -155,7 +148,6 @@ serve(async (req: Request) => {
       }
     }
 
-    // Return response to client
     return new Response(JSON.stringify({
       requires_action: requiresAction,
       client_secret: clientSecret,
@@ -168,7 +160,6 @@ serve(async (req: Request) => {
 
   } catch (error) {
     console.error('Error in create-user-and-subscription Edge Function:', error);
-    // If user creation failed, we might need to clean up Stripe resources, but for simplicity, we rely on Stripe's idempotency and logging.
     return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

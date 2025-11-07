@@ -15,7 +15,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { dismissToast } from '@/utils/toast';
 
 const formSchema = z.object({
@@ -38,9 +38,9 @@ interface SubscriptionTier {
   stripe_price_id: string | null;
 }
 
-// Load Stripe outside of the component render cycle
-// @ts-ignore
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+// Check for the key outside of the component
+const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+const stripePromise: Promise<Stripe | null> | null = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY) : null;
 
 const CARD_ELEMENT_OPTIONS = {
   style: {
@@ -305,7 +305,7 @@ const SignUpForm = () => {
                       <FormControl>
                         <Input type="password" placeholder="••••••••" {...field} />
                       </FormControl>
-                      <FormMessage />
+                        <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -409,16 +409,17 @@ const SignUp = () => {
     );
   }
 
+  // Check if the publishable key is available before rendering Elements
+  if (!STRIPE_PUBLISHABLE_KEY) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 pt-16">
+        <p className="text-red-500">Stripe is not configured. Please set VITE_STRIPE_PUBLISHABLE_KEY.</p>
+      </div>
+    );
+  }
+
   // Only render Elements if we have a tierId, otherwise the form will handle the redirect
   if (tierId) {
-    // Check if the publishable key is available before rendering Elements
-    if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 pt-16">
-          <p className="text-red-500">Stripe is not configured. Please set VITE_STRIPE_PUBLISHABLE_KEY.</p>
-        </div>
-      );
-    }
     return (
       <Elements stripe={stripePromise}>
         <SignUpForm />

@@ -86,6 +86,7 @@ const SignUpForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
+  const [tierFetchError, setTierFetchError] = useState<string | null>(null); // New state for fetch error
 
   const { hasCheckedInitialSession } = useSession();
   const [searchParams] = useSearchParams();
@@ -112,6 +113,7 @@ const SignUpForm = () => {
   });
 
   const fetchTierDetails = useCallback(async (id: string) => {
+    setTierFetchError(null);
     const { data, error } = await supabase
       .from('subscription_tiers')
       .select('*')
@@ -120,6 +122,7 @@ const SignUpForm = () => {
 
     if (error) {
       console.error("Error fetching tier details:", error);
+      setTierFetchError("Failed to load subscription plan details. Please ensure the tier ID is valid.");
       toast({ title: "Error", description: "Failed to load subscription plan details.", variant: "destructive" });
       setSelectedTier(null);
     } else {
@@ -137,8 +140,13 @@ const SignUpForm = () => {
   }, [hasCheckedInitialSession, tierId, fetchTierDetails]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    // Check for Stripe initialization and selected tier before proceeding
     if (!stripe || !elements || !selectedTier || !selectedTier.stripe_price_id) {
-      toast({ title: "Error", description: "Payment system not initialized or plan missing.", variant: "destructive" });
+      toast({ 
+        title: "Initialization Error", 
+        description: "Payment system is not fully initialized or the selected plan is invalid. Please refresh and try again.", 
+        variant: "destructive" 
+      });
       return;
     }
 
@@ -262,7 +270,7 @@ const SignUpForm = () => {
           <CardHeader>
             <CardTitle className="text-2xl">Select a Plan First</CardTitle>
             <CardDescription>
-              Please choose a subscription plan before signing up.
+              {tierFetchError || "Please choose a subscription plan before signing up."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -275,6 +283,10 @@ const SignUpForm = () => {
       </div>
     );
   }
+  
+  // Determine if Stripe elements are ready
+  const isStripeReady = !!stripe && !!elements;
+  const isButtonDisabled = isSubmitting || !isStripeReady;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4 pt-16">
@@ -451,11 +463,17 @@ const SignUpForm = () => {
                 <div className="space-y-2">
                   <FormLabel>Card Information</FormLabel>
                   <div className="p-4 border border-input bg-white rounded-md shadow-sm">
-                    <CardElement options={CARD_ELEMENT_OPTIONS} />
+                    {isStripeReady ? (
+                      <CardElement options={CARD_ELEMENT_OPTIONS} />
+                    ) : (
+                      <div className="flex items-center justify-center h-10 text-muted-foreground">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading payment interface...
+                      </div>
+                    )}
                   </div>
                 </div>
                 
-                <Button type="submit" className="w-full" disabled={isSubmitting || !stripe || !elements}>
+                <Button type="submit" className="w-full" disabled={isButtonDisabled}>
                   {isSubmitting ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (

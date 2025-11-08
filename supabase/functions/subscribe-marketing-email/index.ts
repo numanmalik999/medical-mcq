@@ -11,7 +11,7 @@ const corsHeaders = {
 };
 
 serve(async (req: Request) => {
-  console.log('Edge Function subscribe-marketing-email invoked.'); // Added this log
+  console.log('Edge Function subscribe-marketing-email invoked.');
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -73,24 +73,28 @@ serve(async (req: Request) => {
     const adminEmail = Deno.env.get('ADMIN_EMAIL');
 
     if (resendApiKey && adminEmail) {
-      const resend = new Resend(resendApiKey);
-      const { error: emailError } = await resend.emails.send({
-        from: `Study Prometric MCQs <${adminEmail}>`,
-        to: [email],
-        subject: 'Welcome to Study Prometric MCQs Updates!',
-        html: `
-          <p>Dear Subscriber,</p>
-          <p>Thank you for subscribing to Study Prometric MCQs daily updates!</p>
-          <p>You'll now receive our latest news, quiz challenges, and study tips directly in your inbox.</p>
-          <p>Stay tuned for more exciting content!</p>
-          <p>Best regards,<br/>The Study Prometric MCQs Team</p>
-          <p><small>If you wish to unsubscribe, please contact us at ${adminEmail}.</small></p>
-        `,
-      });
+      try {
+        const resend = new Resend(resendApiKey);
+        const { error: emailError } = await resend.emails.send({
+          from: `Study Prometric MCQs <${adminEmail}>`,
+          to: [email],
+          subject: 'Welcome to Study Prometric MCQs Updates!',
+          html: `
+            <p>Dear Subscriber,</p>
+            <p>Thank you for subscribing to Study Prometric MCQs daily updates!</p>
+            <p>You'll now receive our latest news, quiz challenges, and study tips directly in your inbox.</p>
+            <p>Stay tuned for more exciting content!</p>
+            <p>Best regards,<br/>The Study Prometric MCQs Team</p>
+            <p><small>If you wish to unsubscribe, please contact us at ${adminEmail}.</small></p>
+          `,
+        });
 
-      if (emailError) {
-        console.error('Error sending marketing confirmation email:', emailError);
-        // Don't throw, just log the warning as the subscription itself was successful
+        if (emailError) {
+          console.error('Error sending marketing confirmation email via Resend:', emailError);
+          // Log the error but don't throw, as the subscription was successful
+        }
+      } catch (resendInitError) {
+        console.error('Error initializing or sending email with Resend:', resendInitError);
       }
     } else {
       console.warn('Resend API Key or Admin Email not set, skipping confirmation email.');

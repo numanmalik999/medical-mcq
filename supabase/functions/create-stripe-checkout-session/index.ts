@@ -45,7 +45,7 @@ serve(async (req: Request) => {
 
     // Determine success URL based on environment
     const successUrl = `${supabaseUrl}/functions/v1/fulfill-stripe-subscription?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${supabaseUrl}/functions/v1/cancel-stripe-subscription`; // Placeholder
+    const cancelUrl = `${supabaseUrl}/functions/v1/cancel-stripe-subscription`;
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -60,8 +60,6 @@ serve(async (req: Request) => {
       },
       success_url: successUrl,
       cancel_url: cancelUrl,
-      // Optional: If you have a Stripe Customer ID stored in profiles, you can use it here:
-      // customer: stripeCustomerId, 
     });
 
     return new Response(JSON.stringify({ sessionId: session.id }), {

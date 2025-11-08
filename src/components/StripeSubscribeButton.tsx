@@ -14,9 +14,7 @@ interface StripeSubscribeButtonProps {
   onSubscriptionSuccess: () => void;
 }
 
-// Load Stripe outside of the component render cycle
-// @ts-ignore
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string);
 
 const StripeSubscribeButton = ({ tierId: _tierId, stripePriceId, onSubscriptionSuccess: _onSubscriptionSuccess }: StripeSubscribeButtonProps) => {
   const { user } = useSession();
@@ -52,7 +50,6 @@ const StripeSubscribeButton = ({ tierId: _tierId, stripePriceId, onSubscriptionS
         throw new Error("Failed to load Stripe library.");
       }
 
-      // The correct method for client-side redirection after creating a session
       const { error: redirectError } = await (stripe as any).redirectToCheckout({
         sessionId: sessionId,
       });
@@ -60,9 +57,6 @@ const StripeSubscribeButton = ({ tierId: _tierId, stripePriceId, onSubscriptionS
       if (redirectError) {
         throw redirectError;
       }
-
-      // Note: Fulfillment happens via the success_url redirect to the fulfill-stripe-subscription Edge Function.
-      // The onSubscriptionSuccess callback will be triggered by the parent component after the redirect returns.
 
     } catch (error: any) {
       console.error("Error initiating Stripe checkout:", error);

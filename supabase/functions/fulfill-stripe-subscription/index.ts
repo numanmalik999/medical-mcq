@@ -75,11 +75,9 @@ serve(async (req: Request) => {
       throw new Error('Subscription tier not found for fulfillment.');
     }
     const subscriptionTierId = tierData.id;
-    const durationInMonths = tierData.duration_in_months;
 
     // Calculate end date based on Stripe's current_period_end (which is a timestamp in seconds)
-    const currentPeriodEnd = subscription.current_period_end;
-    const endDate = new Date(currentPeriodEnd * 1000).toISOString();
+    const endDate = new Date(subscription.current_period_end * 1000).toISOString();
     const startDate = new Date(subscription.current_period_start * 1000).toISOString();
 
     // 3. Deactivate any existing active subscriptions for the user in our DB
@@ -134,7 +132,6 @@ serve(async (req: Request) => {
 
   } catch (error) {
     console.error('Error in fulfill-stripe-subscription Edge Function:', error);
-    // In case of error, redirect to a failure page
     const clientFailureUrl = `${Deno.env.get('VITE_BASE_URL') || 'http://localhost:8080'}/user/subscriptions?status=failure`;
     return new Response(null, {
       status: 303,

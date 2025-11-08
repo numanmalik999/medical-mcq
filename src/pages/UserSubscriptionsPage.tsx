@@ -10,7 +10,7 @@ import { useSession } from '@/components/SessionContextProvider';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { differenceInDays, parseISO } from 'date-fns';
 import StripeSubscribeButton from '@/components/StripeSubscribeButton';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 interface SubscriptionTier {
   id: string;
@@ -20,7 +20,7 @@ interface SubscriptionTier {
   duration_in_months: number;
   description: string | null;
   features: string[] | null;
-  stripe_price_id: string | null; // Updated field
+  stripe_price_id: string | null;
 }
 
 interface UserSubscription {
@@ -30,15 +30,16 @@ interface UserSubscription {
   start_date: string;
   end_date: string;
   status: string;
-  stripe_subscription_id: string | null; // Updated field
-  stripe_customer_id: string | null; // Updated field
-  stripe_status: string | null; // Updated field
+  stripe_subscription_id: string | null;
+  stripe_customer_id: string | null;
+  stripe_status: string | null;
 }
 
 const UserSubscriptionsPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
   const [userActiveSubscription, setUserActiveSubscription] = useState<UserSubscription | null>(null);
@@ -55,56 +56,50 @@ const UserSubscriptionsPage = () => {
     }
   }, [user, hasCheckedInitialSession]);
 
-  // Handle Stripe redirect status messages
   useEffect(() => {
     const status = searchParams.get('status');
     const subId = searchParams.get('subId');
 
     if (status === 'success') {
       toast({ title: "Subscription Activated!", description: `Your subscription (ID: ${subId}) is now active.`, variant: "default" });
+      fetchSubscriptionData(); // Re-fetch data to update the UI
     } else if (status === 'cancelled') {
       toast({ title: "Subscription Cancelled", description: "You cancelled the checkout process.", variant: "default" });
     } else if (status === 'failure') {
       toast({ title: "Payment Failed", description: "There was an issue processing your payment. Please try again.", variant: "destructive" });
     }
 
-    // Clear search params after displaying toast
     if (status) {
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, toast, setSearchParams]);
+  }, [searchParams, toast, setSearchParams, navigate]);
 
 
   const fetchSubscriptionData = async () => {
     setIsFetchingData(true);
 
-    // Fetch all subscription tiers
     const { data: tiersData, error: tiersError } = await supabase
       .from('subscription_tiers')
-      .select('*, stripe_price_id') // Select new Stripe field
+      .select('*, stripe_price_id')
       .order('price', { ascending: true });
 
     if (tiersError) {
-      console.error('UserSubscriptionsPage: Error fetching subscription tiers:', tiersError);
+      console.error('Error fetching subscription tiers:', tiersError);
       toast({ title: "Error", description: "Failed to load subscription plans.", variant: "destructive" });
-      setSubscriptionTiers([]);
     } else {
       setSubscriptionTiers(tiersData || []);
     }
 
-    // Fetch user's active subscription
     if (user) {
       const { data: userSubsData, error: userSubError } = await supabase
         .from('user_subscriptions')
-        .select('id, user_id, subscription_tier_id, start_date, end_date, status, stripe_subscription_id, stripe_customer_id, stripe_status') // Select new Stripe fields
+        .select('*')
         .eq('user_id', user.id)
         .order('end_date', { ascending: false });
 
       if (userSubError) {
-        console.error('UserSubscriptionsPage: Error fetching user subscriptions from user_subscriptions table:', userSubError);
+        console.error('Error fetching user subscriptions:', userSubError);
         toast({ title: "Error", description: "Failed to load your subscription status.", variant: "destructive" });
-        setUserActiveSubscription(null);
-        setDaysRemaining(null);
       } else if (userSubsData && userSubsData.length > 0) {
         const activeSub = userSubsData.find(sub => sub.status === 'active');
         if (activeSub) {
@@ -125,13 +120,6 @@ const UserSubscriptionsPage = () => {
     setIsFetchingData(false);
   };
 
-  const handleSubscriptionSuccess = () => {
-    // This function is called after a successful Stripe subscription capture (if triggered manually)
-    // In the Stripe flow, the fulfillment Edge Function handles the DB update and redirects back.
-    // We just need to trigger a refresh here to update the UI state.
-    fetchSubscriptionData();
-  };
-
   if (!hasCheckedInitialSession || isFetchingData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
@@ -146,10 +134,10 @@ const UserSubscriptionsPage = () => {
         <Card className="w-full max-w-md text-center">
           <CardHeader>
             <CardTitle>Access Denied</CardTitle>
-            <CardDescription>Please log in to view subscription plans.</CardDescription>
+            <CardDescription>Please log in to manage your subscriptions.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => window.location.href = '/login'}>Go to Login</Button>
+            <Button onClick={() => navigate('/login')}>Go to Login</Button>
           </CardContent>
         </Card>
         <MadeWithDyad />
@@ -228,7 +216,7 @@ const UserSubscriptionsPage = () => {
                       <StripeSubscribeButton
                         tierId={tier.id}
                         stripePriceId={tier.stripe_price_id!}
-                        onSubscriptionSuccess={handleSubscriptionSuccess}
+                        onSubscriptionSuccess={fetchSubscriptionData}
                       />
                     </div>
                   ) : (

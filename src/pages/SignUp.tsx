@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,9 +11,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useSession } from '@/components/SessionContextProvider';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address.").min(1, "Email is required."),
@@ -24,27 +23,10 @@ const formSchema = z.object({
   whatsapp_number: z.string().optional().or(z.literal('')),
 });
 
-interface SubscriptionTier {
-  id: string;
-  name: string;
-  price: number;
-  currency: string;
-  duration_in_months: number;
-  description: string | null;
-  features: string[] | null;
-}
-
 const SignUp = () => {
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isPageLoading, setIsPageLoading] = useState(true);
-  const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
-  const [tierFetchError, setTierFetchError] = useState<string | null>(null);
-
-  const { hasCheckedInitialSession } = useSession();
-  const [searchParams] = useSearchParams();
-  const tierId = searchParams.get('tierId');
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -58,56 +40,32 @@ const SignUp = () => {
     },
   });
 
-  const fetchTierDetails = useCallback(async (id: string) => {
-    setTierFetchError(null);
-    const { data, error } = await supabase
-      .from('subscription_tiers')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      console.error("Error fetching tier details:", error);
-      setTierFetchError("Failed to load subscription plan details. Please ensure the tier ID is valid.");
-      setSelectedTier(null);
-    } else {
-      setSelectedTier(data);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (hasCheckedInitialSession) {
-      if (tierId) {
-        fetchTierDetails(tierId);
-      }
-      setIsPageLoading(false);
-    }
-  }, [hasCheckedInitialSession, tierId, fetchTierDetails]);
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-user-account-only', {
-        body: values,
+      const { error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            first_name: values.first_name,
+            last_name: values.last_name,
+            phone_number: values.phone_number,
+            whatsapp_number: values.whatsapp_number,
+          },
+        },
       });
 
       if (error) {
         throw error;
       }
 
-      const newUserId = data.userId;
-      if (!newUserId) {
-        throw new Error("Failed to get user ID after account creation.");
-      }
-
+      setIsSubmitted(true);
       toast({
         title: "Account Created!",
-        description: "Redirecting to payment to complete your subscription.",
+        description: "Please check your email to confirm your account.",
       });
-
-      // Redirect to the new payment page with user and tier info
-      navigate(`/payment?userId=${newUserId}&tierId=${tierId}`, { replace: true });
-
+      form.reset();
     } catch (error: any) {
       console.error("Signup Error:", error);
       toast({
@@ -120,44 +78,23 @@ const SignUp = () => {
     }
   };
 
-  if (!hasCheckedInitialSession || isPageLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 pt-16">
-        <p className="text-gray-700">Loading signup page...</p>
-      </div>
-    );
-  }
-
-  if (!tierId || !selectedTier) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4 pt-16">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <CardTitle className="text-2xl">Select a Plan First</CardTitle>
-            <CardDescription>
-              {tierFetchError || "Please choose a subscription plan before signing up."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link to="/subscription">
-              <Button>View Plans</Button>
-            </Link>
-          </CardContent>
-        </Card>
-        <MadeWithDyad />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4 pt-16">
-      <div className="w-full max-w-4xl flex flex-col md:flex-row gap-6">
-        <Card className="w-full md:flex-1">
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">Create Your Account</CardTitle>
-            <CardDescription className="text-center">Step 1 of 2: Set up your login details.</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl text-center">Create Your Account</CardTitle>
+          <CardDescription className="text-center">Sign up to get started.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isSubmitted ? (
+            <div className="text-center space-y-4">
+              <p className="text-lg font-semibold">Thank you for signing up!</p>
+              <p className="text-muted-foreground">A confirmation link has been sent to your email address. Please click the link to activate your account.</p>
+              <Link to="/login">
+                <Button>Back to Login</Button>
+              </Link>
+            </div>
+          ) : (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -183,30 +120,19 @@ const SignUp = () => {
                   )} />
                 </div>
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Continue to Payment"}
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign Up"}
                 </Button>
               </form>
             </Form>
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link to={`/login?tierId=${tierId}`} className="text-primary hover:underline">
-                Log In
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="w-full md:w-80 flex-shrink-0 h-max">
-          <CardHeader className="bg-primary text-primary-foreground rounded-t-lg"><CardTitle className="text-xl">Selected Plan</CardTitle></CardHeader>
-          <CardContent className="p-6 space-y-4">
-            <p className="text-2xl font-bold">{selectedTier.name}</p>
-            <p className="text-4xl font-bold text-primary">{selectedTier.currency} {selectedTier.price.toFixed(2)}<span className="text-lg font-normal text-muted-foreground"> / {selectedTier.duration_in_months} month{selectedTier.duration_in_months > 1 ? 's' : ''}</span></p>
-            <CardDescription>{selectedTier.description}</CardDescription>
-            {selectedTier.features && selectedTier.features.length > 0 && (
-              <ul className="list-none space-y-1 text-sm">{selectedTier.features.map((f, i) => (<li key={i} className="flex items-center gap-2 text-green-600 dark:text-green-400"><CheckCircle2 className="h-4 w-4 flex-shrink-0" />{f}</li>))}</ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          )}
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link to="/login" className="text-primary hover:underline">
+              Log In
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
       <MadeWithDyad />
     </div>
   );

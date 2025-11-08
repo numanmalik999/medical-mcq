@@ -4,22 +4,15 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 
 const Login = () => {
   const { hasCheckedInitialSession } = useSession();
-  const [searchParams] = useSearchParams();
-  const tierId = searchParams.get('tierId'); // Keep tierId check for redirection to signup/subscription page
 
-  // Determine the redirect URL based on whether a tierId is present
-  // If tierId is present, redirect to subscription page after login so they can pay (if they haven't already).
-  // If not, redirect to the general dashboard redirector.
-  const redirectToUrl = tierId 
-    ? `${window.location.origin}/subscription?tierId=${tierId}`
-    : `${window.location.origin}/redirect`; // Use /redirect for default dashboard routing
+  const redirectToUrl = `${window.location.origin}/redirect`;
 
-  if (!hasCheckedInitialSession) { // Show loading only until initial session check is done
+  if (!hasCheckedInitialSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 pt-16">
         <p className="text-gray-700">Loading login page...</p>
@@ -47,7 +40,7 @@ const Login = () => {
           }}
           theme="light"
           view="sign_in"
-          redirectTo={redirectToUrl} // Use the determined redirect URL
+          redirectTo={redirectToUrl}
           localization={{
             variables: {
               sign_in: {
@@ -61,7 +54,7 @@ const Login = () => {
         />
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Don't have an account?{" "}
-          <Link to={`/signup${tierId ? `?tierId=${tierId}` : ''}`} className="text-primary hover:underline">
+          <Link to="/signup" className="text-primary hover:underline">
             Sign Up
           </Link>
         </p>

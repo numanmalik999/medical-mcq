@@ -104,13 +104,17 @@ serve(async (req: Request) => {
       }
       console.log(`New subscription ${newSub.id} inserted successfully.`);
 
-      // 4. Update profile and verify it was updated
-      const { data: updatedProfile, error: updateProfileError } = await supabaseAdmin.from('profiles').update({ has_active_subscription: true }).eq('id', user_id).select('id').maybeSingle();
+      // 4. Upsert profile to ensure it exists and update subscription status
+      const { data: upsertedProfile, error: upsertProfileError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({ id: user_id, has_active_subscription: true }, { onConflict: 'id' })
+        .select('id')
+        .single();
 
-      if (updateProfileError || !updatedProfile) {
-        throw new Error(`Failed to update profile for user ${user_id}: ${updateProfileError?.message}`);
+      if (upsertProfileError || !upsertedProfile) {
+        throw new Error(`Failed to upsert profile for user ${user_id}: ${upsertProfileError?.message}`);
       }
-      console.log(`Profile for user ${updatedProfile.id} updated successfully.`);
+      console.log(`Profile for user ${upsertedProfile.id} upserted successfully.`);
       
       console.log(`✅ Successfully processed subscription for user ${user_id}.`);
     } else {

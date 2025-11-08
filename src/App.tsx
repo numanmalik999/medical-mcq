@@ -31,6 +31,7 @@ import TakeTestPage from "./pages/TakeTestPage";
 import SubscriptionPage from "./pages/SubscriptionPage";
 import Header from "./components/Header";
 import Footer from "./components/Footer"; // Import the new Footer component
+import PaymentPage from "./pages/PaymentPage"; // Import the new PaymentPage
 
 // New static pages
 import AboutUsPage from "./pages/AboutUsPage";
@@ -70,6 +71,7 @@ const AppContent = () => {
             <Route path="/redirect" element={<DashboardRedirect />} /> {/* Old Index page, now a redirector */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/payment" element={<PaymentPage />} /> {/* New Payment Route */}
             <Route path="/quiz" element={<QuizPage />} />
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/quiz-of-the-day" element={<QuestionOfTheDayPage />} /> {/* New QOD route */}

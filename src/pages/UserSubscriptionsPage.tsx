@@ -9,8 +9,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { differenceInDays, parseISO } from 'date-fns';
-import StripeSubscribeButton from '@/components/StripeSubscribeButton';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 
 interface SubscriptionTier {
   id: string;
@@ -212,13 +211,11 @@ const UserSubscriptionsPage = () => {
                   {isCurrentPlan ? (
                     <Button className="w-full" disabled>Current Plan</Button>
                   ) : isStripePlanAvailable ? (
-                    <div className="w-full">
-                      <StripeSubscribeButton
-                        tierId={tier.id}
-                        stripePriceId={tier.stripe_price_id!}
-                        onSubscriptionSuccess={fetchSubscriptionData}
-                      />
-                    </div>
+                    <Link to={`/user/payment/${tier.id}?priceId=${tier.stripe_price_id}`} className="w-full">
+                      <Button className="w-full">
+                        {hasActiveSubscriptionFromSession ? 'Change Plan' : 'Subscribe'}
+                      </Button>
+                    </Link>
                   ) : (
                     <Button className="w-full" disabled>
                       Payment Not Configured

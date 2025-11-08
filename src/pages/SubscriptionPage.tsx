@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
-import StripeSubscribeButton from '@/components/StripeSubscribeButton';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 
 interface SubscriptionTier {
@@ -126,14 +125,11 @@ const SubscriptionPage = () => {
                 <CardFooter>
                   {user ? ( // User is logged in
                     isStripePlanAvailable ? (
-                      <div className="w-full">
-                        {/* Note: StripeSubscribeButton uses hosted checkout for existing users */}
-                        <StripeSubscribeButton
-                          tierId={tier.id}
-                          stripePriceId={tier.stripe_price_id!}
-                          onSubscriptionSuccess={() => { /* Handled by redirect */ }}
-                        />
-                      </div>
+                      <Link to={`/user/payment/${tier.id}?priceId=${tier.stripe_price_id!}`} className="w-full">
+                        <Button className="w-full">
+                          Subscribe
+                        </Button>
+                      </Link>
                     ) : (
                       <Button className="w-full" disabled>
                         Payment Not Configured

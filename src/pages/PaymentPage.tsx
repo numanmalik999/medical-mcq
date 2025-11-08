@@ -65,22 +65,15 @@ const CheckoutForm = ({ tier, user }: { tier: SubscriptionTier; user: any }) => 
     });
 
     if (subError) {
-      let errorMessage = subError.message || "Failed to create subscription.";
-      // Try to parse more details from the context
-      if (subError.context) {
-        try {
-          // The context might be a stringified JSON
-          const errorDetails = typeof subError.context === 'string' ? JSON.parse(subError.context) : subError.context;
-          if (errorDetails && errorDetails.error) {
-            errorMessage = errorDetails.error;
-          }
-        } catch (e) {
-          // Could not parse context, stick with the original message
-          console.error("Could not parse error context:", subError.context);
-        }
-      }
-      
-      toast({ title: "Subscription Error", description: errorMessage, variant: "destructive" });
+      // Aggressively log the entire error object for debugging
+      const rawError = JSON.stringify(subError, null, 2);
+      console.error("Raw subscription error from Supabase function:", rawError);
+      toast({
+        title: "Subscription Error (Raw)",
+        description: `An error occurred. Raw details: ${rawError}`,
+        variant: "destructive",
+        duration: 15000, // Give more time to read the error
+      });
       setIsProcessing(false);
       return;
     }

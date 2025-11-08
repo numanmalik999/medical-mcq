@@ -37,8 +37,8 @@ serve(async (req: Request) => {
     const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id);
     if (userError || !user) throw new Error('User not found');
 
-    const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('stripe_customer_id').eq('id', user_id).single();
-    if (profileError && profileError.code !== 'PGRST116') throw profileError;
+    const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('stripe_customer_id').eq('id', user_id).maybeSingle();
+    if (profileError) throw profileError;
 
     let customerId = profile?.stripe_customer_id;
     if (!customerId) {

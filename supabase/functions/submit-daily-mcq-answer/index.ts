@@ -136,9 +136,9 @@ serve(async (req: Request) => {
         .from('user_daily_mcq_scores')
         .select('total_points, last_awarded_subscription_at')
         .eq('user_id', user_id)
-        .single();
+        .maybeSingle();
 
-      if (fetchScoreError && fetchScoreError.code !== 'PGRST116') { // PGRST116 means no rows found
+      if (fetchScoreError) {
         console.error('Error fetching user score:', fetchScoreError);
         throw new Error('Failed to fetch user score.');
       }
@@ -195,10 +195,10 @@ serve(async (req: Request) => {
 
     // 5. Send email notification
     console.log('Preparing email notification...');
-    const recipientEmailResult = await supabaseAdmin.from('profiles').select('email').eq('id', user_id).single();
+    const recipientEmailResult = await supabaseAdmin.from('profiles').select('email').eq('id', user_id).maybeSingle();
     const recipientEmail = user_id ? recipientEmailResult.data?.email : guest_email;
     
-    const recipientNameResult = await supabaseAdmin.from('profiles').select('first_name').eq('id', user_id).single();
+    const recipientNameResult = await supabaseAdmin.from('profiles').select('first_name').eq('id', user_id).maybeSingle();
     const recipientName = user_id ? recipientNameResult.data?.first_name || 'User' : guest_name || 'Guest';
 
     if (recipientEmail) {

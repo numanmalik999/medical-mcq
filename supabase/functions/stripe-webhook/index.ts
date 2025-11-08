@@ -105,7 +105,7 @@ serve(async (req: Request) => {
       console.log(`New subscription ${newSub.id} inserted successfully.`);
 
       // 4. Update profile and verify it was updated
-      const { data: updatedProfile, error: updateProfileError } = await supabaseAdmin.from('profiles').update({ has_active_subscription: true }).eq('id', user_id).select('id').single();
+      const { data: updatedProfile, error: updateProfileError } = await supabaseAdmin.from('profiles').update({ has_active_subscription: true }).eq('id', user_id).select('id').maybeSingle();
 
       if (updateProfileError || !updatedProfile) {
         throw new Error(`Failed to update profile for user ${user_id}: ${updateProfileError?.message}`);

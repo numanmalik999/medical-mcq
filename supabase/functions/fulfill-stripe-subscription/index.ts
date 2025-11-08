@@ -110,10 +110,10 @@ serve(async (req: Request) => {
       throw new Error(`Failed to save subscription to database: ${insertError.message}`);
     }
 
-    // 5. Update user's profile
+    // 5. Update user's profile with the new stripe_customer_id
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
-      .update({ has_active_subscription: true, paypal_customer_id: customerId }) // Reusing paypal_customer_id column for stripe_customer_id for simplicity
+      .update({ has_active_subscription: true, stripe_customer_id: customerId })
       .eq('id', userId);
 
     if (profileUpdateError) {

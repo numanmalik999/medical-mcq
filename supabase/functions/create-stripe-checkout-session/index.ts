@@ -47,33 +47,21 @@ serve(async (req: Request) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    // Fetch user email
+    // Fetch user email to pass to Stripe
     const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id);
     if (userError || !user || !user.email) {
       throw new Error(`Could not retrieve user email: ${userError?.message || 'User not found or has no email'}`);
     }
     const userEmail = user.email;
 
-    // Find or create a Stripe customer
-    const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
-    let customerId;
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
-    } else {
-      const customer = await stripe.customers.create({
-        email: userEmail,
-        metadata: { user_id: user_id },
-      });
-      customerId = customer.id;
-    }
-
     const successUrl = `${supabaseUrl}/functions/v1/fulfill-stripe-subscription?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${supabaseUrl}/functions/v1/cancel-stripe-subscription`;
 
+    // Create the checkout session, letting Stripe handle customer creation
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: price_id, quantity: 1 }],
-      customer: customerId, // Use the customer ID
+      customer_email: userEmail, // Let Stripe find or create the customer by email
       metadata: {
         user_id: user_id,
         price_id: price_id,

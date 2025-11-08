@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/SessionContextProvider';
 import { useToast } from '@/hooks/use-toast';
@@ -9,8 +9,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 interface SubscriptionTier {
   id: string;
@@ -23,103 +21,6 @@ interface SubscriptionTier {
   stripe_price_id: string | null;
 }
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string);
-
-const CheckoutForm = ({ tier, user }: { tier: SubscriptionTier; user: any }) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!stripe || !elements) return;
-
-    setIsProcessing(true);
-
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) {
-      toast({ title: "Error", description: "Card element not found.", variant: "destructive" });
-      setIsProcessing(false);
-      return;
-    }
-
-    const { error, paymentMethod } = await stripe.createPaymentMethod({
-      type: 'card',
-      card: cardElement,
-    });
-
-    if (error) {
-      toast({ title: "Payment Error", description: error.message || "An unknown error occurred.", variant: "destructive" });
-      setIsProcessing(false);
-      return;
-    }
-
-    const { data: subData, error: subError } = await supabase.functions.invoke('create-stripe-subscription', {
-      body: {
-        price_id: tier.stripe_price_id,
-        user_id: user.id,
-        payment_method_id: paymentMethod.id,
-      },
-    });
-
-    if (subError) {
-      // Aggressively log the entire error object for debugging
-      const rawError = JSON.stringify(subError, null, 2);
-      console.error("Raw subscription error from Supabase function:", rawError);
-      toast({
-        title: "Subscription Error (Raw)",
-        description: `An error occurred. Raw details: ${rawError}`,
-        variant: "destructive",
-        duration: 15000, // Give more time to read the error
-      });
-      setIsProcessing(false);
-      return;
-    }
-
-    const { clientSecret, status } = subData;
-
-    if (status === 'active') {
-      toast({ title: "Success!", description: "Your subscription is now active." });
-      navigate('/user/subscriptions');
-    } else if (status === 'incomplete' || status === 'requires_action') {
-      const { error: confirmError } = await stripe.confirmCardPayment(clientSecret);
-      if (confirmError) {
-        toast({ title: "Payment Confirmation Failed", description: confirmError.message || "Please try again.", variant: "destructive" });
-      } else {
-        toast({ title: "Success!", description: "Your subscription is now active." });
-        navigate('/user/subscriptions');
-      }
-    }
-    setIsProcessing(false);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="p-4 border rounded-md">
-        <CardElement options={{
-          style: {
-            base: {
-              fontSize: '16px',
-              color: '#424770',
-              '::placeholder': {
-                color: '#aab7c4',
-              },
-            },
-            invalid: {
-              color: '#9e2146',
-            },
-          },
-        }} />
-      </div>
-      <Button type="submit" className="w-full" disabled={!stripe || isProcessing}>
-        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : `Pay ${tier.currency} ${tier.price.toFixed(2)}`}
-      </Button>
-    </form>
-  );
-};
-
 const PaymentPage = () => {
   const { tierId } = useParams<{ tierId: string }>();
   const { user } = useSession();
@@ -127,6 +28,7 @@ const PaymentPage = () => {
   
   const [tier, setTier] = useState<SubscriptionTier | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     const fetchTierDetails = async () => {
@@ -153,6 +55,37 @@ const PaymentPage = () => {
 
     fetchTierDetails();
   }, [tierId, toast]);
+
+  const handleProceedToPayment = async () => {
+    if (!tier || !user || !tier.stripe_price_id) return;
+
+    setIsRedirecting(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          price_id: tier.stripe_price_id,
+          user_id: user.id,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("Could not retrieve checkout URL.");
+      }
+    } catch (error: any) {
+      console.error("Error redirecting to checkout:", error);
+      toast({
+        title: "Payment Error",
+        description: `Could not redirect to payment page: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+      setIsRedirecting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -190,18 +123,22 @@ const PaymentPage = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
       <Card className="w-full max-w-lg">
         <CardHeader>
-          <CardTitle className="text-2xl">Complete Your Subscription</CardTitle>
-          <CardDescription>Enter your payment details for the {tier.name} plan.</CardDescription>
+          <CardTitle className="text-2xl">Confirm Your Subscription</CardTitle>
+          <CardDescription>You are about to purchase the {tier.name} plan.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Elements stripe={stripePromise}>
-            <CheckoutForm tier={tier} user={user} />
-          </Elements>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between items-baseline p-4 border rounded-md">
+            <span className="text-lg font-medium">{tier.name}</span>
+            <span className="text-2xl font-bold">{tier.currency} {tier.price.toFixed(2)}</span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            You will be redirected to Stripe's secure checkout page to complete your payment.
+          </p>
         </CardContent>
         <CardFooter>
-          <p className="text-xs text-muted-foreground text-center w-full">
-            Payments are securely processed by Stripe. Your card details are never stored on our servers.
-          </p>
+          <Button onClick={handleProceedToPayment} className="w-full" disabled={isRedirecting}>
+            {isRedirecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : `Proceed to Payment`}
+          </Button>
         </CardFooter>
       </Card>
       <MadeWithDyad />

@@ -37,42 +37,13 @@ interface UserSubscription {
 const UserSubscriptionsPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
   const [userActiveSubscription, setUserActiveSubscription] = useState<UserSubscription | null>(null);
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const [isFetchingData, setIsFetchingData] = useState(true);
-
-  useEffect(() => {
-    if (hasCheckedInitialSession) {
-      if (user) {
-        fetchSubscriptionData();
-      } else {
-        setIsFetchingData(false);
-      }
-    }
-  }, [user, hasCheckedInitialSession]);
-
-  useEffect(() => {
-    const status = searchParams.get('status');
-    const subId = searchParams.get('subId');
-
-    if (status === 'success') {
-      toast({ title: "Subscription Activated!", description: `Your subscription (ID: ${subId}) is now active.`, variant: "default" });
-      fetchSubscriptionData(); // Re-fetch data to update the UI
-    } else if (status === 'cancelled') {
-      toast({ title: "Subscription Cancelled", description: "You cancelled the checkout process.", variant: "default" });
-    } else if (status === 'failure') {
-      toast({ title: "Payment Failed", description: "There was an issue processing your payment. Please try again.", variant: "destructive" });
-    }
-
-    if (status) {
-      setSearchParams({}, { replace: true });
-    }
-  }, [searchParams, toast, setSearchParams, navigate]);
-
 
   const fetchSubscriptionData = async () => {
     setIsFetchingData(true);
@@ -118,6 +89,36 @@ const UserSubscriptionsPage = () => {
     }
     setIsFetchingData(false);
   };
+
+  useEffect(() => {
+    if (hasCheckedInitialSession) {
+      if (user) {
+        fetchSubscriptionData();
+      } else {
+        setIsFetchingData(false);
+      }
+    }
+  }, [user, hasCheckedInitialSession]);
+
+  useEffect(() => {
+    const status = searchParams.get('status');
+
+    if (status === 'success') {
+      toast({ title: "Payment Successful!", description: "Your subscription is being activated. Please wait a moment for the page to update.", variant: "default" });
+      // Re-fetch data to update the UI after a short delay to allow the webhook to process
+      setTimeout(() => {
+        fetchSubscriptionData();
+      }, 3000); 
+    } else if (status === 'cancelled') {
+      toast({ title: "Payment Cancelled", description: "You cancelled the checkout process.", variant: "default" });
+    }
+
+    // Clear search params after displaying toast
+    if (status) {
+      navigate('/user/subscriptions', { replace: true });
+    }
+  }, [searchParams, toast, navigate]);
+
 
   if (!hasCheckedInitialSession || isFetchingData) {
     return (

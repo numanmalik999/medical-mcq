@@ -38,7 +38,7 @@ serve(async (req: Request) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!stripeSecretKey || !supabaseUrl || !supabaseServiceRoleKey) {
-      throw new Error('Server configuration error.');
+      throw new Error('Server configuration error: Missing environment variables.');
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
@@ -47,30 +47,47 @@ serve(async (req: Request) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    // 1. Get user email and existing stripe_customer_id from profiles
+    // 1. Get user and profile data
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id);
+    if (userError || !user || !user.email) throw new Error('User not found');
+    const userEmail = user.email;
+
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('stripe_customer_id')
       .eq('id', user_id)
       .single();
-
     if (profileError && profileError.code !== 'PGRST116') throw profileError;
 
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id);
-    if (userError || !user || !user.email) throw new Error('User not found');
-    const userEmail = user.email;
-
+    // 2. Retrieve or create a valid Stripe customer
     let customerId = profile?.stripe_customer_id;
+    if (customerId) {
+      try {
+        const customer = await stripe.customers.retrieve(customerId);
+        if (customer.deleted) {
+          console.log(`Customer ${customerId} was deleted in Stripe, creating a new one.`);
+          customerId = null; // Treat as non-existent
+        }
+      } catch (e: any) {
+        console.warn(`Failed to retrieve Stripe customer ${customerId}, creating a new one. Error: ${e.message}`);
+        customerId = null; // Could not be found, treat as non-existent
+      }
+    }
 
-    // 2. Create or retrieve Stripe customer
     if (!customerId) {
-      const customer = await stripe.customers.create({
+      const newCustomer = await stripe.customers.create({
         email: userEmail,
         metadata: { user_id: user_id },
       });
-      customerId = customer.id;
-      // Update profile with new customer ID
-      await supabaseAdmin.from('profiles').update({ stripe_customer_id: customerId }).eq('id', user_id);
+      customerId = newCustomer.id;
+      const { error: updateProfileError } = await supabaseAdmin
+        .from('profiles')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', user_id);
+      if (updateProfileError) {
+        console.error(`Failed to update profile with new Stripe customer ID: ${updateProfileError.message}`);
+        // Do not throw, as the main flow can continue
+      }
     }
 
     // 3. Attach payment method to customer and set as default

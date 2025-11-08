@@ -26,7 +26,13 @@ serve(async (req: Request) => {
   try {
     const { price_id, user_id, payment_method_id } = await req.json();
 
+    console.log('--- create-stripe-subscription invoked ---');
+    console.log('Received price_id:', price_id);
+    console.log('Received user_id:', user_id);
+    console.log('Received payment_method_id:', payment_method_id ? 'Exists' : 'MISSING');
+
     if (!price_id || !user_id || !payment_method_id) {
+      console.error('Validation failed: Missing required fields.');
       return new Response(JSON.stringify({ error: 'Missing required fields: price_id, user_id, or payment_method_id.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

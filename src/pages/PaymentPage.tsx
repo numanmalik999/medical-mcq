@@ -166,6 +166,19 @@ const PaymentPage = () => {
     );
   }
 
+  if (!tier.stripe_price_id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader><CardTitle>Configuration Error</CardTitle></CardHeader>
+          <CardContent>
+            <p>This subscription plan is not correctly configured for payments. Please contact support or an administrator.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
       <Card className="w-full max-w-lg">

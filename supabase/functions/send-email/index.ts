@@ -43,10 +43,10 @@ serve(async (req: Request) => {
 
     // Determine the actual recipient email
     const recipientEmail = (to === 'ADMIN_EMAIL') ? adminEmail : to;
-    console.log('send-email: Sending email from:', `Admin Notifications <${adminEmail}>`, 'to:', recipientEmail);
+    console.log('send-email: Sending email from:', `Study Prometric <${adminEmail}>`, 'to:', recipientEmail);
 
     const { data, error } = await resend.emails.send({
-      from: `Admin Notifications <${adminEmail}>`, // Use adminEmail as the sender
+      from: `Study Prometric <${adminEmail}>`, // Use a professional sender name
       to: [recipientEmail], // Use the resolved recipient email
       subject: subject,
       html: body,

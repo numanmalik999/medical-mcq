@@ -19,49 +19,43 @@ const corsHeaders = {
 };
 
 serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  let body;
+  // This is the outermost block. Any error here will be caught.
   try {
-    body = await req.json();
-  } catch (e: any) {
-    const rawBody = await req.text();
-    console.error('Failed to parse request body as JSON.', e);
-    console.error('Raw request body received:', rawBody);
-    return new Response(JSON.stringify({ 
-      error: 'Invalid request format. Expected JSON.',
-      details: e.message,
-      rawBody: rawBody,
-    }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
+    }
 
-  try {
-    const { price_id, user_id, payment_method_id } = body;
+    // 1. Log environment variables immediately
+    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    console.log('--- create-stripe-subscription invoked ---');
-    console.log('Received price_id:', price_id);
-    console.log('Received user_id:', user_id);
-    console.log('Received payment_method_id:', payment_method_id ? 'Exists' : 'MISSING');
+    console.log('--- Function Start ---');
+    console.log('STRIPE_SECRET_KEY available:', !!stripeSecretKey);
+    console.log('SUPABASE_URL available:', !!supabaseUrl);
+    console.log('SUPABASE_SERVICE_ROLE_KEY available:', !!supabaseServiceRoleKey);
 
-    if (!price_id || !user_id || !payment_method_id) {
-      console.error('Validation failed: Missing required fields in JSON body.');
-      return new Response(JSON.stringify({ error: 'Missing required fields: price_id, user_id, or payment_method_id.' }), {
+    if (!stripeSecretKey || !supabaseUrl || !supabaseServiceRoleKey) {
+      throw new Error('Server configuration error: One or more critical environment variables are missing.');
+    }
+
+    // 2. Try to parse the body
+    let body;
+    try {
+      body = await req.json();
+    } catch (e: any) {
+      console.error('Failed to parse request body as JSON.', e);
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body.', details: e.message }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // 3. Main logic
+    const { price_id, user_id, payment_method_id } = body;
 
-    if (!stripeSecretKey || !supabaseUrl || !supabaseServiceRoleKey) {
-      throw new Error('Server configuration error: Missing environment variables.');
+    if (!price_id || !user_id || !payment_method_id) {
+      throw new Error('Missing required fields: price_id, user_id, or payment_method_id.');
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
@@ -70,7 +64,6 @@ serve(async (req: Request) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    // 1. Get user and profile data
     const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id);
     if (userError || !user || !user.email) throw new Error('User not found');
     const userEmail = user.email;
@@ -82,18 +75,13 @@ serve(async (req: Request) => {
       .single();
     if (profileError && profileError.code !== 'PGRST116') throw profileError;
 
-    // 2. Retrieve or create a valid Stripe customer
     let customerId = profile?.stripe_customer_id;
     if (customerId) {
       try {
         const customer = await stripe.customers.retrieve(customerId);
-        if (customer.deleted) {
-          console.log(`Customer ${customerId} was deleted in Stripe, creating a new one.`);
-          customerId = null; // Treat as non-existent
-        }
+        if (customer.deleted) customerId = null;
       } catch (e: any) {
-        console.warn(`Failed to retrieve Stripe customer ${customerId}, creating a new one. Error: ${e.message}`);
-        customerId = null; // Could not be found, treat as non-existent
+        customerId = null;
       }
     }
 
@@ -103,30 +91,20 @@ serve(async (req: Request) => {
         metadata: { user_id: user_id },
       });
       customerId = newCustomer.id;
-      const { error: updateProfileError } = await supabaseAdmin
-        .from('profiles')
-        .update({ stripe_customer_id: customerId })
-        .eq('id', user_id);
-      if (updateProfileError) {
-        console.error(`Failed to update profile with new Stripe customer ID: ${updateProfileError.message}`);
-        // Do not throw, as the main flow can continue
-      }
+      await supabaseAdmin.from('profiles').update({ stripe_customer_id: customerId }).eq('id', user_id);
     }
 
-    // 3. Attach payment method to customer and set as default
     await stripe.paymentMethods.attach(payment_method_id, { customer: customerId });
     await stripe.customers.update(customerId, {
       invoice_settings: { default_payment_method: payment_method_id },
     });
 
-    // 4. Create the subscription
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [{ price: price_id }],
       expand: ['latest_invoice.payment_intent'],
     });
 
-    // 5. Update our database with the new subscription details
     const { data: tierData, error: tierError } = await supabaseAdmin
       .from('subscription_tiers')
       .select('id')
@@ -149,7 +127,6 @@ serve(async (req: Request) => {
 
     await supabaseAdmin.from('profiles').update({ has_active_subscription: true }).eq('id', user_id);
 
-    // 6. Return the subscription status and client secret if further action is needed
     const latestInvoice = subscription.latest_invoice as Stripe.Invoice;
     const paymentIntent = latestInvoice.payment_intent as Stripe.PaymentIntent;
 
@@ -160,16 +137,8 @@ serve(async (req: Request) => {
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
-    console.error('Error in create-stripe-subscription Edge Function:', error);
-    
-    if (error.type) {
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-    }
-
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
+    console.error('--- CRITICAL ERROR in Edge Function ---', error);
+    return new Response(JSON.stringify({ error: error.message || 'An unknown server error occurred.' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

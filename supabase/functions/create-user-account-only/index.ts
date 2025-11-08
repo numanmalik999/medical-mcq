@@ -31,11 +31,12 @@ serve(async (req: Request) => {
     }
 
     // --- 1. Create User in Supabase Auth ---
+    // The 'handle_new_user' trigger will automatically create a profile row.
     const { data: userData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Mark as confirmed without sending an email yet
-      user_metadata: { first_name, last_name, phone_number, whatsapp_number },
+      email_confirm: true,
+      user_metadata: { first_name, last_name }, // Metadata for the trigger
     });
 
     if (authError) {
@@ -43,22 +44,20 @@ serve(async (req: Request) => {
     }
     const newUserId = userData.user.id;
 
-    // --- 2. Manually create the profile ---
+    // --- 2. Update the profile that was just created by the trigger ---
+    // Add the extra information like phone numbers.
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert({
-        id: newUserId,
-        first_name: first_name || null,
-        last_name: last_name || null,
+      .update({
         phone_number: phone_number || null,
         whatsapp_number: whatsapp_number || null,
-        is_admin: false,
-      });
+      })
+      .eq('id', newUserId);
 
     if (profileError) {
-      // If profile creation fails, delete the auth user to keep things clean.
+      // If profile update fails, delete the auth user to keep things clean.
       await supabaseAdmin.auth.admin.deleteUser(newUserId);
-      throw new Error(`Failed to create user profile: ${profileError.message}`);
+      throw new Error(`Failed to update user profile: ${profileError.message}`);
     }
 
     return new Response(JSON.stringify({ userId: newUserId }), {

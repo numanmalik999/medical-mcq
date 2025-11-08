@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 // @ts-ignore
-import Stripe from 'https://esm.sh/stripe@16.5.0';
+import Stripe from 'https://esm.sh/stripe@14.23.0?target=deno';
 
 declare global {
   namespace Deno {
@@ -23,8 +23,25 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let body;
   try {
-    const { price_id, user_id, payment_method_id } = await req.json();
+    body = await req.json();
+  } catch (e: any) {
+    const rawBody = await req.text();
+    console.error('Failed to parse request body as JSON.', e);
+    console.error('Raw request body received:', rawBody);
+    return new Response(JSON.stringify({ 
+      error: 'Invalid request format. Expected JSON.',
+      details: e.message,
+      rawBody: rawBody,
+    }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  try {
+    const { price_id, user_id, payment_method_id } = body;
 
     console.log('--- create-stripe-subscription invoked ---');
     console.log('Received price_id:', price_id);
@@ -32,7 +49,7 @@ serve(async (req: Request) => {
     console.log('Received payment_method_id:', payment_method_id ? 'Exists' : 'MISSING');
 
     if (!price_id || !user_id || !payment_method_id) {
-      console.error('Validation failed: Missing required fields.');
+      console.error('Validation failed: Missing required fields in JSON body.');
       return new Response(JSON.stringify({ error: 'Missing required fields: price_id, user_id, or payment_method_id.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -145,16 +162,13 @@ serve(async (req: Request) => {
   } catch (error: any) {
     console.error('Error in create-stripe-subscription Edge Function:', error);
     
-    // Check if it's a Stripe-specific error
     if (error.type) {
-        // It's a Stripe error, send a more specific message
         return new Response(JSON.stringify({ error: error.message }), {
-            status: 400, // Use 400 for client-side errors like card declines
+            status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
     }
 
-    // It's a generic server error
     return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

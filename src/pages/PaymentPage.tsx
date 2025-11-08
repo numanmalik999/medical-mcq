@@ -65,7 +65,8 @@ const CheckoutForm = ({ tier, user }: { tier: SubscriptionTier; user: any }) => 
     });
 
     if (subError) {
-      toast({ title: "Subscription Error", description: subError.message || "Failed to create subscription.", variant: "destructive" });
+      const errorMessage = subError.context?.error || subError.message || "Failed to create subscription.";
+      toast({ title: "Subscription Error", description: errorMessage, variant: "destructive" });
       setIsProcessing(false);
       return;
     }

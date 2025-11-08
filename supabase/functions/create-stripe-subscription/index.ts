@@ -136,8 +136,19 @@ serve(async (req: Request) => {
       status: subscription.status,
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in create-stripe-subscription Edge Function:', error);
+    
+    // Check if it's a Stripe-specific error
+    if (error.type) {
+        // It's a Stripe error, send a more specific message
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 400, // Use 400 for client-side errors like card declines
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+    }
+
+    // It's a generic server error
     return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

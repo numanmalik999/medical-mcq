@@ -65,7 +65,21 @@ const CheckoutForm = ({ tier, user }: { tier: SubscriptionTier; user: any }) => 
     });
 
     if (subError) {
-      const errorMessage = subError.context?.error || subError.message || "Failed to create subscription.";
+      let errorMessage = subError.message || "Failed to create subscription.";
+      // Try to parse more details from the context
+      if (subError.context) {
+        try {
+          // The context might be a stringified JSON
+          const errorDetails = typeof subError.context === 'string' ? JSON.parse(subError.context) : subError.context;
+          if (errorDetails && errorDetails.error) {
+            errorMessage = errorDetails.error;
+          }
+        } catch (e) {
+          // Could not parse context, stick with the original message
+          console.error("Could not parse error context:", subError.context);
+        }
+      }
+      
       toast({ title: "Subscription Error", description: errorMessage, variant: "destructive" });
       setIsProcessing(false);
       return;

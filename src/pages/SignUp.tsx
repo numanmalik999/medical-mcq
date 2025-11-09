@@ -68,9 +68,16 @@ const SignUp = () => {
       form.reset();
     } catch (error: any) {
       console.error("Signup Error:", error);
+      let errorMessage = error.message || 'An unexpected error occurred.';
+      
+      // Check for common Supabase errors indicating existing user
+      if (errorMessage.toLowerCase().includes('already registered') || errorMessage.toLowerCase().includes('already exists')) {
+        errorMessage = "This email address is already registered. Please log in instead.";
+      }
+
       toast({
         title: "Signup Failed",
-        description: error.message || 'An unexpected error occurred.',
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

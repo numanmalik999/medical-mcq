@@ -41,6 +41,7 @@ import TermsOfServicePage from "./pages/TermsOfServicePage";
 import FAQPage from "./pages/FAQPage";
 import BookmarkedMcqsPage from "./pages/BookmarkedMcqsPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
+import ManageLandingPage from "./pages/ManageLandingPage"; // Import new page
 
 // New Course Pages
 import ManageCoursesPage from "./pages/ManageCoursesPage";
@@ -86,6 +87,7 @@ const AppContent = () => {
               <Route element={<AdminLayout />}>
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="dashboard" element={<AdminDashboardPage />} />
+                <Route path="manage-landing-page" element={<ManageLandingPage />} /> {/* New Route */}
                 <Route path="add-mcq" element={<AddMcqPage />} />
                 <Route path="bulk-upload-mcqs" element={<BulkUploadMcqsPage />} />
                 <Route path="manage-mcqs" element={<ManageMcqsPage />} />

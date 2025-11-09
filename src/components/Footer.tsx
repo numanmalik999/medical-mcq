@@ -5,7 +5,7 @@ import { MadeWithDyad } from './made-with-dyad';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { MessageSquare, MapPin } from 'lucide-react'; // Using MessageSquare as a fallback for Whatsapp
+import { MessageSquare } from 'lucide-react'; // Removed MapPin
 
 interface StaticPageLink {
   slug: string;
@@ -53,8 +53,7 @@ const Footer = () => {
   const quickLinks = footerLinks.filter(link => !link.title.toLowerCase().includes('policy') && !link.title.toLowerCase().includes('terms'));
   const legalLinks = footerLinks.filter(link => link.title.toLowerCase().includes('policy') || link.title.toLowerCase().includes('terms'));
 
-  const whatsappNumber = "+923146616970";
-  const address = "Muhalla Boarding House Chawinda, Sialkot";
+  const whatsappNumber = "+923174636479"; // Updated number
 
   return (
     <footer className="bg-card text-card-foreground py-8 border-t border-border mt-12">
@@ -69,7 +68,7 @@ const Footer = () => {
             
             {/* WhatsApp Contact */}
             <div className="flex items-center justify-center md:justify-start space-x-2 text-sm text-muted-foreground">
-              <MessageSquare className="h-4 w-4 text-green-500 flex-shrink-0 fill-green-500" /> {/* Using MessageSquare with green styling */}
+              <MessageSquare className="h-4 w-4 text-green-500 flex-shrink-0 fill-green-500" />
               <a 
                 href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}`} 
                 target="_blank" 
@@ -80,11 +79,7 @@ const Footer = () => {
               </a>
             </div>
 
-            {/* Address */}
-            <div className="flex items-start justify-center md:justify-start space-x-2 text-sm text-muted-foreground pt-1">
-              <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
-              <p>{address}</p>
-            </div>
+            {/* Address section removed */}
           </div>
 
           {/* Quick Links */}

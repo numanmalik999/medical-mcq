@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { BookOpenText, ClipboardCheck, User, FilePlus, ShieldCheck, Brain, CalendarDays, GraduationCap, Bookmark, Check, Loader2 } from 'lucide-react';
+import { BookOpenText, ClipboardCheck, User, FilePlus, ShieldCheck, Brain, CalendarDays, GraduationCap, Bookmark, Check, Loader2, Zap, Trophy } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -300,7 +300,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Features Section (Moved up to be second) */}
+      {/* Features Section */}
       <section className="py-16 md:py-24 bg-background">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Choose Us?</h2>
@@ -320,8 +320,57 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
+      
+      {/* New Section: Why We Are Different & Result Promise */}
+      <section className="py-16 md:py-24 bg-secondary text-secondary-foreground">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            {/* What Makes Us Different */}
+            <div className="space-y-6">
+              <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
+                <Zap className="h-8 w-8 text-primary-foreground" /> What Makes Us Different?
+              </h2>
+              <p className="text-lg">
+                We go beyond simple flashcards and static question banks. Our platform is built on three core pillars designed for modern medical education:
+              </p>
+              <ul className="space-y-4 text-base list-disc list-inside ml-4">
+                <li>
+                  <strong className="font-semibold">AI-Driven Insights:</strong> Every explanation is enhanced by AI to provide clinical context, diagnostic tests, and initial treatment plans, turning every question into a comprehensive learning module.
+                </li>
+                <li>
+                  <strong className="font-semibold">Community-Curated Content:</strong> Our question bank is constantly growing and validated by both experts and a community of peers, ensuring high relevance and accuracy for Prometric exams.
+                </li>
+                <li>
+                  <strong className="font-semibold">Adaptive Testing:</strong> Our system tracks your performance across categories and difficulties, allowing you to specifically target your weak areas with the "Attempt Incorrect" feature and personalized recommendations.
+                </li>
+              </ul>
+            </div>
 
-      {/* Subscription Tiers Section (Moved down to be third) */}
+            {/* Result Promise */}
+            <div className="space-y-6">
+              <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
+                <Trophy className="h-8 w-8 text-primary-foreground" /> What’s the Result Promise?
+              </h2>
+              <p className="text-lg">
+                Our commitment is simple: **Confidence and Competence.**
+              </p>
+              <ul className="space-y-4 text-base list-disc list-inside ml-4">
+                <li>
+                  <strong className="font-semibold">Maximize Retention:</strong> By focusing on detailed explanations and spaced repetition through targeted practice, you won't just memorize answers—you'll understand the underlying concepts.
+                </li>
+                <li>
+                  <strong className="font-semibold">Simulate Success:</strong> Our timed, full-length tests prepare you mentally and physically for the pressure of the actual exam, reducing anxiety on test day.
+                </li>
+                <li>
+                  <strong className="font-semibold">Guaranteed Improvement:</strong> Consistent use of our platform leads to measurable gains in accuracy and speed, transforming your weakest subjects into areas of strength. We aim to make you exam-ready, not just quiz-ready.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Subscription Tiers Section */}
       <section className="py-16 md:py-24 bg-gray-50 dark:bg-gray-900">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">Pricing Plans</h2>

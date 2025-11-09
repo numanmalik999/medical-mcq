@@ -5,7 +5,7 @@ import { MadeWithDyad } from './made-with-dyad';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { MessageSquare, Twitter, Facebook, Instagram, Linkedin, Globe } from 'lucide-react';
+import { MessageSquare, Twitter, Facebook, Instagram, Linkedin, Globe, Youtube, TikTok } from 'lucide-react'; // Corrected TikTok import
 import { useGlobalSettings, SocialLink } from '@/hooks/useGlobalSettings'; // Import hook
 
 interface StaticPageLink {
@@ -30,6 +30,8 @@ const getSocialIcon = (platform: string) => {
   if (lowerPlatform.includes('facebook')) return <Facebook className="h-5 w-5" />;
   if (lowerPlatform.includes('instagram')) return <Instagram className="h-5 w-5" />;
   if (lowerPlatform.includes('linkedin')) return <Linkedin className="h-5 w-5" />;
+  if (lowerPlatform.includes('youtube')) return <Youtube className="h-5 w-5" />;
+  if (lowerPlatform.includes('tiktok')) return <TikTok className="h-5 w-5" />; // Corrected usage
   return <Globe className="h-5 w-5" />;
 };
 

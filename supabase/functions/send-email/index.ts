@@ -16,7 +16,7 @@ serve(async (req: Request) => {
   try {
     const { to, subject, body } = await req.json();
     console.log('send-email: Received request to send email.');
-    console.log('send-email: To:', to, 'Subject:', subject);
+    console.log('send-email: To:', Array.isArray(to) ? `${to.length} recipients` : to, 'Subject:', subject);
 
     // @ts-ignore
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
@@ -41,13 +41,25 @@ serve(async (req: Request) => {
 
     const resend = new Resend(resendApiKey);
 
-    // Determine the actual recipient email
-    const recipientEmail = (to === 'ADMIN_EMAIL') ? adminEmail : to;
-    console.log('send-email: Sending email from:', `Study Prometric <${adminEmail}>`, 'to:', recipientEmail);
+    // Determine the actual recipient email(s)
+    let recipientEmails: string[] = [];
+    if (Array.isArray(to)) {
+        recipientEmails = to.filter(email => typeof email === 'string');
+    } else if (to === 'ADMIN_EMAIL') {
+        recipientEmails = [adminEmail];
+    } else if (typeof to === 'string') {
+        recipientEmails = [to];
+    }
+    
+    if (recipientEmails.length === 0) {
+        throw new Error('No valid recipient emails provided.');
+    }
+
+    console.log('send-email: Sending email from:', `Study Prometric <${adminEmail}>`, 'to:', recipientEmails);
 
     const { data, error } = await resend.emails.send({
       from: `Study Prometric <${adminEmail}>`, // Use a professional sender name
-      to: [recipientEmail], // Use the resolved recipient email
+      to: recipientEmails, // Use the resolved recipient email(s)
       subject: subject,
       html: body,
     });

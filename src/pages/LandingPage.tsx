@@ -3,17 +3,17 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardTitle, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { BookOpenText, ClipboardCheck, User, FilePlus, ShieldCheck, Brain, CalendarDays, GraduationCap, Bookmark } from 'lucide-react'; // Re-import LayoutDashboard
+import { BookOpenText, ClipboardCheck, User, FilePlus, ShieldCheck, Brain, CalendarDays, GraduationCap, Bookmark, Check, Loader2 } from 'lucide-react'; // Added Check and Loader2
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input'; // Import Input
-import { useForm } from 'react-hook-form'; // Import useForm
-import { zodResolver } from '@hookform/resolvers/zod'; // Import zodResolver
-import * as z from 'zod'; // Import zod
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'; // Import Form components
+import { Input } from '@/components/ui/input';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 
 // Define a type for FAQ items
 interface FaqItem {
@@ -25,6 +25,17 @@ interface FaqItem {
 interface FaqCategory {
   category: string;
   questions: FaqItem[];
+}
+
+interface SubscriptionTier {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  duration_in_months: number;
+  description: string | null;
+  features: string[] | null;
+  stripe_price_id: string | null;
 }
 
 const features = [
@@ -93,7 +104,7 @@ const defaultFaqItems: FaqCategory[] = [
       },
       {
         question: "What payment methods do you accept?",
-        answer: "We currently accept payments via PayPal, ensuring a secure and convenient transaction process.",
+        answer: "We currently accept payments via Stripe, ensuring a secure and convenient transaction process.",
       },
     ],
   },
@@ -109,6 +120,9 @@ const LandingPage = () => {
   const [faqItems, setFaqItems] = useState<FaqCategory[]>(defaultFaqItems);
   const [isLoadingFaq, setIsLoadingFaq] = useState(true);
   const [isSubscribing, setIsSubscribing] = useState(false);
+  
+  const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
+  const [isFetchingTiers, setIsFetchingTiers] = useState(true);
 
   const marketingForm = useForm<z.infer<typeof marketingFormSchema>>({
     resolver: zodResolver(marketingFormSchema),
@@ -148,17 +162,35 @@ const LandingPage = () => {
       setIsLoadingFaq(false);
     };
 
+    const fetchSubscriptionTiers = async () => {
+      setIsFetchingTiers(true);
+      const { data: tiersData, error: tiersError } = await supabase
+        .from('subscription_tiers')
+        .select('*, stripe_price_id')
+        .order('price', { ascending: true });
+
+      if (tiersError) {
+        console.error('Error fetching subscription tiers:', tiersError);
+        toast({ title: "Error", description: "Failed to load subscription plans.", variant: "destructive" });
+        setSubscriptionTiers([]);
+      } else {
+        setSubscriptionTiers(tiersData || []);
+      }
+      setIsFetchingTiers(false);
+    };
+
     fetchFaqContent();
+    fetchSubscriptionTiers();
   }, [toast]);
 
   const handleMarketingSubscribe = async (values: z.infer<typeof marketingFormSchema>) => {
     setIsSubscribing(true);
-    console.log('Client: Attempting to subscribe marketing email:', values.email); // Client-side log
+    console.log('Client: Attempting to subscribe marketing email:', values.email);
     try {
       const { data, error } = await supabase.functions.invoke('subscribe-marketing-email', {
         body: { email: values.email },
       });
-      console.log('Client: Supabase function invoke response - data:', data, 'error:', error); // Client-side log
+      console.log('Client: Supabase function invoke response - data:', data, 'error:', error);
 
       if (error) {
         if (error.status === 409) { // Conflict, email already subscribed
@@ -173,13 +205,13 @@ const LandingPage = () => {
       } else {
         toast({
           title: "Subscription Successful!",
-          description: data.message || "Check your inbox for a confirmation email.", // Explicitly use data.message
+          description: data.message || "Check your inbox for a confirmation email.",
           variant: "default",
         });
         marketingForm.reset();
       }
     } catch (error: any) {
-      console.error("Client: Marketing subscription error:", error); // Client-side error log
+      console.error("Client: Marketing subscription error:", error);
       toast({
         title: "Subscription Failed",
         description: `Failed to subscribe: ${error.message || 'Unknown error'}`,
@@ -187,7 +219,7 @@ const LandingPage = () => {
       });
     } finally {
       setIsSubscribing(false);
-      console.log('Client: Marketing subscription process finished.'); // Client-side log
+      console.log('Client: Marketing subscription process finished.');
     }
   };
 
@@ -219,7 +251,7 @@ const LandingPage = () => {
               </Link>
             ) : (
               <>
-                <Link to="/subscription" className="w-full sm:w-auto">
+                <Link to="/signup" className="w-full sm:w-auto">
                   <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full">
                     Get Started
                   </Button>
@@ -248,6 +280,70 @@ const LandingPage = () => {
           <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
           <div className="absolute top-1/2 right-1/4 w-72 h-72 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
           <div className="absolute bottom-1/4 left-1/2 w-80 h-80 bg-pink-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+        </div>
+      </section>
+
+      {/* Subscription Tiers Section */}
+      <section className="py-16 md:py-24 bg-gray-50 dark:bg-gray-900">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Flexible Pricing Plans</h2>
+          <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
+            Choose the plan that fits your study schedule and unlock premium features instantly.
+          </p>
+          
+          {isFetchingTiers ? (
+            <div className="flex justify-center items-center h-40">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : subscriptionTiers.length === 0 ? (
+            <p className="text-center text-muted-foreground">No subscription plans available at the moment.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+              {subscriptionTiers.map((tier) => {
+                const isStripePlanAvailable = !!tier.stripe_price_id;
+                
+                const ctaLink = user 
+                  ? isStripePlanAvailable ? `/user/payment/${tier.id}?priceId=${tier.stripe_price_id}` : '#'
+                  : `/signup?tierId=${tier.id}`;
+                
+                const ctaText = user 
+                  ? isStripePlanAvailable ? 'Subscribe Now' : 'Payment Not Configured'
+                  : 'Sign Up & Subscribe';
+
+                return (
+                  <Card key={tier.id} className="flex flex-col text-left shadow-lg hover:shadow-xl transition-shadow duration-300">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="text-2xl">{tier.name}</CardTitle>
+                      <CardDescription>{tier.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-grow space-y-4 border-b pb-6">
+                      <p className="text-4xl font-bold">
+                        {tier.currency} {tier.price.toFixed(2)}
+                        <span className="text-lg font-normal text-muted-foreground"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
+                      </p>
+                      {tier.features && tier.features.length > 0 && (
+                        <ul className="space-y-2">
+                          {tier.features.map((feature, index) => (
+                            <li key={index} className="flex items-start gap-2 text-sm">
+                              <Check className="h-4 w-4 text-green-600 mt-1 flex-shrink-0" />
+                              <span>{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </CardContent>
+                    <CardFooter className="pt-6">
+                      <Link to={ctaLink} className="w-full">
+                        <Button className="w-full" disabled={!isStripePlanAvailable && !!user}>
+                          {ctaText}
+                        </Button>
+                      </Link>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
@@ -307,20 +403,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Call to Action Section */}
-      <section className="py-16 md:py-24 bg-primary text-primary-foreground text-center">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Boost Your Scores?</h2>
-          <p className="text-lg mb-8 max-w-2xl mx-auto">
-            Join thousands of students who are already excelling with Study Prometric MCQs.
-          </p>
-          <Link to="/subscription">
-            <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-              Start Your Journey Today
-            </Button>
-          </Link>
-        </div>
-      </section>
+      {/* Call to Action Section (Removed redundant CTA, replaced by Subscription Tiers) */}
 
       {/* FAQ Section (Embedded) */}
       <section className="py-16 md:py-24 bg-background">

@@ -17,7 +17,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import EditStaticPageDialog, { StaticPage } from '@/components/EditStaticPageDialog';
 import { useSession } from '@/components/SessionContextProvider';
-import { Badge } from '@/components/ui/badge'; // Import Badge
+import { Badge } from '@/components/ui/badge';
+import SocialMediaSettingsCard from '@/components/SocialMediaSettingsCard'; // Import new component
 
 const defaultPages = [
   { slug: 'about', title: 'About Us', content: '# About Study Prometric MCQs...', location: ['footer'] },
@@ -169,6 +170,8 @@ const AdminSettingsPage = () => {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Admin Settings</h1>
+
+      <SocialMediaSettingsCard />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

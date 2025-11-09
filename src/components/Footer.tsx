@@ -5,7 +5,8 @@ import { MadeWithDyad } from './made-with-dyad';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { MessageSquare } from 'lucide-react'; // Removed MapPin
+import { MessageSquare, Twitter, Facebook, Instagram, Linkedin, Globe } from 'lucide-react';
+import { useGlobalSettings, SocialLink } from '@/hooks/useGlobalSettings'; // Import hook
 
 interface StaticPageLink {
   slug: string;
@@ -23,11 +24,21 @@ const getRouteFromSlug = (slug: string): string => {
   return `/${slug}`;
 };
 
+const getSocialIcon = (platform: string) => {
+  const lowerPlatform = platform.toLowerCase();
+  if (lowerPlatform.includes('twitter') || lowerPlatform.includes('x')) return <Twitter className="h-5 w-5" />;
+  if (lowerPlatform.includes('facebook')) return <Facebook className="h-5 w-5" />;
+  if (lowerPlatform.includes('instagram')) return <Instagram className="h-5 w-5" />;
+  if (lowerPlatform.includes('linkedin')) return <Linkedin className="h-5 w-5" />;
+  return <Globe className="h-5 w-5" />;
+};
+
 const Footer = () => {
   const currentYear = new Date().getFullYear();
   const { toast } = useToast();
   const [footerLinks, setFooterLinks] = useState<StaticPageLink[]>([]);
   const location = useLocation();
+  const { settings } = useGlobalSettings(); // Use the new hook
 
   useEffect(() => {
     const fetchFooterLinks = async () => {
@@ -45,7 +56,6 @@ const Footer = () => {
         setFooterLinks(data || []);
       }
     };
-    // Re-fetch whenever the route changes (to reflect potential slug changes made in admin panel)
     fetchFooterLinks();
   }, [location.pathname, toast]);
 
@@ -53,7 +63,7 @@ const Footer = () => {
   const quickLinks = footerLinks.filter(link => !link.title.toLowerCase().includes('policy') && !link.title.toLowerCase().includes('terms'));
   const legalLinks = footerLinks.filter(link => link.title.toLowerCase().includes('policy') || link.title.toLowerCase().includes('terms'));
 
-  const whatsappNumber = "+923174636479"; // Updated number
+  const whatsappNumber = "+923174636479";
 
   return (
     <footer className="bg-card text-card-foreground py-8 border-t border-border mt-12">
@@ -79,7 +89,23 @@ const Footer = () => {
               </a>
             </div>
 
-            {/* Address section removed */}
+            {/* Social Media Icons */}
+            {settings.socialLinks.length > 0 && (
+              <div className="flex items-center justify-center md:justify-start space-x-4 pt-4">
+                {settings.socialLinks.map((link: SocialLink, index: number) => (
+                  <a 
+                    key={index} 
+                    href={link.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                    title={link.platform}
+                  >
+                    {getSocialIcon(link.platform)}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Quick Links */}

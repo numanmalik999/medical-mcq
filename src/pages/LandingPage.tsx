@@ -283,7 +283,28 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Subscription Tiers Section */}
+      {/* Features Section (Moved up to be second) */}
+      <section className="py-16 md:py-24 bg-background">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Choose Us?</h2>
+          <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
+            Unlock your full potential with our comprehensive and intelligent learning tools.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((feature, index) => (
+              <Card key={index} className="flex flex-col items-center p-6 text-center hover:shadow-lg transition-shadow duration-300">
+                <div className="mb-4 p-3 rounded-full bg-primary/10">
+                  {feature.icon}
+                </div>
+                <CardTitle className="text-xl mb-2">{feature.title}</CardTitle>
+                <CardDescription className="text-muted-foreground">{feature.description}</CardDescription>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Subscription Tiers Section (Moved down to be third) */}
       <section className="py-16 md:py-24 bg-gray-50 dark:bg-gray-900">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Flexible Pricing Plans</h2>
@@ -347,7 +368,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Marketing Email Subscription Section (Moved up) */}
+      {/* Marketing Email Subscription Section */}
       <section className="py-16 md:py-24 bg-secondary text-secondary-foreground text-center">
         <div className="container mx-auto px-4 max-w-2xl">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Stay Updated!</h2>
@@ -379,27 +400,6 @@ const LandingPage = () => {
               </Button>
             </form>
           </Form>
-        </div>
-      </section>
-
-      {/* Features Section (Moved down) */}
-      <section className="py-16 md:py-24 bg-background">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Choose Us?</h2>
-          <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
-            Unlock your full potential with our comprehensive and intelligent learning tools.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <Card key={index} className="flex flex-col items-center p-6 text-center hover:shadow-lg transition-shadow duration-300">
-                <div className="mb-4 p-3 rounded-full bg-primary/10">
-                  {feature.icon}
-                </div>
-                <CardTitle className="text-xl mb-2">{feature.title}</CardTitle>
-                <CardDescription className="text-muted-foreground">{feature.description}</CardDescription>
-              </Card>
-            ))}
-          </div>
         </div>
       </section>
 

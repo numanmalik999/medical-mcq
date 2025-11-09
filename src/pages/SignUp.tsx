@@ -13,6 +13,9 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { Separator } from '@/components/ui/separator';
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address.").min(1, "Email is required."),
@@ -27,6 +30,8 @@ const SignUp = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  const redirectToUrl = `${window.location.origin}/redirect`;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -102,35 +107,61 @@ const SignUp = () => {
               </Link>
             </div>
           ) : (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="first_name" render={({ field }) => (
-                    <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
+            <>
+              <Auth
+                supabaseClient={supabase}
+                providers={['google']}
+                appearance={{
+                  theme: ThemeSupa,
+                  variables: {
+                    default: {
+                      colors: {
+                        brand: 'hsl(var(--primary))',
+                        brandAccent: 'hsl(var(--primary-foreground))',
+                      },
+                    },
+                  },
+                }}
+                theme="light"
+                view="sign_up"
+                redirectTo={redirectToUrl}
+                onlyThirdPartyProviders={true}
+              />
+              
+              <Separator className="my-6" />
+              
+              <p className="text-center text-sm text-muted-foreground mb-4">Or sign up with email and password:</p>
+
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="first_name" render={({ field }) => (
+                      <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="last_name" render={({ field }) => (
+                      <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  </div>
+                  <FormField control={form.control} name="email" render={({ field }) => (
+                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input placeholder="you@example.com" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
-                  <FormField control={form.control} name="last_name" render={({ field }) => (
-                    <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormField control={form.control} name="password" render={({ field }) => (
+                    <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
-                </div>
-                <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Email</FormLabel><FormControl><Input placeholder="you@example.com" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="password" render={({ field }) => (
-                  <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="phone_number" render={({ field }) => (
-                    <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" placeholder="+1234567890" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="whatsapp_number" render={({ field }) => (
-                    <FormItem><FormLabel>WhatsApp (Optional)</FormLabel><FormControl><Input type="tel" placeholder="+1234567890" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                </div>
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign Up"}
-                </Button>
-              </form>
-            </Form>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="phone_number" render={({ field }) => (
+                      <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" placeholder="+1234567890" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="whatsapp_number" render={({ field }) => (
+                      <FormItem><FormLabel>WhatsApp (Optional)</FormLabel><FormControl><Input type="tel" placeholder="+1234567890" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign Up"}
+                  </Button>
+                </form>
+              </Form>
+            </>
           )}
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Already have an account?{" "}

@@ -26,7 +26,7 @@ const Login = () => {
         <h1 className="text-3xl font-bold text-center text-gray-900 mb-6">Login</h1>
         <Auth
           supabaseClient={supabase}
-          providers={[]}
+          providers={['google']}
           appearance={{
             theme: ThemeSupa,
             variables: {

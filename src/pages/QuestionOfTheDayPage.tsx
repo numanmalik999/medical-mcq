@@ -94,7 +94,7 @@ const QuestionOfTheDayPage = () => {
       .eq('id', explanationId)
       .single();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
       console.error('Supabase Error fetching explanation:', error);
       toast({
         title: "Error",
@@ -174,44 +174,64 @@ const QuestionOfTheDayPage = () => {
 
   const fetchDailyMcq = useCallback(async () => {
     setIsPageLoading(true);
+    let fetchedMcq: DailyMcq | null = null;
+
     try {
+      // 1. Fetch the Daily MCQ (Primary operation)
       const { data, error } = await supabase.functions.invoke('get-daily-mcq');
 
       if (error) {
         throw error;
       }
-      setDailyMcq(data as DailyMcq);
+      fetchedMcq = data as DailyMcq;
+      setDailyMcq(fetchedMcq);
       setSelectedOption(null);
       setSubmissionResult(null);
       setExplanation(null);
 
-      if (data?.daily_mcq_id) {
-        fetchDailyLeaderboard(data.daily_mcq_id); // Fetch leaderboard for today's MCQ
+    } catch (error: any) {
+      console.error('Error fetching daily MCQ (Primary):', error);
+      toast({
+        title: "Error",
+        description: `Failed to load Question of the Day: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+      setDailyMcq(null);
+      setIsPageLoading(false);
+      return;
+    }
 
+    // 2. Handle subsequent data fetches (Secondary operations)
+    if (fetchedMcq?.daily_mcq_id) {
+      // Fetch leaderboard (can run in background)
+      fetchDailyLeaderboard(fetchedMcq.daily_mcq_id); 
+
+      // Check submission status and fetch points (wrap in try/catch)
+      try {
         // Check if user has already submitted for today
         if (user) {
           const { data: existingSubmission, error: subError } = await supabase
             .from('daily_mcq_submissions')
             .select('selected_option, is_correct, points_awarded')
-            .eq('daily_mcq_id', data.daily_mcq_id)
+            .eq('daily_mcq_id', fetchedMcq.daily_mcq_id)
             .eq('user_id', user.id)
             .single();
 
           if (subError && subError.code !== 'PGRST116') {
             console.error('Error checking existing submission:', subError);
-            toast({ title: "Error", description: "Failed to check your previous submission.", variant: "destructive" });
+            // Do not throw, just log
           } else if (existingSubmission) {
             setSubmissionResult({
               message: 'You have already submitted an answer for today\'s question.',
               is_correct: existingSubmission.is_correct,
               points_awarded: existingSubmission.points_awarded,
-              total_points: null, // Will fetch separately
+              total_points: null,
               free_month_awarded: false,
-              selected_option: existingSubmission.selected_option, // Populate selected_option
+              selected_option: existingSubmission.selected_option,
             });
             setSelectedOption(existingSubmission.selected_option);
-            if (data.mcq.explanation_id) {
-              fetchExplanation(data.mcq.explanation_id);
+            if (fetchedMcq.mcq.explanation_id) {
+              fetchExplanation(fetchedMcq.mcq.explanation_id);
             }
           }
         } else { // Guest user check for existing submission
@@ -220,7 +240,7 @@ const QuestionOfTheDayPage = () => {
             const { data: existingGuestSubmission, error: guestSubError } = await supabase
               .from('daily_mcq_submissions')
               .select('selected_option, is_correct, points_awarded')
-              .eq('daily_mcq_id', data.daily_mcq_id)
+              .eq('daily_mcq_id', fetchedMcq.daily_mcq_id)
               .eq('guest_email', guestEmail)
               .is('user_id', null)
               .single();
@@ -234,47 +254,41 @@ const QuestionOfTheDayPage = () => {
                 points_awarded: existingGuestSubmission.points_awarded,
                 total_points: null,
                 free_month_awarded: false,
-                selected_option: existingGuestSubmission.selected_option, // Populate selected_option
+                selected_option: existingGuestSubmission.selected_option,
               });
               setSelectedOption(existingGuestSubmission.selected_option);
-              if (data.mcq.explanation_id) {
-                fetchExplanation(data.mcq.explanation_id);
+              if (fetchedMcq.mcq.explanation_id) {
+                fetchExplanation(fetchedMcq.mcq.explanation_id);
               }
             }
           }
         }
-      }
-      
-      // Fetch user's total points if logged in
-      if (user) {
-        const { data: scoreData, error: scoreError } = await supabase
-          .from('user_daily_mcq_scores')
-          .select('total_points')
-          .eq('user_id', user.id)
-          .single();
         
-        if (scoreError && scoreError.code !== 'PGRST116') {
-          console.error('Error fetching user total points:', scoreError);
-        } else if (scoreData) {
-          setUserTotalPoints(scoreData.total_points);
+        // Fetch user's total points if logged in
+        if (user) {
+          const { data: scoreData, error: scoreError } = await supabase
+            .from('user_daily_mcq_scores')
+            .select('total_points')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (scoreError && scoreError.code !== 'PGRST116') {
+            console.error('Error fetching user total points:', scoreError);
+          } else if (scoreData) {
+            setUserTotalPoints(scoreData.total_points);
+          } else {
+            setUserTotalPoints(0); // User has no score yet
+          }
         } else {
-          setUserTotalPoints(0); // User has no score yet
+          setUserTotalPoints(null); // Guests don't have cumulative scores
         }
-      } else {
-        setUserTotalPoints(null); // Guests don't have cumulative scores
+      } catch (e) {
+        console.error("Error during secondary QOD data fetch (submission/points):", e);
+        // Log error, but do not interrupt rendering the main question
       }
-
-    } catch (error: any) {
-      console.error('Error fetching daily MCQ:', error);
-      toast({
-        title: "Error",
-        description: `Failed to load Question of the Day: ${error.message || 'Unknown error'}`,
-        variant: "destructive",
-      });
-      setDailyMcq(null);
-    } finally {
-      setIsPageLoading(false);
     }
+    
+    setIsPageLoading(false);
   }, [user, toast, fetchExplanation, fetchDailyLeaderboard]);
 
   useEffect(() => {

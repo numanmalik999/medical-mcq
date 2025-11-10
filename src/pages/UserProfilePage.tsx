@@ -27,6 +27,9 @@ const UserProfilePage = () => {
 
   const isGuestMode = !user; // Determine if in guest mode
 
+  // Use VITE_PUBLIC_BASE_URL for production redirect, fallback to current origin for development
+  const baseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
+
   useEffect(() => {
     if (hasCheckedInitialSession) {
       if (user) {
@@ -99,7 +102,7 @@ const UserProfilePage = () => {
     setIsPasswordResetting(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: `${window.location.origin}/login`, // Redirect back to login after reset
+        redirectTo: `${baseUrl}/login`, // Use the base URL for redirect
       });
 
       if (error) throw error;

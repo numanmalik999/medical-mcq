@@ -31,7 +31,9 @@ const SignUp = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const redirectToUrl = `${window.location.origin}/redirect`;
+  // Use VITE_PUBLIC_BASE_URL for production redirect, fallback to current origin for development
+  const baseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
+  const redirectToUrl = `${baseUrl}/redirect`;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

@@ -10,7 +10,9 @@ import { useSession } from '@/components/SessionContextProvider';
 const Login = () => {
   const { hasCheckedInitialSession } = useSession();
 
-  const redirectToUrl = `${window.location.origin}/redirect`;
+  // Use VITE_PUBLIC_BASE_URL for production redirect, fallback to current origin for development
+  const baseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
+  const redirectToUrl = `${baseUrl}/redirect`;
 
   if (!hasCheckedInitialSession) {
     return (

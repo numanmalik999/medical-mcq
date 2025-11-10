@@ -54,6 +54,7 @@ import ManageDailyMcqsPage from "./pages/ManageDailyMcqsPage";
 
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import ReturnRefundPolicyPage from "./pages/ReturnRefundPolicyPage";
+import PasswordResetPage from "./pages/PasswordResetPage"; // Import new page
 
 
 const queryClient = new QueryClient();
@@ -75,6 +76,7 @@ const AppContent = () => {
             <Route path="/quiz" element={<QuizPage />} />
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/quiz-of-the-day" element={<QuestionOfTheDayPage />} />
+            <Route path="/reset-password" element={<PasswordResetPage />} /> {/* New Route */}
             
             <Route path="/about" element={<AboutUsPage />} />
             <Route path="/contact" element={<ContactPage />} />

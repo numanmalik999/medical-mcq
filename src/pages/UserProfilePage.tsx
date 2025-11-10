@@ -102,7 +102,7 @@ const UserProfilePage = () => {
     setIsPasswordResetting(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: `${baseUrl}/login`, // Use the base URL for redirect
+        redirectTo: `${baseUrl}/reset-password`, // Redirect to the new dedicated reset page
       });
 
       if (error) throw error;

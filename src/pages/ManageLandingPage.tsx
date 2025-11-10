@@ -148,7 +148,7 @@ const ManageLandingPage = () => {
       <h4 className="font-semibold">Feature #{index !== undefined ? index + 1 : 'New'}</h4>
       <FormField
         control={form.control}
-        name={`links.${index}.icon` as const}
+        name={`links.${index!}.icon` as const}
         render={({ field }) => (
           <FormItem>
             <FormLabel>Icon Name (Lucide)</FormLabel>
@@ -159,7 +159,7 @@ const ManageLandingPage = () => {
       />
       <FormField
         control={form.control}
-        name={`links.${index}.title` as const}
+        name={`links.${index!}.title` as const}
         render={({ field }) => (
           <FormItem>
             <FormLabel>Title</FormLabel>
@@ -170,7 +170,7 @@ const ManageLandingPage = () => {
       />
       <FormField
         control={form.control}
-        name={`links.${index}.description` as const}
+        name={`links.${index!}.description` as const}
         render={({ field }) => (
           <FormItem>
             <FormLabel>Description</FormLabel>

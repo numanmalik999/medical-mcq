@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User as UserIcon } from 'lucide-react';
+import { User as UserIcon, KeyRound, Loader2 } from 'lucide-react'; // Import KeyRound and Loader2
 import { Link } from 'react-router-dom';
 
 const UserProfilePage = () => {
@@ -23,6 +23,7 @@ const UserProfilePage = () => {
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [isFetchingProfile, setIsFetchingProfile] = useState(true); // New combined loading state
   const [isSaving, setIsSaving] = useState(false);
+  const [isPasswordResetting, setIsPasswordResetting] = useState(false); // New state for password reset
 
   const isGuestMode = !user; // Determine if in guest mode
 
@@ -90,6 +91,34 @@ const UserProfilePage = () => {
       fetchProfile(); // Re-fetch to ensure state is consistent
     }
     setIsSaving(false);
+  };
+
+  const handleChangePassword = async () => {
+    if (!user || !user.email) return;
+
+    setIsPasswordResetting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/login`, // Redirect back to login after reset
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Password Reset Email Sent",
+        description: "Please check your email inbox (and spam folder) for the password reset link.",
+        variant: "default",
+      });
+    } catch (error: any) {
+      console.error('Error sending password reset email:', error);
+      toast({
+        title: "Error",
+        description: `Failed to send password reset email: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsPasswordResetting(false);
+    }
   };
 
   if (!hasCheckedInitialSession || isFetchingProfile) { // Use hasCheckedInitialSession for initial loading
@@ -201,9 +230,27 @@ const UserProfilePage = () => {
               </div>
             </div>
           </div>
-          <Button onClick={handleSaveProfile} disabled={isSaving || isGuestMode}>
-            {isSaving ? "Saving..." : "Save Profile"}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button onClick={handleSaveProfile} disabled={isSaving || isGuestMode} className="sm:flex-1">
+              {isSaving ? "Saving..." : "Save Profile"}
+            </Button>
+            <Button 
+              onClick={handleChangePassword} 
+              disabled={isPasswordResetting || isGuestMode || !user?.email} 
+              variant="outline"
+              className="sm:flex-1"
+            >
+              {isPasswordResetting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending Link...
+                </>
+              ) : (
+                <>
+                  <KeyRound className="mr-2 h-4 w-4" /> Change Password
+                </>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

@@ -26,11 +26,12 @@ async function generateExplanationAndDifficulty(
   });
 
   const prompt = `Given the following multiple-choice question, its options, and the correct answer, generate a detailed explanation. The explanation should clearly state why the correct answer is right and why each of the other options is wrong, with each point on a new line.
-After the explanation, include the following four distinct sections:
-1. A section titled '### Best Diagnostic Test' with the most definitive test to confirm the diagnosis.
-2. A section titled '### Best Initial Treatment' with the immediate first-line therapy.
-3. A section titled '### Best Initial Test' with the first test that should be ordered in the clinical scenario.
-4. A section titled '### Best Treatment' with the overall management plan for the condition.
+After the explanation, include the following five distinct sections:
+1. A section titled '### The Diagnosis' with the clinical diagnosis, if the question implies a specific condition. If no diagnosis is applicable, omit this section entirely.
+2. A section titled '### Best Diagnostic Test' with the most definitive test to confirm the diagnosis.
+3. A section titled '### Best Initial Treatment' with the immediate first-line therapy.
+4. A section titled '### Best Initial Test' with the first test that should be ordered in the clinical scenario.
+5. A section titled '### Best Treatment' with the overall management plan for the condition.
 Also, assign a difficulty level (Easy, Medium, Hard) to the question.
 
 Question: ${question}
@@ -41,7 +42,7 @@ C: ${options.C}
 D: ${options.D}
 Correct Answer: ${correct_answer}
 
-Please provide the output in a JSON format with two fields: "explanation_text" (string, containing the structured explanation and all four sections), and "difficulty" (string, one of "Easy", "Medium", "Hard").
+Please provide the output in a JSON format with two fields: "explanation_text" (string, containing the structured explanation and all five sections), and "difficulty" (string, one of "Easy", "Medium", "Hard").
 IMPORTANT: Only return the JSON object, no other text or markdown.`;
 
   console.log('OpenAI Prompt:', prompt); // Log the prompt being sent to OpenAI

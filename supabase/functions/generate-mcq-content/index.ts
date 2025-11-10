@@ -26,7 +26,7 @@ async function generateExplanationAndDifficulty(
   });
 
   const prompt = `Given the following multiple-choice question, its options, and the correct answer, generate a detailed explanation. The explanation should clearly state why the correct answer is right and why each of the other options is wrong, with each point on a new line.
-After the explanation, include a section titled '### Best Diagnostic Test' with the best diagnostic test to confirm the diagnosis, and another section titled '### Best Initial Treatment' with the best initial treatment.
+After the explanation, include a section titled '### Best Initial Test' with the best initial diagnostic test based on the clinical scenario, and another section titled '### Best Treatment' with the best initial treatment based on the clinical scenario.
 Also, assign a difficulty level (Easy, Medium, Hard) to the question.
 
 Question: ${question}

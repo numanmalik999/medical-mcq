@@ -13,7 +13,7 @@ import {
   pricingCtaSchema,
 } from '@/utils/landingPageSchemas';
 import * as z from 'zod';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// Removed unused Card imports
 
 // --- Default Values based on current LandingPage.tsx ---
 
@@ -143,9 +143,9 @@ const ManageLandingPage = () => {
   );
 
   // --- Features Section Form (List) ---
-  const renderFeaturesForm = (form: UseFormReturn<z.infer<typeof featuresWrapperSchema>>, index: number) => (
+  const renderFeaturesForm = (form: UseFormReturn<z.infer<typeof featuresWrapperSchema>>, index?: number) => (
     <div className="space-y-3">
-      <h4 className="font-semibold">Feature #{index + 1}</h4>
+      <h4 className="font-semibold">Feature #{index !== undefined ? index + 1 : 'New'}</h4>
       <FormField
         control={form.control}
         name={`links.${index}.icon` as const}

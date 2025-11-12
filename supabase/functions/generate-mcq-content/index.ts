@@ -25,7 +25,7 @@ async function generateExplanationAndDifficulty(
     apiKey: openaiApiKey,
   });
 
-  const prompt = `Given the following multiple-choice question, its options, and the correct answer, generate a detailed explanation. The explanation should clearly state why the correct answer is right and why each of the other options is wrong, with each point on a new line.
+  const prompt = `Given the following multiple-choice question (the clinical scenario), its options, and the correct answer, perform a detailed analysis. The explanation MUST start with a brief analysis of the scenario, followed by the selection of the correct answer, a detailed justification for that choice, and then a clear explanation of why each of the other options is incorrect. Structure the justification clearly.
 After the explanation, include the following five distinct sections in this exact order:
 1. A section titled '### The Diagnosis' with the clinical diagnosis, if the question implies a specific condition. If no diagnosis is applicable, omit this section entirely.
 2. A section titled '### Best Initial Test' with the first test that should be ordered in the clinical scenario.

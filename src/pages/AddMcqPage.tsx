@@ -85,12 +85,12 @@ const AddMcqPage = () => {
   }, [hasCheckedInitialSession, toast]); // Dependencies changed
 
   const handleGenerateWithAI = async () => {
-    const { question_text, option_a, option_b, option_c, option_d, correct_answer } = form.getValues();
+    const { question_text, option_a, option_b, option_c, option_d } = form.getValues();
 
-    if (!question_text || !option_a || !option_b || !option_c || !option_d || !correct_answer) {
+    if (!question_text || !option_a || !option_b || !option_c || !option_d) {
       toast({
         title: "Missing Information",
-        description: "Please fill in the question, all options, and the correct answer before generating with AI.",
+        description: "Please fill in the question and all options before generating with AI.",
         variant: "destructive",
       });
       return;
@@ -99,7 +99,7 @@ const AddMcqPage = () => {
     setIsGeneratingAI(true);
     const loadingToastId = toast({
       title: "Generating with AI...",
-      description: "Please wait while AI generates the explanation and difficulty.",
+      description: "Please wait while AI determines the correct answer, generates the explanation, and difficulty.",
       duration: 999999,
       action: <Loader2 className="h-4 w-4 animate-spin" />,
     });
@@ -109,7 +109,7 @@ const AddMcqPage = () => {
         body: {
           question: question_text,
           options: { A: option_a, B: option_b, C: option_c, D: option_d },
-          correct_answer: correct_answer,
+          // Removed correct_answer from body as AI determines it
         },
       });
 
@@ -117,13 +117,15 @@ const AddMcqPage = () => {
         throw error;
       }
 
+      // Use the AI-determined correct answer
+      form.setValue("correct_answer", data.correct_answer);
       form.setValue("explanation_text", data.explanation_text);
       form.setValue("difficulty", data.difficulty);
       
       dismiss(loadingToastId.id);
       toast({
         title: "AI Generation Complete!",
-        description: "Explanation and difficulty have been generated. Please review.",
+        description: `Correct answer determined as ${data.correct_answer}. Explanation and difficulty have been generated. Please review.`,
         variant: "default",
       });
     } catch (error: any) {
@@ -267,11 +269,11 @@ const AddMcqPage = () => {
                 name="correct_answer"
                 render={({ field }) => (
                   <FormItem className="space-y-3">
-                    <FormLabel>Correct Answer</FormLabel>
+                    <FormLabel>Correct Answer (AI will override this if used)</FormLabel>
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                         className="flex flex-col space-y-1"
                       >
                         {['A', 'B', 'C', 'D'].map((val) => (

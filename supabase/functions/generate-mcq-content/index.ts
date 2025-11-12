@@ -11,7 +11,7 @@ const corsHeaders = {
 async function generateExplanationAndDifficulty(
   question: string,
   options: { A: string; B: string; C: string; D: string },
-  correct_answer: 'A' | 'B' | 'C' | 'D'
+  // Removed correct_answer from function signature as AI will determine it
 ) {
   // @ts-ignore // Ignore the Deno global type error
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -25,7 +25,10 @@ async function generateExplanationAndDifficulty(
     apiKey: openaiApiKey,
   });
 
-  const prompt = `Given the following multiple-choice question (the clinical scenario), its options, and the correct answer, perform a detailed analysis. The explanation MUST start with a brief analysis of the scenario, followed by the selection of the correct answer, a detailed justification for that choice, and then a clear explanation of why each of the other options is incorrect. Structure the justification clearly.
+  const prompt = `Given the following multiple-choice question (the clinical scenario) and its options, you must first determine the single best correct answer.
+
+Then, generate a detailed analysis. The explanation MUST start with a brief analysis of the scenario, followed by the selection of the correct answer, a detailed justification for that choice, and then a clear explanation of why each of the other options is incorrect. Structure the justification clearly.
+
 After the explanation, include the following five distinct sections in this exact order:
 1. A section titled '### The Diagnosis' with the clinical diagnosis, if the question implies a specific condition. If no diagnosis is applicable, omit this section entirely.
 2. A section titled '### Best Initial Test' with the first test that should be ordered in the clinical scenario.
@@ -40,9 +43,8 @@ A: ${options.A}
 B: ${options.B}
 C: ${options.C}
 D: ${options.D}
-Correct Answer: ${correct_answer}
 
-Please provide the output in a JSON format with two fields: "explanation_text" (string, containing the structured explanation and all five sections), and "difficulty" (string, one of "Easy", "Medium", "Hard").
+Please provide the output in a JSON format with three fields: "explanation_text" (string, containing the structured explanation and all five sections), "difficulty" (string, one of "Easy", "Medium", "Hard"), and "correct_answer" (string, the letter of the option you determined to be correct, e.g., "A").
 IMPORTANT: Only return the JSON object, no other text or markdown.`;
 
   console.log('OpenAI Prompt:', prompt); // Log the prompt being sent to OpenAI
@@ -63,9 +65,16 @@ IMPORTANT: Only return the JSON object, no other text or markdown.`;
     }
 
     const parsedContent = JSON.parse(responseContent);
+    
+    // Ensure the AI returned the determined correct answer
+    if (!parsedContent.correct_answer || !['A', 'B', 'C', 'D'].includes(parsedContent.correct_answer)) {
+        throw new Error('AI failed to determine and return a valid "correct_answer" (A, B, C, or D).');
+    }
+
     return {
       explanation_text: parsedContent.explanation_text,
       difficulty: parsedContent.difficulty,
+      correct_answer: parsedContent.correct_answer, // Return the AI-determined correct answer
     };
   } catch (error) {
     console.error('Failed to generate content with OpenAI AI:', error);
@@ -82,18 +91,24 @@ serve(async (req: Request) => {
     const requestBody = await req.json();
     console.log('Incoming Request Body:', requestBody); // Log the incoming request body
 
-    const { question, options, correct_answer } = requestBody;
+    const { question, options } = requestBody;
 
-    if (!question || !options || !correct_answer) {
-      return new Response(JSON.stringify({ error: 'Missing required fields: question, options, or correct_answer.' }), {
+    if (!question || !options) {
+      return new Response(JSON.stringify({ error: 'Missing required fields: question or options.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const aiResponse = await generateExplanationAndDifficulty(question, options, correct_answer);
+    // Call AI function without the pre-selected correct_answer
+    const aiResponse = await generateExplanationAndDifficulty(question, options);
 
-    return new Response(JSON.stringify(aiResponse), {
+    // Merge the AI-determined correct answer back into the response structure
+    return new Response(JSON.stringify({
+      explanation_text: aiResponse.explanation_text,
+      difficulty: aiResponse.difficulty,
+      correct_answer: aiResponse.correct_answer, // This is the AI-determined answer
+    }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

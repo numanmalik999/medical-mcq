@@ -25,27 +25,39 @@ async function generateExplanationAndDifficulty(
     apiKey: openaiApiKey,
   });
 
-  const prompt = `Given the following multiple-choice question (the clinical scenario) and its options, you must first determine the single best correct answer.
+  const prompt = `You are an expert medical educator and content creator for a platform called 'Study Prometric,' which helps users prepare for medical licensing exams.
 
-Then, generate a detailed analysis. The explanation MUST start with a brief analysis of the scenario, followed by the selection of the correct answer, a detailed justification for that choice, and then a clear explanation of why each of the other options is incorrect. Structure the justification clearly.
-
-After the explanation, include the following five distinct sections in this exact order:
-1. A section titled '### The Diagnosis' with the clinical diagnosis, if the question implies a specific condition. If no diagnosis is applicable, omit this section entirely.
-2. A section titled '### Best Initial Test' with the first test that should be ordered in the clinical scenario.
-3. A section titled '### Best Diagnostic Test' with the most definitive test to confirm the diagnosis.
-4. A section titled '### Best Initial Treatment' with the immediate first-line therapy.
-5. A section titled '### Best Treatment' with the overall management plan for the condition.
-Also, assign a difficulty level (Easy, Medium, Hard) to the question.
+Your task is to analyze the following multiple-choice question (MCQ) and its options:
 
 Question: ${question}
-Options:
-A: ${options.A}
-B: ${options.B}
-C: ${options.C}
-D: ${options.D}
+Option A: ${options.A}
+Option B: ${options.B}
+Option C: ${options.C}
+Option D: ${options.D}
 
-Please provide the output in a JSON format with three fields: "explanation_text" (string, containing the structured explanation and all five sections), "difficulty" (string, one of "Easy", "Medium", "Hard"), and "correct_answer" (string, the letter of the option you determined to be correct, e.g., "A").
-IMPORTANT: Only return the JSON object, no other text or markdown.`;
+You must first determine the single best correct answer and then generate a comprehensive, structured explanation.
+
+The explanation must be structured as follows:
+1.  **Brief Scenario Analysis:** Start with a 1-2 sentence summary of the clinical scenario presented in the question.
+2.  **Correct Answer Justification:** Clearly state the correct answer (e.g., 'The correct answer is B.') and provide a detailed, step-by-step justification for why it is the best choice.
+3.  **Incorrect Options Analysis:** Explain why each of the other three options is incorrect. Use clear headings for each (e.g., 'Why A is incorrect:').
+
+After the main explanation, you MUST include the following five sections, using the exact markdown headings provided. If a section is not applicable to the question, you MUST omit that section entirely from the output.
+
+### The Diagnosis
+State the clinical diagnosis, followed by a brief 1-2 sentence summary of the condition.
+### Best Initial Test
+### Best Diagnostic Test
+### Best Initial Treatment
+### Best Treatment
+
+Finally, assign a difficulty level to the question. It must be one of three values: 'Easy', 'Medium', or 'Hard'.
+
+The entire output MUST be a single, valid JSON object with exactly three top-level keys: \`correct_answer\`, \`explanation_text\`, and \`difficulty\`.
+
+Example format: \`{"correct_answer": "B", "explanation_text": "...", "difficulty": "Medium"}\`
+
+Do not include any introductory text, markdown code blocks (like \`\`\`json), or any other text outside of this JSON object.`;
 
   console.log('OpenAI Prompt:', prompt); // Log the prompt being sent to OpenAI
 

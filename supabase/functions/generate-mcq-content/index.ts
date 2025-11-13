@@ -11,7 +11,6 @@ const corsHeaders = {
 async function generateExplanationAndDifficulty(
   question: string,
   options: { A: string; B: string; C: string; D: string },
-  // Removed correct_answer from function signature as AI will determine it
 ) {
   // @ts-ignore // Ignore the Deno global type error
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -53,9 +52,9 @@ State the clinical diagnosis, followed by a brief 1-2 sentence summary of the co
 
 Finally, assign a difficulty level to the question. It must be one of three values: 'Easy', 'Medium', or 'Hard'.
 
-The entire output MUST be a single, valid JSON object with exactly three top-level keys: \`correct_answer\`, \`explanation_text\`, and \`difficulty\`.
+The entire output MUST be a single, valid JSON object with exactly three top-level keys: \`correct_answer\`, \`explanation_text\`, and \`difficulty\`. The value for the \`explanation_text\` key MUST be a single string containing all the structured parts of the explanation, formatted with markdown (using newlines and headings).
 
-Example format: \`{"correct_answer": "B", "explanation_text": "...", "difficulty": "Medium"}\`
+Example format: \`{"correct_answer": "B", "explanation_text": "Brief Scenario Analysis...\\n\\nCorrect Answer Justification...\\n\\n### The Diagnosis\\n...", "difficulty": "Medium"}\`
 
 Do not include any introductory text, markdown code blocks (like \`\`\`json), or any other text outside of this JSON object.`;
 
@@ -83,8 +82,15 @@ Do not include any introductory text, markdown code blocks (like \`\`\`json), or
         throw new Error('AI failed to determine and return a valid "correct_answer" (A, B, C, or D).');
     }
 
+    // Defensive check: if explanation_text is an object, stringify it to prevent UI errors.
+    let explanationText = parsedContent.explanation_text;
+    if (typeof explanationText === 'object' && explanationText !== null) {
+        console.warn("AI returned an object for explanation_text despite instructions. Stringifying it as a fallback.");
+        explanationText = JSON.stringify(explanationText, null, 2); // Pretty-print JSON as a fallback
+    }
+
     return {
-      explanation_text: parsedContent.explanation_text,
+      explanation_text: explanationText,
       difficulty: parsedContent.difficulty,
       correct_answer: parsedContent.correct_answer, // Return the AI-determined correct answer
     };

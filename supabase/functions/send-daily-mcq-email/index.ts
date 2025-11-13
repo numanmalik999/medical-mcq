@@ -71,6 +71,12 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ message: 'No subscribers found.' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // Get the app's base URL from environment variables
+    const appBaseUrl = Deno.env.get('APP_BASE_URL');
+    if (!appBaseUrl) {
+        throw new Error('APP_BASE_URL environment variable is not set in Supabase project secrets.');
+    }
+
     // 3. Prepare and send the email content
     const emailSubject = `🧠 Question of the Day: ${mcq.question_text.substring(0, 50)}...`;
     const emailBody = `
@@ -88,7 +94,7 @@ serve(async (req: Request) => {
       </div>
       
       <p>Visit our app to submit your answer and see the explanation!</p>
-      <p><a href="https://uvhlyitcrogvssmcqtni.supabase.co/quiz-of-the-day" style="display: inline-block; padding: 10px 20px; background-color: #1e3a8a; color: white; text-decoration: none; border-radius: 5px;">Answer the Question</a></p>
+      <p><a href="${appBaseUrl}/quiz-of-the-day" style="display: inline-block; padding: 10px 20px; background-color: #1e3a8a; color: white; text-decoration: none; border-radius: 5px;">Answer the Question</a></p>
       
       <p>Good luck!</p>
       <p><small>You are receiving this email because you subscribed to our daily updates.</small></p>

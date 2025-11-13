@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2, Lock } from 'lucide-react';
+import { useSession } from '@/components/SessionContextProvider';
 
 const formSchema = z.object({
   password: z.string().min(6, "New password must be at least 6 characters long."),
@@ -25,9 +26,7 @@ const formSchema = z.object({
 const PasswordResetPage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [isProcessing, setIsProcessing] = useState(true);
-  const [isTokenValid, setIsTokenValid] = useState(false);
+  const { session, hasCheckedInitialSession } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -39,41 +38,16 @@ const PasswordResetPage = () => {
   });
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const type = searchParams.get('type');
-
-    if (token && type === 'recovery') {
-      // The token is automatically handled by Supabase client when the page loads,
-      // setting the user session temporarily. We just need to check if a session exists.
-      const checkSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && session.access_token === token) {
-          setIsTokenValid(true);
-          toast({
-            title: "Ready to Reset",
-            description: "Please enter your new password.",
-          });
-        } else {
-          toast({
-            title: "Invalid Link",
-            description: "The password reset link is invalid or expired.",
-            variant: "destructive",
-          });
-          setTimeout(() => navigate('/login'), 3000);
-        }
-        setIsProcessing(false);
-      };
-      checkSession();
-    } else {
-      setIsProcessing(false);
+    // After the initial session check, if there's no session, the link was invalid or expired.
+    if (hasCheckedInitialSession && !session) {
       toast({
-        title: "Missing Information",
-        description: "This page requires a valid password recovery link.",
+        title: "Invalid Link",
+        description: "The password reset link is invalid or has expired. Please request a new one.",
         variant: "destructive",
       });
-      setTimeout(() => navigate('/login'), 3000);
+      navigate('/login');
     }
-  }, [searchParams, navigate, toast]);
+  }, [session, hasCheckedInitialSession, navigate, toast]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
@@ -106,7 +80,7 @@ const PasswordResetPage = () => {
     }
   };
 
-  if (isProcessing) {
+  if (!hasCheckedInitialSession || !session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -123,46 +97,39 @@ const PasswordResetPage = () => {
           <CardDescription className="text-center">Enter and confirm your new password below.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isTokenValid ? (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2"><Lock className="h-4 w-4" /> New Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2"><Lock className="h-4 w-4" /> Confirm Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Reset Password"}
-                </Button>
-              </form>
-            </Form>
-          ) : (
-            <div className="text-center space-y-4">
-              <p className="text-red-600">The link is invalid or expired.</p>
-              <Button onClick={() => navigate('/login')}>Go to Login</Button>
-            </div>
-          )}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2"><Lock className="h-4 w-4" /> New Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2"><Lock className="h-4 w-4" /> Confirm Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Reset Password"}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
       <MadeWithDyad />

@@ -55,6 +55,7 @@ import ManageDailyMcqsPage from "./pages/ManageDailyMcqsPage";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import ReturnRefundPolicyPage from "./pages/ReturnRefundPolicyPage";
 import PasswordResetPage from "./pages/PasswordResetPage"; // Import new page
+import ReviewsPage from "./pages/ReviewsPage";
 
 
 const queryClient = new QueryClient();
@@ -84,6 +85,7 @@ const AppContent = () => {
             <Route path="/terms" element={<TermsOfServicePage />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/refund" element={<ReturnRefundPolicyPage />} />
+            <Route path="/reviews" element={<ReviewsPage />} />
 
             <Route path="/admin" element={<AdminProtectedRoute />}>
               <Route element={<AdminLayout />}>

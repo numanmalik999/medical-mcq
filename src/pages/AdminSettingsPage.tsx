@@ -27,6 +27,7 @@ const defaultPages = [
   { slug: 'terms', title: 'Terms of Service', content: '# Terms of Service...', location: ['footer'] },
   { slug: 'faq', title: 'FAQ', content: '# Frequently Asked Questions...', location: ['footer'] },
   { slug: 'refund', title: 'Return & Refund Policy', content: '# Return and Refund Policy...', location: ['footer'] },
+  { slug: 'reviews', title: 'Reviews', content: 'This page is dynamically generated.', location: ['footer'] },
 ];
 
 const AdminSettingsPage = () => {
@@ -80,7 +81,7 @@ const AdminSettingsPage = () => {
     if (hasCheckedInitialSession) {
       // First, fetch existing pages
       fetchStaticPages().then(() => {
-        // Then, ensure defaults exist (this relies on the state being updated, so we call it after the initial fetch)
+        // Then, ensure defaults exist (this relies on the state being updated, so we call it after the initial fetch completes)
         // We call it here to ensure it runs after the initial fetch completes and populates `staticPages` state.
       });
     }

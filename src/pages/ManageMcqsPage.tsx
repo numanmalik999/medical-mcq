@@ -12,8 +12,9 @@ import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Wand2, Loader2 } from 'lucide-react'; // Import new icons
 import { useSession } from '@/components/SessionContextProvider'; // Import useSession
+import { RowSelectionState } from '@tanstack/react-table';
 
 interface Category {
   id: string;
@@ -42,6 +43,9 @@ const ManageMcqsPage = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [isEnhancing, setIsEnhancing] = useState(false);
 
   const { hasCheckedInitialSession } = useSession();
 
@@ -281,6 +285,50 @@ const ManageMcqsPage = () => {
     return result;
   }, [rawMcqs, selectedFilterCategory]);
 
+  const handleBulkEnhance = async () => {
+    const selectedIndices = Object.keys(rowSelection);
+    const selectedMcqIds = selectedIndices.map(index => filteredMcqs[parseInt(index)].id);
+
+    if (selectedMcqIds.length === 0) {
+      toast({ title: "No MCQs Selected", description: "Please select one or more MCQs to enhance.", variant: "destructive" });
+      return;
+    }
+
+    if (!window.confirm(`You are about to enhance ${selectedMcqIds.length} MCQs with AI. This will overwrite existing explanations, correct answers, difficulties, and categories. Continue?`)) {
+      return;
+    }
+
+    setIsEnhancing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
+        body: { mcq_ids: selectedMcqIds },
+      });
+
+      if (error) throw error;
+
+      if (data.errorCount > 0) {
+        toast({
+          title: "Partial Success",
+          description: `Enhanced ${data.successCount} MCQs. ${data.errorCount} failed. Check console for details.`,
+          variant: "default",
+        });
+        console.error("Bulk Enhance Errors:", data.errors);
+      } else {
+        toast({
+          title: "Success!",
+          description: `Successfully enhanced ${data.successCount} MCQs.`,
+        });
+      }
+    } catch (error: any) {
+      console.error("Error invoking bulk-enhance-mcqs function:", error);
+      toast({ title: "Error", description: `Failed to enhance MCQs: ${error.message || 'Unknown error'}`, variant: "destructive" });
+    } finally {
+      setIsEnhancing(false);
+      setRowSelection({});
+      refreshAllData();
+    }
+  };
+
   const handleDeleteMcq = async (mcqId: string, explanationId: string | null) => {
     if (!window.confirm("Are you sure you want to delete this MCQ? This action cannot be undone.")) {
       return;
@@ -475,6 +523,8 @@ const ManageMcqsPage = () => {
     );
   }
 
+  const numSelected = Object.keys(rowSelection).length;
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Manage MCQs</h1>
@@ -526,6 +576,24 @@ const ManageMcqsPage = () => {
 
       <Card>
         <CardHeader>
+          <CardTitle>Bulk Actions</CardTitle>
+          <CardDescription>Perform actions on multiple selected MCQs at once.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <Button onClick={handleBulkEnhance} disabled={isEnhancing || numSelected === 0}>
+              {isEnhancing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+              Bulk Enhance with AI ({numSelected})
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              {numSelected > 0 ? `${numSelected} MCQ(s) selected.` : "Select MCQs in the table below to perform bulk actions."}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>All Multiple Choice Questions</CardTitle>
           <CardDescription>View, edit, and delete MCQs from your database.</CardDescription>
         </CardHeader>
@@ -533,7 +601,7 @@ const ManageMcqsPage = () => {
           {isPageLoading ? (
             <p className="text-center text-gray-600 dark:text-gray-400">Loading MCQs...</p>
           ) : (
-            <DataTable columns={columns} data={filteredMcqs} />
+            <DataTable columns={columns} data={filteredMcqs} rowSelection={rowSelection} setRowSelection={setRowSelection} />
           )}
           {!isPageLoading && filteredMcqs.length === 0 && (
             <div className="mt-4 text-center">

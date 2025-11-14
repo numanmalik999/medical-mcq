@@ -26,35 +26,33 @@ async function generateExplanationAndDifficulty(
 
   const prompt = `You are an expert medical educator and content creator for a platform called 'Study Prometric,' which helps users prepare for medical licensing exams.
 
-Your task is to analyze the following multiple-choice question (MCQ) and its options:
+Your task is to analyze the following multiple-choice question (MCQ) and its options. You must first determine the single best correct answer and then generate a comprehensive, structured explanation.
 
+MCQ to analyze:
 Question: ${question}
-Option A: ${options.A}
-Option B: ${options.B}
-Option C: ${options.C}
-Option D: ${options.D}
-
-You must first determine the single best correct answer and then generate a comprehensive, structured explanation.
+Options:
+A: ${options.A}
+B: ${options.B}
+C: ${options.C}
+D: ${options.D}
 
 The explanation must be structured as follows:
-1.  **Brief Scenario Analysis:** Start with a 1-2 sentence summary of the clinical scenario presented in the question.
-2.  **Correct Answer Justification:** Clearly state the correct answer (e.g., 'The correct answer is B.') and provide a detailed, step-by-step justification for why it is the best choice.
-3.  **Incorrect Options Analysis:** Explain why each of the other three options is incorrect. Use clear headings for each (e.g., 'Why A is incorrect:').
 
-After the main explanation, you MUST include the following five sections, using the exact markdown headings provided. If a section is not applicable to the question, you MUST omit that section entirely from the output.
+Brief Scenario Analysis: Start with a 1-2 sentence summary of the clinical scenario presented in the question.
+Correct Answer Justification: Clearly state the correct answer (e.g., 'The correct answer is B.') and provide a detailed, step-by-step justification for why it is the best choice.
+Incorrect Options Analysis: Explain why each of the other three options is incorrect. Use clear headings for each (e.g., 'Why A is incorrect:').
+After the main explanation, you MUST include the following five sections, using the exact markdown headings provided. If a section is not applicable to the question (e.g., no specific diagnosis), you MUST omit that section entirely from the output.
 
-### The Diagnosis
-State the clinical diagnosis, followed by a brief 1-2 sentence summary of the condition.
-### Best Initial Test
-### Best Diagnostic Test
-### Best Initial Treatment
-### Best Treatment
-
+The Diagnosis
+Best Initial Test
+Best Diagnostic Test
+Best Initial Treatment
+Best Treatment
 Finally, assign a difficulty level to the question. It must be one of three values: 'Easy', 'Medium', or 'Hard'.
 
-The entire output MUST be a single, valid JSON object with exactly three top-level keys: \`correct_answer\`, \`explanation_text\`, and \`difficulty\`. The value for the \`explanation_text\` key MUST be a single string containing all the structured parts of the explanation, formatted with markdown (using newlines and headings).
+The entire output MUST be a single, valid JSON object with exactly three top-level keys: correct_answer, explanation_text, and difficulty.
 
-Example format: \`{"correct_answer": "B", "explanation_text": "Brief Scenario Analysis...\\n\\nCorrect Answer Justification...\\n\\n### The Diagnosis\\n...", "difficulty": "Medium"}\`
+Example format: {"correct_answer": "B", "explanation_text": "...", "difficulty": "Medium"}
 
 Do not include any introductory text, markdown code blocks (like \`\`\`json), or any other text outside of this JSON object.`;
 

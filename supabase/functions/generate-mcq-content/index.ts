@@ -38,13 +38,22 @@ D: ${options.D}
 
 The explanation must be structured as follows:
 
-Brief Scenario Analysis: Start with a 1-2 sentence summary of the clinical scenario presented in the question. Correct Answer Justification: Clearly state the correct answer (e.g., 'The correct answer is B.') and provide a detailed, step-by-step justification for why it is the best choice. Incorrect Options Analysis: Explain why each of the other three options is incorrect. Use clear headings for each (e.g., 'Why A is incorrect:'). After the main explanation, you MUST include the following five sections, using the exact markdown headings provided. If a section is not applicable to the question (e.g., no specific diagnosis), you MUST omit that section entirely from the output.
+Brief Scenario Analysis: Start with a 1-2 sentence summary of the clinical scenario presented in the question.
+Correct Answer Justification: Clearly state the correct answer (e.g., 'The correct answer is B.') and provide a detailed, step-by-step justification for why it is the best choice.
+Incorrect Options Analysis: Explain why each of the other three options is incorrect. Use clear headings for each (e.g., 'Why A is incorrect:').
+After the main explanation, you MUST include the following five sections, using the exact markdown headings provided. If a section is not applicable to the question (e.g., no specific diagnosis), you MUST omit that section entirely from the output.
 
-The Diagnosis Best Initial Test Best Diagnostic Test Best Initial Treatment Best Treatment Finally, assign a difficulty level to the question. It must be one of three values: 'Easy', 'Medium', or 'Hard'.
+The Diagnosis
+Best Initial Test
+Best Diagnostic Test
+Best Initial Treatment
+Best Treatment
+Finally, assign a difficulty level to the question. It must be one of three values: 'Easy', 'Medium', or 'Hard'.
 
 The entire output MUST be a single, valid JSON object with exactly three top-level keys: correct_answer, explanation_text, and difficulty.
+The value for "explanation_text" MUST be a single string containing the full, formatted explanation. Use markdown for headings (e.g., '### Correct Answer Justification') and newlines (\\n) for spacing.
 
-Example format: {"correct_answer": "B", "explanation_text": "...", "difficulty": "Medium"}
+Example format: {"correct_answer": "B", "explanation_text": "### Brief Scenario Analysis\\nA 65-year-old man presents with chest pain...", "difficulty": "Medium"}
 
 Do not include any introductory text, markdown code blocks (like \`\`\`json), or any other text outside of this JSON object.`;
 
@@ -72,11 +81,13 @@ Do not include any introductory text, markdown code blocks (like \`\`\`json), or
         throw new Error('AI failed to determine and return a valid "correct_answer" (A, B, C, or D).');
     }
 
-    // Defensive check: if explanation_text is an object, stringify it to prevent UI errors.
     let explanationText = parsedContent.explanation_text;
     if (typeof explanationText === 'object' && explanationText !== null) {
-        console.warn("AI returned an object for explanation_text despite instructions. Stringifying it as a fallback.");
-        explanationText = JSON.stringify(explanationText, null, 2); // Pretty-print JSON as a fallback
+        console.warn("AI returned an object for explanation_text. Attempting to format it into a string.");
+        // Try to build a string from common keys if the AI messes up
+        explanationText = Object.entries(explanationText)
+            .map(([key, value]) => `**${key.replace(/_/g, ' ')}**\n${value}`)
+            .join('\n\n');
     }
 
     return {

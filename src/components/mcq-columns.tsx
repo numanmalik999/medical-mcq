@@ -10,9 +10,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
-import { Badge } from "@/components/ui/badge"; // Import Badge
-import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
+import { MoreHorizontal, Wand2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // New type for a single MCQ-Category-Subcategory link
 export type McqCategoryLink = {
@@ -79,6 +85,30 @@ export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnD
     },
   },
   {
+    id: "enhanced",
+    header: "AI",
+    cell: ({ row }) => {
+      const difficulty = row.original.difficulty;
+      if (difficulty) {
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex justify-center">
+                  <Wand2 className="h-4 w-4 text-blue-500" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>AI Enhanced (Difficulty: {difficulty})</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      }
+      return <div className="flex justify-center text-muted-foreground">-</div>;
+    },
+  },
+  {
     accessorKey: "correct_answer",
     header: "Correct",
   },
@@ -95,10 +125,6 @@ export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnD
         </div>
       );
     },
-  },
-  {
-    accessorKey: "difficulty",
-    header: "Difficulty",
   },
   {
     accessorKey: "is_trial_mcq", // New column for trial status

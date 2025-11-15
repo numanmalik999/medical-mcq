@@ -106,7 +106,7 @@ const DailyMcqSubmissionsDialog = ({ open, onOpenChange, dailyMcqEntry }: DailyM
         <DialogHeader>
           <DialogTitle>Submissions for Question of the Day</DialogTitle>
           <DialogDescription>
-            Date: {dailyMcqEntry ? format(new Date(dailyMcqEntry.date), 'PPP') : 'N/A'}
+            Date: {dailyMcqEntry ? format(new Date(dailyMcqEntry.date.replace(/-/g, '\/')), 'PPP') : 'N/A'}
             <br />
             Question: {dailyMcqEntry?.mcq_question_text}
           </DialogDescription>

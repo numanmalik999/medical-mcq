@@ -68,14 +68,14 @@ const ManageDailyMcqsPage = () => {
       toast({ title: "Error", description: "Failed to load daily MCQs.", variant: "destructive" });
       setDailyMcqs([]);
     } else {
-      const formattedData: DailyMcqEntry[] = data.map((entry: any) => ({
+      const formattedData: DailyMcqEntry[] = (data || []).map((entry: any) => ({
         id: entry.id,
         date: entry.date,
         mcq_id: entry.mcq_id,
         mcq_question_text: entry.mcqs?.question_text || 'N/A',
         created_at: entry.created_at,
       }));
-      setDailyMcqs(formattedData || []);
+      setDailyMcqs(formattedData);
     }
     setIsPageLoading(false);
   };
@@ -114,7 +114,7 @@ const ManageDailyMcqsPage = () => {
     {
       accessorKey: 'date',
       header: 'Date',
-      cell: ({ row }) => format(new Date(row.original.date), 'PPP'),
+      cell: ({ row }) => format(new Date(row.original.date.replace(/-/g, '\/')), 'PPP'),
     },
     {
       accessorKey: 'mcq_question_text',

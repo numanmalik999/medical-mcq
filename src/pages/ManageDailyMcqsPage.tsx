@@ -8,15 +8,17 @@ import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Eye } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import EditDailyMcqDialog from '@/components/EditDailyMcqDialog';
+import DailyMcqSubmissionsDialog from '@/components/DailyMcqSubmissionsDialog';
 import { useSession } from '@/components/SessionContextProvider';
 import { format } from 'date-fns';
 
@@ -35,6 +37,10 @@ const ManageDailyMcqsPage = () => {
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedDailyMcqForEdit, setSelectedDailyMcqForEdit] = useState<DailyMcqEntry | null>(null);
+
+  // New state for submissions dialog
+  const [isSubmissionsDialogOpen, setIsSubmissionsDialogOpen] = useState(false);
+  const [selectedDailyMcqForSubmissions, setSelectedDailyMcqForSubmissions] = useState<DailyMcqEntry | null>(null);
 
   const { hasCheckedInitialSession } = useSession();
 
@@ -98,6 +104,12 @@ const ManageDailyMcqsPage = () => {
     setIsEditDialogOpen(true);
   };
 
+  // New function to open submissions dialog
+  const openSubmissionsDialog = (entry: DailyMcqEntry) => {
+    setSelectedDailyMcqForSubmissions(entry);
+    setIsSubmissionsDialogOpen(true);
+  };
+
   const columns: ColumnDef<DailyMcqEntry>[] = [
     {
       accessorKey: 'date',
@@ -123,6 +135,10 @@ const ManageDailyMcqsPage = () => {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => openSubmissionsDialog(row.original)}>
+              <Eye className="mr-2 h-4 w-4" /> View Submissions
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => openEditDialog(row.original)}>Edit</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleDeleteDailyMcq(row.original.id)} className="text-red-600">Delete</DropdownMenuItem>
           </DropdownMenuContent>
@@ -161,6 +177,13 @@ const ManageDailyMcqsPage = () => {
         onOpenChange={setIsEditDialogOpen}
         dailyMcqEntry={selectedDailyMcqForEdit}
         onSave={fetchDailyMcqs}
+      />
+
+      {/* Render the new submissions dialog */}
+      <DailyMcqSubmissionsDialog
+        open={isSubmissionsDialogOpen}
+        onOpenChange={setIsSubmissionsDialogOpen}
+        dailyMcqEntry={selectedDailyMcqForSubmissions}
       />
     </div>
   );

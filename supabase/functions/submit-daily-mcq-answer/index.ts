@@ -163,13 +163,11 @@ serve(async (req: Request) => {
       // 4. Check for free month award
       if (newTotalPoints >= POINTS_FOR_FREE_MONTH) {
         console.log(`User ${user_id} reached ${POINTS_FOR_FREE_MONTH} points. Checking for free month award...`);
-        // Check if a free month has already been awarded since the last score update or if it's a new award threshold
         const lastAwarded = userScore?.last_awarded_subscription_at ? new Date(userScore.last_awarded_subscription_at) : null;
         const oneMonthAgo = new Date();
         oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
-        // Award if points reached threshold and no award in the last month (or never awarded)
-        if (!lastAwarded || lastAwarded < oneMonthAgo) { // Simple check to prevent frequent awards
+        if (!lastAwarded || lastAwarded < oneMonthAgo) {
           console.log('Awarding free subscription...');
           const { error: awardError } = await supabaseAdmin.functions.invoke('award-free-subscription', {
             body: { user_id },
@@ -177,10 +175,8 @@ serve(async (req: Request) => {
 
           if (awardError) {
             console.error('Error awarding free subscription:', awardError);
-            // Don't throw, just log and continue
           } else {
             freeMonthAwarded = true;
-            // Update last_awarded_subscription_at immediately
             await supabaseAdmin
               .from('user_daily_mcq_scores')
               .update({ last_awarded_subscription_at: new Date().toISOString() })
@@ -193,8 +189,8 @@ serve(async (req: Request) => {
       }
     }
 
-    // 5. Send email notification
-    console.log('Preparing email notification...');
+    // 5. Send email notification to user
+    console.log('Preparing email notification for user...');
     const recipientEmailResult = await supabaseAdmin.from('profiles').select('email').eq('id', user_id).maybeSingle();
     const recipientEmail = user_id ? recipientEmailResult.data?.email : guest_email;
     
@@ -225,11 +221,44 @@ serve(async (req: Request) => {
 
       if (emailError) {
         console.error('Error sending QOD submission email:', emailError);
-        // Don't throw, just log the warning
       }
-      console.log('Email notification sent (or attempted).');
+      console.log('User email notification sent (or attempted).');
     } else {
-      console.log('No recipient email found, skipping email notification.');
+      console.log('No recipient email found, skipping user email notification.');
+    }
+
+    // 6. Send email notification to admin
+    console.log('Preparing email notification for admin...');
+    // @ts-ignore
+    const adminEmail = Deno.env.get('ADMIN_EMAIL');
+    if (adminEmail) {
+        const adminSubject = `New QOD Submission from ${recipientName}`;
+        const adminBody = `
+            <p>A new answer has been submitted for the Question of the Day.</p>
+            <ul>
+                <li><strong>User:</strong> ${recipientName} (${recipientEmail || 'N/A'})</li>
+                <li><strong>Question:</strong> ${mcqData.question_text}</li>
+                <li><strong>Selected Answer:</strong> ${selected_option} (${isCorrect ? 'Correct' : 'Incorrect'})</li>
+                <li><strong>Points Awarded:</strong> ${pointsAwarded}</li>
+            </ul>
+            <p>You can view all submissions in the admin panel.</p>
+        `;
+
+        const { error: adminEmailError } = await supabaseAdmin.functions.invoke('send-email', {
+            body: {
+                to: adminEmail,
+                subject: adminSubject,
+                body: adminBody,
+            },
+        });
+
+        if (adminEmailError) {
+            console.error('Error sending QOD submission email to admin:', adminEmailError);
+        } else {
+            console.log('Admin notification sent successfully.');
+        }
+    } else {
+        console.warn('ADMIN_EMAIL not set, skipping admin notification.');
     }
 
     console.log('Returning final success response.');

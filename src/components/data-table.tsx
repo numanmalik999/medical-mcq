@@ -35,9 +35,11 @@ export function DataTable<TData, TValue>({
     columns,
     getCoreRowModel: getCoreRowModel(),
     state: {
-      rowSelection,
+      // Pass rowSelection state only if it's being controlled from the parent component.
+      // Default to an empty object if setRowSelection is provided but rowSelection is not yet defined.
+      ...(setRowSelection && { rowSelection: rowSelection || {} }),
     },
-    enableRowSelection: !!setRowSelection, // Enable selection only if the handler is passed
+    enableRowSelection: !!setRowSelection,
     onRowSelectionChange: setRowSelection,
   });
 

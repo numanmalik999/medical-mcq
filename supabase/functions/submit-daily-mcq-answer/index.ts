@@ -227,40 +227,6 @@ serve(async (req: Request) => {
       console.log('No recipient email found, skipping user email notification.');
     }
 
-    // 6. Send email notification to admin
-    console.log('Preparing email notification for admin...');
-    // @ts-ignore
-    const adminEmail = Deno.env.get('ADMIN_EMAIL');
-    if (adminEmail) {
-        const adminSubject = `New QOD Submission from ${recipientName}`;
-        const adminBody = `
-            <p>A new answer has been submitted for the Question of the Day.</p>
-            <ul>
-                <li><strong>User:</strong> ${recipientName} (${recipientEmail || 'N/A'})</li>
-                <li><strong>Question:</strong> ${mcqData.question_text}</li>
-                <li><strong>Selected Answer:</strong> ${selected_option} (${isCorrect ? 'Correct' : 'Incorrect'})</li>
-                <li><strong>Points Awarded:</strong> ${pointsAwarded}</li>
-            </ul>
-            <p>You can view all submissions in the admin panel.</p>
-        `;
-
-        const { error: adminEmailError } = await supabaseAdmin.functions.invoke('send-email', {
-            body: {
-                to: adminEmail,
-                subject: adminSubject,
-                body: adminBody,
-            },
-        });
-
-        if (adminEmailError) {
-            console.error('Error sending QOD submission email to admin:', adminEmailError);
-        } else {
-            console.log('Admin notification sent successfully.');
-        }
-    } else {
-        console.warn('ADMIN_EMAIL not set, skipping admin notification.');
-    }
-
     console.log('Returning final success response.');
     return new Response(JSON.stringify({
       message: 'Submission recorded successfully.',

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ const formSchema = z.object({
 const PasswordResetPage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, hasCheckedInitialSession } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -38,16 +39,22 @@ const PasswordResetPage = () => {
   });
 
   useEffect(() => {
-    // After the initial session check, if there's no session, the link was invalid or expired.
-    if (hasCheckedInitialSession && !session) {
-      toast({
-        title: "Invalid Link",
-        description: "The password reset link is invalid or has expired. Please request a new one.",
-        variant: "destructive",
-      });
-      navigate('/login');
+    const hasRecoveryToken = location.hash.includes('type=recovery');
+
+    // This effect runs whenever the session or initial check status changes.
+    if (hasCheckedInitialSession) {
+      // If the initial check is done, we still don't have a session,
+      // AND there's no recovery token in the URL, then the link is definitely invalid.
+      if (!session && !hasRecoveryToken) {
+        toast({
+          title: "Invalid Link",
+          description: "The password reset link is invalid or has expired. Please request a new one.",
+          variant: "destructive",
+        });
+        navigate('/login');
+      }
     }
-  }, [session, hasCheckedInitialSession, navigate, toast]);
+  }, [session, hasCheckedInitialSession, location.hash, navigate, toast]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
@@ -80,13 +87,24 @@ const PasswordResetPage = () => {
     }
   };
 
-  if (!hasCheckedInitialSession || !session) {
+  // Show loading state if:
+  // 1. The initial session check hasn't completed yet.
+  // 2. OR, there's a recovery token in the URL, but the session hasn't been established by the context provider yet.
+  const isLoading = !hasCheckedInitialSession || (location.hash.includes('type=recovery') && !session);
+
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-gray-700 dark:text-gray-300 ml-3">Verifying link...</p>
       </div>
     );
+  }
+
+  // If we are not loading but still don't have a session, the useEffect will handle the redirect.
+  // Rendering null here prevents a brief flash of the form before redirection.
+  if (!session) {
+    return null;
   }
 
   return (

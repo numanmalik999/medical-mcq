@@ -203,7 +203,11 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-background text-foreground pt-16">
       {/* Hero Section */}
-      <section className="relative w-full py-20 md:py-32 bg-gradient-to-r from-primary to-blue-600 text-primary-foreground text-center overflow-hidden">
+      <section
+        className="relative w-full py-20 md:py-32 bg-cover bg-center text-primary-foreground text-center overflow-hidden"
+        style={{ backgroundImage: "url('/hero-background.png')" }}
+      >
+        <div className="absolute inset-0 bg-black/60 z-0"></div>
         <div className="container mx-auto px-4 relative z-10">
           <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-6 animate-fade-in-up">
             {settings.hero.mainTitle}
@@ -260,12 +264,6 @@ const LandingPage = () => {
               </>
             )}
           </div>
-        </div>
-        {/* Background shapes for visual appeal */}
-        <div className="absolute inset-0 z-0 opacity-20">
-          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-          <div className="absolute top-1/2 right-1/4 w-72 h-72 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-          <div className="absolute bottom-1/4 left-1/2 w-80 h-80 bg-pink-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
         </div>
       </section>
 

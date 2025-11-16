@@ -20,6 +20,7 @@ interface RecentSubscription {
   profiles: {
     first_name: string | null;
     last_name: string | null;
+    email: string | null;
   } | null;
   subscription_tiers: {
     name: string;
@@ -87,7 +88,7 @@ const AdminDashboardPage = () => {
                 id,
                 created_at,
                 status,
-                profiles ( first_name, last_name ),
+                profiles ( first_name, last_name, email ),
                 subscription_tiers ( name )
               `)
               .order('created_at', { ascending: false })
@@ -98,7 +99,7 @@ const AdminDashboardPage = () => {
           setRecentUsers(usersResponse.data || []);
 
           if (subsResponse.error) throw subsResponse.error;
-          setRecentSubscriptions(subsResponse.data || []);
+          setRecentSubscriptions(subsResponse.data as RecentSubscription[] || []);
 
         } catch (error: any) {
           console.error("Error fetching recent activity:", error);

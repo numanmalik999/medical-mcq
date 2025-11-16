@@ -7,7 +7,24 @@ import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Users, CreditCard, ArrowRight } from 'lucide-react';
+import { User } from '@supabase/supabase-js';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { formatDistanceToNow } from 'date-fns';
+
+// Define interfaces for the new data
+interface RecentSubscription {
+  id: string;
+  created_at: string;
+  status: string;
+  profiles: {
+    first_name: string | null;
+    last_name: string | null;
+  } | null;
+  subscription_tiers: {
+    name: string;
+  } | null;
+}
 
 const AdminDashboardPage = () => {
   const { hasCheckedInitialSession } = useSession();
@@ -17,52 +34,80 @@ const AdminDashboardPage = () => {
     correctSubmissions: number;
   } | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  
+  // New states
+  const [recentUsers, setRecentUsers] = useState<User[]>([]);
+  const [recentSubscriptions, setRecentSubscriptions] = useState<RecentSubscription[]>([]);
+  const [isLoadingRecentData, setIsLoadingRecentData] = useState(true);
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      const fetchDailyStats = async () => {
+      const fetchDashboardData = async () => {
         setIsLoadingStats(true);
+        setIsLoadingRecentData(true);
+        
+        // Fetch daily stats
         try {
-          // 1. Get today's daily MCQ
           const { data: dailyMcqData, error: dailyMcqError } = await supabase.functions.invoke('get-daily-mcq');
           if (dailyMcqError) throw dailyMcqError;
           if (!dailyMcqData || !dailyMcqData.daily_mcq_id) {
-            setDailyStats(null); // No question for today
-            return;
+            setDailyStats(null);
+          } else {
+            const { daily_mcq_id, mcq } = dailyMcqData;
+            const { count: totalCount, error: totalError } = await supabase
+              .from('daily_mcq_submissions')
+              .select('id', { count: 'exact', head: true })
+              .eq('daily_mcq_id', daily_mcq_id);
+            if (totalError) throw totalError;
+            const { count: correctCount, error: correctError } = await supabase
+              .from('daily_mcq_submissions')
+              .select('id', { count: 'exact', head: true })
+              .eq('daily_mcq_id', daily_mcq_id)
+              .eq('is_correct', true);
+            if (correctError) throw correctError;
+            setDailyStats({
+              question: mcq.question_text,
+              totalSubmissions: totalCount || 0,
+              correctSubmissions: correctCount || 0,
+            });
           }
-
-          const { daily_mcq_id, mcq } = dailyMcqData;
-
-          // 2. Get total submissions count
-          const { count: totalCount, error: totalError } = await supabase
-            .from('daily_mcq_submissions')
-            .select('id', { count: 'exact', head: true })
-            .eq('daily_mcq_id', daily_mcq_id);
-          if (totalError) throw totalError;
-
-          // 3. Get correct submissions count
-          const { count: correctCount, error: correctError } = await supabase
-            .from('daily_mcq_submissions')
-            .select('id', { count: 'exact', head: true })
-            .eq('daily_mcq_id', daily_mcq_id)
-            .eq('is_correct', true);
-          if (correctError) throw correctError;
-
-          setDailyStats({
-            question: mcq.question_text,
-            totalSubmissions: totalCount || 0,
-            correctSubmissions: correctCount || 0,
-          });
-
         } catch (error: any) {
           console.error("Error fetching daily stats:", error);
-          // Don't show a toast for this, as it's just a summary card
         } finally {
           setIsLoadingStats(false);
         }
+
+        // Fetch recent users and subscriptions
+        try {
+          const [usersResponse, subsResponse] = await Promise.all([
+            supabase.functions.invoke('list-recent-users'),
+            supabase
+              .from('user_subscriptions')
+              .select(`
+                id,
+                created_at,
+                status,
+                profiles ( first_name, last_name ),
+                subscription_tiers ( name )
+              `)
+              .order('created_at', { ascending: false })
+              .limit(5)
+          ]);
+
+          if (usersResponse.error) throw usersResponse.error;
+          setRecentUsers(usersResponse.data || []);
+
+          if (subsResponse.error) throw subsResponse.error;
+          setRecentSubscriptions(subsResponse.data || []);
+
+        } catch (error: any) {
+          console.error("Error fetching recent activity:", error);
+        } finally {
+          setIsLoadingRecentData(false);
+        }
       };
 
-      fetchDailyStats();
+      fetchDashboardData();
     }
   }, [hasCheckedInitialSession]);
 
@@ -129,6 +174,71 @@ const AdminDashboardPage = () => {
               <Link to="/admin/manage-daily-mcqs">View Detailed Submissions</Link>
             </Button>
           </CardFooter>
+        </Card>
+      </div>
+
+      {/* New Cards for Recent Activity */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Recent Signups</CardTitle>
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/admin/manage-users">View All <ArrowRight className="h-4 w-4 ml-1" /></Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {isLoadingRecentData ? (
+              <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            ) : recentUsers.length > 0 ? (
+              <div className="space-y-4">
+                {recentUsers.map(user => (
+                  <div key={user.id} className="flex items-center gap-4">
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="grid gap-1">
+                      <p className="text-sm font-medium leading-none">{user.email}</p>
+                      <p className="text-sm text-muted-foreground">{formatDistanceToNow(new Date(user.created_at), { addSuffix: true })}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-10">No new user signups recently.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5" /> Recent Subscriptions</CardTitle>
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/admin/manage-subscriptions">View All <ArrowRight className="h-4 w-4 ml-1" /></Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {isLoadingRecentData ? (
+              <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            ) : recentSubscriptions.length > 0 ? (
+              <div className="space-y-4">
+                {recentSubscriptions.map(sub => (
+                  <div key={sub.id} className="flex items-center gap-4">
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback>{sub.profiles?.first_name?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                    </Avatar>
+                    <div className="grid gap-1">
+                      <p className="text-sm font-medium leading-none">{`${sub.profiles?.first_name || ''} ${sub.profiles?.last_name || ''}`.trim() || 'Unknown User'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Subscribed to "{sub.subscription_tiers?.name || 'Unknown Plan'}" {formatDistanceToNow(new Date(sub.created_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-10">No new subscriptions recently.</p>
+            )}
+          </CardContent>
         </Card>
       </div>
       

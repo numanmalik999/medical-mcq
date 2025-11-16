@@ -12,6 +12,7 @@ import { Accordion, AccordionItem, AccordionTrigger } from '@/components/ui/acco
 import { ArrowLeft, BookOpenText } from 'lucide-react'; // Added BookOpenText icon
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 
 interface Course {
   id: string;
@@ -188,7 +189,7 @@ const UserCourseDetailsPage = () => {
           </DialogHeader>
           <div className="py-4 prose dark:prose-invert max-w-none">
             {selectedTopic?.content ? (
-              <ReactMarkdown>{selectedTopic.content}</ReactMarkdown>
+              <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopic.content}</ReactMarkdown>
             ) : (
               <p className="text-muted-foreground">No content available for this topic.</p>
             )}

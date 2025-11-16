@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import {
 import EditStaticPageDialog, { StaticPage } from '@/components/EditStaticPageDialog';
 import { useSession } from '@/components/SessionContextProvider';
 import { Badge } from '@/components/ui/badge';
-import SocialMediaSettingsCard from '@/components/SocialMediaSettingsCard'; // Import new component
+import SocialMediaSettingsCard from '@/components/SocialMediaSettingsCard';
 
 const roadToGulfContent = `
 # Your Road to Practicing in the Gulf
@@ -130,8 +130,22 @@ const AdminSettingsPage = () => {
 
   const { hasCheckedInitialSession } = useSession();
 
-  const ensureDefaultStaticPages = async () => {
-    const existingPagesMap = new Map(staticPages.map(p => [p.slug, p]));
+  const fetchStaticPages = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('static_pages')
+      .select('*')
+      .order('title', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching static pages:', error);
+      toast({ title: "Error", description: "Failed to load static pages.", variant: "destructive" });
+      return [];
+    }
+    return data || [];
+  }, [toast]);
+
+  const ensureDefaultStaticPages = useCallback(async (currentPages: StaticPage[]) => {
+    const existingPagesMap = new Map(currentPages.map(p => [p.slug, p]));
     const pagesToInsert = [];
     const pagesToUpdate = [];
 
@@ -156,12 +170,12 @@ const AdminSettingsPage = () => {
       }
     }
 
-    if (pagesToInsert.length > 0) {
-      console.log(`Inserting ${pagesToInsert.length} default static pages.`);
-      const { error } = await supabase
-        .from('static_pages')
-        .insert(pagesToInsert);
+    let changesMade = false;
 
+    if (pagesToInsert.length > 0) {
+      changesMade = true;
+      console.log(`Inserting ${pagesToInsert.length} default static pages.`);
+      const { error } = await supabase.from('static_pages').insert(pagesToInsert);
       if (error) {
         console.error('Error inserting default static pages:', error);
         toast({ title: "Error", description: "Failed to initialize default pages.", variant: "destructive" });
@@ -169,53 +183,38 @@ const AdminSettingsPage = () => {
     }
 
     if (pagesToUpdate.length > 0) {
+      changesMade = true;
       console.log(`Updating ${pagesToUpdate.length} default static pages.`);
       const updates = pagesToUpdate.map(page => 
         supabase.from('static_pages').update({ location: page.location, content: page.content }).eq('id', page.id)
       );
       const results = await Promise.all(updates);
       const updateError = results.some(res => res.error);
-
       if (updateError) {
         console.error('Error updating default static pages:', results.map(r => r.error).filter(Boolean));
         toast({ title: "Error", description: "Failed to update default pages.", variant: "destructive" });
       }
     }
 
-    if (pagesToInsert.length > 0 || pagesToUpdate.length > 0) {
-      await fetchStaticPages(false);
-    }
-  };
-
-  const fetchStaticPages = async (setLoading = true) => {
-    if (setLoading) setIsPageLoading(true);
-    const { data, error } = await supabase
-      .from('static_pages')
-      .select('*')
-      .order('title', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching static pages:', error);
-      toast({ title: "Error", description: "Failed to load static pages.", variant: "destructive" });
-      setStaticPages([]);
-    } else {
-      setStaticPages(data || []);
-    }
-    if (setLoading) setIsPageLoading(false);
-  };
+    return changesMade;
+  }, [toast]);
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      fetchStaticPages();
+      const runSetup = async () => {
+        setIsPageLoading(true);
+        const initialPages = await fetchStaticPages();
+        setStaticPages(initialPages);
+        const wereChangesMade = await ensureDefaultStaticPages(initialPages);
+        if (wereChangesMade) {
+          const updatedPages = await fetchStaticPages();
+          setStaticPages(updatedPages);
+        }
+        setIsPageLoading(false);
+      };
+      runSetup();
     }
-  }, [hasCheckedInitialSession]);
-
-  useEffect(() => {
-    if (hasCheckedInitialSession && !isPageLoading) {
-        ensureDefaultStaticPages();
-    }
-  }, [isPageLoading, hasCheckedInitialSession, staticPages]);
-
+  }, [hasCheckedInitialSession, fetchStaticPages, ensureDefaultStaticPages]);
 
   const handleDeletePage = async (id: string) => {
     if (!window.confirm("Are you sure you want to delete this static page? This action cannot be undone.")) {
@@ -229,7 +228,8 @@ const AdminSettingsPage = () => {
 
       if (error) throw error;
       toast({ title: "Success", description: "Static page deleted successfully." });
-      fetchStaticPages();
+      const updatedPages = await fetchStaticPages();
+      setStaticPages(updatedPages);
     } catch (error: any) {
       console.error("Error deleting static page:", error);
       toast({ title: "Error", description: `Failed to delete page: ${error.message}`, variant: "destructive" });
@@ -312,7 +312,10 @@ const AdminSettingsPage = () => {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         page={selectedPageForEdit}
-        onSave={() => fetchStaticPages()}
+        onSave={async () => {
+          const updatedPages = await fetchStaticPages();
+          setStaticPages(updatedPages);
+        }}
       />
     </div>
   );

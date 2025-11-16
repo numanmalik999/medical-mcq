@@ -20,6 +20,95 @@ import { useSession } from '@/components/SessionContextProvider';
 import { Badge } from '@/components/ui/badge';
 import SocialMediaSettingsCard from '@/components/SocialMediaSettingsCard'; // Import new component
 
+const roadToGulfContent = `
+# Your Road to Practicing in the Gulf
+
+Navigating the requirements for medical practice in the Gulf countries can be complex. This guide provides a clear overview of the DataFlow verification process and the specific licensing exams for each major Gulf country.
+
+---
+
+## 1. Primary Source Verification (PSV) by DataFlow Group
+
+Primary Source Verification (PSV) is a mandatory process for all healthcare professionals seeking to practice in the Gulf region. The DataFlow Group is the designated body that verifies your credentials directly from the issuing source (e.g., your university, previous employers).
+
+**What is verified?**
+- **Educational Qualifications:** Degrees, Diplomas.
+- **Work Experience:** Certificates of employment.
+- **Professional Licenses:** Your home country's medical license.
+- **Good Standing Certificate:** A certificate from your home medical council.
+
+**The Process:**
+1.  **Create an Account:** Register on the DataFlow portal for the specific country's health authority.
+2.  **Submit Documents:** Upload clear scans of all required documents.
+3.  **Payment:** Pay the verification fees online.
+4.  **Verification:** DataFlow contacts the issuing authorities to verify your documents. This can take several weeks to months.
+5.  **Report:** Once completed, a PSV report is generated and sent to you and the relevant health authority.
+
+**Tip:** Start your DataFlow application as early as possible, as it is often the most time-consuming part of the licensing process.
+
+---
+
+## 2. Country-Specific Licensing Exams
+
+After or during your PSV, you must pass the country-specific licensing exam.
+
+### 🇦🇪 United Arab Emirates (UAE)
+
+The UAE has three different health authorities depending on the emirate you wish to work in:
+- **DHA (Dubai Health Authority):** For practicing in Dubai.
+- **MOHAP (Ministry of Health and Prevention):** For practicing in Sharjah, Ajman, Umm Al Quwain, Ras Al Khaimah, and Fujairah.
+- **DOH / HAAD (Department of Health - Abu Dhabi):** For practicing in Abu Dhabi.
+
+**Exam Format:** All are computer-based tests (CBT) consisting of multiple-choice questions.
+**Key Focus:** General medical knowledge, clinical scenarios, and specialty-specific questions.
+**Note:** Passing one authority's exam may allow for license transfer to another, but specific rules apply.
+
+### 🇸🇦 Saudi Arabia
+
+**Authority:** Saudi Commission for Health Specialties (SCFHS).
+**Exam:** Saudi Medical Licensing Exam (SMLE).
+
+**Exam Format:** A computer-based test with MCQs.
+**Key Focus:** The exam is comprehensive and covers a broad range of medical topics. It is known for its clinical-vignette style questions.
+**Process:** You must first register with the SCFHS Mumaris Plus system before you can book your exam.
+
+### 🇶🇦 Qatar
+
+**Authority:** Department of Healthcare Professions (DHP) under the Ministry of Public Health (MOPH), formerly QCHP.
+**Exam:** Qatar Prometric Exam.
+
+**Exam Format:** A computer-based MCQ exam administered by Prometric.
+**Key Focus:** Varies by specialty but generally covers foundational and clinical knowledge relevant to your field.
+**Process:** You need to create an account on the DHP e-licensing system and complete the initial credentialing before being eligible for the exam.
+
+### 🇴🇲 Oman
+
+**Authority:** Oman Medical Specialty Board (OMSB).
+**Exam:** Oman Prometric Exam.
+
+**Exam Format:** Computer-based MCQ exam.
+**Key Focus:** The exam tests the knowledge and skills required for your specific specialty.
+**Process:** Similar to other countries, you must apply through the OMSB portal and complete credentialing and PSV.
+
+### 🇰🇼 Kuwait
+
+**Authority:** Ministry of Health (MOH).
+**Exam:** Kuwait Medical Licensing Examination (KMLE).
+
+**Exam Format:** Typically a written or computer-based MCQ exam.
+**Key Focus:** General medicine and specialty-specific knowledge.
+**Process:** The process is managed by the MOH, and requirements can be specific. It's essential to check the latest guidelines on their official website.
+
+### 🇧🇭 Bahrain
+
+**Authority:** National Health Regulatory Authority (NHRA).
+**Exam:** Bahrain Licensure Examination.
+
+**Exam Format:** Computer-based MCQ exam.
+**Key Focus:** Assesses the candidate's competency in their chosen specialty.
+**Process:** Application is done through the NHRA portal, followed by credential verification and the exam.
+`;
+
 const defaultPages = [
   { slug: 'about', title: 'About Us', content: '# About Study Prometric MCQs...', location: ['footer'] },
   { slug: 'contact', title: 'Contact Us', content: '# Contact Us...', location: ['footer'] },
@@ -28,7 +117,7 @@ const defaultPages = [
   { slug: 'faq', title: 'FAQ', content: '# Frequently Asked Questions...', location: ['footer'] },
   { slug: 'refund', title: 'Return & Refund Policy', content: '# Return and Refund Policy...', location: ['footer'] },
   { slug: 'reviews', title: 'Reviews', content: 'This page is dynamically generated.', location: ['footer'] },
-  { slug: 'road-to-gulf', title: 'Road to Gulf', content: '## Your Road to Practicing in the Gulf...', location: ['header', 'footer'] },
+  { slug: 'road-to-gulf', title: 'Road to Gulf', content: roadToGulfContent, location: ['header', 'footer'] },
 ];
 
 const AdminSettingsPage = () => {
@@ -51,15 +140,17 @@ const AdminSettingsPage = () => {
       if (!existingPage) {
         pagesToInsert.push(defaultPage);
       } else {
-        // Check if location needs an update
         const existingLocation = existingPage.location || [];
         const defaultLocation = defaultPage.location || [];
-        const needsUpdate = defaultLocation.length !== existingLocation.length || !defaultLocation.every(loc => existingLocation.includes(loc));
+        const needsLocationUpdate = defaultLocation.length !== existingLocation.length || !defaultLocation.every(loc => existingLocation.includes(loc));
         
-        if (needsUpdate) {
+        const needsContentUpdate = existingPage.slug === 'road-to-gulf' && existingPage.content !== roadToGulfContent;
+
+        if (needsLocationUpdate || needsContentUpdate) {
           pagesToUpdate.push({
-            ...existingPage,
+            id: existingPage.id,
             location: defaultPage.location,
+            content: needsContentUpdate ? defaultPage.content : existingPage.content,
           });
         }
       }
@@ -78,21 +169,21 @@ const AdminSettingsPage = () => {
     }
 
     if (pagesToUpdate.length > 0) {
-      console.log(`Updating ${pagesToUpdate.length} default static pages with correct locations.`);
+      console.log(`Updating ${pagesToUpdate.length} default static pages.`);
       const updates = pagesToUpdate.map(page => 
-        supabase.from('static_pages').update({ location: page.location }).eq('id', page.id)
+        supabase.from('static_pages').update({ location: page.location, content: page.content }).eq('id', page.id)
       );
       const results = await Promise.all(updates);
       const updateError = results.some(res => res.error);
 
       if (updateError) {
-        console.error('Error updating default static page locations:', results.map(r => r.error).filter(Boolean));
-        toast({ title: "Error", description: "Failed to update default page locations.", variant: "destructive" });
+        console.error('Error updating default static pages:', results.map(r => r.error).filter(Boolean));
+        toast({ title: "Error", description: "Failed to update default pages.", variant: "destructive" });
       }
     }
 
     if (pagesToInsert.length > 0 || pagesToUpdate.length > 0) {
-      await fetchStaticPages(false); // Re-fetch if any changes were made
+      await fetchStaticPages(false);
     }
   };
 
@@ -115,20 +206,15 @@ const AdminSettingsPage = () => {
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      // First, fetch existing pages
-      fetchStaticPages().then(() => {
-        // Then, ensure defaults exist (this relies on the state being updated, so we call it after the initial fetch completes)
-        // We call it here to ensure it runs after the initial fetch completes and populates `staticPages` state.
-      });
+      fetchStaticPages();
     }
   }, [hasCheckedInitialSession]);
 
-  // Separate effect to run default page check after initial fetch completes
   useEffect(() => {
     if (hasCheckedInitialSession && !isPageLoading) {
         ensureDefaultStaticPages();
     }
-  }, [isPageLoading, hasCheckedInitialSession]);
+  }, [isPageLoading, hasCheckedInitialSession, staticPages]);
 
 
   const handleDeletePage = async (id: string) => {

@@ -38,62 +38,6 @@ Primary Source Verification (PSV) is a mandatory process for all healthcare prof
 ## 2. Country-Specific Licensing Exams
 
 After or during your PSV, you must pass the country-specific licensing exam.
-
-### 🇦🇪 United Arab Emirates (UAE)
-
-The UAE has three different health authorities depending on the emirate you wish to work in:
-- **DHA (Dubai Health Authority):** For practicing in Dubai.
-- **MOHAP (Ministry of Health and Prevention):** For practicing in Sharjah, Ajman, Umm Al Quwain, Ras Al Khaimah, and Fujairah.
-- **DOH / HAAD (Department of Health - Abu Dhabi):** For practicing in Abu Dhabi.
-
-**Exam Format:** All are computer-based tests (CBT) consisting of multiple-choice questions.
-**Key Focus:** General medical knowledge, clinical scenarios, and specialty-specific questions.
-**Note:** Passing one authority's exam may allow for license transfer to another, but specific rules apply.
-
-### 🇸🇦 Saudi Arabia
-
-**Authority:** Saudi Commission for Health Specialties (SCFHS).
-**Exam:** Saudi Medical Licensing Exam (SMLE).
-
-**Exam Format:** A computer-based test with MCQs.
-**Key Focus:** The exam is comprehensive and covers a broad range of medical topics. It is known for its clinical-vignette style questions.
-**Process:** You must first register with the SCFHS Mumaris Plus system before you can book your exam.
-
-### 🇶🇦 Qatar
-
-**Authority:** Department of Healthcare Professions (DHP) under the Ministry of Public Health (MOPH), formerly QCHP.
-**Exam:** Qatar Prometric Exam.
-
-**Exam Format:** A computer-based MCQ exam administered by Prometric.
-**Key Focus:** Varies by specialty but generally covers foundational and clinical knowledge relevant to your field.
-**Process:** You need to create an account on the DHP e-licensing system and complete the initial credentialing before being eligible for the exam.
-
-### 🇴🇲 Oman
-
-**Authority:** Oman Medical Specialty Board (OMSB).
-**Exam:** Oman Prometric Exam.
-
-**Exam Format:** Computer-based MCQ exam.
-**Key Focus:** The exam tests the knowledge and skills required for your specific specialty.
-**Process:** Similar to other countries, you must apply through the OMSB portal and complete credentialing and PSV.
-
-### 🇰🇼 Kuwait
-
-**Authority:** Ministry of Health (MOH).
-**Exam:** Kuwait Medical Licensing Examination (KMLE).
-
-**Exam Format:** Typically a written or computer-based MCQ exam.
-**Key Focus:** General medicine and specialty-specific knowledge.
-**Process:** The process is managed by the MOH, and requirements can be specific. It's essential to check the latest guidelines on their official website.
-
-### 🇧🇭 Bahrain
-
-**Authority:** National Health Regulatory Authority (NHRA).
-**Exam:** Bahrain Licensure Examination.
-
-**Exam Format:** Computer-based MCQ exam.
-**Key Focus:** Assesses the candidate's competency in their chosen specialty.
-**Process:** Application is done through the NHRA portal, followed by credential verification and the exam.
 `;
 
 const RoadToGulfPage = () => {
@@ -141,7 +85,7 @@ const RoadToGulfPage = () => {
             A guide to DataFlow verification and licensing exams for Gulf countries.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 prose dark:prose-invert max-w-none">
+        <CardContent className="prose dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-primary hover:prose-a:underline">
           <ReactMarkdown>{pageContent}</ReactMarkdown>
         </CardContent>
       </Card>

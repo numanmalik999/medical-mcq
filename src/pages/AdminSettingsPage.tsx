@@ -50,11 +50,11 @@ Primary Source Verification (PSV) is a mandatory process for all healthcare prof
 
 ## 2. Country-Specific Licensing Exams
 
-After or during your PSV, you must pass the country-specific licensing exam.
+After or during your PSV, you must pass the country-specific licensing exam. Below is a breakdown for each country.
 
 ### 🇦🇪 United Arab Emirates (UAE)
 
-The UAE has three different health authorities depending on the emirate you wish to work in:
+To practice in the UAE, you must obtain a license from one of three different health authorities, depending on the emirate:
 - **DHA (Dubai Health Authority):** For practicing in Dubai.
 - **MOHAP (Ministry of Health and Prevention):** For practicing in Sharjah, Ajman, Umm Al Quwain, Ras Al Khaimah, and Fujairah.
 - **DOH / HAAD (Department of Health - Abu Dhabi):** For practicing in Abu Dhabi.
@@ -65,6 +65,7 @@ The UAE has three different health authorities depending on the emirate you wish
 
 ### 🇸🇦 Saudi Arabia
 
+The licensing body in Saudi Arabia is the Saudi Commission for Health Specialties (SCFHS).
 **Authority:** Saudi Commission for Health Specialties (SCFHS).
 **Exam:** Saudi Medical Licensing Exam (SMLE).
 
@@ -74,6 +75,7 @@ The UAE has three different health authorities depending on the emirate you wish
 
 ### 🇶🇦 Qatar
 
+In Qatar, the process is managed by the Department of Healthcare Professions (DHP).
 **Authority:** Department of Healthcare Professions (DHP) under the Ministry of Public Health (MOPH), formerly QCHP.
 **Exam:** Qatar Prometric Exam.
 
@@ -83,6 +85,7 @@ The UAE has three different health authorities depending on the emirate you wish
 
 ### 🇴🇲 Oman
 
+The Oman Medical Specialty Board (OMSB) oversees the licensing process in Oman.
 **Authority:** Oman Medical Specialty Board (OMSB).
 **Exam:** Oman Prometric Exam.
 
@@ -92,6 +95,7 @@ The UAE has three different health authorities depending on the emirate you wish
 
 ### 🇰🇼 Kuwait
 
+The Ministry of Health (MOH) is responsible for licensing in Kuwait.
 **Authority:** Ministry of Health (MOH).
 **Exam:** Kuwait Medical Licensing Examination (KMLE).
 
@@ -101,12 +105,17 @@ The UAE has three different health authorities depending on the emirate you wish
 
 ### 🇧🇭 Bahrain
 
+In Bahrain, the National Health Regulatory Authority (NHRA) is the governing body.
 **Authority:** National Health Regulatory Authority (NHRA).
 **Exam:** Bahrain Licensure Examination.
 
 **Exam Format:** Computer-based MCQ exam.
 **Key Focus:** Assesses the candidate's competency in their chosen specialty.
 **Process:** Application is done through the NHRA portal, followed by credential verification and the exam.
+
+---
+
+**Disclaimer:** Licensing requirements and processes can change. Always refer to the official websites of the respective health authorities for the most up-to-date information.
 `;
 
 const defaultPages = [

@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 import { Loader2 } from 'lucide-react';
 
 const GenericStaticPage = () => {
@@ -89,7 +90,7 @@ const GenericStaticPage = () => {
           <CardTitle className="text-3xl text-center">{pageTitle}</CardTitle>
         </CardHeader>
         <CardContent className="prose dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-primary hover:prose-a:underline">
-          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{pageContent || ""}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{pageContent || ""}</ReactMarkdown>
         </CardContent>
       </Card>
       <MadeWithDyad />

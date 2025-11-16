@@ -13,6 +13,7 @@ import { ArrowLeft, BookOpenText } from 'lucide-react'; // Added BookOpenText ic
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 
 interface Course {
   id: string;
@@ -189,7 +190,7 @@ const UserCourseDetailsPage = () => {
           </DialogHeader>
           <div className="py-4 prose dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-primary hover:prose-a:underline">
             {selectedTopic?.content ? (
-              <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopic.content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{selectedTopic.content}</ReactMarkdown>
             ) : (
               <p className="text-muted-foreground">No content available for this topic.</p>
             )}

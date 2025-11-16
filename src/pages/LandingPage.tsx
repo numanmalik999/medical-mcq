@@ -16,7 +16,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { useLandingPageSettings } from '@/hooks/useLandingPageSettings'; // Import new hook
-import heroBackground from '@/assets/hero-background.jpg'; // Import the image directly
 
 // Helper to get Lucide Icon component by name
 const getIconComponent = (iconName: string) => {
@@ -205,10 +204,8 @@ const LandingPage = () => {
     <div className="min-h-screen bg-background text-foreground pt-16">
       {/* Hero Section */}
       <section
-        className="relative w-full py-20 md:py-32 bg-cover bg-center text-primary-foreground text-center overflow-hidden"
-        style={{ backgroundImage: `url(${heroBackground})` }}
+        className="relative w-full py-20 md:py-32 bg-primary text-primary-foreground text-center overflow-hidden"
       >
-        <div className="absolute inset-0 bg-black/60 z-0"></div>
         <div className="container mx-auto px-4 relative z-10">
           <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-6 animate-fade-in-up">
             {settings.hero.mainTitle}

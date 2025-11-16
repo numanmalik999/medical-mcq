@@ -16,7 +16,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { useLandingPageSettings } from '@/hooks/useLandingPageSettings'; // Import new hook
-import heroBackground from '@/assets/hero-background.png'; // Import the image directly
+import heroBackground from '@/assets/hero-background.jpg'; // Import the image directly
 
 // Helper to get Lucide Icon component by name
 const getIconComponent = (iconName: string) => {

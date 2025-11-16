@@ -187,7 +187,7 @@ const UserCourseDetailsPage = () => {
               Topic {selectedTopic?.order} of {course?.title}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 prose dark:prose-invert max-w-none">
+          <div className="py-4 prose dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-primary hover:prose-a:underline">
             {selectedTopic?.content ? (
               <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopic.content}</ReactMarkdown>
             ) : (

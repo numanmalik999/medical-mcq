@@ -33,12 +33,9 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import PaymentPage from "./pages/PaymentPage";
 
-// New static pages
-import AboutUsPage from "./pages/AboutUsPage";
-import ContactPage from "./pages/ContactPage";
-import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
-import TermsOfServicePage from "./pages/TermsOfServicePage";
-import FAQPage from "./pages/FAQPage";
+// Import the new generic static page component
+import GenericStaticPage from "./pages/GenericStaticPage";
+
 import BookmarkedMcqsPage from "./pages/BookmarkedMcqsPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import ManageLandingPage from "./pages/ManageLandingPage";
@@ -53,11 +50,8 @@ import QuestionOfTheDayPage from "./pages/QuestionOfTheDayPage";
 import ManageDailyMcqsPage from "./pages/ManageDailyMcqsPage";
 
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
-import ReturnRefundPolicyPage from "./pages/ReturnRefundPolicyPage";
 import PasswordResetPage from "./pages/PasswordResetPage";
 import ReviewsPage from "./pages/ReviewsPage";
-import RoadToGulfPage from "./pages/RoadToGulfPage"; // Import the new page
-
 
 const queryClient = new QueryClient();
 
@@ -79,15 +73,7 @@ const AppContent = () => {
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/quiz-of-the-day" element={<QuestionOfTheDayPage />} />
             <Route path="/reset-password" element={<PasswordResetPage />} />
-            
-            <Route path="/about" element={<AboutUsPage />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/privacy" element={<PrivacyPolicyPage />} />
-            <Route path="/terms" element={<TermsOfServicePage />} />
-            <Route path="/faq" element={<FAQPage />} />
-            <Route path="/refund" element={<ReturnRefundPolicyPage />} />
             <Route path="/reviews" element={<ReviewsPage />} />
-            <Route path="/road-to-gulf" element={<RoadToGulfPage />} /> {/* New Route */}
 
             <Route path="/admin" element={<AdminProtectedRoute />}>
               <Route element={<AdminLayout />}>
@@ -123,6 +109,9 @@ const AppContent = () => {
                 <Route path="courses/:courseId" element={<UserCourseDetailsPage />} />
               </Route>
             </Route>
+
+            {/* Dynamic route for all other top-level slugs */}
+            <Route path="/:slug" element={<GenericStaticPage />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

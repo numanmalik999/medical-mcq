@@ -28,6 +28,7 @@ const defaultPages = [
   { slug: 'faq', title: 'FAQ', content: '# Frequently Asked Questions...', location: ['footer'] },
   { slug: 'refund', title: 'Return & Refund Policy', content: '# Return and Refund Policy...', location: ['footer'] },
   { slug: 'reviews', title: 'Reviews', content: 'This page is dynamically generated.', location: ['footer'] },
+  { slug: 'road-to-gulf', title: 'Road to Gulf', content: '## Your Road to Practicing in the Gulf...', location: ['header', 'footer'] },
 ];
 
 const AdminSettingsPage = () => {

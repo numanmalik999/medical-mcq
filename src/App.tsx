@@ -31,7 +31,7 @@ import TakeTestPage from "./pages/TakeTestPage";
 import SubscriptionPage from "./pages/SubscriptionPage";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import PaymentPage from "./pages/PaymentPage"; // Import the new page
+import PaymentPage from "./pages/PaymentPage";
 
 // New static pages
 import AboutUsPage from "./pages/AboutUsPage";
@@ -41,7 +41,7 @@ import TermsOfServicePage from "./pages/TermsOfServicePage";
 import FAQPage from "./pages/FAQPage";
 import BookmarkedMcqsPage from "./pages/BookmarkedMcqsPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
-import ManageLandingPage from "./pages/ManageLandingPage"; // Import new page
+import ManageLandingPage from "./pages/ManageLandingPage";
 
 // New Course Pages
 import ManageCoursesPage from "./pages/ManageCoursesPage";
@@ -54,8 +54,9 @@ import ManageDailyMcqsPage from "./pages/ManageDailyMcqsPage";
 
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import ReturnRefundPolicyPage from "./pages/ReturnRefundPolicyPage";
-import PasswordResetPage from "./pages/PasswordResetPage"; // Import new page
+import PasswordResetPage from "./pages/PasswordResetPage";
 import ReviewsPage from "./pages/ReviewsPage";
+import RoadToGulfPage from "./pages/RoadToGulfPage"; // Import the new page
 
 
 const queryClient = new QueryClient();
@@ -77,7 +78,7 @@ const AppContent = () => {
             <Route path="/quiz" element={<QuizPage />} />
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/quiz-of-the-day" element={<QuestionOfTheDayPage />} />
-            <Route path="/reset-password" element={<PasswordResetPage />} /> {/* New Route */}
+            <Route path="/reset-password" element={<PasswordResetPage />} />
             
             <Route path="/about" element={<AboutUsPage />} />
             <Route path="/contact" element={<ContactPage />} />
@@ -86,12 +87,13 @@ const AppContent = () => {
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/refund" element={<ReturnRefundPolicyPage />} />
             <Route path="/reviews" element={<ReviewsPage />} />
+            <Route path="/road-to-gulf" element={<RoadToGulfPage />} /> {/* New Route */}
 
             <Route path="/admin" element={<AdminProtectedRoute />}>
               <Route element={<AdminLayout />}>
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="dashboard" element={<AdminDashboardPage />} />
-                <Route path="manage-landing-page" element={<ManageLandingPage />} /> {/* New Route */}
+                <Route path="manage-landing-page" element={<ManageLandingPage />} />
                 <Route path="add-mcq" element={<AddMcqPage />} />
                 <Route path="bulk-upload-mcqs" element={<BulkUploadMcqsPage />} />
                 <Route path="manage-mcqs" element={<ManageMcqsPage />} />
@@ -109,7 +111,7 @@ const AppContent = () => {
 
             <Route path="/user" element={<UserProtectedRoute />}>
               <Route path="take-test" element={<TakeTestPage />} /> 
-              <Route path="payment/:tierId" element={<PaymentPage />} /> {/* New Payment Route */}
+              <Route path="payment/:tierId" element={<PaymentPage />} />
               <Route element={<UserLayout />}>
                 <Route index element={<UserDashboardPage />} />
                 <Route path="dashboard" element={<UserDashboardPage />} />

@@ -21,6 +21,7 @@ const getRouteFromSlug = (slug: string): string => {
   if (slug.includes('about')) return '/about';
   if (slug.includes('contact')) return '/contact';
   if (slug.includes('faq')) return '/faq';
+  if (slug.includes('road-to-gulf')) return '/road-to-gulf';
   return `/${slug}`;
 };
 

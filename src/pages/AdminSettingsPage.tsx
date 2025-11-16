@@ -42,8 +42,28 @@ const AdminSettingsPage = () => {
   const { hasCheckedInitialSession } = useSession();
 
   const ensureDefaultStaticPages = async () => {
-    const existingSlugs = new Set(staticPages.map(p => p.slug));
-    const pagesToInsert = defaultPages.filter(p => !existingSlugs.has(p.slug));
+    const existingPagesMap = new Map(staticPages.map(p => [p.slug, p]));
+    const pagesToInsert = [];
+    const pagesToUpdate = [];
+
+    for (const defaultPage of defaultPages) {
+      const existingPage = existingPagesMap.get(defaultPage.slug);
+      if (!existingPage) {
+        pagesToInsert.push(defaultPage);
+      } else {
+        // Check if location needs an update
+        const existingLocation = existingPage.location || [];
+        const defaultLocation = defaultPage.location || [];
+        const needsUpdate = defaultLocation.length !== existingLocation.length || !defaultLocation.every(loc => existingLocation.includes(loc));
+        
+        if (needsUpdate) {
+          pagesToUpdate.push({
+            ...existingPage,
+            location: defaultPage.location,
+          });
+        }
+      }
+    }
 
     if (pagesToInsert.length > 0) {
       console.log(`Inserting ${pagesToInsert.length} default static pages.`);
@@ -54,10 +74,25 @@ const AdminSettingsPage = () => {
       if (error) {
         console.error('Error inserting default static pages:', error);
         toast({ title: "Error", description: "Failed to initialize default pages.", variant: "destructive" });
-      } else {
-        // If successful, re-fetch all pages
-        await fetchStaticPages(false); // Fetch without setting loading state again
       }
+    }
+
+    if (pagesToUpdate.length > 0) {
+      console.log(`Updating ${pagesToUpdate.length} default static pages with correct locations.`);
+      const updates = pagesToUpdate.map(page => 
+        supabase.from('static_pages').update({ location: page.location }).eq('id', page.id)
+      );
+      const results = await Promise.all(updates);
+      const updateError = results.some(res => res.error);
+
+      if (updateError) {
+        console.error('Error updating default static page locations:', results.map(r => r.error).filter(Boolean));
+        toast({ title: "Error", description: "Failed to update default page locations.", variant: "destructive" });
+      }
+    }
+
+    if (pagesToInsert.length > 0 || pagesToUpdate.length > 0) {
+      await fetchStaticPages(false); // Re-fetch if any changes were made
     }
   };
 

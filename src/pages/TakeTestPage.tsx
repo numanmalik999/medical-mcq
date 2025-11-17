@@ -1249,7 +1249,7 @@ const TakeTestPage = () => {
                         })}
                       </ul>
                       {explanation && (
-                        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md text-sm prose dark:prose-invert max-w-none prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground">
+                        <div className="mt-4 p-3 bg-white dark:bg-gray-800 rounded-md text-sm prose dark:prose-invert max-w-none prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground">
                           <h4 className="font-semibold">Explanation:</h4>
                           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                             {explanation.explanation_text}

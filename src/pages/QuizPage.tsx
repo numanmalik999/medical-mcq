@@ -19,6 +19,9 @@ import { MCQ } from '@/components/mcq-columns';
 import { cn } from '@/lib/utils';
 import { useBookmark } from '@/hooks/use-bookmark';
 import useOfflineMcqs from '@/hooks/useOfflineMcqs'; // Import offline hook
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 
 
 interface MCQExplanation {
@@ -1209,7 +1212,7 @@ const QuizPage = () => {
       setIsFeedbackDialogOpen(false);
     } catch (error: any) {
       console.error("Error submitting feedback:", error);
-      toast({ title: "Error", description: `Failed to submit feedback: ${error.message}`, variant: "destructive" });
+      toast({ title: "Error", description: `Failed to submit feedback: ${error.message || 'Unknown error'}`, variant: "destructive" });
     } finally {
       setIsSubmittingFeedback(false);
     }
@@ -1604,9 +1607,11 @@ const QuizPage = () => {
                         })}
                       </ul>
                       {explanation && (
-                        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md text-sm">
+                        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md text-sm prose dark:prose-invert max-w-none prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground">
                           <h4 className="font-semibold">Explanation:</h4>
-                          <p>{explanation.explanation_text}</p>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                            {explanation.explanation_text}
+                          </ReactMarkdown>
                           {explanation.image_url && (
                             <img src={explanation.image_url} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
                           )}
@@ -1741,7 +1746,11 @@ const QuizPage = () => {
             {showExplanation && explanations.has(currentMcq.explanation_id || '') && (
               <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
                 <h3 className="text-lg font-semibold mb-2">Explanation:</h3>
-                <p className="text-gray-800 dark:text-gray-200">{explanations.get(currentMcq.explanation_id || '')?.explanation_text}</p>
+                <div className="prose dark:prose-invert max-w-none prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                    {explanations.get(currentMcq.explanation_id || '')?.explanation_text || ""}
+                  </ReactMarkdown>
+                </div>
                 {explanations.get(currentMcq.explanation_id || '')?.image_url && (
                   <img src={explanations.get(currentMcq.explanation_id || '')?.image_url || ''} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
                 )}

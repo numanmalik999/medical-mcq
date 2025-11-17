@@ -18,6 +18,9 @@ import { Input } from '@/components/ui/input'; // Import Input for number of MCQ
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'; // Added DialogDescription
 import QuizNavigator from '@/components/QuizNavigator'; // Import QuizNavigator
 import { useBookmark } from '@/hooks/use-bookmark'; // Import useBookmark hook
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 
 interface MCQ {
   id: string;
@@ -1246,9 +1249,11 @@ const TakeTestPage = () => {
                         })}
                       </ul>
                       {explanation && (
-                        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md text-sm">
+                        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md text-sm prose dark:prose-invert max-w-none prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground">
                           <h4 className="font-semibold">Explanation:</h4>
-                          <p>{explanation.explanation_text}</p>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                            {explanation.explanation_text}
+                          </ReactMarkdown>
                           {explanation.image_url && (
                             <img src={explanation.image_url} alt="Explanation" className="mt-2 max-w-full h-auto rounded-md" />
                           )}

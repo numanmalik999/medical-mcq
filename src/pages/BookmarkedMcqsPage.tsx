@@ -14,6 +14,9 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 
 interface MCQExplanation {
   id: string;
@@ -274,9 +277,11 @@ const BookmarkedMcqsPage = () => {
           </RadioGroup>
 
           {showExplanation && explanations.has(currentMcq?.explanation_id || '') && (
-            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600 prose dark:prose-invert max-w-none prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground">
               <h3 className="text-lg font-semibold mb-2">Explanation:</h3>
-              <p className="text-gray-800 dark:text-gray-200">{explanations.get(currentMcq?.explanation_id || '')?.explanation_text}</p>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                {explanations.get(currentMcq?.explanation_id || '')?.explanation_text || ""}
+              </ReactMarkdown>
               {explanations.get(currentMcq?.explanation_id || '')?.image_url && (
                 <img src={explanations.get(currentMcq?.explanation_id || '')?.image_url || ''} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
               )}

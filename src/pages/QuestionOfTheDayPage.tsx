@@ -16,6 +16,9 @@ import * as z from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 
 interface DailyMcq {
   daily_mcq_id: string;
@@ -512,9 +515,13 @@ const QuestionOfTheDayPage = () => {
                 )}
 
                 {explanation && (
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
-                    <h3 className="text-lg font-semibold mb-2">Explanation:</h3>
-                    <p className="text-gray-800 dark:text-gray-200">{explanation.explanation_text}</p>
+                  <div className="p-4 bg-white rounded-md border border-gray-200">
+                    <h3 className="text-lg font-semibold mb-2 text-gray-900">Explanation:</h3>
+                    <div className="prose max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                        {explanation.explanation_text}
+                      </ReactMarkdown>
+                    </div>
                     {explanation.image_url && (
                       <img src={explanation.image_url} alt="Explanation" className="mt-4 max-w-full h-auto rounded-md" />
                     )}

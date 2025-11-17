@@ -277,8 +277,8 @@ const BookmarkedMcqsPage = () => {
           </RadioGroup>
 
           {showExplanation && explanations.has(currentMcq?.explanation_id || '') && (
-            <div className="mt-6 p-4 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 prose dark:prose-invert max-w-none prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground">
-              <h3 className="text-lg font-semibold mb-2">Explanation:</h3>
+            <div className="mt-6 p-4 bg-white rounded-md border border-gray-200 prose max-w-none">
+              <h3 className="text-lg font-semibold mb-2 text-gray-900">Explanation:</h3>
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                 {explanations.get(currentMcq?.explanation_id || '')?.explanation_text || ""}
               </ReactMarkdown>

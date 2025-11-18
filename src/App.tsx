@@ -32,6 +32,7 @@ import SubscriptionPage from "./pages/SubscriptionPage";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import PaymentPage from "./pages/PaymentPage";
+import AiChatbot from "./components/AiChatbot"; // Import the new component
 
 // Import the new generic static page component
 import GenericStaticPage from "./pages/GenericStaticPage";
@@ -118,6 +119,7 @@ const AppContent = () => {
         </div>
         <Footer />
       </div>
+      <AiChatbot />
     </>
   );
 };

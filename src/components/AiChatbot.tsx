@@ -61,8 +61,15 @@ const AiChatbot = () => {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get response from AI.');
+        const errorText = await response.text();
+        let errorMessage = 'Failed to get response from AI.';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const reader = response.body?.getReader();
@@ -74,26 +81,36 @@ const AiChatbot = () => {
       let assistantResponse = '';
       setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
+      let buffer = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\\n');
-        const parsedLines = lines
-          .map((line) => line.replace(/^data: /, '').trim())
-          .filter((line) => line !== '' && line !== '[DONE]')
-          .map((line) => JSON.parse(line));
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep the last, possibly incomplete, line
 
-        for (const parsedLine of parsedLines) {
-          const { choices } = parsedLine;
-          const { delta } = choices[0];
-          if (delta?.content) {
-            assistantResponse += delta.content;
-            setMessages((prev) => {
-              const updatedMessages = [...prev];
-              updatedMessages[updatedMessages.length - 1].content = assistantResponse;
-              return updatedMessages;
-            });
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.substring(6).trim();
+            if (jsonStr === '[DONE]') {
+              continue;
+            }
+            try {
+              const parsedLine = JSON.parse(jsonStr);
+              const { choices } = parsedLine;
+              const { delta } = choices[0];
+              if (delta?.content) {
+                assistantResponse += delta.content;
+                setMessages((prev) => {
+                  const updatedMessages = [...prev];
+                  updatedMessages[updatedMessages.length - 1].content = assistantResponse;
+                  return updatedMessages;
+                });
+              }
+            } catch (e) {
+              console.error('Error parsing stream line:', jsonStr, e);
+            }
           }
         }
       }

@@ -48,11 +48,11 @@ const AiChatbot = () => {
 
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, // Always send apikey
       };
 
       if (session) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+        headers['Authorization'] = `Bearer ${session.access_token}`; // Add Authorization only if logged in
       }
 
       const response = await fetch(

@@ -32,14 +32,25 @@ serve(async (req: Request) => {
       content: "You are an expert assistant for 'Study Prometric', a platform that helps medical professionals prepare for exams in Gulf countries (like Saudi Arabia, UAE, Qatar, etc.). Your name is 'Prometric AI'. Your goal is to answer user questions about medical topics, exam preparation, and the features of the Study Prometric platform. Be helpful, concise, and professional. If you don't know an answer, say so. Do not make up information."
     };
 
-    const response = await openai.chat.completions.create({
+    const stream = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [systemPrompt, ...messages],
       stream: true,
     });
 
-    // The ReadableStream from the OpenAI SDK is directly compatible with Deno's Response
-    return new Response(response.toReadableStream(), {
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        for await (const chunk of stream) {
+          const chunkStr = JSON.stringify(chunk);
+          controller.enqueue(encoder.encode(`data: ${chunkStr}\n\n`));
+        }
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+
+    return new Response(readableStream, {
       headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
     });
 

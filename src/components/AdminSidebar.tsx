@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users, LogOut, UploadCloud, MessageSquareWarning, FileQuestion, Settings, GraduationCap, CalendarDays, Layout } from 'lucide-react'; // Import Layout
+import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users, LogOut, UploadCloud, MessageSquareWarning, FileQuestion, Settings, GraduationCap, CalendarDays, Layout, Lightbulb } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -61,7 +61,7 @@ const AdminSidebar = () => {
 
   const navItems = [
     { to: "/admin/dashboard", icon: <LayoutDashboard className="h-4 w-4" />, label: "Dashboard" },
-    { to: "/admin/manage-landing-page", icon: <Layout className="h-4 w-4" />, label: "Manage Landing Page" }, // New item
+    { to: "/admin/manage-landing-page", icon: <Layout className="h-4 w-4" />, label: "Manage Landing Page" },
     { to: "/admin/add-mcq", icon: <PlusCircle className="h-4 w-4" />, label: "Add MCQ" },
     { to: "/admin/bulk-upload-mcqs", icon: <UploadCloud className="h-4 w-4" />, label: "Bulk Upload MCQs" },
     { to: "/admin/manage-mcqs", icon: <BookOpenText className="h-4 w-4" />, label: "Manage MCQs" },
@@ -72,6 +72,7 @@ const AdminSidebar = () => {
     { to: "/admin/manage-subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "Manage Subscriptions" },
     { to: "/admin/manage-users", icon: <Users className="h-4 w-4" />, label: "Manage Users" },
     { to: "/admin/manage-feedback", icon: <MessageSquareWarning className="h-4 w-4" />, label: "Manage Feedback" },
+    { to: "/admin/manage-suggestions", icon: <Lightbulb className="h-4 w-4" />, label: "Manage Suggestions" },
     { to: "/admin/settings", icon: <Settings className="h-4 w-4" />, label: "Settings" },
   ];
 

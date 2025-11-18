@@ -7,7 +7,7 @@ import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Loader2, Users, CreditCard, ArrowRight } from 'lucide-react';
+import { Loader2, Users, CreditCard, ArrowRight, Lightbulb } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
@@ -27,6 +27,14 @@ interface RecentSubscription {
   }[] | null;
 }
 
+interface RecentSuggestion {
+  id: string;
+  suggestion_text: string;
+  user_id: string;
+  created_at: string;
+  user_email: string;
+}
+
 const AdminDashboardPage = () => {
   const { hasCheckedInitialSession } = useSession();
   const [dailyStats, setDailyStats] = useState<{
@@ -39,6 +47,7 @@ const AdminDashboardPage = () => {
   // New states
   const [recentUsers, setRecentUsers] = useState<User[]>([]);
   const [recentSubscriptions, setRecentSubscriptions] = useState<RecentSubscription[]>([]);
+  const [recentSuggestions, setRecentSuggestions] = useState<RecentSuggestion[]>([]);
   const [isLoadingRecentData, setIsLoadingRecentData] = useState(true);
 
   useEffect(() => {
@@ -78,9 +87,9 @@ const AdminDashboardPage = () => {
           setIsLoadingStats(false);
         }
 
-        // Fetch recent users and subscriptions
+        // Fetch recent users, subscriptions, and suggestions
         try {
-          const [usersResponse, subsResponse] = await Promise.all([
+          const [usersResponse, subsResponse, suggestionsResponse] = await Promise.all([
             supabase.functions.invoke('list-recent-users'),
             supabase
               .from('user_subscriptions')
@@ -92,6 +101,11 @@ const AdminDashboardPage = () => {
                 subscription_tiers ( name )
               `)
               .order('created_at', { ascending: false })
+              .limit(5),
+            supabase
+              .from('user_suggestions')
+              .select('id, suggestion_text, user_id, created_at')
+              .order('created_at', { ascending: false })
               .limit(5)
           ]);
 
@@ -100,6 +114,24 @@ const AdminDashboardPage = () => {
 
           if (subsResponse.error) throw subsResponse.error;
           setRecentSubscriptions(subsResponse.data as RecentSubscription[] || []);
+
+          if (suggestionsResponse.error) {
+            throw suggestionsResponse.error;
+          } else if (suggestionsResponse.data) {
+            const suggestionsWithDetails = await Promise.all(suggestionsResponse.data.map(async (suggestion) => {
+              let userEmail = 'N/A';
+              if (suggestion.user_id) {
+                const { data: emailData, error: emailError } = await supabase.functions.invoke('get-user-email-by-id', {
+                  body: { user_id: suggestion.user_id },
+                });
+                if (!emailError && emailData?.email) {
+                  userEmail = emailData.email;
+                }
+              }
+              return { ...suggestion, user_email: userEmail };
+            }));
+            setRecentSuggestions(suggestionsWithDetails);
+          }
 
         } catch (error: any) {
           console.error("Error fetching recent activity:", error);
@@ -176,9 +208,40 @@ const AdminDashboardPage = () => {
             </Button>
           </CardFooter>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2"><Lightbulb className="h-5 w-5" /> Recent Suggestions</CardTitle>
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/admin/manage-suggestions">View All <ArrowRight className="h-4 w-4 ml-1" /></Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {isLoadingRecentData ? (
+              <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            ) : recentSuggestions.length > 0 ? (
+              <div className="space-y-4">
+                {recentSuggestions.map(suggestion => (
+                  <div key={suggestion.id} className="flex items-start gap-4">
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback>{suggestion.user_email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                    </Avatar>
+                    <div className="grid gap-1">
+                      <p className="text-sm font-medium leading-none truncate" title={suggestion.suggestion_text}>{suggestion.suggestion_text}</p>
+                      <p className="text-sm text-muted-foreground">
+                        by {suggestion.user_email}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-10">No new suggestions recently.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* New Cards for Recent Activity */}
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">

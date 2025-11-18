@@ -32,7 +32,7 @@ import SubscriptionPage from "./pages/SubscriptionPage";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import PaymentPage from "./pages/PaymentPage";
-import AiChatbot from "./components/AiChatbot"; // Import the new component
+import AiChatbot from "./components/AiChatbot";
 
 // Import the new generic static page component
 import GenericStaticPage from "./pages/GenericStaticPage";
@@ -53,6 +53,8 @@ import ManageDailyMcqsPage from "./pages/ManageDailyMcqsPage";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import PasswordResetPage from "./pages/PasswordResetPage";
 import ReviewsPage from "./pages/ReviewsPage";
+import SuggestionPage from "./pages/SuggestionPage";
+import ManageSuggestionsPage from "./pages/ManageSuggestionsPage";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +94,7 @@ const AppContent = () => {
                 <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
                 <Route path="manage-users" element={<ManageUsersPage />} />
                 <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />
+                <Route path="manage-suggestions" element={<ManageSuggestionsPage />} />
                 <Route path="settings" element={<AdminSettingsPage />} />
               </Route>
             </Route>
@@ -106,6 +109,7 @@ const AppContent = () => {
                 <Route path="subscriptions" element={<UserSubscriptionsPage />} />
                 <Route path="submit-mcq" element={<SubmitMcqPage />} />
                 <Route path="bookmarked-mcqs" element={<BookmarkedMcqsPage />} />
+                <Route path="suggestion" element={<SuggestionPage />} />
                 <Route path="courses" element={<UserCoursesPage />} />
                 <Route path="courses/:courseId" element={<UserCourseDetailsPage />} />
               </Route>

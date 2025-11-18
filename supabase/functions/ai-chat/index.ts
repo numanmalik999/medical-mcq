@@ -25,6 +25,7 @@ serve(async (req: Request) => {
     const openai = new OpenAI({ apiKey: openaiApiKey });
 
     const { messages } = await req.json();
+    console.log(`[ai-chat] Received ${messages.length} messages. Starting OpenAI stream.`);
 
     const systemPrompt = {
       role: 'system',
@@ -43,7 +44,7 @@ serve(async (req: Request) => {
     });
 
   } catch (error) {
-    console.error('Error in ai-chat Edge Function:', error);
+    console.error('[ai-chat] Error in Edge Function:', error);
     return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

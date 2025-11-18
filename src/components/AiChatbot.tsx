@@ -45,17 +45,21 @@ const AiChatbot = () => {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      };
+
+      if (session) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          },
+          headers,
           body: JSON.stringify({ messages: newMessages }),
         }
       );

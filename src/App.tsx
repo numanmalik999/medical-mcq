@@ -53,7 +53,7 @@ import ManageDailyMcqsPage from "./pages/ManageDailyMcqsPage";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import PasswordResetPage from "./pages/PasswordResetPage";
 import ReviewsPage from "./pages/ReviewsPage";
-import SuggestionPage from "./pages/SuggestionPage";
+import UserSuggestionsPage from "./pages/UserSuggestionsPage";
 import ManageSuggestionsPage from "./pages/ManageSuggestionsPage";
 
 const queryClient = new QueryClient();
@@ -109,7 +109,7 @@ const AppContent = () => {
                 <Route path="subscriptions" element={<UserSubscriptionsPage />} />
                 <Route path="submit-mcq" element={<SubmitMcqPage />} />
                 <Route path="bookmarked-mcqs" element={<BookmarkedMcqsPage />} />
-                <Route path="suggestion" element={<SuggestionPage />} />
+                <Route path="suggestions" element={<UserSuggestionsPage />} />
                 <Route path="courses" element={<UserCoursesPage />} />
                 <Route path="courses/:courseId" element={<UserCourseDetailsPage />} />
               </Route>

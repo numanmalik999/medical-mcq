@@ -87,7 +87,7 @@ const UserSidebar = () => {
     { to: "/user/subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "My Subscriptions" },
     { to: "/user/submit-mcq", icon: <FilePlus className="h-4 w-4" />, label: "Submit MCQ" },
     { to: "/user/bookmarked-mcqs", icon: <Bookmark className="h-4 w-4" />, label: "Bookmarked MCQs" },
-    { to: "/user/suggestion", icon: <Lightbulb className="h-4 w-4" />, label: "Suggestions" },
+    { to: "/user/suggestions", icon: <Lightbulb className="h-4 w-4" />, label: "Suggestions" },
   ];
 
   if (isMobile) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,15 +13,27 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSession } from '@/components/SessionContextProvider';
 import { Loader2, Lightbulb } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
+
+interface UserSuggestion {
+  id: string;
+  suggestion_text: string;
+  status: 'pending' | 'reviewed' | 'implemented' | 'rejected';
+  admin_notes: string | null;
+  created_at: string;
+}
 
 const formSchema = z.object({
   suggestion_text: z.string().min(10, "Suggestion must be at least 10 characters long."),
 });
 
-const SuggestionPage = () => {
+const UserSuggestionsPage = () => {
   const { user } = useSession();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(true);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -29,6 +41,37 @@ const SuggestionPage = () => {
       suggestion_text: "",
     },
   });
+
+  const fetchUserSuggestions = async () => {
+    if (!user) {
+      setIsLoadingSuggestions(false);
+      return;
+    }
+    setIsLoadingSuggestions(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_suggestions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSuggestions(data || []);
+    } catch (error: any) {
+      console.error("Error fetching user suggestions:", error);
+      toast({ title: "Error", description: "Failed to load your suggestions.", variant: "destructive" });
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchUserSuggestions();
+    } else {
+      setIsLoadingSuggestions(false);
+    }
+  }, [user]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user) {
@@ -53,6 +96,7 @@ const SuggestionPage = () => {
         description: "Thank you for your feedback. We appreciate your input!",
       });
       form.reset();
+      fetchUserSuggestions(); // Refresh the list after submitting
     } catch (error: any) {
       console.error("Error submitting suggestion:", error);
       toast({
@@ -66,9 +110,8 @@ const SuggestionPage = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Submit a Suggestion</h1>
-      <Card className="w-full max-w-2xl">
+    <div className="space-y-8">
+      <Card className="w-full max-w-3xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Lightbulb className="h-6 w-6 text-primary" />
@@ -88,7 +131,7 @@ const SuggestionPage = () => {
                     <FormControl>
                       <Textarea
                         placeholder="Describe your suggestion in detail..."
-                        rows={8}
+                        rows={6}
                         {...field}
                       />
                     </FormControl>
@@ -109,9 +152,55 @@ const SuggestionPage = () => {
           </Form>
         </CardContent>
       </Card>
+
+      <Card className="w-full max-w-3xl">
+        <CardHeader>
+          <CardTitle>Your Past Suggestions</CardTitle>
+          <CardDescription>Track the status of your submitted ideas.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingSuggestions ? (
+            <div className="flex items-center justify-center h-20">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : suggestions.length === 0 ? (
+            <p className="text-center text-muted-foreground">You haven't submitted any suggestions yet.</p>
+          ) : (
+            <div className="space-y-4">
+              {suggestions.map((suggestion) => (
+                <div key={suggestion.id} className="border p-4 rounded-lg bg-muted/50">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Submitted on {format(new Date(suggestion.created_at), 'PPP')}
+                  </p>
+                  <p className="mb-3">{suggestion.suggestion_text}</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-medium">Status: </span>
+                      <Badge variant={
+                        suggestion.status === 'implemented' ? 'default' :
+                        suggestion.status === 'rejected' ? 'destructive' :
+                        suggestion.status === 'reviewed' ? 'secondary' : 'outline'
+                      }>
+                        {suggestion.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  {suggestion.admin_notes && (
+                    <div className="mt-3 border-t pt-3">
+                      <p className="text-sm font-semibold">Admin Notes:</p>
+                      <p className="text-sm text-muted-foreground italic">"{suggestion.admin_notes}"</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <MadeWithDyad />
     </div>
   );
 };
 
-export default SuggestionPage;
+export default UserSuggestionsPage;

@@ -45,50 +45,33 @@ const ManageMcqsPage = () => {
   const fetchData = useCallback(async () => {
     setIsPageLoading(true);
     try {
-      // Step 1: Fetch all categories and all category links concurrently
-      const [categoriesResult, linksResult] = await Promise.all([
-        supabase.from('categories').select('*'),
-        supabase.from('mcq_category_links').select('mcq_id, category_id')
-      ]);
+      // Step 1: Fetch all categories
+      const { data: categoriesData, error: categoriesError } = await supabase.from('categories').select('*');
+      if (categoriesError) throw categoriesError;
 
-      if (categoriesResult.error) throw categoriesResult.error;
-      if (linksResult.error) throw linksResult.error;
+      // Step 2: Fetch counts for each category
+      const categoriesWithCounts = await Promise.all(
+        (categoriesData || []).map(async (category) => {
+          const { count } = await supabase.from('mcq_category_links').select('mcq_id', { count: 'exact', head: true }).eq('category_id', category.id);
+          return { ...category, mcq_count: count || 0 };
+        })
+      );
 
-      const categoriesData = categoriesResult.data || [];
-      const allLinks = linksResult.data || [];
-
-      // Step 2: Process links to get counts and a set of categorized MCQ IDs
-      const categoryCounts = new Map<string, number>();
-      allLinks.forEach(link => {
-        categoryCounts.set(link.category_id, (categoryCounts.get(link.category_id) || 0) + 1);
-      });
-      const categorizedMcqIds = Array.from(new Set(allLinks.map(link => link.mcq_id)));
-
-      // Step 3: Get the count of uncategorized MCQs
-      let uncategorizedCountQuery = supabase
+      // Step 3: Get the count of uncategorized MCQs using a left join and null check
+      const { count: uncategorizedCount, error: uncategorizedError } = await supabase
         .from('mcqs')
-        .select('id', { count: 'exact', head: true });
-      
-      if (categorizedMcqIds.length > 0) {
-        uncategorizedCountQuery = uncategorizedCountQuery.not('id', 'in', `(${categorizedMcqIds.join(',')})`);
-      }
-      
-      const { count: uncategorizedCount, error: uncategorizedError } = await uncategorizedCountQuery;
+        .select('id, mcq_category_links!left(mcq_id)', { count: 'exact', head: true })
+        .is('mcq_category_links.mcq_id', null);
       if (uncategorizedError) throw uncategorizedError;
-
-      // Step 4: Combine data for the categories state
-      const categoriesWithCounts = categoriesData.map(category => ({
-        ...category,
-        mcq_count: categoryCounts.get(category.id) || 0,
-      }));
       
+      // Step 4: Combine data for the categories state
       setCategories([
         ...categoriesWithCounts,
         { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: uncategorizedCount }
       ]);
 
       // Step 5: Build and execute the main MCQs query with filters
-      let mcqsQuery = supabase.from('mcqs').select(`*, mcq_category_links (category_id, categories (name))`);
+      let mcqsQuery = supabase.from('mcqs').select(`*, mcq_category_links!left(category_id, categories(name))`);
 
       if (searchTerm) {
         mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
@@ -96,13 +79,12 @@ const ManageMcqsPage = () => {
 
       if (selectedFilterCategory && selectedFilterCategory !== 'all') {
         if (selectedFilterCategory === UNCATEGORIZED_ID) {
-          if (categorizedMcqIds.length > 0) {
-            mcqsQuery = mcqsQuery.not('id', 'in', `(${categorizedMcqIds.join(',')})`);
-          }
+          mcqsQuery = mcqsQuery.is('mcq_category_links.category_id', null);
         } else {
-          const mcqIdsForCategory = allLinks
-            .filter(link => link.category_id === selectedFilterCategory)
-            .map(link => link.mcq_id);
+          // To filter by a category on a left-joined table, it's safer to get the MCQ IDs first
+          const { data: linkData, error: linkError } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', selectedFilterCategory);
+          if (linkError) throw linkError;
+          const mcqIdsForCategory = linkData.map(link => link.mcq_id);
           
           if (mcqIdsForCategory.length === 0) {
             setMcqs([]);

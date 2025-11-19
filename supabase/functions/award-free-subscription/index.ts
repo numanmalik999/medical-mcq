@@ -62,7 +62,7 @@ serve(async (req: Request) => {
       .update({ status: 'inactive' })
       .eq('user_id', user_id)
       .eq('status', 'active')
-      .is('paypal_subscription_id', null); // Assuming free subscriptions won't have PayPal IDs
+      .is('stripe_subscription_id', null); // Corrected: Check for Stripe ID instead of non-existent PayPal ID
 
     if (deactivateError) {
       console.warn('Failed to deactivate previous free user subscriptions:', deactivateError);
@@ -77,7 +77,7 @@ serve(async (req: Request) => {
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         status: 'active',
-        // No paypal_subscription_id or paypal_plan_id for free awards
+        // No stripe_subscription_id for free awards
       })
       .select()
       .single();

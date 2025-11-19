@@ -44,6 +44,15 @@ const safeStringify = (content: any): string => {
 const TopicContentDialog = ({ open, onOpenChange, topicContent }: TopicContentDialogProps) => {
   if (!topicContent) return null;
 
+  const sections = [
+    { key: 'definition', title: 'Definition' },
+    { key: 'main_causes', title: 'Main Causes' },
+    { key: 'symptoms', title: 'Symptoms' },
+    { key: 'diagnostic_tests', title: 'Diagnostic Tests' },
+    { key: 'diagnostic_criteria', title: 'Diagnostic Criteria' },
+    { key: 'treatment_management', title: 'Treatment & Management' },
+  ] as const;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
@@ -52,12 +61,16 @@ const TopicContentDialog = ({ open, onOpenChange, topicContent }: TopicContentDi
           <DialogDescription>Detailed information on this topic.</DialogDescription>
         </DialogHeader>
         <div className="py-4 prose dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-primary hover:prose-a:underline">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.definition)}</ReactMarkdown>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.main_causes)}</ReactMarkdown>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.symptoms)}</ReactMarkdown>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.diagnostic_tests)}</ReactMarkdown>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.diagnostic_criteria)}</ReactMarkdown>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.treatment_management)}</ReactMarkdown>
+          {sections.map(section => (
+            topicContent[section.key] && (
+              <div key={section.key}>
+                <h2>{section.title}</h2>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                  {safeStringify(topicContent[section.key])}
+                </ReactMarkdown>
+              </div>
+            )
+          ))}
           {topicContent.youtube_video_id && (
             <div className="aspect-video mt-6">
               <iframe

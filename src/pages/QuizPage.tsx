@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
-import { MessageSquareText, Bookmark, BookmarkCheck, ArrowLeft, Loader2 } from 'lucide-react';
+import { MessageSquareText, Bookmark, BookmarkCheck, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,7 +19,6 @@ import { useBookmark } from '@/hooks/use-bookmark';
 import ExplanationDisplay from '@/components/ExplanationDisplay';
 import TopicContentDialog from '@/components/TopicContentDialog';
 
-// ... (Keep all interfaces)
 interface MCQExplanation {
   id: string;
   explanation_text: string;

@@ -62,8 +62,7 @@ const ManageMcqsPage = () => {
     setIsPageLoading(true);
     let mcqsQuery = supabase.from('mcqs').select(`
       *,
-      mcq_category_links (category_id, categories (name)),
-      mcq_topic_links (topic_id, course_topics (title))
+      mcq_category_links (category_id, categories (name))
     `);
 
     if (searchTerm) {
@@ -82,10 +81,6 @@ const ManageMcqsPage = () => {
         category_links: mcq.mcq_category_links.map((link: any) => ({
           category_id: link.category_id,
           category_name: link.categories?.name || null,
-        })),
-        topic_links: mcq.mcq_topic_links.map((link: any) => ({
-          topic_id: link.topic_id,
-          topic_title: link.course_topics?.title || null,
         })),
       }));
       setRawMcqs(displayMcqs);

@@ -25,11 +25,6 @@ export type McqCategoryLink = {
   category_name: string;
 };
 
-export type McqTopicLink = {
-  topic_id: string;
-  topic_title: string;
-};
-
 export type MCQ = {
   id: string;
   question_text: string;
@@ -42,7 +37,6 @@ export type MCQ = {
   difficulty: string | null;
   is_trial_mcq: boolean | null;
   category_links: McqCategoryLink[];
-  topic_links: McqTopicLink[];
   
   explanation_text?: string;
   image_url?: string | null;
@@ -126,14 +120,6 @@ export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnD
           )) : 'N/A'}
         </div>
       );
-    },
-  },
-  {
-    id: "topic",
-    header: "Linked Topic",
-    cell: ({ row }) => {
-      const topicTitle = row.original.topic_links?.[0]?.topic_title;
-      return <div className="w-[150px] truncate">{topicTitle || 'N/A'}</div>;
     },
   },
   {

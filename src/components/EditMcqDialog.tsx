@@ -15,43 +15,49 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { MCQ } from './mcq-columns';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Wand2 } from 'lucide-react'; // Removed X icon import
-import MultiSelect from './MultiSelect'; // Import the new MultiSelect component
+import { Loader2, Wand2 } from 'lucide-react';
+import MultiSelect from './MultiSelect';
 
 interface Category {
   id: string;
   name: string;
 }
 
+interface Topic {
+  id: string;
+  title: string;
+}
+
 interface EditMcqDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mcq: MCQ | null;
-  onSave: () => void; // Callback to refresh data after save
+  onSave: () => void;
 }
+
+const formSchema = z.object({
+  id: z.string().uuid(),
+  question_text: z.string().min(1, "Question text is required."),
+  option_a: z.string().min(1, "Option A is required."),
+  option_b: z.string().min(1, "Option B is required."),
+  option_c: z.string().min(1, "Option C is required."),
+  option_d: z.string().min(1, "Option D is required."),
+  correct_answer: z.enum(['A', 'B', 'C', 'D'], { message: "Correct answer is required." }),
+  explanation_id: z.string().uuid().nullable(),
+  explanation_text: z.string().min(1, "Explanation text is required."),
+  image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
+  category_ids: z.array(z.string().uuid("Invalid category ID.")).optional(),
+  topic_id: z.string().uuid().optional().or(z.literal('')),
+  difficulty: z.string().optional().or(z.literal('')),
+  is_trial_mcq: z.boolean().optional(),
+});
 
 const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) => {
   const { toast, dismiss } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-
-  // Define formSchema inside the component to access `subcategories` state
-  const formSchema = z.object({
-    id: z.string().uuid(), // MCQ ID
-    question_text: z.string().min(1, "Question text is required."),
-    option_a: z.string().min(1, "Option A is required."),
-    option_b: z.string().min(1, "Option B is required."),
-    option_c: z.string().min(1, "Option C is required."),
-    option_d: z.string().min(1, "Option D is required."),
-    correct_answer: z.enum(['A', 'B', 'C', 'D'], { message: "Correct answer is required." }),
-    explanation_id: z.string().uuid().nullable(), // Explanation ID
-    explanation_text: z.string().min(1, "Explanation text is required."),
-    image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
-    category_ids: z.array(z.string().uuid("Invalid category ID.")).optional(), // Now an array
-    difficulty: z.string().optional().or(z.literal('')),
-    is_trial_mcq: z.boolean().optional(),
-  });
+  const [topics, setTopics] = useState<Topic[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -64,29 +70,34 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
       correct_answer: 'A',
       explanation_text: "",
       image_url: "",
-      category_ids: [], // Initialize as empty array
+      category_ids: [],
+      topic_id: "",
       difficulty: "",
       is_trial_mcq: false,
     },
   });
 
-  // Fetch categories
   useEffect(() => {
-    const fetchCategories = async () => {
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('*');
+    const fetchData = async () => {
+      const { data: categoriesData, error: categoriesError } = await supabase.from('categories').select('*');
       if (categoriesError) {
         console.error('Error fetching categories:', categoriesError);
         toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
       } else {
         setCategories(categoriesData || []);
       }
+
+      const { data: topicsData, error: topicsError } = await supabase.from('course_topics').select('id, title');
+      if (topicsError) {
+        console.error('Error fetching topics:', topicsError);
+        toast({ title: "Error", description: "Failed to load topics.", variant: "destructive" });
+      } else {
+        setTopics(topicsData || []);
+      }
     };
-    fetchCategories();
+    fetchData();
   }, [toast]);
 
-  // Populate form when MCQ prop changes
   useEffect(() => {
     if (mcq && open) {
       const loadMcqData = async () => {
@@ -109,8 +120,8 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           }
         }
 
-        // Extract category_ids from mcq.category_links
         const initialCategoryIds = mcq.category_links?.map(link => link.category_id).filter((id): id is string => id !== null) || [];
+        const initialTopicId = mcq.topic_links?.[0]?.topic_id || "";
 
         form.reset({
           id: mcq.id,
@@ -124,68 +135,37 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           explanation_text: explanationText,
           image_url: imageUrl,
           category_ids: initialCategoryIds,
+          topic_id: initialTopicId,
           difficulty: mcq.difficulty || "",
           is_trial_mcq: mcq.is_trial_mcq || false,
         });
       };
       loadMcqData();
     } else if (!open) {
-      form.reset(); // Reset form when dialog closes
+      form.reset();
     }
   }, [mcq, open, form, toast]);
 
   const handleGenerateWithAI = async () => {
     const { question_text, option_a, option_b, option_c, option_d } = form.getValues();
-
     if (!question_text || !option_a || !option_b || !option_c || !option_d) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in the question and all options before generating with AI.",
-        variant: "destructive",
-      });
+      toast({ title: "Missing Information", description: "Please fill in the question and all options before generating with AI.", variant: "destructive" });
       return;
     }
-
     setIsGeneratingAI(true);
-    const loadingToastId = toast({
-      title: "Generating with AI...",
-      description: "Please wait while AI determines the correct answer, generates the explanation, and difficulty.",
-      duration: 999999,
-      action: <Loader2 className="h-4 w-4 animate-spin" />,
-    });
-
+    const loadingToastId = toast({ title: "Generating with AI...", description: "Please wait...", duration: 999999, action: <Loader2 className="h-4 w-4 animate-spin" /> });
     try {
-      const { data, error } = await supabase.functions.invoke('generate-mcq-content', {
-        body: {
-          question: question_text,
-          options: { A: option_a, B: option_b, C: option_c, D: option_d },
-          // Removed correct_answer from body as AI determines it
-        },
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      // Use the AI-determined correct answer
+      const { data, error } = await supabase.functions.invoke('generate-mcq-content', { body: { question: question_text, options: { A: option_a, B: option_b, C: option_c, D: option_d } } });
+      if (error) throw error;
       form.setValue("correct_answer", data.correct_answer);
       form.setValue("explanation_text", data.explanation_text);
       form.setValue("difficulty", data.difficulty);
-      
       dismiss(loadingToastId.id);
-      toast({
-        title: "AI Generation Complete!",
-        description: `Correct answer determined as ${data.correct_answer}. Explanation and difficulty have been generated. Please review.`,
-        variant: "default",
-      });
+      toast({ title: "AI Generation Complete!", description: `Correct answer determined as ${data.correct_answer}. Please review.`, variant: "default" });
     } catch (error: any) {
       dismiss(loadingToastId.id);
       console.error("Error generating with AI:", error);
-      toast({
-        title: "AI Generation Failed",
-        description: `Failed to generate content with AI: ${error.message || 'Unknown error'}`,
-        variant: "destructive",
-      });
+      toast({ title: "AI Generation Failed", description: `Failed to generate content: ${error.message || 'Unknown error'}`, variant: "destructive" });
     } finally {
       setIsGeneratingAI(false);
     }
@@ -195,103 +175,47 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
     setIsSubmitting(true);
     try {
       let currentExplanationId = values.explanation_id;
-
-      // Update or insert explanation
       if (currentExplanationId) {
-        const { error: explanationError } = await supabase
-          .from('mcq_explanations')
-          .update({
-            explanation_text: values.explanation_text,
-            image_url: values.image_url || null,
-          })
-          .eq('id', currentExplanationId);
-
-        if (explanationError) {
-          throw explanationError;
-        }
-      } else {
-        // If no explanation_id exists, but explanation text is provided, create one
-        if (values.explanation_text.trim()) {
-          const { data: newExplanationData, error: newExplanationError } = await supabase
-            .from('mcq_explanations')
-            .insert({
-              explanation_text: values.explanation_text,
-              image_url: values.image_url || null,
-            })
-            .select('id')
-            .single();
-
-          if (newExplanationError) {
-            throw newExplanationError;
-          }
-          currentExplanationId = newExplanationData.id; // Assign new explanation ID
-        }
+        const { error } = await supabase.from('mcq_explanations').update({ explanation_text: values.explanation_text, image_url: values.image_url || null }).eq('id', currentExplanationId);
+        if (error) throw error;
+      } else if (values.explanation_text.trim()) {
+        const { data, error } = await supabase.from('mcq_explanations').insert({ explanation_text: values.explanation_text, image_url: values.image_url || null }).select('id').single();
+        if (error) throw error;
+        currentExplanationId = data.id;
       }
 
-      // Update MCQ
-      const { error: mcqError } = await supabase
-        .from('mcqs')
-        .update({
-          question_text: values.question_text,
-          option_a: values.option_a,
-          option_b: values.option_b,
-          option_c: values.option_c,
-          option_d: values.option_d,
-          correct_answer: values.correct_answer,
-          explanation_id: currentExplanationId, // Use the resolved explanation ID
-          difficulty: values.difficulty || null,
-          is_trial_mcq: values.is_trial_mcq,
-        })
-        .eq('id', values.id);
+      const { error: mcqError } = await supabase.from('mcqs').update({
+        question_text: values.question_text,
+        option_a: values.option_a,
+        option_b: values.option_b,
+        option_c: values.option_c,
+        option_d: values.option_d,
+        correct_answer: values.correct_answer,
+        explanation_id: currentExplanationId,
+        difficulty: values.difficulty || null,
+        is_trial_mcq: values.is_trial_mcq,
+      }).eq('id', values.id);
+      if (mcqError) throw mcqError;
 
-      if (mcqError) {
-        throw mcqError;
-      }
-
-      // Handle mcq_category_links
-      // First, delete all existing links for this MCQ
-      const { error: deleteLinksError } = await supabase
-        .from('mcq_category_links')
-        .delete()
-        .eq('mcq_id', values.id);
-
-      if (deleteLinksError) {
-        console.error("Error deleting existing category links:", deleteLinksError);
-        // Don't throw, try to proceed with inserting new ones
-      }
-
-      // Then, insert new links if category_ids are provided
+      await supabase.from('mcq_category_links').delete().eq('mcq_id', values.id);
       if (values.category_ids && values.category_ids.length > 0) {
-        const linksToInsert = values.category_ids.map(catId => ({
-          mcq_id: values.id,
-          category_id: catId,
-        }));
-
-        if (linksToInsert.length > 0) {
-          const { error: insertLinkError } = await supabase
-            .from('mcq_category_links')
-            .insert(linksToInsert);
-
-          if (insertLinkError) {
-            console.error("Error inserting new category links:", insertLinkError);
-            throw insertLinkError;
-          }
-        }
+        const linksToInsert = values.category_ids.map(catId => ({ mcq_id: values.id, category_id: catId }));
+        const { error } = await supabase.from('mcq_category_links').insert(linksToInsert);
+        if (error) throw error;
       }
 
-      toast({
-        title: "Success!",
-        description: "MCQ updated successfully.",
-      });
-      onSave(); // Refresh data in parent component
-      onOpenChange(false); // Close dialog
+      await supabase.from('mcq_topic_links').delete().eq('mcq_id', values.id);
+      if (values.topic_id) {
+        const { error } = await supabase.from('mcq_topic_links').insert({ mcq_id: values.id, topic_id: values.topic_id });
+        if (error) throw error;
+      }
+
+      toast({ title: "Success!", description: "MCQ updated successfully." });
+      onSave();
+      onOpenChange(false);
     } catch (error: any) {
       console.error("Error updating MCQ:", error);
-      toast({
-        title: "Error",
-        description: `Failed to update MCQ: ${error.message || 'Unknown error'}`,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: `Failed to update MCQ: ${error.message || 'Unknown error'}`, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -300,183 +224,22 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit MCQ</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Edit MCQ</DialogTitle></DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
-            <FormField
-              control={form.control}
-              name="question_text"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Question Text</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Enter the question text" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {['a', 'b', 'c', 'd'].map((optionKey) => (
-              <FormField
-                key={optionKey}
-                control={form.control}
-                name={`option_${optionKey}` as 'option_a' | 'option_b' | 'option_c' | 'option_d'}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{`Option ${optionKey.toUpperCase()}`}</FormLabel>
-                    <FormControl>
-                      <Input placeholder={`Enter option ${optionKey.toUpperCase()}`} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            ))}
-
-            <FormField
-              control={form.control}
-              name="correct_answer"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>Correct Answer (AI will override this if used)</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      className="flex flex-col space-y-1"
-                    >
-                      {['A', 'B', 'C', 'D'].map((val) => (
-                        <FormItem key={val} className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value={val} />
-                          </FormControl>
-                          <FormLabel className="font-normal">{val}</FormLabel>
-                        </FormItem>
-                      ))}
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <Button
-              type="button"
-              onClick={handleGenerateWithAI}
-              disabled={isGeneratingAI || isSubmitting}
-              className="w-full flex items-center gap-2"
-            >
-              {isGeneratingAI ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Generating...
-                </>
-              ) : (
-                <>
-                  <Wand2 className="h-4 w-4" /> Generate with AI
-                </>
-              )}
-            </Button>
-
-            <FormField
-              control={form.control}
-              name="explanation_text"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Explanation Text</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Provide a detailed explanation for the correct answer" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="image_url"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Explanation Image URL (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., https://example.com/image.jpg" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="category_ids"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Categories (Optional)</FormLabel>
-                  <FormControl>
-                    <MultiSelect
-                      options={categories.map(cat => ({ value: cat.id, label: cat.name }))}
-                      selectedValues={field.value || []}
-                      onValueChange={field.onChange}
-                      placeholder="Select categories"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="difficulty"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Difficulty (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ''}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select difficulty" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Easy">Easy</SelectItem>
-                      <SelectItem value="Medium">Medium</SelectItem>
-                      <SelectItem value="Hard">Hard</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="is_trial_mcq"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">Mark as Trial MCQ</FormLabel>
-                    <FormDescription>
-                      If enabled, this MCQ will be available to users on a free trial.
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      aria-label="Mark as trial MCQ"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
+            <FormField control={form.control} name="question_text" render={({ field }) => (<FormItem><FormLabel>Question Text</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
+            {['a', 'b', 'c', 'd'].map(key => (<FormField key={key} control={form.control} name={`option_${key}` as any} render={({ field }) => (<FormItem><FormLabel>{`Option ${key.toUpperCase()}`}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />))}
+            <FormField control={form.control} name="correct_answer" render={({ field }) => (<FormItem><FormLabel>Correct Answer</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col space-y-1">{['A', 'B', 'C', 'D'].map(val => (<FormItem key={val} className="flex items-center space-x-3 space-y-0"><FormControl><RadioGroupItem value={val} /></FormControl><FormLabel className="font-normal">{val}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem>)} />
+            <Button type="button" onClick={handleGenerateWithAI} disabled={isGeneratingAI || isSubmitting} className="w-full flex items-center gap-2">{isGeneratingAI ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</> : <><Wand2 className="h-4 w-4" /> Generate with AI</>}</Button>
+            <FormField control={form.control} name="explanation_text" render={({ field }) => (<FormItem><FormLabel>Explanation Text</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="image_url" render={({ field }) => (<FormItem><FormLabel>Image URL</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="category_ids" render={({ field }) => (<FormItem><FormLabel>Categories</FormLabel><FormControl><MultiSelect options={categories.map(c => ({ value: c.id, label: c.name }))} selectedValues={field.value || []} onValueChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="topic_id" render={({ field }) => (<FormItem><FormLabel>Topic (Optional)</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger><SelectValue placeholder="Select a topic to link" /></SelectTrigger></FormControl><SelectContent><SelectItem value="">None</SelectItem>{topics.map(t => (<SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="difficulty" render={({ field }) => (<FormItem><FormLabel>Difficulty</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger><SelectValue placeholder="Select difficulty" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Easy">Easy</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="Hard">Hard</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="is_trial_mcq" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-4"><div className="space-y-0.5"><FormLabel>Trial MCQ</FormLabel><FormDescription>Available to users on a free trial.</FormDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
             <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)} type="button">Cancel</Button>
-              <Button type="submit" disabled={isSubmitting || isGeneratingAI}>
-                {isSubmitting ? "Saving..." : "Save Changes"}
-              </Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button type="submit" disabled={isSubmitting || isGeneratingAI}>{isSubmitting ? "Saving..." : "Save Changes"}</Button>
             </DialogFooter>
           </form>
         </Form>

@@ -1,7 +1,7 @@
 // @ts-ignore
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
-import OpenAI from 'https://esm.sh/openai@4.52.0'; // Using a specific version for stability
+import OpenAI from 'https://esm.sh/openai@4.52.0?target=deno'; // Using a specific version for stability
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

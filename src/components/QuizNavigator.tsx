@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, SkipForward } from "lucide-react"; // Import SkipForward
 import { cn } from "@/lib/utils"; // Import cn utility
+import { MCQ } from '@/components/mcq-columns'; // Import the correct MCQ type
 
 // New interface for userAnswers map value, matching QuizPage
 interface UserAnswerData {
@@ -10,26 +11,6 @@ interface UserAnswerData {
   isCorrect: boolean | null;
   submitted: boolean;
 }
-
-export type McqCategoryLink = {
-  category_id: string;
-  category_name: string; // For display
-};
-
-export type MCQ = {
-  id: string;
-  question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct_answer: 'A' | 'B' | 'C' | 'D';
-  explanation_id: string | null;
-  difficulty: string | null;
-  is_trial_mcq: boolean | null;
-  // New: Array of category links
-  category_links: McqCategoryLink[];
-};
 
 interface QuizNavigatorProps {
   mcqs: MCQ[];

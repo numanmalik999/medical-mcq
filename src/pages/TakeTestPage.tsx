@@ -13,7 +13,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { TimerIcon, Pause, Play, SkipForward, Save, Bookmark, BookmarkCheck, ArrowLeft } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { McqCategoryLink } from '@/components/mcq-columns'; // Import McqCategoryLink
+import { MCQ } from '@/components/mcq-columns'; // Import McqCategoryLink and MCQ
 import { Input } from '@/components/ui/input'; // Import Input for number of MCQs and duration
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'; // Added DialogDescription
 import QuizNavigator from '@/components/QuizNavigator'; // Import QuizNavigator
@@ -21,20 +21,6 @@ import { useBookmark } from '@/hooks/use-bookmark'; // Import useBookmark hook
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
-
-interface MCQ {
-  id: string;
-  question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct_answer: 'A' | 'B' | 'C' | 'D';
-  explanation_id: string | null;
-  difficulty: string | null; // Ensure difficulty is here
-  is_trial_mcq: boolean | null;
-  category_links: McqCategoryLink[]; // Add category_links to MCQ interface
-}
 
 interface MCQExplanation {
   id: string;
@@ -382,7 +368,7 @@ const TakeTestPage = () => {
               id,
               question_text: 'Loading...', // Placeholder
               option_a: '', option_b: '', option_c: '', option_d: '',
-              correct_answer: 'A', explanation_id: null, difficulty: null, is_trial_mcq: null, category_links: [],
+              correct_answer: 'A', explanation_id: null, difficulty: null, is_trial_mcq: null, category_links: [], topic_links: [],
             })),
             userAnswers: new Map(Object.entries(dbSession.user_answers_json)),
             currentQuestionIndex: dbSession.current_question_index,

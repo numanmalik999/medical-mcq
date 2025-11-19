@@ -179,7 +179,7 @@ const EditCourseTopicDialog = ({ open, onOpenChange, courseId, topic, onSave }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{topic ? 'Edit Course Topic' : 'Add New Course Topic'}</DialogTitle>
+          <DialogTitle>{topic ? 'Edit Topic' : 'Add New Topic'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
@@ -223,7 +223,7 @@ const EditCourseTopicDialog = ({ open, onOpenChange, courseId, topic, onSave }: 
                 </>
               ) : (
                 <>
-                  <Wand2 className="h-4 w-4" /> Generate with AI
+                  <Wand2 className="h-4 w-4" /> Generate Content with AI
                 </>
               )}
             </Button>
@@ -233,9 +233,9 @@ const EditCourseTopicDialog = ({ open, onOpenChange, courseId, topic, onSave }: 
               name="content"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Content</FormLabel>
+                  <FormLabel>Content (JSON format)</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Detailed content for the topic (supports basic HTML/Markdown)" rows={15} {...field} />
+                    <Textarea placeholder="Detailed content for the topic (will be populated by AI in JSON format)" rows={15} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

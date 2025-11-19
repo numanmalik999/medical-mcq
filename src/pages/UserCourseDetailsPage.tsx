@@ -9,7 +9,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { useParams, Link } from 'react-router-dom';
 import { Accordion, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { ArrowLeft, BookOpenText } from 'lucide-react'; // Added BookOpenText icon
+import { ArrowLeft, BookOpenText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -19,7 +19,7 @@ interface Course {
   id: string;
   title: string;
   description: string | null;
-  image_url: string | null; // Added image_url
+  image_url: string | null;
 }
 
 interface CourseTopic {
@@ -30,6 +30,17 @@ interface CourseTopic {
   order: number;
 }
 
+interface StructuredTopicContent {
+  title: string;
+  definition: string;
+  main_causes: string;
+  symptoms: string;
+  diagnostic_tests: string;
+  diagnostic_criteria: string;
+  treatment_management: string;
+  youtube_embed_code: string;
+}
+
 const UserCourseDetailsPage = () => {
   const { hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
@@ -38,9 +49,9 @@ const UserCourseDetailsPage = () => {
   const [topics, setTopics] = useState<CourseTopic[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
 
-  // State for the topic dialog
   const [isTopicDialogOpen, setIsTopicDialogOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<CourseTopic | null>(null);
+  const [selectedTopicContent, setSelectedTopicContent] = useState<StructuredTopicContent | null>(null);
 
   useEffect(() => {
     if (hasCheckedInitialSession && courseId) {
@@ -50,7 +61,6 @@ const UserCourseDetailsPage = () => {
 
   const fetchCourseDetailsAndTopics = async () => {
     setIsPageLoading(true);
-    // Fetch course details
     const { data: courseData, error: courseError } = await supabase
       .from('courses')
       .select('*')
@@ -65,7 +75,6 @@ const UserCourseDetailsPage = () => {
       setCourse(courseData);
     }
 
-    // Fetch topics for the course
     const { data: topicsData, error: topicsError } = await supabase
       .from('course_topics')
       .select('*')
@@ -84,6 +93,21 @@ const UserCourseDetailsPage = () => {
 
   const handleTopicClick = (topic: CourseTopic) => {
     setSelectedTopic(topic);
+    try {
+      if (topic.content) {
+        const parsedContent = JSON.parse(topic.content);
+        if (parsedContent.definition && parsedContent.youtube_embed_code) {
+          setSelectedTopicContent(parsedContent);
+        } else {
+          setSelectedTopicContent(null);
+        }
+      } else {
+        setSelectedTopicContent(null);
+      }
+    } catch (e) {
+      setSelectedTopicContent(null);
+      console.warn("Could not parse topic content as JSON, falling back to markdown rendering.");
+    }
     setIsTopicDialogOpen(true);
   };
 
@@ -169,7 +193,6 @@ const UserCourseDetailsPage = () => {
                       {topic.order}. {topic.title}
                     </span>
                   </AccordionTrigger>
-                  {/* AccordionContent is intentionally empty as content is shown in dialog */}
                 </AccordionItem>
               ))}
             </Accordion>
@@ -179,7 +202,6 @@ const UserCourseDetailsPage = () => {
 
       <MadeWithDyad />
 
-      {/* Topic Details Dialog */}
       <Dialog open={isTopicDialogOpen} onOpenChange={setIsTopicDialogOpen}>
         <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -189,7 +211,20 @@ const UserCourseDetailsPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 prose dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-primary hover:prose-a:underline">
-            {selectedTopic?.content ? (
+            {selectedTopicContent ? (
+              <div>
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.title || ''}</ReactMarkdown>
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.definition || ''}</ReactMarkdown>
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.main_causes || ''}</ReactMarkdown>
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.symptoms || ''}</ReactMarkdown>
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.diagnostic_tests || ''}</ReactMarkdown>
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.diagnostic_criteria || ''}</ReactMarkdown>
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.treatment_management || ''}</ReactMarkdown>
+                {selectedTopicContent.youtube_embed_code && (
+                  <div className="aspect-video mt-6" dangerouslySetInnerHTML={{ __html: selectedTopicContent.youtube_embed_code }} />
+                )}
+              </div>
+            ) : selectedTopic?.content ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{selectedTopic.content}</ReactMarkdown>
             ) : (
               <p className="text-muted-foreground">No content available for this topic.</p>

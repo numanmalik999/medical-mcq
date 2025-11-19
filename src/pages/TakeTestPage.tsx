@@ -562,6 +562,10 @@ const TakeTestPage = () => {
         mcq_category_links (
           category_id,
           categories (name)
+        ),
+        mcq_topic_links (
+          topic_id,
+          course_topics (title)
         )
       `);
 
@@ -593,6 +597,10 @@ const TakeTestPage = () => {
       category_links: mcq.mcq_category_links.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
+      })),
+      topic_links: mcq.mcq_topic_links.map((link: any) => ({
+        topic_id: link.topic_id,
+        topic_title: link.course_topics?.title || null,
       })),
     }));
 
@@ -675,6 +683,10 @@ const TakeTestPage = () => {
         mcq_category_links (
           category_id,
           categories (name)
+        ),
+        mcq_topic_links (
+          topic_id,
+          course_topics (title)
         )
       `)
       .in('id', loadedSession.mcqs.map(m => m.id)) // Use the IDs from the placeholder MCQs
@@ -692,6 +704,10 @@ const TakeTestPage = () => {
       category_links: mcq.mcq_category_links.map((link: any) => ({
         category_id: link.category_id,
         category_name: link.categories?.name || null,
+      })),
+      topic_links: mcq.mcq_topic_links.map((link: any) => ({
+        topic_id: link.topic_id,
+        topic_title: link.course_topics?.title || null,
       })),
     }));
 

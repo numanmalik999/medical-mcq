@@ -14,7 +14,7 @@ interface StructuredTopicContent {
   diagnostic_tests: string;
   diagnostic_criteria: string;
   treatment_management: string;
-  youtube_embed_code: string;
+  youtube_video_id: string; // Changed from youtube_embed_code
 }
 
 interface TopicContentDialogProps {
@@ -23,7 +23,6 @@ interface TopicContentDialogProps {
   topicContent: StructuredTopicContent | null;
 }
 
-// Helper to ensure content is a string to prevent ReactMarkdown from crashing
 const safeStringify = (content: any): string => {
   if (typeof content === 'string') {
     return content;
@@ -31,7 +30,6 @@ const safeStringify = (content: any): string => {
   if (content === null || content === undefined) {
     return '';
   }
-  // If it's an object (which causes the crash), format it into a readable string.
   if (typeof content === 'object') {
     return Object.entries(content)
       .map(([key, value]) => `**${key.replace(/_/g, ' ')}:** ${value}`)
@@ -57,8 +55,18 @@ const TopicContentDialog = ({ open, onOpenChange, topicContent }: TopicContentDi
           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.diagnostic_tests)}</ReactMarkdown>
           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.diagnostic_criteria)}</ReactMarkdown>
           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.treatment_management)}</ReactMarkdown>
-          {topicContent.youtube_embed_code && (
-            <div className="aspect-video mt-6" dangerouslySetInnerHTML={{ __html: topicContent.youtube_embed_code }} />
+          {topicContent.youtube_video_id && (
+            <div className="aspect-video mt-6">
+              <iframe
+                width="100%"
+                height="100%"
+                src={`https://www.youtube.com/embed/${topicContent.youtube_video_id}`}
+                title="YouTube video player"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              ></iframe>
+            </div>
           )}
         </div>
         <DialogFooter>

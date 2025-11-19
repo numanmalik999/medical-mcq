@@ -27,11 +27,11 @@ The content must be structured into the following sections. For each section, pr
 4.  **Diagnostic Tests:** Key laboratory findings, imaging studies, and other relevant tests.
 5.  **Diagnostic Criteria:** The established criteria for diagnosis.
 6.  **Treatment/Management:** A comprehensive overview of the treatment strategy. Break this down into "Initial Management (Supportive Care)" and "Specific/Definitive Treatment" where applicable.
-7.  **YouTube Video Embed:** Find a relevant, high-quality educational video **on YouTube** from one of the following reputable channels: **Osmosis, Khan Academy Medicine, Armando Hasudungan, or Ninja Nerd**. Provide the full HTML \`<iframe>\` embed code for this video. The \`src\` attribute must use the \`https://www.youtube.com/embed/VIDEO_ID\` format. The iframe should be responsive (\`width="100%"\`).
+7.  **YouTube Video ID:** Find a relevant, high-quality educational video **on YouTube** from one of the following reputable channels: **Osmosis, Khan Academy Medicine, Armando Hasudungan, or Ninja Nerd**. Provide ONLY the 11-character YouTube Video ID (e.g., 'dQw4w9WgXcQ'). If no suitable video is found, return an empty string.
 
 **Topic:** ${topicTitle}
 
-The entire output MUST be a single, valid JSON object with the following keys: \`title\`, \`definition\`, \`main_causes\`, \`symptoms\`, \`diagnostic_tests\`, \`diagnostic_criteria\`, \`treatment_management\`, and \`youtube_embed_code\`.
+The entire output MUST be a single, valid JSON object with the following keys: \`title\`, \`definition\`, \`main_causes\`, \`symptoms\`, \`diagnostic_tests\`, \`diagnostic_criteria\`, \`treatment_management\`, and \`youtube_video_id\`.
 
 Do not include any introductory text, markdown code blocks (like \`\`\`json), or any other text outside of this JSON object.`;
 

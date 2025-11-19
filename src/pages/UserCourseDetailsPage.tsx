@@ -34,7 +34,7 @@ interface StructuredTopicContent {
   diagnostic_tests: string;
   diagnostic_criteria: string;
   treatment_management: string;
-  youtube_embed_code: string;
+  youtube_video_id: string;
 }
 
 const UserCourseDetailsPage = () => {
@@ -111,7 +111,7 @@ const UserCourseDetailsPage = () => {
           diagnostic_tests: '',
           diagnostic_criteria: '',
           treatment_management: '',
-          youtube_embed_code: ''
+          youtube_video_id: ''
         };
       }
     }
@@ -125,7 +125,7 @@ const UserCourseDetailsPage = () => {
         diagnostic_tests: '',
         diagnostic_criteria: '',
         treatment_management: '',
-        youtube_embed_code: ''
+        youtube_video_id: ''
       };
     }
 

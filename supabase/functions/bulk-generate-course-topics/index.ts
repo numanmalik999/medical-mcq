@@ -26,9 +26,9 @@ The content must be structured into sections using HTML tags (<h2>, <p>, <ul>, <
 4.  **Diagnostic Tests:** Relevant labs and imaging.
 5.  **Diagnostic Criteria:** Established criteria.
 6.  **Treatment/Management:** Overview of treatment strategy.
-7.  **YouTube Video Embed:** Provide a full HTML <iframe> embed code for a relevant educational video from Osmosis, Khan Academy Medicine, Armando Hasudungan, or Ninja Nerd. Use the youtube.com/embed/ format.
+7.  **YouTube Video ID:** Provide ONLY the 11-character YouTube Video ID for a relevant educational video from Osmosis, Khan Academy Medicine, Armando Hasudungan, or Ninja Nerd. If none, return an empty string.
 
-The entire output MUST be a single, valid JSON object with keys: \`title\`, \`definition\`, \`main_causes\`, \`symptoms\`, \`diagnostic_tests\`, \`diagnostic_criteria\`, \`treatment_management\`, and \`youtube_embed_code\`. Do not add any text outside this JSON object.`;
+The entire output MUST be a single, valid JSON object with keys: \`title\`, \`definition\`, \`main_causes\`, \`symptoms\`, \`diagnostic_tests\`, \`diagnostic_criteria\`, \`treatment_management\`, and \`youtube_video_id\`. Do not add any text outside this JSON object.`;
 
   const chatCompletion = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",

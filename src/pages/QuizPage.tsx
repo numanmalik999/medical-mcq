@@ -37,7 +37,7 @@ interface StructuredTopicContent {
   diagnostic_tests: string;
   diagnostic_criteria: string;
   treatment_management: string;
-  youtube_embed_code: string;
+  youtube_video_id: string;
 }
 
 

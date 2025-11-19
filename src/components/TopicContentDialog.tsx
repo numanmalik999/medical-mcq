@@ -23,6 +23,23 @@ interface TopicContentDialogProps {
   topicContent: StructuredTopicContent | null;
 }
 
+// Helper to ensure content is a string to prevent ReactMarkdown from crashing
+const safeStringify = (content: any): string => {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (content === null || content === undefined) {
+    return '';
+  }
+  // If it's an object (which causes the crash), format it into a readable string.
+  if (typeof content === 'object') {
+    return Object.entries(content)
+      .map(([key, value]) => `**${key.replace(/_/g, ' ')}:** ${value}`)
+      .join('\n\n');
+  }
+  return String(content);
+};
+
 const TopicContentDialog = ({ open, onOpenChange, topicContent }: TopicContentDialogProps) => {
   if (!topicContent) return null;
 
@@ -34,12 +51,12 @@ const TopicContentDialog = ({ open, onOpenChange, topicContent }: TopicContentDi
           <DialogDescription>Detailed information on this topic.</DialogDescription>
         </DialogHeader>
         <div className="py-4 prose dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-primary hover:prose-a:underline">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{topicContent.definition || ''}</ReactMarkdown>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{topicContent.main_causes || ''}</ReactMarkdown>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{topicContent.symptoms || ''}</ReactMarkdown>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{topicContent.diagnostic_tests || ''}</ReactMarkdown>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{topicContent.diagnostic_criteria || ''}</ReactMarkdown>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{topicContent.treatment_management || ''}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.definition)}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.main_causes)}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.symptoms)}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.diagnostic_tests)}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.diagnostic_criteria)}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{safeStringify(topicContent.treatment_management)}</ReactMarkdown>
           {topicContent.youtube_embed_code && (
             <div className="aspect-video mt-6" dangerouslySetInnerHTML={{ __html: topicContent.youtube_embed_code }} />
           )}

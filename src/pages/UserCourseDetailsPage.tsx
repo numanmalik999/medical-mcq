@@ -10,10 +10,7 @@ import { useSession } from '@/components/SessionContextProvider';
 import { useParams, Link } from 'react-router-dom';
 import { Accordion, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ArrowLeft, BookOpenText } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import remarkGfm from 'remark-gfm';
+import TopicContentDialog from '@/components/TopicContentDialog';
 
 interface Course {
   id: string;
@@ -50,7 +47,6 @@ const UserCourseDetailsPage = () => {
   const [isPageLoading, setIsPageLoading] = useState(true);
 
   const [isTopicDialogOpen, setIsTopicDialogOpen] = useState(false);
-  const [selectedTopic, setSelectedTopic] = useState<CourseTopic | null>(null);
   const [selectedTopicContent, setSelectedTopicContent] = useState<StructuredTopicContent | null>(null);
 
   useEffect(() => {
@@ -92,22 +88,32 @@ const UserCourseDetailsPage = () => {
   };
 
   const handleTopicClick = (topic: CourseTopic) => {
-    setSelectedTopic(topic);
+    let content: StructuredTopicContent | null = null;
     try {
       if (topic.content) {
-        const parsedContent = JSON.parse(topic.content);
-        if (parsedContent.definition && parsedContent.youtube_embed_code) {
-          setSelectedTopicContent(parsedContent);
+        const parsed = JSON.parse(topic.content);
+        if (typeof parsed === 'object' && parsed !== null && (parsed.definition || parsed.title)) {
+          content = parsed;
         } else {
-          setSelectedTopicContent(null);
+          throw new Error("Content is not a structured JSON object.");
         }
-      } else {
-        setSelectedTopicContent(null);
       }
     } catch (e) {
-      setSelectedTopicContent(null);
-      console.warn("Could not parse topic content as JSON, falling back to markdown rendering.");
+      console.warn("Could not parse topic content as JSON. Displaying as raw text.", e);
+      if (topic.content) {
+        content = {
+          title: `<h2>${topic.title}</h2>`,
+          definition: `<p>${topic.content.replace(/\n/g, '<br />')}</p>`,
+          main_causes: '',
+          symptoms: '',
+          diagnostic_tests: '',
+          diagnostic_criteria: '',
+          treatment_management: '',
+          youtube_embed_code: ''
+        };
+      }
     }
+    setSelectedTopicContent(content);
     setIsTopicDialogOpen(true);
   };
 
@@ -202,39 +208,11 @@ const UserCourseDetailsPage = () => {
 
       <MadeWithDyad />
 
-      <Dialog open={isTopicDialogOpen} onOpenChange={setIsTopicDialogOpen}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedTopic?.title}</DialogTitle>
-            <DialogDescription>
-              Topic {selectedTopic?.order} of {course?.title}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 prose dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-primary hover:prose-a:underline">
-            {selectedTopicContent ? (
-              <div>
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.title || ''}</ReactMarkdown>
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.definition || ''}</ReactMarkdown>
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.main_causes || ''}</ReactMarkdown>
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.symptoms || ''}</ReactMarkdown>
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.diagnostic_tests || ''}</ReactMarkdown>
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.diagnostic_criteria || ''}</ReactMarkdown>
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{selectedTopicContent.treatment_management || ''}</ReactMarkdown>
-                {selectedTopicContent.youtube_embed_code && (
-                  <div className="aspect-video mt-6" dangerouslySetInnerHTML={{ __html: selectedTopicContent.youtube_embed_code }} />
-                )}
-              </div>
-            ) : selectedTopic?.content ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{selectedTopic.content}</ReactMarkdown>
-            ) : (
-              <p className="text-muted-foreground">No content available for this topic.</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setIsTopicDialogOpen(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TopicContentDialog
+        open={isTopicDialogOpen}
+        onOpenChange={setIsTopicDialogOpen}
+        topicContent={selectedTopicContent}
+      />
     </div>
   );
 };

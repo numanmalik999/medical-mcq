@@ -92,7 +92,6 @@ const UserCourseDetailsPage = () => {
       if (topic.content) {
         const parsed = JSON.parse(topic.content);
         if (typeof parsed === 'object' && parsed !== null && (parsed.definition || parsed.title)) {
-          // Safeguard: Ensure title is a string, fallback to topic title if not.
           if (typeof parsed.title !== 'string') {
             parsed.title = topic.title;
           }
@@ -104,9 +103,8 @@ const UserCourseDetailsPage = () => {
     } catch (e) {
       console.warn("Could not parse topic content as JSON. Displaying as raw text.", e);
       if (topic.content) {
-        // Fallback for non-JSON content
         content = {
-          title: topic.title, // Use the plain topic title
+          title: topic.title,
           definition: `<p>${topic.content.replace(/\n/g, '<br />')}</p>`,
           main_causes: '',
           symptoms: '',
@@ -117,6 +115,20 @@ const UserCourseDetailsPage = () => {
         };
       }
     }
+
+    if (!content) {
+      content = {
+        title: topic.title,
+        definition: '<p>No content available for this topic yet.</p>',
+        main_causes: '',
+        symptoms: '',
+        diagnostic_tests: '',
+        diagnostic_criteria: '',
+        treatment_management: '',
+        youtube_embed_code: ''
+      };
+    }
+
     setSelectedTopicContent(content);
     setIsTopicDialogOpen(true);
   };
@@ -192,7 +204,7 @@ const UserCourseDetailsPage = () => {
             <p className="text-center text-muted-foreground">No topics available for this course yet.</p>
           ) : (
             <div className="space-y-2">
-              {topics.map((topic) => (
+              {topics.map((topic, index) => (
                 <Button
                   key={topic.id}
                   type="button"
@@ -202,7 +214,7 @@ const UserCourseDetailsPage = () => {
                 >
                   <span className="flex items-center gap-3">
                     <BookOpenText className="h-5 w-5 text-primary" />
-                    {topic.order}. {topic.title}
+                    {index + 1}. {topic.title}
                   </span>
                 </Button>
               ))}

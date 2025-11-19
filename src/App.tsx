@@ -9,6 +9,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import QuizPage from "./pages/QuizPage";
+import QuizRunPage from "./pages/QuizRunPage";
 import AddMcqPage from "./pages/AddMcqPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ManageMcqsPage from "./pages/ManageMcqsPage";
@@ -73,6 +74,7 @@ const AppContent = () => {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/quiz" element={<QuizPage />} />
+            <Route path="/quiz/run" element={<QuizRunPage />} />
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/quiz-of-the-day" element={<QuestionOfTheDayPage />} />
             <Route path="/reset-password" element={<PasswordResetPage />} />

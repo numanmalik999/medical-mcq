@@ -23,11 +23,6 @@ interface Category {
   name: string;
 }
 
-interface Topic {
-  id: string;
-  title: string;
-}
-
 interface EditMcqDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,7 +42,6 @@ const formSchema = z.object({
   explanation_text: z.string().min(1, "Explanation text is required."),
   image_url: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
   category_ids: z.array(z.string().uuid("Invalid category ID.")).optional(),
-  topic_id: z.string().uuid().optional().or(z.literal('')),
   difficulty: z.string().optional().or(z.literal('')),
   is_trial_mcq: z.boolean().optional(),
 });
@@ -57,7 +51,6 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [topics, setTopics] = useState<Topic[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -71,7 +64,6 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
       explanation_text: "",
       image_url: "",
       category_ids: [],
-      topic_id: "",
       difficulty: "",
       is_trial_mcq: false,
     },
@@ -85,14 +77,6 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
         toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
       } else {
         setCategories(categoriesData || []);
-      }
-
-      const { data: topicsData, error: topicsError } = await supabase.from('course_topics').select('id, title');
-      if (topicsError) {
-        console.error('Error fetching topics:', topicsError);
-        toast({ title: "Error", description: "Failed to load topics.", variant: "destructive" });
-      } else {
-        setTopics(topicsData || []);
       }
     };
     fetchData();
@@ -121,7 +105,6 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
         }
 
         const initialCategoryIds = mcq.category_links?.map(link => link.category_id).filter((id): id is string => id !== null) || [];
-        const initialTopicId = mcq.topic_links?.[0]?.topic_id || "";
 
         form.reset({
           id: mcq.id,
@@ -135,7 +118,6 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
           explanation_text: explanationText,
           image_url: imageUrl,
           category_ids: initialCategoryIds,
-          topic_id: initialTopicId,
           difficulty: mcq.difficulty || "",
           is_trial_mcq: mcq.is_trial_mcq || false,
         });
@@ -204,12 +186,6 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
         if (error) throw error;
       }
 
-      await supabase.from('mcq_topic_links').delete().eq('mcq_id', values.id);
-      if (values.topic_id) {
-        const { error } = await supabase.from('mcq_topic_links').insert({ mcq_id: values.id, topic_id: values.topic_id });
-        if (error) throw error;
-      }
-
       toast({ title: "Success!", description: "MCQ updated successfully." });
       onSave();
       onOpenChange(false);
@@ -234,27 +210,6 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
             <FormField control={form.control} name="explanation_text" render={({ field }) => (<FormItem><FormLabel>Explanation Text</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="image_url" render={({ field }) => (<FormItem><FormLabel>Image URL</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="category_ids" render={({ field }) => (<FormItem><FormLabel>Categories</FormLabel><FormControl><MultiSelect options={categories.map(c => ({ value: c.id, label: c.name }))} selectedValues={field.value || []} onValueChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField
-              control={form.control}
-              name="topic_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Topic (Optional)</FormLabel>
-                  <Select onValueChange={(value) => field.onChange(value === 'no-topic' ? '' : value)} value={field.value ? field.value : 'no-topic'}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a topic to link" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="no-topic">None</SelectItem>
-                      {topics.map(t => (<SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField control={form.control} name="difficulty" render={({ field }) => (<FormItem><FormLabel>Difficulty</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger><SelectValue placeholder="Select difficulty" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Easy">Easy</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="Hard">Hard</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="is_trial_mcq" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-4"><div className="space-y-0.5"><FormLabel>Trial MCQ</FormLabel><FormDescription>Available to users on a free trial.</FormDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
             <DialogFooter>

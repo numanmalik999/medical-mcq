@@ -294,7 +294,7 @@ const TakeTestPage = () => {
             dbSessionId: dbSession.id,
             categoryIds: dbSession.category_id ? [dbSession.category_id] : [],
             categoryNames: [categoryName],
-            mcqs: dbSession.mcq_ids_order.map(id => ({ id, question_text: 'Loading...', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: 'A', explanation_id: null, difficulty: null, is_trial_mcq: null, category_links: [], topic_links: [] })),
+            mcqs: dbSession.mcq_ids_order.map(id => ({ id, question_text: 'Loading...', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: 'A', explanation_id: null, difficulty: null, is_trial_mcq: null, category_links: [] })),
             userAnswers: new Map(Object.entries(dbSession.user_answers_json)),
             currentQuestionIndex: dbSession.current_question_index,
             testDurationSeconds: dbSession.test_duration_seconds || 0,
@@ -384,7 +384,7 @@ const TakeTestPage = () => {
       setIsPageLoading(false);
       return;
     }
-    let query = supabase.from('mcqs').select(`*, mcq_category_links(category_id, categories(name)), mcq_topic_links(topic_id, course_topics(title))`);
+    let query = supabase.from('mcqs').select(`*, mcq_category_links(category_id, categories(name))`);
     if (mcqIdsToFilter) query = query.in('id', mcqIdsToFilter);
     if (selectedDifficulty && selectedDifficulty !== "all") query = query.eq('difficulty', selectedDifficulty);
     const { data, error } = await query.limit(5000);
@@ -393,7 +393,7 @@ const TakeTestPage = () => {
       setIsPageLoading(false);
       return;
     }
-    const formattedMcqs: MCQ[] = data.map((mcq: any) => ({ ...mcq, category_links: mcq.mcq_category_links.map((l: any) => ({ category_id: l.category_id, category_name: l.categories?.name || null })), topic_links: mcq.mcq_topic_links.map((l: any) => ({ topic_id: l.topic_id, topic_title: l.course_topics?.title || null })) }));
+    const formattedMcqs: MCQ[] = data.map((mcq: any) => ({ ...mcq, category_links: mcq.mcq_category_links.map((l: any) => ({ category_id: l.category_id, category_name: l.categories?.name || null })) }));
     const selectedMcqs = formattedMcqs.sort(() => 0.5 - Math.random()).slice(0, numMcqsToSelect);
     if (selectedMcqs.length === 0) {
       toast({ title: "No MCQs", description: "No MCQs could be selected. Please adjust criteria.", variant: "default" });
@@ -429,13 +429,13 @@ const TakeTestPage = () => {
     setSelectedCategoryIds(loadedSession.categoryIds);
     setNumMcqsToSelect(loadedSession.mcqs.length);
     setTestDurationMinutes(loadedSession.testDurationSeconds / 60);
-    const { data, error } = await supabase.from('mcqs').select(`*, mcq_category_links(category_id, categories(name)), mcq_topic_links(topic_id, course_topics(title))`).in('id', loadedSession.mcqs.map(m => m.id)).order('created_at', { ascending: true });
+    const { data, error } = await supabase.from('mcqs').select(`*, mcq_category_links(category_id, categories(name))`).in('id', loadedSession.mcqs.map(m => m.id)).order('created_at', { ascending: true });
     if (error) {
       toast({ title: "Error", description: "Failed to load test questions for saved session.", variant: "destructive" });
       setIsPageLoading(false);
       return;
     }
-    const formattedMcqs: MCQ[] = data.map((mcq: any) => ({ ...mcq, category_links: mcq.mcq_category_links.map((l: any) => ({ category_id: l.category_id, category_name: l.categories?.name || null })), topic_links: mcq.mcq_topic_links.map((l: any) => ({ topic_id: l.topic_id, topic_title: l.course_topics?.title || null })) }));
+    const formattedMcqs: MCQ[] = data.map((mcq: any) => ({ ...mcq, category_links: mcq.mcq_category_links.map((l: any) => ({ category_id: l.category_id, category_name: l.categories?.name || null })) }));
     const orderedMcqs = loadedSession.mcqs.map(lm => formattedMcqs.find(fm => fm.id === lm.id)).filter((m): m is MCQ => m !== undefined);
     setMcqs(orderedMcqs);
     setUserAnswers(loadedSession.userAnswers);

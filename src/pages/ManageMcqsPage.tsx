@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Wand2, Loader2, Link2 } from 'lucide-react';
+import { Wand2, Loader2 } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
 import { RowSelectionState } from '@tanstack/react-table';
 
@@ -39,7 +39,6 @@ const ManageMcqsPage = () => {
   
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [isEnhancing, setIsEnhancing] = useState(false);
-  const [isLinking, setIsLinking] = useState(false); // New state for linking
 
   const { hasCheckedInitialSession } = useSession();
 
@@ -63,8 +62,7 @@ const ManageMcqsPage = () => {
     setIsPageLoading(true);
     let mcqsQuery = supabase.from('mcqs').select(`
       *,
-      mcq_category_links (category_id, categories (name)),
-      mcq_topic_links (topic_id, course_topics (title))
+      mcq_category_links (category_id, categories (name))
     `);
 
     if (searchTerm) {
@@ -83,10 +81,6 @@ const ManageMcqsPage = () => {
         category_links: mcq.mcq_category_links.map((link: any) => ({
           category_id: link.category_id,
           category_name: link.categories?.name || null,
-        })),
-        topic_links: mcq.mcq_topic_links.map((link: any) => ({
-          topic_id: link.topic_id,
-          topic_title: link.course_topics?.title || null,
         })),
       }));
       setRawMcqs(displayMcqs);
@@ -123,8 +117,8 @@ const ManageMcqsPage = () => {
   }, [rawMcqs, selectedFilterCategory]);
 
   const handleBulkAction = async (
-    action: 'enhance' | 'link',
-    functionName: 'bulk-enhance-mcqs' | 'bulk-link-mcqs-to-topics',
+    action: 'enhance',
+    functionName: 'bulk-enhance-mcqs',
     confirmMessage: string,
     successMessage: string
   ) => {
@@ -138,7 +132,6 @@ const ManageMcqsPage = () => {
     if (!window.confirm(confirmMessage.replace('{count}', String(selectedMcqIds.length)))) return;
 
     if (action === 'enhance') setIsEnhancing(true);
-    if (action === 'link') setIsLinking(true);
 
     try {
       const { data, error } = await supabase.functions.invoke(functionName, {
@@ -155,7 +148,6 @@ const ManageMcqsPage = () => {
       toast({ title: "Error", description: `Failed to ${action} MCQs: ${error.message || 'Unknown error'}`, variant: "destructive" });
     } finally {
       if (action === 'enhance') setIsEnhancing(false);
-      if (action === 'link') setIsLinking(false);
       setRowSelection({});
       refreshAllData();
     }
@@ -165,7 +157,6 @@ const ManageMcqsPage = () => {
     if (!window.confirm("Are you sure you want to delete this MCQ?")) return;
     try {
       await supabase.from('mcq_category_links').delete().eq('mcq_id', mcqId);
-      await supabase.from('mcq_topic_links').delete().eq('mcq_id', mcqId);
       await supabase.from('mcqs').delete().eq('id', mcqId);
       if (explanationId) {
         await supabase.from('mcq_explanations').delete().eq('id', explanationId);
@@ -213,10 +204,6 @@ const ManageMcqsPage = () => {
             <Button onClick={() => handleBulkAction('enhance', 'bulk-enhance-mcqs', 'Enhance {count} MCQs with AI? This will overwrite existing data.', 'Enhanced')} disabled={isEnhancing || numSelected === 0}>
               {isEnhancing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
               Bulk Enhance with AI ({numSelected})
-            </Button>
-            <Button onClick={() => handleBulkAction('link', 'bulk-link-mcqs-to-topics', 'Auto-link {count} MCQs to topics with AI? This will overwrite existing topic links.', 'Auto-linked')} disabled={isLinking || numSelected === 0}>
-              {isLinking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}
-              AI Auto-Link Topics ({numSelected})
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">

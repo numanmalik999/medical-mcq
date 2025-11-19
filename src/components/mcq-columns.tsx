@@ -25,11 +25,6 @@ export type McqCategoryLink = {
   category_name: string;
 };
 
-export type McqTopicLink = {
-  topic_id: string;
-  topic_title: string | null;
-};
-
 export type MCQ = {
   id: string;
   question_text: string;
@@ -42,7 +37,6 @@ export type MCQ = {
   difficulty: string | null;
   is_trial_mcq: boolean | null;
   category_links: McqCategoryLink[];
-  topic_links: McqTopicLink[]; // New field for topic links
   
   explanation_text?: string;
   image_url?: string | null;
@@ -124,20 +118,6 @@ export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnD
           {categories.length > 0 ? categories.map((name, index) => (
             <Badge key={index} variant="secondary">{name}</Badge>
           )) : 'N/A'}
-        </div>
-      );
-    },
-  },
-  {
-    id: "topics", // New column for topics
-    header: "Linked Topic",
-    cell: ({ row }) => {
-      const topics = row.original.topic_links?.map(link => link.topic_title).filter(Boolean);
-      return (
-        <div className="w-[150px] flex flex-wrap gap-1">
-          {topics && topics.length > 0 ? topics.map((name, index) => (
-            <Badge key={index} variant="outline">{name}</Badge>
-          )) : <span className="text-muted-foreground">None</span>}
         </div>
       );
     },

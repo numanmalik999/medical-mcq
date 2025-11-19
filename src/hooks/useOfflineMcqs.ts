@@ -193,7 +193,6 @@ export const useOfflineMcqs = () => {
               explanation_text: explanation?.explanation_text || "No explanation available offline.",
               image_url: explanation?.image_url || null,
               category_ids_json: JSON.stringify(mcqCategoryMap.get(mcq.id) || []),
-              topic_links: [],
             });
           }
         }
@@ -297,7 +296,6 @@ export const useOfflineMcqs = () => {
         // Add explanation details directly to the object for easy access
         explanation_text: row.explanation_text,
         image_url: row.image_url,
-        topic_links: [],
       })) as MCQ[];
 
     } catch (e) {

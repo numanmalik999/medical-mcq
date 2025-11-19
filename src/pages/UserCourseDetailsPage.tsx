@@ -8,7 +8,6 @@ import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { useParams, Link } from 'react-router-dom';
-import { Accordion, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ArrowLeft, BookOpenText } from 'lucide-react';
 import TopicContentDialog from '@/components/TopicContentDialog';
 
@@ -192,21 +191,21 @@ const UserCourseDetailsPage = () => {
           {topics.length === 0 ? (
             <p className="text-center text-muted-foreground">No topics available for this course yet.</p>
           ) : (
-            <Accordion type="single" collapsible className="w-full">
+            <div className="space-y-2">
               {topics.map((topic) => (
-                <AccordionItem key={topic.id} value={topic.id} className="border-b border-border last:border-b-0">
-                  <AccordionTrigger
-                    className="flex items-center justify-between w-full p-4 text-left font-medium text-lg hover:bg-accent hover:text-accent-foreground transition-colors duration-200"
-                    onClick={() => handleTopicClick(topic)}
-                  >
-                    <span className="flex items-center gap-3">
-                      <BookOpenText className="h-5 w-5 text-primary" />
-                      {topic.order}. {topic.title}
-                    </span>
-                  </AccordionTrigger>
-                </AccordionItem>
+                <Button
+                  key={topic.id}
+                  variant="ghost"
+                  className="w-full justify-start p-4 h-auto text-left font-medium text-lg hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => handleTopicClick(topic)}
+                >
+                  <span className="flex items-center gap-3">
+                    <BookOpenText className="h-5 w-5 text-primary" />
+                    {topic.order}. {topic.title}
+                  </span>
+                </Button>
               ))}
-            </Accordion>
+            </div>
           )}
         </CardContent>
       </Card>

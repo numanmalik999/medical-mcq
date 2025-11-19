@@ -195,6 +195,7 @@ const UserCourseDetailsPage = () => {
               {topics.map((topic) => (
                 <Button
                   key={topic.id}
+                  type="button"
                   variant="ghost"
                   className="w-full justify-start p-4 h-auto text-left font-medium text-lg hover:bg-accent hover:text-accent-foreground"
                   onClick={() => handleTopicClick(topic)}

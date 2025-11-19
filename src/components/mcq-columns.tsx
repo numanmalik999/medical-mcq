@@ -20,10 +20,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// New type for a single MCQ-Category-Subcategory link
 export type McqCategoryLink = {
   category_id: string;
-  category_name: string; // For display
+  category_name: string;
+};
+
+export type McqTopicLink = {
+  topic_id: string;
+  topic_title: string | null;
 };
 
 export type MCQ = {
@@ -37,15 +41,13 @@ export type MCQ = {
   explanation_id: string | null;
   difficulty: string | null;
   is_trial_mcq: boolean | null;
-  // New: Array of category links
   category_links: McqCategoryLink[];
+  topic_links: McqTopicLink[]; // New field for topic links
   
-  // Optional fields used when loading from local SQLite database
   explanation_text?: string;
   image_url?: string | null;
 };
 
-// DisplayMCQ is now the same as MCQ as category_links contains display names
 type DisplayMCQ = MCQ;
 
 interface MCQColumnsProps {
@@ -113,7 +115,7 @@ export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnD
     header: "Correct",
   },
   {
-    id: "categories", // New ID for categories column
+    id: "categories",
     header: "Categories",
     cell: ({ row }) => {
       const categories = row.original.category_links.map(link => link.category_name).filter(Boolean);
@@ -127,7 +129,21 @@ export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnD
     },
   },
   {
-    accessorKey: "is_trial_mcq", // New column for trial status
+    id: "topics", // New column for topics
+    header: "Linked Topic",
+    cell: ({ row }) => {
+      const topics = row.original.topic_links?.map(link => link.topic_title).filter(Boolean);
+      return (
+        <div className="w-[150px] flex flex-wrap gap-1">
+          {topics && topics.length > 0 ? topics.map((name, index) => (
+            <Badge key={index} variant="outline">{name}</Badge>
+          )) : <span className="text-muted-foreground">None</span>}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: "is_trial_mcq",
     header: "Trial MCQ",
     cell: ({ row }) => {
       const isTrial = row.original.is_trial_mcq;

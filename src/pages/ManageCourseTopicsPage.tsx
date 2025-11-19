@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, ArrowLeft } from 'lucide-react';
+import { MoreHorizontal, ArrowLeft, Wand2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import EditCourseTopicDialog, { CourseTopic } from '@/components/EditCourseTopicDialog';
+import BulkGenerateTopicsDialog from '@/components/BulkGenerateTopicsDialog'; // Import new dialog
 import { useSession } from '@/components/SessionContextProvider';
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -30,6 +31,7 @@ const ManageCourseTopicsPage = () => {
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTopicForEdit, setSelectedTopicForEdit] = useState<CourseTopic | null>(null);
+  const [isBulkGenerateOpen, setIsBulkGenerateOpen] = useState(false); // State for new dialog
 
   const { hasCheckedInitialSession } = useSession();
 
@@ -147,9 +149,14 @@ const ManageCourseTopicsPage = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-xl">Course Topics</CardTitle>
-          <Button onClick={() => openEditDialog()}>Add New Topic</Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setIsBulkGenerateOpen(true)} variant="outline">
+              <Wand2 className="mr-2 h-4 w-4" /> Bulk Generate Topics
+            </Button>
+            <Button onClick={() => openEditDialog()}>Add New Topic</Button>
+          </div>
         </CardHeader>
-        <CardDescription>Create, edit, and delete topics for this course.</CardDescription> {/* Added CardDescription */}
+        <CardDescription className="px-6">Create, edit, and delete topics for this course.</CardDescription>
         <CardContent>
           <DataTable columns={columns} data={topics} />
         </CardContent>
@@ -158,13 +165,21 @@ const ManageCourseTopicsPage = () => {
       <MadeWithDyad />
 
       {courseId && (
-        <EditCourseTopicDialog
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          courseId={courseId}
-          topic={selectedTopicForEdit}
-          onSave={fetchCourseDetailsAndTopics}
-        />
+        <>
+          <EditCourseTopicDialog
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            courseId={courseId}
+            topic={selectedTopicForEdit}
+            onSave={fetchCourseDetailsAndTopics}
+          />
+          <BulkGenerateTopicsDialog
+            open={isBulkGenerateOpen}
+            onOpenChange={setIsBulkGenerateOpen}
+            courseId={courseId}
+            onSave={fetchCourseDetailsAndTopics}
+          />
+        </>
       )}
     </div>
   );

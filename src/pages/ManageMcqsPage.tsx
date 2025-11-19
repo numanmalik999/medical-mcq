@@ -59,8 +59,8 @@ const ManageMcqsPage = () => {
       // Directly count uncategorized MCQs for accuracy
       const { count: uncategorizedCount, error: uncategorizedError } = await supabase
         .from('mcqs')
-        .select('*, mcq_category_links!left(*)', { count: 'exact', head: true })
-        .is('mcq_category_links.id', null);
+        .select('id, mcq_category_links!left(mcq_id)', { count: 'exact', head: true })
+        .is('mcq_category_links.mcq_id', null);
 
       if (uncategorizedError) {
         console.error("Error fetching uncategorized count:", uncategorizedError);

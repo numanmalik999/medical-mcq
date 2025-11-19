@@ -56,10 +56,17 @@ const ManageMcqsPage = () => {
         })
       );
 
-      const { data: linkedMcqIdsData } = await supabase.from('mcq_category_links').select('mcq_id');
-      const categorizedMcqIds = new Set(linkedMcqIdsData?.map(link => link.mcq_id) || []);
-      const { count: totalMcqCount } = await supabase.from('mcqs').select('id', { count: 'exact', head: true });
-      const uncategorizedCount = (totalMcqCount || 0) - categorizedMcqIds.size;
+      // Directly count uncategorized MCQs for accuracy
+      const { count: uncategorizedCount, error: uncategorizedError } = await supabase
+        .from('mcqs')
+        .select('id, mcq_category_links!left(mcq_id)', { count: 'exact', head: true })
+        .is('mcq_category_links.mcq_id', null);
+
+      if (uncategorizedError) {
+        console.error("Error fetching uncategorized count:", uncategorizedError);
+        throw uncategorizedError;
+      }
+      
       setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: uncategorizedCount }]);
 
       // Build and execute MCQs query with filters

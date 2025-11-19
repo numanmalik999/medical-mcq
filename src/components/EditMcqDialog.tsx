@@ -234,7 +234,27 @@ const EditMcqDialog = ({ open, onOpenChange, mcq, onSave }: EditMcqDialogProps) 
             <FormField control={form.control} name="explanation_text" render={({ field }) => (<FormItem><FormLabel>Explanation Text</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="image_url" render={({ field }) => (<FormItem><FormLabel>Image URL</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="category_ids" render={({ field }) => (<FormItem><FormLabel>Categories</FormLabel><FormControl><MultiSelect options={categories.map(c => ({ value: c.id, label: c.name }))} selectedValues={field.value || []} onValueChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="topic_id" render={({ field }) => (<FormItem><FormLabel>Topic (Optional)</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger><SelectValue placeholder="Select a topic to link" /></SelectTrigger></FormControl><SelectContent><SelectItem value="">None</SelectItem>{topics.map(t => (<SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
+            <FormField
+              control={form.control}
+              name="topic_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Topic (Optional)</FormLabel>
+                  <Select onValueChange={(value) => field.onChange(value === 'no-topic' ? '' : value)} value={field.value ? field.value : 'no-topic'}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a topic to link" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="no-topic">None</SelectItem>
+                      {topics.map(t => (<SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField control={form.control} name="difficulty" render={({ field }) => (<FormItem><FormLabel>Difficulty</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger><SelectValue placeholder="Select difficulty" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Easy">Easy</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="Hard">Hard</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="is_trial_mcq" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-4"><div className="space-y-0.5"><FormLabel>Trial MCQ</FormLabel><FormDescription>Available to users on a free trial.</FormDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
             <DialogFooter>

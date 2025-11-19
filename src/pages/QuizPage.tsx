@@ -18,6 +18,7 @@ import { MCQ } from '@/components/mcq-columns';
 import { useBookmark } from '@/hooks/use-bookmark';
 import ExplanationDisplay from '@/components/ExplanationDisplay';
 import TopicContentDialog from '@/components/TopicContentDialog';
+import { cn } from '@/lib/utils';
 
 interface MCQExplanation {
   id: string;
@@ -94,13 +95,24 @@ const QuizPage = () => {
   useEffect(() => {
     const startNewQuiz = async () => {
       setIsPageLoading(true);
-      const { data, error } = await supabase.from('mcqs').select(`*, mcq_category_links(category_id, categories(name))`).limit(10); // Simple quiz with 10 random questions
+      const { data, error } = await supabase.from('mcqs').select(`*, mcq_category_links(category_id, categories(name)), mcq_topic_links(topic_id, course_topics(title))`).limit(10);
       if (error) {
         toast({ title: "Error", description: "Failed to load quiz questions.", variant: "destructive" });
       } else {
-        setQuizQuestions(data as MCQ[]);
+        const formattedMcqs: MCQ[] = data.map((mcq: any) => ({
+          ...mcq,
+          category_links: mcq.mcq_category_links.map((link: any) => ({
+            category_id: link.category_id,
+            category_name: link.categories?.name || null,
+          })),
+          topic_links: mcq.mcq_topic_links.map((link: any) => ({
+            topic_id: link.topic_id,
+            topic_title: link.course_topics?.title || null,
+          })),
+        }));
+        setQuizQuestions(formattedMcqs);
         const initialAnswers = new Map();
-        data.forEach(mcq => initialAnswers.set(mcq.id, { selectedOption: null, isCorrect: null, submitted: false }));
+        formattedMcqs.forEach(mcq => initialAnswers.set(mcq.id, { selectedOption: null, isCorrect: null, submitted: false }));
         setUserAnswers(initialAnswers);
       }
       setIsPageLoading(false);
@@ -233,8 +245,8 @@ const QuizPage = () => {
                 return (
                   <div key={key} className="flex items-center space-x-2">
                     <RadioGroupItem value={key} id={`option-${key}`} />
-                    <Label htmlFor={`option-${key}`} className={showExplanation && isCorrect ? 'text-green-600 font-bold' : showExplanation && isSelected ? 'text-red-600' : ''}>
-                      {`${key}. ${optionText}`}
+                    <Label htmlFor={`option-${key}`} className={cn(showExplanation && isCorrect ? 'text-green-600 font-bold' : showExplanation && isSelected ? 'text-red-600' : '')}>
+                      {`${key}. ${optionText as string}`}
                     </Label>
                   </div>
                 );

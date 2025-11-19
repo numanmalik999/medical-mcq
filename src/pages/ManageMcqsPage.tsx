@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
@@ -26,7 +26,7 @@ type DisplayMCQ = MCQ;
 const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id';
 
 const ManageMcqsPage = () => {
-  const [rawMcqs, setRawMcqs] = useState<DisplayMCQ[]>([]);
+  const [mcqs, setMcqs] = useState<DisplayMCQ[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const { toast } = useToast();
 
@@ -42,79 +42,77 @@ const ManageMcqsPage = () => {
 
   const { hasCheckedInitialSession } = useSession();
 
-  const fetchCategories = async () => {
-    const { data: categoriesData, error: categoriesError } = await supabase.from('categories').select('*');
-    if (categoriesError) {
-      console.error('Error fetching categories:', categoriesError);
-      toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
-    } else {
+  const fetchData = useCallback(async () => {
+    setIsPageLoading(true);
+    try {
+      // Fetch categories and their counts
+      const { data: categoriesData, error: categoriesError } = await supabase.from('categories').select('*');
+      if (categoriesError) throw categoriesError;
+
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
           const { count } = await supabase.from('mcq_category_links').select('mcq_id', { count: 'exact', head: true }).eq('category_id', category.id);
           return { ...category, mcq_count: count || 0 };
         })
       );
-      setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: 0 }]); // Placeholder count
-    }
-  };
 
-  const fetchMcqs = async () => {
-    setIsPageLoading(true);
-    let mcqsQuery = supabase.from('mcqs').select(`
-      *,
-      mcq_category_links (category_id, categories (name))
-    `);
+      const { data: linkedMcqIdsData } = await supabase.from('mcq_category_links').select('mcq_id');
+      const categorizedMcqIds = new Set(linkedMcqIdsData?.map(link => link.mcq_id) || []);
+      const { count: totalMcqCount } = await supabase.from('mcqs').select('id', { count: 'exact', head: true });
+      const uncategorizedCount = (totalMcqCount || 0) - categorizedMcqIds.size;
+      setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: uncategorizedCount }]);
 
-    if (searchTerm) {
-      mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
-    }
-    
-    const { data: mcqsData, error: mcqsError } = await mcqsQuery.limit(5000);
+      // Build and execute MCQs query with filters
+      let mcqsQuery = supabase.from('mcqs').select(`*, mcq_category_links (category_id, categories (name))`);
 
-    if (mcqsError) {
-      console.error('Error fetching MCQs:', mcqsError);
-      toast({ title: "Error", description: "Failed to load MCQs.", variant: "destructive" });
-      setRawMcqs([]);
-    } else {
+      if (searchTerm) {
+        mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
+      }
+
+      if (selectedFilterCategory && selectedFilterCategory !== 'all') {
+        if (selectedFilterCategory === UNCATEGORIZED_ID) {
+          mcqsQuery = mcqsQuery.select(`*, mcq_category_links!left(*)`).is('mcq_category_links.id', null);
+        } else {
+          const { data: linkData, error: linkError } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', selectedFilterCategory);
+          if (linkError) throw linkError;
+          const mcqIds = linkData.map(link => link.mcq_id);
+          if (mcqIds.length === 0) {
+            setMcqs([]);
+            setIsPageLoading(false);
+            return;
+          }
+          mcqsQuery = mcqsQuery.in('id', mcqIds);
+        }
+      }
+
+      const { data: mcqsData, error: mcqsError } = await mcqsQuery.limit(5000);
+      if (mcqsError) throw mcqsError;
+
       const displayMcqs: DisplayMCQ[] = (mcqsData || []).map((mcq: any) => ({
         ...mcq,
-        category_links: mcq.mcq_category_links.map((link: any) => ({
+        category_links: mcq.mcq_category_links?.map((link: any) => ({
           category_id: link.category_id,
           category_name: link.categories?.name || null,
-        })),
+        })) || [],
       }));
-      setRawMcqs(displayMcqs);
-    }
-    setIsPageLoading(false);
-  };
+      setMcqs(displayMcqs);
 
-  const refreshAllData = async () => {
-    setIsPageLoading(true);
-    await fetchCategories();
-    await fetchMcqs();
-    setIsPageLoading(false);
-  };
+    } catch (error: any) {
+      console.error("Error fetching data:", error);
+      toast({ title: "Error", description: `Failed to load data: ${error.message}`, variant: "destructive" });
+    } finally {
+      setIsPageLoading(false);
+    }
+  }, [toast, searchTerm, selectedFilterCategory]);
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      refreshAllData();
+      const handler = setTimeout(() => {
+        fetchData();
+      }, 300); // Debounce requests
+      return () => clearTimeout(handler);
     }
-  }, [hasCheckedInitialSession]);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      if (hasCheckedInitialSession) {
-        fetchMcqs();
-      }
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [searchTerm, hasCheckedInitialSession]);
-
-  const filteredMcqs = useMemo(() => {
-    if (!selectedFilterCategory || selectedFilterCategory === "all") return rawMcqs;
-    if (selectedFilterCategory === UNCATEGORIZED_ID) return rawMcqs.filter(mcq => mcq.category_links.length === 0);
-    return rawMcqs.filter(mcq => mcq.category_links.some(link => link.category_id === selectedFilterCategory));
-  }, [rawMcqs, selectedFilterCategory]);
+  }, [hasCheckedInitialSession, fetchData]);
 
   const handleBulkAction = async (
     action: 'enhance',
@@ -123,7 +121,7 @@ const ManageMcqsPage = () => {
     successMessage: string
   ) => {
     const selectedIndices = Object.keys(rowSelection);
-    const selectedMcqIds = selectedIndices.map(index => filteredMcqs[parseInt(index)].id);
+    const selectedMcqIds = selectedIndices.map(index => mcqs[parseInt(index)].id);
 
     if (selectedMcqIds.length === 0) {
       toast({ title: "No MCQs Selected", description: "Please select one or more MCQs.", variant: "destructive" });
@@ -149,7 +147,7 @@ const ManageMcqsPage = () => {
     } finally {
       if (action === 'enhance') setIsEnhancing(false);
       setRowSelection({});
-      refreshAllData();
+      fetchData();
     }
   };
 
@@ -162,7 +160,7 @@ const ManageMcqsPage = () => {
         await supabase.from('mcq_explanations').delete().eq('id', explanationId);
       }
       toast({ title: "Success!", description: "MCQ deleted successfully." });
-      refreshAllData();
+      fetchData();
     } catch (error: any) {
       toast({ title: "Error", description: `Failed to delete MCQ: ${error.message}`, variant: "destructive" });
     }
@@ -215,11 +213,11 @@ const ManageMcqsPage = () => {
       <Card>
         <CardHeader><CardTitle>All Multiple Choice Questions</CardTitle></CardHeader>
         <CardContent>
-          {isPageLoading ? <p>Loading MCQs...</p> : <DataTable columns={columns} data={filteredMcqs} rowSelection={rowSelection} setRowSelection={setRowSelection} />}
+          {isPageLoading ? <p>Loading MCQs...</p> : <DataTable columns={columns} data={mcqs} rowSelection={rowSelection} setRowSelection={setRowSelection} />}
         </CardContent>
       </Card>
       <MadeWithDyad />
-      {selectedMcqForEdit && <EditMcqDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mcq={selectedMcqForEdit} onSave={refreshAllData} />}
+      {selectedMcqForEdit && <EditMcqDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mcq={selectedMcqForEdit} onSave={fetchData} />}
     </div>
   );
 };

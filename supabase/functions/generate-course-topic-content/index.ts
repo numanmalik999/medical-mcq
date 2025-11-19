@@ -1,7 +1,7 @@
 // @ts-ignore
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
-import OpenAI from 'https://esm.sh/openai@4.52.0';
+import OpenAI from 'https://esm.sh/openai@4.52.0?target=deno';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,9 +19,11 @@ async function generateStructuredTopicContent(topicTitle: string) {
 
   const prompt = `You are an expert medical educator creating high-yield, exam-style content for a platform called 'Study Prometric'. Your task is to generate a comprehensive guide for the medical topic provided below.
 
-The content must be structured into the following sections. For each section, provide detailed, clinically relevant information suitable for a student preparing for a medical licensing exam. Use HTML tags like <h2>, <p>, and <ul><li>...</li></ul> for formatting within each content string.
+The content must be structured into the following sections. For each section, provide detailed, clinically relevant information suitable for a student preparing for a medical licensing exam.
 
-1.  **Definition:** A clear, concise definition of the condition.
+For sections that are lists (like Main Causes, Symptoms, Diagnostic Tests), the value MUST be a single string containing a complete HTML <ul> element. Each item in the list must be wrapped in an <li> tag. Example: "<ul><li>First item</li><li>Second item</li></ul>". Do not include any extraneous characters like commas or quotes outside of the <ul>...</ul> block for these values. For paragraph-based sections (like Definition), use <p> tags.
+
+1.  **Definition:** A clear, concise definition.
 2.  **Main Causes:** A list of the most common etiologies and risk factors.
 3.  **Symptoms:** The classic clinical presentation, including key signs and symptoms.
 4.  **Diagnostic Tests:** Key laboratory findings, imaging studies, and other relevant tests.

@@ -14,7 +14,7 @@ interface StructuredTopicContent {
   diagnostic_tests: string;
   diagnostic_criteria: string;
   treatment_management: string;
-  youtube_video_id: string; // Changed from youtube_embed_code
+  youtube_video_id: string;
 }
 
 interface TopicContentDialogProps {
@@ -30,10 +30,13 @@ const safeStringify = (content: any): string => {
   if (content === null || content === undefined) {
     return '';
   }
+  if (Array.isArray(content)) {
+    return `<ul>${content.map(item => `<li>${String(item)}</li>`).join('')}</ul>`;
+  }
   if (typeof content === 'object') {
     return Object.entries(content)
-      .map(([key, value]) => `**${key.replace(/_/g, ' ')}:** ${value}`)
-      .join('\n\n');
+      .map(([key, value]) => `<p><strong>${key.replace(/_/g, ' ')}:</strong> ${String(value)}</p>`)
+      .join('');
   }
   return String(content);
 };

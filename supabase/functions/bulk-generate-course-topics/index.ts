@@ -20,6 +20,8 @@ async function generateStructuredTopicContent(topicTitle: string) {
 
 The content must be structured into sections using HTML tags (<h2>, <p>, <ul>, <li>).
 
+For sections that are lists (like Main Causes, Symptoms, Diagnostic Tests), the value MUST be a single string containing a complete HTML <ul> element. Each item in the list must be wrapped in an <li> tag. Example: "<ul><li>First item</li><li>Second item</li></ul>". Do not include any extraneous characters like commas or quotes outside of the <ul>...</ul> block for these values. For paragraph-based sections (like Definition), use <p> tags.
+
 1.  **Definition:** A clear definition.
 2.  **Main Causes:** A list of etiologies.
 3.  **Symptoms:** Key signs and symptoms.

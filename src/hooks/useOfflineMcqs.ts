@@ -30,7 +30,7 @@ interface SupabaseLinkData {
 }
 
 // Define the structure of the data stored locally
-interface LocalMCQ extends Omit<MCQ, 'category_links'> {
+interface LocalMCQ extends Omit<MCQ, 'category_links' | 'topic_links'> {
   category_ids_json: string; // Store category IDs as JSON string
   explanation_text: string;
   image_url: string | null;
@@ -293,6 +293,7 @@ export const useOfflineMcqs = () => {
           category_id: catId,
           category_name: "Offline Category", // Placeholder, actual name needs to be fetched separately or stored
         })),
+        topic_links: [], // Add empty topic_links to satisfy the type
         // Add explanation details directly to the object for easy access
         explanation_text: row.explanation_text,
         image_url: row.image_url,

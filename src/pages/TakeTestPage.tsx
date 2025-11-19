@@ -294,7 +294,7 @@ const TakeTestPage = () => {
             dbSessionId: dbSession.id,
             categoryIds: dbSession.category_id ? [dbSession.category_id] : [],
             categoryNames: [categoryName],
-            mcqs: dbSession.mcq_ids_order.map(id => ({ id, question_text: 'Loading...', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: 'A', explanation_id: null, difficulty: null, is_trial_mcq: null, category_links: [] })),
+            mcqs: dbSession.mcq_ids_order.map(id => ({ id, question_text: 'Loading...', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: 'A', explanation_id: null, difficulty: null, is_trial_mcq: null, category_links: [], topic_links: [] })),
             userAnswers: new Map(Object.entries(dbSession.user_answers_json)),
             currentQuestionIndex: dbSession.current_question_index,
             testDurationSeconds: dbSession.test_duration_seconds || 0,

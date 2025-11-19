@@ -93,6 +93,10 @@ const UserCourseDetailsPage = () => {
       if (topic.content) {
         const parsed = JSON.parse(topic.content);
         if (typeof parsed === 'object' && parsed !== null && (parsed.definition || parsed.title)) {
+          // Safeguard: Ensure title is a string, fallback to topic title if not.
+          if (typeof parsed.title !== 'string') {
+            parsed.title = topic.title;
+          }
           content = parsed;
         } else {
           throw new Error("Content is not a structured JSON object.");
@@ -101,8 +105,9 @@ const UserCourseDetailsPage = () => {
     } catch (e) {
       console.warn("Could not parse topic content as JSON. Displaying as raw text.", e);
       if (topic.content) {
+        // Fallback for non-JSON content
         content = {
-          title: `<h2>${topic.title}</h2>`,
+          title: topic.title, // Use the plain topic title
           definition: `<p>${topic.content.replace(/\n/g, '<br />')}</p>`,
           main_causes: '',
           symptoms: '',

@@ -71,7 +71,7 @@ const ManageMcqsPage = () => {
       mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
     }
     
-    const { data: mcqsData, error: mcqsError } = await mcqsQuery;
+    const { data: mcqsData, error: mcqsError } = await mcqsQuery.limit(5000);
 
     if (mcqsError) {
       console.error('Error fetching MCQs:', mcqsError);

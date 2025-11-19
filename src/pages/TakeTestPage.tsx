@@ -387,7 +387,7 @@ const TakeTestPage = () => {
     let query = supabase.from('mcqs').select(`*, mcq_category_links(category_id, categories(name)), mcq_topic_links(topic_id, course_topics(title))`);
     if (mcqIdsToFilter) query = query.in('id', mcqIdsToFilter);
     if (selectedDifficulty && selectedDifficulty !== "all") query = query.eq('difficulty', selectedDifficulty);
-    const { data, error } = await query;
+    const { data, error } = await query.limit(5000);
     if (error || !data || data.length === 0) {
       toast({ title: "Error", description: "Failed to load test questions.", variant: "destructive" });
       setIsPageLoading(false);

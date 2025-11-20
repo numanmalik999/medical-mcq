@@ -82,6 +82,12 @@ const Header = () => {
                 {link.title}
               </Link>
             ))}
+            <Link
+              to="/subscription"
+              className="text-sm font-medium text-primary-foreground/80 hover:text-primary-foreground transition-colors"
+            >
+              Pricing
+            </Link>
           </nav>
         </div>
         <div className="flex justify-end items-center gap-2">

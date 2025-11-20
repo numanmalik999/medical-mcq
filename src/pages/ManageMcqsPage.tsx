@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react'; // Import useMemo
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
@@ -10,23 +10,30 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Wand2, Loader2 } from 'lucide-react';
-import { useSession } from '@/components/SessionContextProvider';
+import { Trash2, Wand2, Loader2 } from 'lucide-react'; // Import new icons
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 import { RowSelectionState } from '@tanstack/react-table';
 
 interface Category {
   id: string;
   name: string;
-  mcq_count?: number;
+  mcq_count?: number; // Added mcq_count
+}
+
+// Define a type for a single MCQ-Category-Subcategory link from the database
+interface DbMcqCategoryLink {
+  mcq_id: string;
+  category_id: string;
 }
 
 type DisplayMCQ = MCQ;
 
-const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id';
+const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id'; // Unique ID for the virtual uncategorized category
 
 const ManageMcqsPage = () => {
-  const [mcqs, setMcqs] = useState<DisplayMCQ[]>([]);
+  const [rawMcqs, setRawMcqs] = useState<DisplayMCQ[]>([]); // Store raw fetched MCQs
   const [isPageLoading, setIsPageLoading] = useState(true);
   const { toast } = useToast();
 
@@ -42,138 +49,462 @@ const ManageMcqsPage = () => {
 
   const { hasCheckedInitialSession } = useSession();
 
-  const fetchData = useCallback(async () => {
-    setIsPageLoading(true);
-    try {
-      // Step 1: Fetch all categories and their counts concurrently
-      const { data: categoriesData, error: categoriesError } = await supabase.from('categories').select('*');
-      if (categoriesError) throw categoriesError;
+  const fetchCategories = async () => {
+    console.log('[ManageMcqsPage] Fetching categories...');
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from('categories')
+      .select('*');
+    if (categoriesError) {
+      console.error('[ManageMcqsPage] Error fetching categories:', categoriesError);
+      toast({ title: "Error", description: "Failed to load categories for filter.", variant: "destructive" });
+    } else {
+      
+      // --- START: Fetch all linked MCQ IDs (paginated) ---
+      let allLinkedMcqIdsData: { mcq_id: string }[] = [];
+      let offsetLinkedIds = 0;
+      const limitLinkedIds = 1000;
+      let hasMoreLinkedIds = true;
+
+      while (hasMoreLinkedIds) {
+        const { data: chunkData, error: linkedMcqIdsError } = await supabase
+          .from('mcq_category_links')
+          .select('mcq_id')
+          .range(offsetLinkedIds, offsetLinkedIds + limitLinkedIds - 1);
+
+        if (linkedMcqIdsError) {
+          console.error('[ManageMcqsPage] Error fetching all linked MCQ IDs for uncategorized count during pagination:', linkedMcqIdsError);
+          break; // Exit loop on error
+        }
+
+        if (chunkData && chunkData.length > 0) {
+          allLinkedMcqIdsData = allLinkedMcqIdsData.concat(chunkData);
+          offsetLinkedIds += chunkData.length;
+          hasMoreLinkedIds = chunkData.length === limitLinkedIds;
+        } else {
+          hasMoreLinkedIds = false;
+        }
+      }
+      const allLinkedMcqIds = allLinkedMcqIdsData.map(link => link.mcq_id);
+      const uniqueLinkedMcqIds = new Set(allLinkedMcqIds);
+      // --- END: Fetch all linked MCQ IDs ---
 
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
-          const { count } = await supabase.from('mcq_category_links').select('mcq_id', { count: 'exact', head: true }).eq('category_id', category.id);
-          return { ...category, mcq_count: count || 0 };
+          // Count MCQs by querying mcq_category_links table directly
+          const { count: mcqCount, error: mcqCountError } = await supabase
+            .from('mcq_category_links')
+            .select('mcq_id', { count: 'exact', head: true })
+            .eq('category_id', category.id);
+
+          if (mcqCountError) {
+            console.error(`[ManageMcqsPage] Error fetching MCQ count for category ${category.name}:`, mcqCountError);
+          }
+          return { ...category, mcq_count: mcqCount || 0 };
         })
       );
 
-      // Step 2: Get the accurate count of uncategorized MCQs using a left join and null check on the FK
-      const { count: uncategorizedCount, error: uncategorizedError } = await supabase
+      // Calculate count for Uncategorized MCQs
+      console.log('[ManageMcqsPage] Calculating uncategorized MCQ count...');
+      
+      const { count: totalMcqCount, error: totalMcqCountError } = await supabase
         .from('mcqs')
-        .select('id, mcq_category_links!left(mcq_id)', { count: 'exact', head: true })
-        .is('mcq_category_links.mcq_id', null);
-      
-      if (uncategorizedError) throw uncategorizedError;
-      
-      // Step 3: Combine data for the categories state
-      setCategories([
-        ...categoriesWithCounts,
-        { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: uncategorizedCount }
-      ]);
+        .select('id', { count: 'exact', head: true });
 
-      // Step 4: Build and execute the main MCQs query with filters
-      let mcqsQuery = supabase.from('mcqs').select(`*, mcq_category_links!left(category_id, categories(name))`);
+      if (totalMcqCountError) {
+        console.error('[ManageMcqsPage] Error fetching total MCQ count for uncategorized:', totalMcqCountError);
+      }
+      console.log(`[ManageMcqsPage] Total MCQs in 'mcqs' table: ${totalMcqCount}`);
+
+      const uncategorizedMcqCount = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
+      console.log(`[ManageMcqsPage] Calculated uncategorized MCQ count: ${uncategorizedMcqCount}`);
+
+      setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: Math.max(0, uncategorizedMcqCount) }]);
+    }
+  };
+
+  const fetchMcqs = async () => {
+    setIsPageLoading(true);
+    console.log(`[ManageMcqsPage] STARTING PAGINATED DATA FETCH with search term: ${searchTerm}`);
+
+    let allMcqs: any[] = [];
+    let allMcqCategoryLinks: DbMcqCategoryLink[] = [];
+    const limit = 1000; // Fetch 1000 records at a time
+
+    // --- Fetch all MCQs (paginated) ---
+    let offsetMcqs = 0;
+    let hasMoreMcqs = true;
+    while (hasMoreMcqs) {
+      let mcqsQuery = supabase
+        .from('mcqs')
+        .select(`
+          id,
+          question_text,
+          option_a,
+          option_b,
+          option_c,
+          option_d,
+          correct_answer,
+          explanation_id,
+          difficulty,
+          is_trial_mcq
+        `)
+        .range(offsetMcqs, offsetMcqs + limit - 1);
 
       if (searchTerm) {
         mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
       }
+      mcqsQuery = mcqsQuery.order('created_at', { ascending: true });
 
-      if (selectedFilterCategory && selectedFilterCategory !== 'all') {
-        if (selectedFilterCategory === UNCATEGORIZED_ID) {
-          mcqsQuery = mcqsQuery.is('mcq_category_links.mcq_id', null);
-        } else {
-          const { data: linkData, error: linkError } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', selectedFilterCategory);
-          if (linkError) throw linkError;
-          const mcqIdsForCategory = linkData.map(link => link.mcq_id);
-          
-          if (mcqIdsForCategory.length === 0) {
-            setMcqs([]);
-            setIsPageLoading(false);
-            return;
-          }
-          mcqsQuery = mcqsQuery.in('id', mcqIdsForCategory);
-        }
+      console.log(`[ManageMcqsPage] Executing MCQs query for range ${offsetMcqs}-${offsetMcqs + limit - 1}...`);
+      const { data: mcqsData, error: mcqsError } = await mcqsQuery;
+
+      if (mcqsError) {
+        console.error('[ManageMcqsPage] Error fetching MCQs during pagination:', mcqsError.message, mcqsError.details, mcqsError.hint);
+        toast({ title: "Error", description: "Failed to load MCQs. Please try again.", variant: "destructive" });
+        setRawMcqs([]);
+        setIsPageLoading(false);
+        return;
       }
 
-      const { data: mcqsData, error: mcqsError } = await mcqsQuery.limit(5000);
-      if (mcqsError) throw mcqsError;
-
-      const displayMcqs: DisplayMCQ[] = (mcqsData || []).map((mcq: any) => ({
-        ...mcq,
-        category_links: Array.isArray(mcq.mcq_category_links)
-          ? mcq.mcq_category_links.map((link: any) => ({
-              category_id: link.category_id,
-              category_name: link.categories?.name || null,
-            }))
-          : [], // Handle the case where mcq_category_links is null for uncategorized
-      }));
-      setMcqs(displayMcqs);
-
-    } catch (error: any) {
-      console.error("Error fetching data:", error);
-      toast({ title: "Error", description: `Failed to load data: ${error.message}`, variant: "destructive" });
-    } finally {
-      setIsPageLoading(false);
+      if (mcqsData && mcqsData.length > 0) {
+        allMcqs = allMcqs.concat(mcqsData);
+        offsetMcqs += mcqsData.length;
+        hasMoreMcqs = mcqsData.length === limit;
+        console.log(`[ManageMcqsPage] Fetched ${mcqsData.length} MCQs. Total MCQs so far: ${allMcqs.length}. Has more MCQs: ${hasMoreMcqs}`);
+      } else {
+        hasMoreMcqs = false;
+      }
     }
-  }, [toast, searchTerm, selectedFilterCategory]);
+    console.log('[ManageMcqsPage] All MCQs fetched. Total:', allMcqs.length);
+
+    // --- Fetch all MCQ category links (paginated) ---
+    let offsetLinks = 0;
+    let hasMoreLinks = true;
+    while (hasMoreLinks) {
+      const { data: mcqCategoryLinksData, error: mcqCategoryLinksError } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id, category_id')
+        .range(offsetLinks, offsetLinks + limit - 1);
+
+      if (mcqCategoryLinksError) {
+        console.error('[ManageMcqsPage] Error fetching MCQ category links during pagination:', mcqCategoryLinksError);
+        toast({ title: "Error", description: "Failed to load MCQ category links. Please try again.", variant: "destructive" });
+        setRawMcqs([]);
+        setIsPageLoading(false);
+        return;
+      }
+
+      if (mcqCategoryLinksData && mcqCategoryLinksData.length > 0) {
+        allMcqCategoryLinks = allMcqCategoryLinks.concat(mcqCategoryLinksData);
+        offsetLinks += mcqCategoryLinksData.length;
+        hasMoreLinks = mcqCategoryLinksData.length === limit;
+        console.log(`[ManageMcqsPage] Fetched ${mcqCategoryLinksData.length} links. Total links so far: ${allMcqCategoryLinks.length}. Has more links: ${hasMoreLinks}`);
+      } else {
+        hasMoreLinks = false;
+      }
+    }
+    console.log('[ManageMcqsPage] All MCQ category links fetched. Total:', allMcqCategoryLinks.length);
+
+    // 3. Hydrate MCQs with category names on the client side
+    const categoryNameMap = new Map(categories.map(cat => [cat.id, cat.name]));
+    console.log('[ManageMcqsPage] categoryNameMap:', categoryNameMap);
+
+    const mcqLinksMap = new Map<string, DbMcqCategoryLink[]>();
+    allMcqCategoryLinks.forEach(link => { // Use allMcqCategoryLinks here
+      if (!mcqLinksMap.has(link.mcq_id)) {
+        mcqLinksMap.set(link.mcq_id, []);
+      }
+      mcqLinksMap.get(link.mcq_id)?.push(link);
+    });
+    console.log('[ManageMcqsPage] mcqLinksMap (first 5 entries):', Array.from(mcqLinksMap.entries()).slice(0, 5));
+
+    const displayMcqs: DisplayMCQ[] = (allMcqs || []).map((mcq: any) => { // Use allMcqs here
+      const linksForMcq = mcqLinksMap.get(mcq.id) || [];
+      const hydratedLinks = linksForMcq.map(link => ({
+        category_id: link.category_id,
+        category_name: categoryNameMap.get(link.category_id) || null,
+      }));
+      return {
+        ...mcq,
+        category_links: hydratedLinks,
+      };
+    });
+    console.log(`[ManageMcqsPage] Successfully fetched and hydrated ${displayMcqs.length} MCQs. First 5 hydrated MCQs:`, displayMcqs.slice(0, 5));
+    setRawMcqs(displayMcqs || []);
+    setIsPageLoading(false);
+  };
+
+  // New function to refresh both MCQs and categories
+  const refreshAllData = async () => {
+    setIsPageLoading(true);
+    await fetchCategories(); // Re-fetch categories first to get updated counts
+    await fetchMcqs(); // Then re-fetch MCQs with potentially updated category info
+    setIsPageLoading(false);
+  };
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      const handler = setTimeout(() => {
-        fetchData();
-      }, 300); // Debounce requests
-      return () => clearTimeout(handler);
+      fetchCategories();
     }
-  }, [hasCheckedInitialSession, fetchData]);
+  }, [hasCheckedInitialSession]);
 
-  const handleBulkAction = async (
-    action: 'enhance',
-    functionName: 'bulk-enhance-mcqs',
-    confirmMessage: string,
-    successMessage: string
-  ) => {
+  useEffect(() => {
+    // Only fetch MCQs if categories are loaded (or if there are no categories to load)
+    // and initial session check is done.
+    if (hasCheckedInitialSession && (categories.length > 0 || (categories.length === 0 && !isPageLoading))) {
+      fetchMcqs();
+    }
+  }, [searchTerm, hasCheckedInitialSession, categories]); // Re-run when categories change
+
+  // Client-side filtering based on selectedFilterCategory
+  const filteredMcqs = useMemo(() => {
+    console.log('[filteredMcqs Memo] Recalculating...'); // Added log
+    console.log('[filteredMcqs Memo] rawMcqs length:', rawMcqs.length); // Added log
+    console.log('[filteredMcqs Memo] selectedFilterCategory:', selectedFilterCategory); // Added log
+
+    if (!selectedFilterCategory || selectedFilterCategory === "all") {
+      console.log('[filteredMcqs Memo] Returning all rawMcqs.'); // Added log
+      return rawMcqs;
+    }
+
+    if (selectedFilterCategory === UNCATEGORIZED_ID) {
+      const result = rawMcqs.filter(mcq => mcq.category_links.length === 0);
+      console.log('[filteredMcqs Memo] Filtering for UNCATEGORIZED_ID. Result length:', result.length); // Added log
+      return result;
+    }
+
+    const result = rawMcqs.filter(mcq =>
+      mcq.category_links.some(link => link.category_id === selectedFilterCategory)
+    );
+    console.log(`[filteredMcqs Memo] Filtering for category ID "${selectedFilterCategory}". Result length:`, result.length); // Added log
+    // Log a sample of filtered MCQs to inspect their category_links
+    if (result.length > 0) {
+      console.log('[filteredMcqs Memo] First filtered MCQ category_links:', result[0].category_links); // Added log
+    }
+    console.log('[filteredMcqs Memo] Final filteredMcqs length:', result.length); // ADDED LOG
+    return result;
+  }, [rawMcqs, selectedFilterCategory]);
+
+  const handleBulkEnhance = async () => {
     const selectedIndices = Object.keys(rowSelection);
-    const selectedMcqIds = selectedIndices.map(index => mcqs[parseInt(index)].id);
+    const selectedMcqIds = selectedIndices.map(index => filteredMcqs[parseInt(index)].id);
 
     if (selectedMcqIds.length === 0) {
-      toast({ title: "No MCQs Selected", description: "Please select one or more MCQs.", variant: "destructive" });
+      toast({ title: "No MCQs Selected", description: "Please select one or more MCQs to enhance.", variant: "destructive" });
       return;
     }
-    if (!window.confirm(confirmMessage.replace('{count}', String(selectedMcqIds.length)))) return;
 
-    if (action === 'enhance') setIsEnhancing(true);
+    if (!window.confirm(`You are about to enhance ${selectedMcqIds.length} MCQs with AI. This will overwrite existing explanations, correct answers, difficulties, and categories. Continue?`)) {
+      return;
+    }
 
+    setIsEnhancing(true);
     try {
-      const { data, error } = await supabase.functions.invoke(functionName, {
+      const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
         body: { mcq_ids: selectedMcqIds },
       });
+
       if (error) throw error;
+
       if (data.errorCount > 0) {
-        toast({ title: "Partial Success", description: `${successMessage} ${data.successCount} MCQs. ${data.errorCount} failed.`, variant: "default" });
-        console.error(`Bulk ${action} Errors:`, data.errors);
+        toast({
+          title: "Partial Success",
+          description: `Enhanced ${data.successCount} MCQs. ${data.errorCount} failed. Check console for details.`,
+          variant: "default",
+        });
+        console.error("Bulk Enhance Errors:", data.errors);
       } else {
-        toast({ title: "Success!", description: `${successMessage} ${data.successCount} MCQs.` });
+        toast({
+          title: "Success!",
+          description: `Successfully enhanced ${data.successCount} MCQs.`,
+        });
       }
     } catch (error: any) {
-      toast({ title: "Error", description: `Failed to ${action} MCQs: ${error.message || 'Unknown error'}`, variant: "destructive" });
+      console.error("Error invoking bulk-enhance-mcqs function:", error);
+      toast({ title: "Error", description: `Failed to enhance MCQs: ${error.message || 'Unknown error'}`, variant: "destructive" });
     } finally {
-      if (action === 'enhance') setIsEnhancing(false);
+      setIsEnhancing(false);
       setRowSelection({});
-      fetchData();
+      refreshAllData();
     }
   };
 
   const handleDeleteMcq = async (mcqId: string, explanationId: string | null) => {
-    if (!window.confirm("Are you sure you want to delete this MCQ?")) return;
+    if (!window.confirm("Are you sure you want to delete this MCQ? This action cannot be undone.")) {
+      return;
+    }
+
     try {
-      await supabase.from('mcq_category_links').delete().eq('mcq_id', mcqId);
-      await supabase.from('mcqs').delete().eq('id', mcqId);
-      if (explanationId) {
-        await supabase.from('mcq_explanations').delete().eq('id', explanationId);
+      // Delete associated links first
+      const { error: linksError } = await supabase
+        .from('mcq_category_links')
+        .delete()
+        .eq('mcq_id', mcqId);
+
+      if (linksError) {
+        console.warn("Could not delete associated category links:", linksError);
+        // Continue with MCQ deletion even if links fail
       }
-      toast({ title: "Success!", description: "MCQ deleted successfully." });
-      fetchData();
+
+      // Delete the MCQ
+      const { error: mcqError } = await supabase
+        .from('mcqs')
+        .delete()
+        .eq('id', mcqId);
+
+      if (mcqError) {
+        throw mcqError;
+      }
+
+      // If there's an associated explanation, delete it too
+      if (explanationId) {
+        const { error: explanationError } = await supabase
+          .from('mcq_explanations')
+          .delete()
+          .eq('id', explanationId);
+
+        if (explanationError) {
+          console.warn("Could not delete associated explanation:", explanationError);
+          // We don't throw here as the MCQ itself was deleted successfully
+        }
+      }
+
+      toast({
+        title: "Success!",
+        description: "MCQ deleted successfully.",
+      });
+      refreshAllData(); // Refresh both MCQs and categories
     } catch (error: any) {
-      toast({ title: "Error", description: `Failed to delete MCQ: ${error.message}`, variant: "destructive" });
+      console.error("Error deleting MCQ:", error);
+      toast({
+        title: "Error",
+        description: `Failed to delete MCQ: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteAllMcqsInCategory = async () => {
+    if (!selectedFilterCategory) {
+      toast({ title: "Error", description: "Please select a category to delete all MCQs from.", variant: "destructive" });
+      return;
+    }
+
+    const categoryName = categories.find(cat => cat.id === selectedFilterCategory)?.name || 'Selected Category';
+
+    if (!window.confirm(`Are you absolutely sure you want to delete ALL MCQs and their explanations linked to the "${categoryName}" category? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsPageLoading(true);
+    try {
+      let mcqIdsToDelete: string[] = [];
+
+      if (selectedFilterCategory === UNCATEGORIZED_ID) {
+        // Get all categorized MCQ IDs
+        const { data: categorizedMcqLinks, error: linksError } = await supabase
+          .from('mcq_category_links')
+          .select('mcq_id');
+
+        if (linksError) {
+          throw linksError;
+        }
+        const categorizedMcqIds = Array.from(new Set(categorizedMcqLinks?.map(link => link.mcq_id) || []));
+
+        // Get all MCQs that are NOT in the categorized list
+        const { data: uncategorizedMcqs, error: uncategorizedError } = await supabase
+          .from('mcqs')
+          .select('id')
+          .not('id', 'in', `(${categorizedMcqIds.join(',')})`);
+
+        if (uncategorizedError) {
+          throw uncategorizedError;
+        }
+        mcqIdsToDelete = uncategorizedMcqs?.map(mcq => mcq.id) || [];
+
+      } else {
+        // First, get all mcq_ids that are linked to this category
+        const { data: mcqLinksData, error: fetchLinksError } = await supabase
+          .from('mcq_category_links')
+          .select('mcq_id')
+          .eq('category_id', selectedFilterCategory);
+
+        if (fetchLinksError) {
+          throw fetchLinksError;
+        }
+        mcqIdsToDelete = Array.from(new Set(mcqLinksData?.map(link => link.mcq_id) || []));
+      }
+
+      if (mcqIdsToDelete.length === 0) {
+        toast({ title: "Info", description: `No MCQs found linked to "${categoryName}" to delete.`, variant: "default" });
+        setIsPageLoading(false);
+        return;
+      }
+
+      // Fetch explanation IDs for these MCQs
+      const { data: mcqsWithExplanations, error: fetchMcqsError } = await supabase
+        .from('mcqs')
+        .select('id, explanation_id')
+        .in('id', mcqIdsToDelete);
+
+      if (fetchMcqsError) {
+        throw fetchMcqsError;
+      }
+
+      const explanationIdsToDelete = mcqsWithExplanations
+        .map(mcq => mcq.explanation_id)
+        .filter((id): id is string => id !== null);
+
+      // Delete category links first (only for actual categories)
+      if (selectedFilterCategory !== UNCATEGORIZED_ID) {
+        const { error: deleteLinksError } = await supabase
+          .from('mcq_category_links')
+          .delete()
+          .in('mcq_id', mcqIdsToDelete) // Delete all links for these MCQs
+          .eq('category_id', selectedFilterCategory); // And specifically for this category
+
+        if (deleteLinksError) {
+          console.warn("Error deleting some category links:", deleteLinksError);
+        }
+      }
+
+      // Delete explanations
+      if (explanationIdsToDelete.length > 0) {
+        const { error: deleteExplanationsError } = await supabase
+          .from('mcq_explanations')
+          .delete()
+          .in('id', explanationIdsToDelete);
+
+        if (deleteExplanationsError) {
+          console.warn("Could not delete some explanations:", explanationIdsToDelete);
+        }
+      }
+
+      // Delete MCQs
+      const { error: deleteMcqsError } = await supabase
+        .from('mcqs')
+        .delete()
+        .in('id', mcqIdsToDelete);
+
+      if (deleteMcqsError) {
+        throw deleteMcqsError;
+      }
+
+      toast({
+        title: "Success!",
+        description: `All ${mcqIdsToDelete.length} MCQs and their explanations linked to "${categoryName}" have been deleted.`,
+      });
+      refreshAllData(); // Refresh both MCQs and categories
+      setSelectedFilterCategory(null); // Clear filter after mass deletion
+    } catch (error: any) {
+      console.error("Error deleting all MCQs in category:", error);
+      toast({
+        title: "Error",
+        description: `Failed to delete MCQs in category: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsPageLoading(false);
     }
   };
 
@@ -183,52 +514,113 @@ const ManageMcqsPage = () => {
   };
 
   const columns = createMcqColumns({ onDelete: handleDeleteMcq, onEdit: handleEditClick });
+
+  if (!hasCheckedInitialSession || isPageLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-gray-700 dark:text-gray-300">Loading MCQs...</p>
+      </div>
+    );
+  }
+
   const numSelected = Object.keys(rowSelection).length;
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Manage MCQs</h1>
+
       <Card>
-        <CardHeader><CardTitle>Filter MCQs</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Filter MCQs</CardTitle>
+          <CardDescription>Filter MCQs by category or search by question text.</CardDescription>
+        </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <Input placeholder="Search by question text..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-          <Select onValueChange={(value) => setSelectedFilterCategory(value === "all" ? null : value)} value={selectedFilterCategory || "all"}>
-            <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((cat) => <SelectItem key={cat.id} value={cat.id}>{cat.name} ({cat.mcq_count || 0})</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Button onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); }} variant="outline">Clear Filters</Button>
+          <div className="flex-1">
+            <Label htmlFor="search-term">Search Question</Label>
+            <Input
+              id="search-term"
+              placeholder="Search by question text..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <Label htmlFor="filterCategory">Category</Label>
+              <Select onValueChange={(value) => setSelectedFilterCategory(value === "all" ? null : value)} value={selectedFilterCategory || "all"}>
+                <SelectTrigger id="filterCategory">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name} ({cat.mcq_count || 0})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); }} variant="outline">Clear Filters</Button>
+            <Button
+              onClick={handleDeleteAllMcqsInCategory}
+              variant="destructive"
+              disabled={!selectedFilterCategory || isPageLoading}
+              className="flex items-center gap-1"
+            >
+              <Trash2 className="h-4 w-4" /> Delete All in Category
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>Bulk Actions</CardTitle>
-          <CardDescription>Perform actions on multiple selected MCQs.</CardDescription>
+          <CardDescription>Perform actions on multiple selected MCQs at once.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <div className="flex items-center gap-4">
-            <Button onClick={() => handleBulkAction('enhance', 'bulk-enhance-mcqs', 'Enhance {count} MCQs with AI? This will overwrite existing data.', 'Enhanced')} disabled={isEnhancing || numSelected === 0}>
+            <Button onClick={handleBulkEnhance} disabled={isEnhancing || numSelected === 0}>
               {isEnhancing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
               Bulk Enhance with AI ({numSelected})
             </Button>
+            <p className="text-sm text-muted-foreground">
+              {numSelected > 0 ? `${numSelected} MCQ(s) selected.` : "Select MCQs in the table below to perform bulk actions."}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {numSelected > 0 ? `${numSelected} MCQ(s) selected.` : "Select MCQs in the table below to perform bulk actions."}
-          </p>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>All Multiple Choice Questions</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>All Multiple Choice Questions</CardTitle>
+          <CardDescription>View, edit, and delete MCQs from your database.</CardDescription>
+        </CardHeader>
         <CardContent>
-          {isPageLoading ? <p>Loading MCQs...</p> : <DataTable columns={columns} data={mcqs} rowSelection={rowSelection} setRowSelection={setRowSelection} />}
+          {isPageLoading ? (
+            <p className="text-center text-gray-600 dark:text-gray-400">Loading MCQs...</p>
+          ) : (
+            <DataTable columns={columns} data={filteredMcqs} rowSelection={rowSelection} setRowSelection={setRowSelection} />
+          )}
+          {!isPageLoading && filteredMcqs.length === 0 && (
+            <div className="mt-4 text-center">
+              <p className="text-gray-600 dark:text-gray-400 mb-2">No MCQs found. Add some using the "Add MCQ" link in the sidebar.</p>
+              <Button onClick={refreshAllData}>Refresh List</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
       <MadeWithDyad />
-      {selectedMcqForEdit && <EditMcqDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mcq={selectedMcqForEdit} onSave={fetchData} />}
+
+      {selectedMcqForEdit && (
+        <EditMcqDialog
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          mcq={selectedMcqForEdit}
+          onSave={refreshAllData}
+        />
+      )}
     </div>
   );
 };

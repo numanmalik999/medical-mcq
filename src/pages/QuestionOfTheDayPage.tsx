@@ -134,9 +134,11 @@ const QuestionOfTheDayPage = () => {
     }
 
     const userIds = submissions.map(s => s.user_id).filter(Boolean) as string[];
-    let publicProfilesMap = new Map<string, { first_name: string | null; last_name: string | null }>();
+    // Updated type definition for publicProfilesMap to include email
+    let publicProfilesMap = new Map<string, { first_name: string | null; last_name: string | null; email: string | null }>();
 
     if (userIds.length > 0) {
+      // The Edge Function now returns email as well
       const { data: publicProfiles, error: profilesError } = await supabase.functions.invoke('get-public-profiles', {
         body: { user_ids: userIds },
       });
@@ -145,8 +147,9 @@ const QuestionOfTheDayPage = () => {
         console.error('Error fetching public profiles from Edge Function:', profilesError);
         toast({ title: "Error", description: "Failed to load user names for leaderboard.", variant: "destructive" });
       } else if (publicProfiles) {
-        publicProfiles.forEach((profile: { id: string; first_name: string | null; last_name: string | null }) => {
-          publicProfilesMap.set(profile.id, { first_name: profile.first_name, last_name: profile.last_name });
+        // Updated mapping to include email
+        publicProfiles.forEach((profile: { id: string; first_name: string | null; last_name: string | null; email: string | null }) => {
+          publicProfilesMap.set(profile.id, { first_name: profile.first_name, last_name: profile.last_name, email: profile.email });
         });
       }
     }
@@ -155,8 +158,14 @@ const QuestionOfTheDayPage = () => {
       let displayName = '';
       if (entry.user_id) {
         const profile = publicProfilesMap.get(entry.user_id);
-        displayName = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim();
-        if (!displayName) {
+        const fullName = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim();
+        
+        if (fullName) {
+          displayName = fullName;
+        } else if (profile?.email) {
+          // Fallback to email if name is missing
+          displayName = profile.email;
+        } else {
           displayName = `User (${entry.user_id.substring(0, 4)})`;
         }
       } else {
@@ -228,7 +237,7 @@ const QuestionOfTheDayPage = () => {
               message: 'You have already submitted an answer for today\'s question.',
               is_correct: existingSubmission.is_correct,
               points_awarded: existingSubmission.points_awarded,
-              total_points: null,
+              total_points: null, // Will be fetched separately by fetchDailyMcq
               free_month_awarded: false,
               selected_option: existingSubmission.selected_option,
             });

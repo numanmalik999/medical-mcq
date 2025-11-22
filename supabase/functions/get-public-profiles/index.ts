@@ -16,6 +16,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface ProfileData {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -37,21 +43,36 @@ serve(async (req: Request) => {
       });
     }
 
-    // Fetch public profile data using the service role key (bypasses RLS)
-    const { data, error } = await supabaseAdmin
+    // 1. Fetch public profile data using the service role key (bypasses RLS)
+    const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
       .select('id, first_name, last_name')
       .in('id', user_ids);
 
-    if (error) {
-      console.error('Error fetching public profiles:', error);
-      return new Response(JSON.stringify({ error: error.message }), {
+    if (profilesError) {
+      console.error('Error fetching public profiles:', profilesError);
+      return new Response(JSON.stringify({ error: profilesError.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    
+    // 2. Fetch auth data (emails) for the same users
+    // Note: This involves multiple calls but is necessary to get emails using the admin client.
+    const usersWithEmail = await Promise.all(user_ids.map(async (id: string) => {
+        const { data: userData } = await supabaseAdmin.auth.admin.getUserById(id);
+        return { id, email: userData?.user?.email || null };
+    }));
+    
+    const emailMap = new Map(usersWithEmail.map(u => [u.id, u.email]));
 
-    return new Response(JSON.stringify(data), {
+    // 3. Combine profile data with email
+    const combinedData = (profiles as ProfileData[]).map(profile => ({
+        ...profile,
+        email: emailMap.get(profile.id) || null,
+    }));
+
+    return new Response(JSON.stringify(combinedData), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -85,12 +85,16 @@ serve(async (req: Request) => {
         throw new Error('Could not retrieve today\'s MCQ from get-daily-mcq.');
     }
 
-    // 3. Format the post message as requested
-    const fixedIntro = `Study at ${appBaseUrl}/`;
-    const mcqContent = `\n\n🧠 Question of the Day! 🧠\n\n${mcq.question_text}\n\nA: ${mcq.option_a}\nB: ${mcq.option_b}\nC: ${mcq.option_c}\nD: ${mcq.option_d}`;
+    // 3. Format the post message as requested:
+    // Full MCQ content (Question and Options)
+    // Study at [Link]
+    // Promotional tagline
+    
+    const mcqContent = `🧠 Question of the Day! 🧠\n\n${mcq.question_text}\n\nA: ${mcq.option_a}\nB: ${mcq.option_b}\nC: ${mcq.option_c}\nD: ${mcq.option_d}`;
+    const studyLink = `\n\nStudy at ${appBaseUrl}/`;
     const promotionalTagline = `\n\nPrepare for Prometric exams for Saudi Arabia, UAE, Qatar, Oman, Kuwait & Bahrain. Thousands of updated MCQs for doctors, nurses, and medical professionals. Start your free trial today!`;
 
-    const postMessage = fixedIntro + mcqContent + promotionalTagline;
+    const postMessage = mcqContent + studyLink + promotionalTagline;
     const postLink = `${appBaseUrl}/quiz-of-the-day`;
 
     // 4. Post to Facebook

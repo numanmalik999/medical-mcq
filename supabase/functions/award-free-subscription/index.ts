@@ -36,16 +36,16 @@ serve(async (req: Request) => {
       });
     }
 
-    // 1. Get the 'Monthly Basic' subscription tier ID
+    // 1. Get the '1 Month' subscription tier ID
     const { data: tierData, error: tierError } = await supabaseAdmin
       .from('subscription_tiers')
       .select('id, duration_in_months')
-      .eq('name', 'Monthly Basic') // Assuming 'Monthly Basic' is the tier to award
+      .eq('name', '1 Month') // <-- UPDATED TIER NAME
       .single();
 
     if (tierError || !tierData) {
-      console.error('Error fetching Monthly Basic subscription tier:', tierError);
-      throw new Error('Monthly Basic subscription tier not found.');
+      console.error('Error fetching 1 Month subscription tier:', tierError);
+      throw new Error('1 Month subscription tier not found.'); // <-- UPDATED ERROR MESSAGE
     }
 
     const subscriptionTierId = tierData.id;
@@ -62,7 +62,7 @@ serve(async (req: Request) => {
       .update({ status: 'inactive' })
       .eq('user_id', user_id)
       .eq('status', 'active')
-      .is('stripe_subscription_id', null); // Corrected: Check for Stripe ID instead of non-existent PayPal ID
+      .is('stripe_subscription_id', null); // Check for Stripe ID instead of non-existent PayPal ID
 
     if (deactivateError) {
       console.warn('Failed to deactivate previous free user subscriptions:', deactivateError);

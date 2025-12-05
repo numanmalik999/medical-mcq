@@ -118,12 +118,12 @@ serve(async (req: Request) => {
         const { data: tierData, error: tierError } = await supabaseAdmin
           .from('subscription_tiers')
           .select('id, duration_in_months')
-          .eq('name', 'Monthly Basic')
+          .eq('name', '1 Month') // <-- UPDATED TIER NAME
           .single();
 
         if (tierError || !tierData) {
           console.error('Default subscription tier not found:', tierError);
-          throw new Error("Default subscription tier 'Monthly Basic' not configured.");
+          throw new Error("Default subscription tier '1 Month' not configured."); // <-- UPDATED ERROR MESSAGE
         }
         
         // Calculate end date if not provided by admin

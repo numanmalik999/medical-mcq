@@ -7,11 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2, Wand2, ExternalLink, Search } from 'lucide-react';
+import { Loader2, Wand2, ExternalLink, Search, AlertCircle } from 'lucide-react';
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required."),
@@ -73,10 +73,10 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
       
       if (data.youtube_video_id) {
         form.setValue('youtube_video_id', data.youtube_video_id);
-        toast({ title: "Video Found!", description: "AI populated the details. Please verify the ID." });
+        toast({ title: "Video Found!", description: "Verify the ID using the preview below." });
       } else {
         form.setValue('youtube_video_id', '');
-        toast({ title: "ID Verification Needed", description: "AI found the topic but needs you to provide the ID." });
+        toast({ title: "Query Generated", description: "AI found the best match. Use the search button to get the ID." });
       }
       
     } catch (error: any) {
@@ -119,14 +119,14 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
       <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{video ? 'Edit Video' : 'Add New Video'}</DialogTitle>
-          <DialogDescription>Use AI to fetch metadata, then verify the ID on YouTube.</DialogDescription>
+          <DialogDescription>1. Search topic with AI. 2. Verify/Find ID on YouTube. 3. Save.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-2">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3 p-4 bg-muted/30 rounded-lg border">
             <div className="flex gap-2">
               <Input 
-                placeholder="Topic (e.g., 'Ninja Nerd MI')" 
+                placeholder="Topic (e.g., 'Ninja Nerd COPD')" 
                 value={searchTopic} 
                 onChange={(e) => setSearchTopic(e.target.value)} 
               />
@@ -136,10 +136,13 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
               </Button>
             </div>
             
-            {(searchTopic || suggestedSearchQuery) && (
-              <Button onClick={handleManualSearch} variant="outline" size="sm" className="w-full text-blue-600 hover:text-blue-700">
-                <Search className="h-4 w-4 mr-2" /> Search on YouTube to Verify ID
-              </Button>
+            {suggestedSearchQuery && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Verification Helper:</p>
+                <Button onClick={handleManualSearch} variant="outline" size="sm" className="w-full text-blue-600 border-blue-200 hover:bg-blue-50">
+                  <Search className="h-4 w-4 mr-2" /> Find on YouTube: "{suggestedSearchQuery}"
+                </Button>
+              </div>
             )}
           </div>
 
@@ -152,14 +155,15 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
               <FormField control={form.control} name="youtube_video_id" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center gap-2">
-                    YouTube Video ID 
+                    YouTube Video ID (11 chars)
                     {field.value?.length === 11 && (
                       <a href={`https://youtube.com/watch?v=${field.value}`} target="_blank" className="text-xs text-blue-500 hover:underline flex items-center gap-1">
-                        (Test Link <ExternalLink className="h-3 w-3" />)
+                        (Check Link <ExternalLink className="h-3 w-3" />)
                       </a>
                     )}
                   </FormLabel>
                   <FormControl><Input placeholder="e.g. dQw4w9WgXcQ" {...field} /></FormControl>
+                  <FormDescription className="text-xs">Copy the characters after <strong>v=</strong> in the YouTube URL.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -168,13 +172,17 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
                 <FormItem><FormLabel>Short Description</FormLabel><FormControl><Textarea rows={3} {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               
-              {form.watch('youtube_video_id')?.length === 11 && (
+              {form.watch('youtube_video_id')?.length === 11 ? (
                 <div className="aspect-video rounded-md overflow-hidden border bg-black shadow-inner">
                    <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${form.watch('youtube_video_id')}`} frameBorder="0" allowFullScreen></iframe>
                 </div>
+              ) : (
+                <div className="aspect-video rounded-md flex items-center justify-center bg-muted/50 border border-dashed">
+                  <p className="text-sm text-muted-foreground flex items-center gap-2"><AlertCircle className="h-4 w-4" /> Enter a valid ID to see preview</p>
+                </div>
               )}
 
-              <DialogFooter className="pt-4">
+              <DialogFooter className="pt-4 border-t mt-4">
                 <Button type="submit" disabled={isSubmitting} className="w-full">
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {video ? "Update Video" : "Save to Library"}

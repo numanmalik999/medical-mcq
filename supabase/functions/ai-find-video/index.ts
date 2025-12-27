@@ -24,23 +24,21 @@ serve(async (req: Request) => {
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const prompt = `You are a medical education search specialist. Your goal is to identify the best educational video for the topic: "${topic}".
+    const prompt = `You are a medical education specialist. Identify the best educational video from Ninja Nerd, Osmosis, or Khan Academy for: "${topic}".
 
-    CHANNELS TO SEARCH: Osmosis, Ninja Nerd, Khan Academy Medicine, Armando Hasudungan.
-
-    INSTRUCTIONS:
-    1. Provide the most accurate Title and Description for a video on this topic.
-    2. Provide the EXACT 11-character YouTube ID ONLY if you are absolutely certain (100% confidence).
-    3. If you have any doubt about the ID (even one character), leave "youtube_video_id" as an empty string "".
-    4. Provide a "search_query" that the user can use to find this exact video on YouTube if the ID is missing.
+    CRITICAL INSTRUCTIONS FOR YOUTUBE ID:
+    - 99% of the time, you should leave "youtube_video_id" as an empty string "".
+    - ONLY provide an 11-character ID if you are 100% certain it is the current, active ID for that video. 
+    - DO NOT reconstruct, guess, or assume an ID based on keywords. 
+    - Providing a fake or incorrect ID is a critical failure. If you have any doubt, use "".
 
     Return ONLY a valid JSON object:
     {
       "title": "Exact Video Title",
       "description": "2-3 sentence summary.",
-      "youtube_video_id": "11_CHAR_ID_OR_EMPTY",
-      "search_query": "The exact search term to find this video (e.g. 'Ninja Nerd Myocardial Infarction')",
-      "confidence": 0-100
+      "youtube_video_id": "", 
+      "search_query": "e.g. 'Ninja Nerd Myocardial Infarction Pharmacology'",
+      "confidence_in_id": 0
     }`;
 
     const result = await model.generateContent(prompt);

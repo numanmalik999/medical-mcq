@@ -596,11 +596,6 @@ const QuestionOfTheDayPage = () => {
                 Already have an account? <Link to="/login" className="text-primary hover:underline">Log In</Link>
               </p>
             )}
-            {!isGuest && (
-              <Button onClick={fetchDailyMcq} variant="outline" disabled={isSubmitting}>
-                Load Next Day's Question (for testing)
-              </Button>
-            )}
           </CardFooter>
         </Card>
 

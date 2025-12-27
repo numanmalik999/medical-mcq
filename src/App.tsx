@@ -33,28 +33,25 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import PaymentPage from "./pages/PaymentPage";
 import AiChatbot from "./components/AiChatbot";
-
-// Import the new generic static page component
 import GenericStaticPage from "./pages/GenericStaticPage";
-
 import BookmarkedMcqsPage from "./pages/BookmarkedMcqsPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import ManageLandingPage from "./pages/ManageLandingPage";
-
-// New Course Pages
 import ManageCoursesPage from "./pages/ManageCoursesPage";
 import ManageCourseTopicsPage from "./pages/ManageCourseTopicsPage";
 import UserCoursesPage from "./pages/UserCoursesPage";
 import UserCourseDetailsPage from "./pages/UserCourseDetailsPage";
-
 import QuestionOfTheDayPage from "./pages/QuestionOfTheDayPage";
 import ManageDailyMcqsPage from "./pages/ManageDailyMcqsPage";
-
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import PasswordResetPage from "./pages/PasswordResetPage";
 import ReviewsPage from "./pages/ReviewsPage";
 import UserSuggestionsPage from "./pages/UserSuggestionsPage";
 import ManageSuggestionsPage from "./pages/ManageSuggestionsPage";
+
+// New Video Pages
+import ManageVideosPage from "./pages/ManageVideosPage";
+import UserVideosPage from "./pages/UserVideosPage";
 
 const queryClient = new QueryClient();
 
@@ -91,6 +88,7 @@ const AppContent = () => {
                 <Route path="manage-categories" element={<ManageCategoriesPage />} />
                 <Route path="manage-courses" element={<ManageCoursesPage />} />
                 <Route path="manage-courses/:courseId/topics" element={<ManageCourseTopicsPage />} />
+                <Route path="manage-videos" element={<ManageVideosPage />} />
                 <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
                 <Route path="manage-users" element={<ManageUsersPage />} />
                 <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />
@@ -112,12 +110,11 @@ const AppContent = () => {
                 <Route path="suggestions" element={<UserSuggestionsPage />} />
                 <Route path="courses" element={<UserCoursesPage />} />
                 <Route path="courses/:courseId" element={<UserCourseDetailsPage />} />
+                <Route path="videos" element={<UserVideosPage />} />
               </Route>
             </Route>
 
-            {/* Dynamic route for all other top-level slugs */}
             <Route path="/:slug" element={<GenericStaticPage />} />
-
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>

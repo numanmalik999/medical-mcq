@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users, LogOut, UploadCloud, MessageSquareWarning, FileQuestion, Settings, GraduationCap, CalendarDays, Layout, Lightbulb } from 'lucide-react';
+import { MenuIcon, LayoutDashboard, PlusCircle, BookOpenText, FolderKanban, CreditCard, Users, LogOut, UploadCloud, MessageSquareWarning, FileQuestion, Settings, GraduationCap, CalendarDays, Layout, Lightbulb, Youtube } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -46,16 +46,12 @@ const AdminSidebar = () => {
   const navigate = useNavigate();
 
   const handleLinkClick = () => {
-    if (isMobile) {
-      setIsOpen(false);
-    }
+    if (isMobile) setIsOpen(false);
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    if (isMobile) {
-      setIsOpen(false);
-    }
+    if (isMobile) setIsOpen(false);
     navigate('/login');
   };
 
@@ -69,6 +65,7 @@ const AdminSidebar = () => {
     { to: "/admin/manage-submitted-mcqs", icon: <FileQuestion className="h-4 w-4" />, label: "Submitted MCQs" },
     { to: "/admin/manage-categories", icon: <FolderKanban className="h-4 w-4" />, label: "Manage Categories" },
     { to: "/admin/manage-courses", icon: <GraduationCap className="h-4 w-4" />, label: "Manage Courses" },
+    { to: "/admin/manage-videos", icon: <Youtube className="h-4 w-4" />, label: "Manage Videos" },
     { to: "/admin/manage-subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "Manage Subscriptions" },
     { to: "/admin/manage-users", icon: <Users className="h-4 w-4" />, label: "Manage Users" },
     { to: "/admin/manage-feedback", icon: <MessageSquareWarning className="h-4 w-4" />, label: "Manage Feedback" },
@@ -82,32 +79,17 @@ const AdminSidebar = () => {
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 text-primary-foreground hover:bg-primary/50">
             <MenuIcon className="h-6 w-6" />
-            <span className="sr-only">Toggle navigation</span>
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-4 bg-sidebar flex flex-col">
           <h2 className="text-2xl font-bold text-sidebar-primary-foreground mb-6">Admin Panel</h2>
           <nav className="flex flex-col gap-2 flex-grow">
             {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                icon={item.icon}
-                label={item.label}
-                isMobile={true}
-                onLinkClick={handleLinkClick}
-              />
+              <NavLink key={item.to} to={item.to} icon={item.icon} label={item.label} isMobile={true} onLinkClick={handleLinkClick} />
             ))}
           </nav>
           <div className="mt-auto pt-4 border-t border-sidebar-border">
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              onClick={handleLogout}
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Logout</span>
-            </Button>
+            <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLogout}><LogOut className="h-4 w-4" /><span>Logout</span></Button>
           </div>
         </SheetContent>
       </Sheet>
@@ -123,14 +105,7 @@ const AdminSidebar = () => {
         ))}
       </nav>
       <div className="mt-auto pt-4 border-t border-sidebar-border">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          onClick={handleLogout}
-        >
-          <LogOut className="h-4 w-4" />
-          <span>Logout</span>
-        </Button>
+        <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLogout}><LogOut className="h-4 w-4" /><span>Logout</span></Button>
       </div>
     </aside>
   );

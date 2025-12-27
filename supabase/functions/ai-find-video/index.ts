@@ -1,7 +1,7 @@
 // @ts-ignore
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // @ts-ignore
-import OpenAI from 'https://esm.sh/openai@4.52.0?target=deno';
+import OpenAI from 'https://esm.sh/openai@4.52.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,18 +9,29 @@ const corsHeaders = {
 };
 
 serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
     const { topic } = await req.json();
-    if (!topic) throw new Error('Topic is required');
+    if (!topic) {
+      throw new Error('Topic is required');
+    }
 
     // @ts-ignore
-    const openai = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY') });
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      throw new Error('OPENAI_API_KEY is not set.');
+    }
+
+    const openai = new OpenAI({
+      apiKey: openaiApiKey,
+    });
 
     const prompt = `You are a medical education curator. Find a high-quality educational YouTube video for the topic: "${topic}".
     
-    Search for videos from: Osmosis, Ninja Nerd, Khan Academy Medicine, or Armando Hasudungan.
+    Search for videos from reputable channels like: Osmosis, Ninja Nerd, Khan Academy Medicine, or Armando Hasudungan.
     
     Return a valid JSON object with:
     1. "title": A clear, educational title for this video.
@@ -43,6 +54,7 @@ serve(async (req: Request) => {
     });
 
   } catch (error: any) {
+    console.error('Error in ai-find-video:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

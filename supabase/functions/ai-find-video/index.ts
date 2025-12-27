@@ -22,19 +22,18 @@ serve(async (req: Request) => {
     if (!geminiKey) throw new Error('GEMINI_API_KEY is not configured in Supabase secrets.');
 
     const genAI = new GoogleGenerativeAI(geminiKey);
-    // Using 1.5-flash which is extremely stable and fast
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Using gemini-2.0-flash as it's the current state-of-the-art for this task
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `You are a medical education expert. Find the best YouTube video from 'Ninja Nerd', 'Osmosis', or 'Khan Academy Medicine' for this topic: "${topic}".
 
     Your goal is to provide the exact YouTube Video ID (the 11 characters after v=). 
-    If you are NOT 100% sure of the ID, leave "youtube_video_id" empty.
 
     Return ONLY a valid JSON object:
     {
       "title": "Exact Title of the Video",
       "description": "Short 2-sentence summary.",
-      "youtube_video_id": "11_character_id_or_empty",
+      "youtube_video_id": "11_character_id",
       "search_query": "The best search query to find this exact video on YouTube"
     }`;
 
@@ -42,10 +41,8 @@ serve(async (req: Request) => {
     const response = await result.response;
     let text = response.text().trim();
     
-    // Remove any markdown formatting if present
-    if (text.startsWith('```')) {
-      text = text.replace(/^```json\s*|```$/g, '');
-    }
+    // Clean up markdown markers if the AI includes them
+    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
     return new Response(text, {
       status: 200,

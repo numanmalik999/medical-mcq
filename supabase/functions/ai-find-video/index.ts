@@ -24,16 +24,22 @@ serve(async (req: Request) => {
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const prompt = `You are a medical education curator. Find a high-quality educational YouTube video for the topic: "${topic}".
+    const prompt = `You are a medical education curator. Your task is to find the EXACT 11-character YouTube Video ID for a high-quality educational video on the topic: "${topic}".
     
-    Search for videos from reputable channels like: Osmosis, Ninja Nerd, Khan Academy Medicine, or Armando Hasudungan.
+    Search your internal database for videos from these specific channels ONLY:
+    - Osmosis
+    - Ninja Nerd
+    - Khan Academy Medicine
+    - Armando Hasudungan
     
-    Return ONLY a valid JSON object with:
-    1. "title": A clear, educational title for this video.
-    2. "description": A 2-3 sentence summary of what the video covers.
-    3. "youtube_video_id": The 11-character YouTube video ID.
+    CRITICAL: Do NOT hallucinate or invent a "youtube_video_id". It MUST be a real, working 11-character ID. If you are unsure of the specific ID, try to recall the most popular video for this topic from the channels mentioned above.
     
-    Format: {"title": "...", "description": "...", "youtube_video_id": "..."}`;
+    Return ONLY a valid JSON object:
+    {
+      "title": "The exact or highly accurate title of the video",
+      "description": "A 2-3 sentence summary of the video content.",
+      "youtube_video_id": "11_CHAR_ID"
+    }`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -42,6 +48,8 @@ serve(async (req: Request) => {
     // Clean potential markdown code blocks from response
     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     const data = JSON.parse(text);
+
+    console.log(`AI found video for "${topic}": ${data.youtube_video_id}`);
 
     return new Response(JSON.stringify(data), {
       status: 200,

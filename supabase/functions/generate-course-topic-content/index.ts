@@ -20,8 +20,12 @@ serve(async (req: Request) => {
 
     const prompt = `You are an expert medical educator for 'Study Prometric'. Generate a comprehensive guide for: "${topic_title}".
     Use HTML tags (<ul>, <li>, <p>) for formatting.
+    
+    You must also include a "youtube_video_id". 
+    CRITICAL: This MUST be a real, working 11-character YouTube ID from Osmosis, Ninja Nerd, or Khan Academy Medicine. DO NOT MAKE ONE UP. If you don't know a specific working ID for this topic, leave the "youtube_video_id" field empty.
+
     Return ONLY a JSON object with these keys: 
-    title, definition, main_causes, symptoms, diagnostic_tests, diagnostic_criteria, treatment_management, youtube_video_id (11 char ID or empty)`;
+    title, definition, main_causes, symptoms, diagnostic_tests, diagnostic_criteria, treatment_management, youtube_video_id`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;

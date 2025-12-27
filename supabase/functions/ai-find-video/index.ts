@@ -22,7 +22,7 @@ serve(async (req: Request) => {
     if (!geminiKey) throw new Error('GEMINI_API_KEY is not set.');
 
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `You are a medical education curator. Find a high-quality educational YouTube video for the topic: "${topic}".
     

@@ -15,7 +15,7 @@ serve(async (req: Request) => {
     // @ts-ignore
     const geminiKey = Deno.env.get('GEMINI_API_KEY');
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const { messages } = await req.json();
     

@@ -1,5 +1,5 @@
 // @ts-ignore
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
 import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.14.0";
 
@@ -22,34 +22,33 @@ serve(async (req: Request) => {
     if (!geminiKey) throw new Error('GEMINI_API_KEY is not set.');
 
     const genAI = new GoogleGenerativeAI(geminiKey);
-    // Using 2.0 Flash for better reasoning and retrieval
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const prompt = `You are a medical education specialist. Your task is to provide the EXACT 11-character YouTube Video ID for the most relevant, high-quality educational video on the topic: "${topic}".
+    const prompt = `You are a medical education specialist. Your task is to find a high-quality educational video on the topic: "${topic}".
 
-    RULES:
-    1. Only use videos from these trusted channels: Osmosis, Ninja Nerd, Khan Academy Medicine, or Armando Hasudungan.
-    2. THE ID MUST BE REAL. Do not guess, do not create a random string, and do not use an ID you are not 100% certain of. 
-    3. If you are even slightly unsure of the exact 11-character ID, do not provide one. Instead, return an empty string for "youtube_video_id".
-    4. Verify the ID against your internal knowledge of the specific video's content and duration.
+    THINKING PROCESS:
+    1. Identify a real video from: Osmosis, Ninja Nerd, Khan Academy Medicine, or Armando Hasudungan.
+    2. Recall the exact 11-character YouTube ID (the part after v= in the URL).
+    3. CRITICAL: Evaluate your confidence. If you are not 100% certain of the EXACT 11 characters, you MUST return an empty string "" for the ID.
+    4. NEVER guess a single character. It is better to return NO ID than a WRONG ID.
 
     Return ONLY a valid JSON object:
     {
-      "title": "Clear educational title",
-      "description": "2-3 sentence summary of the video content.",
-      "youtube_video_id": "11_CHAR_ID_OR_EMPTY",
-      "verification_note": "A brief internal thought on why this ID is correct (e.g., 'Matches the Osmosis video on X')"
+      "title": "Actual video title",
+      "description": "2-3 sentence summary.",
+      "youtube_video_id": "11_CHAR_ID_OR_EMPTY_STRING",
+      "confidence_score": 0-100
     }`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let text = response.text();
     
-    // Clean potential markdown code blocks from response
+    // Clean potential markdown code blocks
     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     const data = JSON.parse(text);
 
-    console.log(`AI Result for "${topic}": ID=${data.youtube_video_id}, Note=${data.verification_note}`);
+    console.log(`AI Result for "${topic}": ID=${data.youtube_video_id}, Confidence=${data.confidence_score}%`);
 
     return new Response(JSON.stringify(data), {
       status: 200,

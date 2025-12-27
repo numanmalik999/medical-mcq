@@ -22,23 +22,23 @@ serve(async (req: Request) => {
     if (!geminiKey) throw new Error('GEMINI_API_KEY is not set.');
 
     const genAI = new GoogleGenerativeAI(geminiKey);
+    // Using 2.0 Flash for better reasoning and retrieval
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const prompt = `You are a medical education curator. Your task is to find the EXACT 11-character YouTube Video ID for a high-quality educational video on the topic: "${topic}".
-    
-    Search your internal database for videos from these specific channels ONLY:
-    - Osmosis
-    - Ninja Nerd
-    - Khan Academy Medicine
-    - Armando Hasudungan
-    
-    CRITICAL: Do NOT hallucinate or invent a "youtube_video_id". It MUST be a real, working 11-character ID. If you are unsure of the specific ID, try to recall the most popular video for this topic from the channels mentioned above.
-    
+    const prompt = `You are a medical education specialist. Your task is to provide the EXACT 11-character YouTube Video ID for the most relevant, high-quality educational video on the topic: "${topic}".
+
+    RULES:
+    1. Only use videos from these trusted channels: Osmosis, Ninja Nerd, Khan Academy Medicine, or Armando Hasudungan.
+    2. THE ID MUST BE REAL. Do not guess, do not create a random string, and do not use an ID you are not 100% certain of. 
+    3. If you are even slightly unsure of the exact 11-character ID, do not provide one. Instead, return an empty string for "youtube_video_id".
+    4. Verify the ID against your internal knowledge of the specific video's content and duration.
+
     Return ONLY a valid JSON object:
     {
-      "title": "The exact or highly accurate title of the video",
-      "description": "A 2-3 sentence summary of the video content.",
-      "youtube_video_id": "11_CHAR_ID"
+      "title": "Clear educational title",
+      "description": "2-3 sentence summary of the video content.",
+      "youtube_video_id": "11_CHAR_ID_OR_EMPTY",
+      "verification_note": "A brief internal thought on why this ID is correct (e.g., 'Matches the Osmosis video on X')"
     }`;
 
     const result = await model.generateContent(prompt);
@@ -49,7 +49,7 @@ serve(async (req: Request) => {
     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     const data = JSON.parse(text);
 
-    console.log(`AI found video for "${topic}": ${data.youtube_video_id}`);
+    console.log(`AI Result for "${topic}": ID=${data.youtube_video_id}, Note=${data.verification_note}`);
 
     return new Response(JSON.stringify(data), {
       status: 200,

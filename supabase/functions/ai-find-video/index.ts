@@ -19,42 +19,41 @@ serve(async (req: Request) => {
 
     // @ts-ignore
     const geminiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!geminiKey) throw new Error('GEMINI_API_KEY is not set.');
+    if (!geminiKey) throw new Error('GEMINI_API_KEY is not configured in Supabase secrets.');
 
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // Using 1.5-flash which is extremely stable and fast
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `You are a medical education specialist. Identify the best educational video from Ninja Nerd, Osmosis, or Khan Academy for: "${topic}".
+    const prompt = `You are a medical education expert. Find the best YouTube video from 'Ninja Nerd', 'Osmosis', or 'Khan Academy Medicine' for this topic: "${topic}".
 
-    CRITICAL INSTRUCTIONS FOR YOUTUBE ID:
-    - 99% of the time, you should leave "youtube_video_id" as an empty string "".
-    - ONLY provide an 11-character ID if you are 100% certain it is the current, active ID for that video. 
-    - DO NOT reconstruct, guess, or assume an ID based on keywords. 
-    - Providing a fake or incorrect ID is a critical failure. If you have any doubt, use "".
+    Your goal is to provide the exact YouTube Video ID (the 11 characters after v=). 
+    If you are NOT 100% sure of the ID, leave "youtube_video_id" empty.
 
     Return ONLY a valid JSON object:
     {
-      "title": "Exact Video Title",
-      "description": "2-3 sentence summary.",
-      "youtube_video_id": "", 
-      "search_query": "e.g. 'Ninja Nerd Myocardial Infarction Pharmacology'",
-      "confidence_in_id": 0
+      "title": "Exact Title of the Video",
+      "description": "Short 2-sentence summary.",
+      "youtube_video_id": "11_character_id_or_empty",
+      "search_query": "The best search query to find this exact video on YouTube"
     }`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    let text = response.text();
+    let text = response.text().trim();
     
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const data = JSON.parse(text);
+    // Remove any markdown formatting if present
+    if (text.startsWith('```')) {
+      text = text.replace(/^```json\s*|```$/g, '');
+    }
 
-    return new Response(JSON.stringify(data), {
+    return new Response(text, {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
-    console.error('Error in ai-find-video:', error.message);
+    console.error('AI Find Video Error:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

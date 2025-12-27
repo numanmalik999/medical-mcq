@@ -24,31 +24,31 @@ serve(async (req: Request) => {
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const prompt = `You are a medical education specialist. Your task is to find a high-quality educational video on the topic: "${topic}".
+    const prompt = `You are a medical education search specialist. Your goal is to identify the best educational video for the topic: "${topic}".
 
-    THINKING PROCESS:
-    1. Identify a real video from: Osmosis, Ninja Nerd, Khan Academy Medicine, or Armando Hasudungan.
-    2. Recall the exact 11-character YouTube ID (the part after v= in the URL).
-    3. CRITICAL: Evaluate your confidence. If you are not 100% certain of the EXACT 11 characters, you MUST return an empty string "" for the ID.
-    4. NEVER guess a single character. It is better to return NO ID than a WRONG ID.
+    CHANNELS TO SEARCH: Osmosis, Ninja Nerd, Khan Academy Medicine, Armando Hasudungan.
+
+    INSTRUCTIONS:
+    1. Provide the most accurate Title and Description for a video on this topic.
+    2. Provide the EXACT 11-character YouTube ID ONLY if you are absolutely certain (100% confidence).
+    3. If you have any doubt about the ID (even one character), leave "youtube_video_id" as an empty string "".
+    4. Provide a "search_query" that the user can use to find this exact video on YouTube if the ID is missing.
 
     Return ONLY a valid JSON object:
     {
-      "title": "Actual video title",
+      "title": "Exact Video Title",
       "description": "2-3 sentence summary.",
-      "youtube_video_id": "11_CHAR_ID_OR_EMPTY_STRING",
-      "confidence_score": 0-100
+      "youtube_video_id": "11_CHAR_ID_OR_EMPTY",
+      "search_query": "The exact search term to find this video (e.g. 'Ninja Nerd Myocardial Infarction')",
+      "confidence": 0-100
     }`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let text = response.text();
     
-    // Clean potential markdown code blocks
     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     const data = JSON.parse(text);
-
-    console.log(`AI Result for "${topic}": ID=${data.youtube_video_id}, Confidence=${data.confidence_score}%`);
 
     return new Response(JSON.stringify(data), {
       status: 200,

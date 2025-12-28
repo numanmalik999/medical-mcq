@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from 'react'; 
+import { useEffect, useState, useMemo } from 'react'; 
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { createMcqColumns, MCQ } from '@/components/mcq-columns';
@@ -15,7 +15,6 @@ import { Input } from '@/components/ui/input';
 import { Wand2, Loader2 } from 'lucide-react'; 
 import { useSession } from '@/components/SessionContextProvider'; 
 import { RowSelectionState } from '@tanstack/react-table';
-import LoadingBar from '@/components/LoadingBar';
 
 interface Category {
   id: string;
@@ -28,10 +27,12 @@ interface DbMcqCategoryLink {
   category_id: string;
 }
 
+type DisplayMCQ = MCQ;
+
 const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id'; 
 
 const ManageMcqsPage = () => {
-  const [rawMcqs, setRawMcqs] = useState<MCQ[]>([]); 
+  const [rawMcqs, setRawMcqs] = useState<DisplayMCQ[]>([]); 
   const [isPageLoading, setIsPageLoading] = useState(true);
   const { toast } = useToast();
 
@@ -47,154 +48,211 @@ const ManageMcqsPage = () => {
 
   const { hasCheckedInitialSession } = useSession();
 
-  // Helper to fetch categories with their MCQ counts
-  const fetchCategoriesData = async (): Promise<Category[]> => {
+  const fetchCategories = async () => {
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
-      .select('id, name');
-      
-    if (categoriesError) throw categoriesError;
+      .select('*');
+    if (categoriesError) {
+      console.error('[ManageMcqsPage] Error fetching categories:', categoriesError);
+      toast({ title: "Error", description: "Failed to load categories for filter.", variant: "destructive" });
+    } else {
+      let allLinkedMcqIdsData: { mcq_id: string }[] = [];
+      let offsetLinkedIds = 0;
+      const limitLinkedIds = 1000;
+      let hasMoreLinkedIds = true;
 
-    // Fetch all links to count uncategorized MCQs efficiently
-    const { data: allLinks, error: linksError } = await supabase
-      .from('mcq_category_links')
-      .select('mcq_id, category_id');
-    
-    if (linksError) throw linksError;
+      while (hasMoreLinkedIds) {
+        const { data: chunkData, error: linkedMcqIdsError } = await supabase
+          .from('mcq_category_links')
+          .select('mcq_id')
+          .range(offsetLinkedIds, offsetLinkedIds + limitLinkedIds - 1);
 
-    const linkCountMap = new Map<string, number>();
-    const uniqueLinkedMcqIds = new Set<string>();
+        if (linkedMcqIdsError) {
+          console.error('[ManageMcqsPage] Error fetching all linked MCQ IDs:', linkedMcqIdsError);
+          break; 
+        }
 
-    allLinks.forEach(link => {
-      uniqueLinkedMcqIds.add(link.mcq_id);
-      linkCountMap.set(link.category_id, (linkCountMap.get(link.category_id) || 0) + 1);
-    });
+        if (chunkData && chunkData.length > 0) {
+          allLinkedMcqIdsData = allLinkedMcqIdsData.concat(chunkData);
+          offsetLinkedIds += chunkData.length;
+          hasMoreLinkedIds = chunkData.length === limitLinkedIds;
+        } else {
+          hasMoreLinkedIds = false;
+        }
+      }
+      const allLinkedMcqIds = allLinkedMcqIdsData.map(link => link.mcq_id);
+      const uniqueLinkedMcqIds = new Set(allLinkedMcqIds);
 
-    const { count: totalMcqCount } = await supabase
-      .from('mcqs')
-      .select('id', { count: 'exact', head: true });
+      const categoriesWithCounts = await Promise.all(
+        (categoriesData || []).map(async (category) => {
+          const { count: mcqCount, error: mcqCountError } = await supabase
+            .from('mcq_category_links')
+            .select('mcq_id', { count: 'exact', head: true })
+            .eq('category_id', category.id);
 
-    const categoriesWithStats = (categoriesData || []).map(cat => ({
-      ...cat,
-      mcq_count: linkCountMap.get(cat.id) || 0
-    }));
+          if (mcqCountError) {
+            console.error(`[ManageMcqsPage] Error fetching count for ${category.name}:`, mcqCountError);
+          }
+          return { ...category, mcq_count: mcqCount || 0 };
+        })
+      );
 
-    const uncategorizedCount = Math.max(0, (totalMcqCount || 0) - uniqueLinkedMcqIds.size);
-    
-    return [
-      ...categoriesWithStats,
-      { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: uncategorizedCount }
-    ];
+      const { count: totalMcqCount } = await supabase
+        .from('mcqs')
+        .select('id', { count: 'exact', head: true });
+
+      const uncategorizedMcqCount = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
+
+      setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: Math.max(0, uncategorizedMcqCount) }]);
+    }
   };
 
-  // Helper to fetch all MCQs and their links
-  const fetchMcqsData = async (currentCategories: Category[]): Promise<MCQ[]> => {
-    let allMcqs: any[] = [];
-    let allLinks: DbMcqCategoryLink[] = [];
-    const limit = 1000;
+  const fetchMcqs = async () => {
+    setIsPageLoading(true);
 
-    // 1. Fetch MCQs (filtered by search term if active)
+    let allMcqs: any[] = [];
+    let allMcqCategoryLinks: DbMcqCategoryLink[] = [];
+    const limit = 1000; 
+
     let offsetMcqs = 0;
     let hasMoreMcqs = true;
     while (hasMoreMcqs) {
-      let query = supabase
+      let mcqsQuery = supabase
         .from('mcqs')
-        .select('id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation_id, difficulty, is_trial_mcq')
-        .range(offsetMcqs, offsetMcqs + limit - 1)
-        .order('created_at', { ascending: true });
+        .select(`
+          id,
+          question_text,
+          option_a,
+          option_b,
+          option_c,
+          option_d,
+          correct_answer,
+          explanation_id,
+          difficulty,
+          is_trial_mcq
+        `)
+        .range(offsetMcqs, offsetMcqs + limit - 1);
 
-      if (searchTerm) query = query.ilike('question_text', `%${searchTerm}%`);
+      if (searchTerm) {
+        mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
+      }
+      mcqsQuery = mcqsQuery.order('created_at', { ascending: true });
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data: mcqsData, error: mcqsError } = await mcqsQuery;
 
-      if (data && data.length > 0) {
-        allMcqs = allMcqs.concat(data);
-        offsetMcqs += data.length;
-        hasMoreMcqs = data.length === limit;
+      if (mcqsError) {
+        console.error('[ManageMcqsPage] Error fetching MCQs:', mcqsError.message);
+        toast({ title: "Error", description: "Failed to load MCQs.", variant: "destructive" });
+        setRawMcqs([]);
+        setIsPageLoading(false);
+        return;
+      }
+
+      if (mcqsData && mcqsData.length > 0) {
+        allMcqs = allMcqs.concat(mcqsData);
+        offsetMcqs += mcqsData.length;
+        hasMoreMcqs = mcqsData.length === limit;
       } else {
         hasMoreMcqs = false;
       }
     }
 
-    // 2. Fetch Category Links
     let offsetLinks = 0;
     let hasMoreLinks = true;
     while (hasMoreLinks) {
-      const { data, error } = await supabase
+      const { data: mcqCategoryLinksData, error: mcqCategoryLinksError } = await supabase
         .from('mcq_category_links')
         .select('mcq_id, category_id')
         .range(offsetLinks, offsetLinks + limit - 1);
 
-      if (error) throw error;
+      if (mcqCategoryLinksError) {
+        console.error('[ManageMcqsPage] Error fetching links:', mcqCategoryLinksError);
+        toast({ title: "Error", description: "Failed to load links.", variant: "destructive" });
+        setRawMcqs([]);
+        setIsPageLoading(false);
+        return;
+      }
 
-      if (data && data.length > 0) {
-        allLinks = allLinks.concat(data);
-        offsetLinks += data.length;
-        hasMoreLinks = data.length === limit;
+      if (mcqCategoryLinksData && mcqCategoryLinksData.length > 0) {
+        allMcqCategoryLinks = allMcqCategoryLinks.concat(mcqCategoryLinksData);
+        offsetLinks += mcqCategoryLinksData.length;
+        hasMoreLinks = mcqCategoryLinksData.length === limit;
       } else {
         hasMoreLinks = false;
       }
     }
 
-    // 3. Combine using Maps for O(1) lookups
-    const catMap = new Map(currentCategories.map(c => [c.id, c.name]));
-    const linksByMcq = new Map<string, { category_id: string; category_name: string }[]>();
-
-    allLinks.forEach(link => {
-      if (!linksByMcq.has(link.mcq_id)) linksByMcq.set(link.mcq_id, []);
-      linksByMcq.get(link.mcq_id)?.push({
-        category_id: link.category_id,
-        category_name: catMap.get(link.category_id) || 'Unknown'
-      });
+    const categoryNameMap = new Map(categories.map(cat => [cat.id, cat.name]));
+    const mcqLinksMap = new Map<string, DbMcqCategoryLink[]>();
+    allMcqCategoryLinks.forEach(link => { 
+      if (!mcqLinksMap.has(link.mcq_id)) {
+        mcqLinksMap.set(link.mcq_id, []);
+      }
+      mcqLinksMap.get(link.mcq_id)?.push(link);
     });
 
-    return allMcqs.map(mcq => ({
-      ...mcq,
-      category_links: linksByMcq.get(mcq.id) || []
-    }));
+    const displayMcqs: DisplayMCQ[] = (allMcqs || []).map((mcq: any) => { 
+      const linksForMcq = mcqLinksMap.get(mcq.id) || [];
+      const hydratedLinks = linksForMcq.map(link => ({
+        category_id: link.category_id,
+        category_name: categoryNameMap.get(link.category_id) || null,
+      }));
+      return {
+        ...mcq,
+        category_links: hydratedLinks,
+      };
+    });
+    setRawMcqs(displayMcqs || []);
+    setIsPageLoading(false);
   };
 
-  const loadData = useCallback(async () => {
+  const loadData = async () => {
     setIsPageLoading(true);
-    try {
-      // Parallelize category and MCQ fetching
-      const categoriesData = await fetchCategoriesData();
-      setCategories(categoriesData);
-      
-      const mcqsData = await fetchMcqsData(categoriesData);
-      setRawMcqs(mcqsData);
-    } catch (error: any) {
-      console.error('[ManageMcqsPage] Load error:', error);
-      toast({ title: "Error", description: "Failed to load management data.", variant: "destructive" });
-    } finally {
-      setIsPageLoading(false);
-    }
-  }, [searchTerm, toast]);
+    await fetchCategories(); 
+    await fetchMcqs(); 
+    setIsPageLoading(false);
+  };
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      loadData();
+      fetchCategories();
     }
-  }, [hasCheckedInitialSession, loadData]);
+  }, [hasCheckedInitialSession]);
+
+  useEffect(() => {
+    if (hasCheckedInitialSession && categories.length > 0) {
+      fetchMcqs();
+    }
+  }, [searchTerm, hasCheckedInitialSession, categories]); 
 
   const filteredMcqs = useMemo(() => {
-    if (!selectedFilterCategory || selectedFilterCategory === "all") return rawMcqs;
-    if (selectedFilterCategory === UNCATEGORIZED_ID) return rawMcqs.filter(m => m.category_links.length === 0);
-    return rawMcqs.filter(m => m.category_links.some(l => l.category_id === selectedFilterCategory));
+    if (!selectedFilterCategory || selectedFilterCategory === "all") {
+      return rawMcqs;
+    }
+
+    if (selectedFilterCategory === UNCATEGORIZED_ID) {
+      return rawMcqs.filter(mcq => mcq.category_links.length === 0);
+    }
+
+    return rawMcqs.filter(mcq =>
+      mcq.category_links.some(link => link.category_id === selectedFilterCategory)
+    );
   }, [rawMcqs, selectedFilterCategory]);
 
   const handleDeleteMcq = async (mcqId: string, explanationId: string | null) => {
-    if (!window.confirm("Are you sure?")) return;
+    if (!window.confirm("Are you sure you want to delete this MCQ? This action cannot be undone.")) {
+      return;
+    }
     try {
       await supabase.from('mcq_category_links').delete().eq('mcq_id', mcqId);
       const { error: mcqError } = await supabase.from('mcqs').delete().eq('id', mcqId);
       if (mcqError) throw mcqError;
       if (explanationId) await supabase.from('mcq_explanations').delete().eq('id', explanationId);
-      toast({ title: "Success!", description: "MCQ deleted." });
+      toast({ title: "Success!", description: "MCQ deleted successfully." });
       loadData();
     } catch (error: any) {
-      toast({ title: "Error", description: `Failed: ${error.message}`, variant: "destructive" });
+      console.error("Error deleting MCQ:", error);
+      toast({ title: "Error", description: `Failed to delete MCQ: ${error.message}`, variant: "destructive" });
     }
   };
 
@@ -203,23 +261,39 @@ const ManageMcqsPage = () => {
     const selectedMcqIds = selectedIndices.map(index => filteredMcqs[parseInt(index)].id);
 
     if (selectedMcqIds.length === 0) {
-      toast({ title: "No MCQs Selected", description: "Please select MCQs to enhance.", variant: "destructive" });
+      toast({ title: "No MCQs Selected", description: "Please select one or more MCQs to enhance.", variant: "destructive" });
       return;
     }
 
-    if (!window.confirm(`Enhance ${selectedMcqIds.length} MCQs with AI?`)) return;
+    if (!window.confirm(`You are about to enhance ${selectedMcqIds.length} MCQs with AI. Continue?`)) {
+      return;
+    }
 
     setIsEnhancing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', { body: { mcq_ids: selectedMcqIds } });
+      const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
+        body: { mcq_ids: selectedMcqIds },
+      });
+
       if (error) throw error;
-      toast({ title: "Complete", description: `Enhanced ${data.successCount} MCQs.` });
-    } catch (error: any) {
-      toast({ title: "Error", description: "Enhancement failed.", variant: "destructive" });
-    } finally {
-      setIsEnhancing(false);
+
+      if (data.errorCount > 0) {
+        toast({
+          title: "Partial Success",
+          description: `Enhanced ${data.successCount} MCQs. ${data.errorCount} failed. Check console for details.`,
+          variant: "default",
+        });
+        console.error("Bulk Enhance Errors:", data.errors);
+      } else {
+        toast({ title: "Success!", description: `Successfully enhanced ${data.successCount} MCQs.` });
+      }
       setRowSelection({});
       loadData();
+    } catch (error: any) {
+      console.error("Error bulk enhancing MCQs:", error);
+      toast({ title: "Error", description: `Failed to enhance MCQs: ${error.message || 'Unknown error'}`, variant: "destructive" });
+    } finally {
+      setIsEnhancing(false);
     }
   };
 
@@ -228,31 +302,37 @@ const ManageMcqsPage = () => {
     setIsEditDialogOpen(true);
   };
 
-  const columns = useMemo(() => createMcqColumns({ onDelete: handleDeleteMcq, onEdit: handleEditClick }), [loadData]);
+  const columns = useMemo(() => createMcqColumns({ onDelete: handleDeleteMcq, onEdit: handleEditClick }), []);
 
-  if (!hasCheckedInitialSession) return <LoadingBar />;
+  if (!hasCheckedInitialSession || isPageLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
+        <p className="text-gray-700 dark:text-gray-300">Loading questions...</p>
+      </div>
+    );
+  }
 
   const numSelected = Object.keys(rowSelection).length;
 
   return (
     <div className="space-y-6">
-      {isPageLoading && <LoadingBar />}
       <h1 className="text-3xl font-bold">Manage MCQs</h1>
 
       <Card>
         <CardHeader>
           <CardTitle>Filter & Search</CardTitle>
+          <CardDescription>Filter questions by category or search by text.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex-1">
-            <Label htmlFor="search-term">Search Text</Label>
-            <Input id="search-term" placeholder="Find question..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <Label htmlFor="search-term">Search Question Text</Label>
+            <Input id="search-term" placeholder="Enter keywords to search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
-              <Label htmlFor="filterCategory">Category</Label>
-              <Select onValueChange={(v) => setSelectedFilterCategory(v === "all" ? null : v)} value={selectedFilterCategory || "all"}>
-                <SelectTrigger id="filterCategory"><SelectValue placeholder="Select category" /></SelectTrigger>
+              <Label htmlFor="filterCategory">Filter by Category</Label>
+              <Select onValueChange={(value) => setSelectedFilterCategory(value === "all" ? null : value)} value={selectedFilterCategory || "all"}>
+                <SelectTrigger id="filterCategory"><SelectValue placeholder="All Categories" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
                   {categories.map((cat) => (
@@ -262,7 +342,7 @@ const ManageMcqsPage = () => {
               </Select>
             </div>
             <div className="flex items-end">
-                <Button onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); }} variant="outline" className="w-full sm:w-auto">Reset</Button>
+                <Button onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); }} variant="outline" className="w-full sm:w-auto">Reset Filters</Button>
             </div>
           </div>
         </CardContent>
@@ -271,6 +351,7 @@ const ManageMcqsPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Bulk Actions</CardTitle>
+          <CardDescription>Perform actions on multiple selected questions.</CardDescription>
         </CardHeader>
         <CardContent>
             <Button onClick={handleBulkEnhance} disabled={isEnhancing || numSelected === 0}>
@@ -283,11 +364,12 @@ const ManageMcqsPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Multiple Choice Questions</CardTitle>
+          <CardDescription>View and manage all MCQs in your database.</CardDescription>
         </CardHeader>
         <CardContent>
           <DataTable columns={columns} data={filteredMcqs} rowSelection={rowSelection} setRowSelection={setRowSelection} />
           {!isPageLoading && filteredMcqs.length === 0 && (
-            <div className="mt-8 text-center text-muted-foreground">No questions matching your filters.</div>
+            <div className="mt-8 text-center text-muted-foreground">No questions found matching your filters.</div>
           )}
         </CardContent>
       </Card>

@@ -105,7 +105,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{video ? 'Edit Video' : 'Add Video'}</DialogTitle>
           <DialogDescription>Quickly find and add educational videos.</DialogDescription>
@@ -118,7 +118,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
               value={topic} 
               onChange={(e) => setTopic(e.target.value)} 
             />
-            <Button onClick={handleAiSearch} disabled={isGenerating} size="sm">
+            <Button onClick={handleAiSearch} disabled={isGenerating} size="sm" type="button">
               {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
               AI Find
             </Button>
@@ -135,7 +135,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
                   <FormLabel className="flex justify-between">
                     <span>YouTube ID (11 chars)</span>
                     {field.value?.length === 11 && (
-                      <a href={`https://youtube.com/watch?v=${field.value}`} target="_blank" className="text-xs text-blue-500 flex items-center gap-1">
+                      <a href={`https://youtube.com/watch?v=${field.value}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 flex items-center gap-1">
                         Open <ExternalLink className="h-3 w-3" />
                       </a>
                     )}

@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Wand2, Loader2 } from 'lucide-react'; 
 import { useSession } from '@/components/SessionContextProvider'; 
 import { RowSelectionState } from '@tanstack/react-table';
+import LoadingBar from '@/components/LoadingBar';
 
 interface Category {
   id: string;
@@ -108,8 +109,6 @@ const ManageMcqsPage = () => {
   };
 
   const fetchMcqs = async () => {
-    setIsPageLoading(true);
-
     let allMcqs: any[] = [];
     let allMcqCategoryLinks: DbMcqCategoryLink[] = [];
     const limit = 1000; 
@@ -203,10 +202,9 @@ const ManageMcqsPage = () => {
       };
     });
     setRawMcqs(displayMcqs || []);
-    setIsPageLoading(false);
   };
 
-  const loadData = async () => {
+  const refreshAllData = async () => {
     setIsPageLoading(true);
     await fetchCategories(); 
     await fetchMcqs(); 
@@ -215,15 +213,19 @@ const ManageMcqsPage = () => {
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      fetchCategories();
+      refreshAllData();
     }
   }, [hasCheckedInitialSession]);
 
+  // Handle search with separate effect to avoid re-fetching categories unnecessarily
   useEffect(() => {
     if (hasCheckedInitialSession && categories.length > 0) {
-      fetchMcqs();
+      const debounceTimer = setTimeout(() => {
+        fetchMcqs().then(() => setIsPageLoading(false));
+      }, 500);
+      return () => clearTimeout(debounceTimer);
     }
-  }, [searchTerm, hasCheckedInitialSession, categories]); 
+  }, [searchTerm, hasCheckedInitialSession]);
 
   const filteredMcqs = useMemo(() => {
     if (!selectedFilterCategory || selectedFilterCategory === "all") {
@@ -249,7 +251,7 @@ const ManageMcqsPage = () => {
       if (mcqError) throw mcqError;
       if (explanationId) await supabase.from('mcq_explanations').delete().eq('id', explanationId);
       toast({ title: "Success!", description: "MCQ deleted successfully." });
-      loadData();
+      refreshAllData();
     } catch (error: any) {
       console.error("Error deleting MCQ:", error);
       toast({ title: "Error", description: `Failed to delete MCQ: ${error.message}`, variant: "destructive" });
@@ -288,7 +290,7 @@ const ManageMcqsPage = () => {
         toast({ title: "Success!", description: `Successfully enhanced ${data.successCount} MCQs.` });
       }
       setRowSelection({});
-      loadData();
+      refreshAllData();
     } catch (error: any) {
       console.error("Error bulk enhancing MCQs:", error);
       toast({ title: "Error", description: `Failed to enhance MCQs: ${error.message || 'Unknown error'}`, variant: "destructive" });
@@ -304,12 +306,8 @@ const ManageMcqsPage = () => {
 
   const columns = useMemo(() => createMcqColumns({ onDelete: handleDeleteMcq, onEdit: handleEditClick }), []);
 
-  if (!hasCheckedInitialSession || isPageLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
-        <p className="text-gray-700 dark:text-gray-300">Loading questions...</p>
-      </div>
-    );
+  if (!hasCheckedInitialSession || (isPageLoading && rawMcqs.length === 0)) {
+    return <LoadingBar />;
   }
 
   const numSelected = Object.keys(rowSelection).length;
@@ -375,7 +373,7 @@ const ManageMcqsPage = () => {
       </Card>
 
       {selectedMcqForEdit && (
-        <EditMcqDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mcq={selectedMcqForEdit} onSave={loadData} />
+        <EditMcqDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mcq={selectedMcqForEdit} onSave={refreshAllData} />
       )}
       <MadeWithDyad />
     </div>

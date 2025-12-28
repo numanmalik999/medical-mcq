@@ -11,9 +11,8 @@ import { Loader2, Upload, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import * as XLSX from 'xlsx';
 import { Separator } from '@/components/ui/separator';
-import { useSession } from '@/components/SessionContextProvider'; // Import useSession
+import { useSession } from '@/components/SessionContextProvider';
 
-// Define the expected structure of an incoming MCQ object
 interface IncomingMcq {
   question: string;
   options: {
@@ -25,7 +24,7 @@ interface IncomingMcq {
   correct_answer: 'A' | 'B' | 'C' | 'D';
   explanation: string;
   image_url?: string;
-  category_name?: string; // Changed from category_id to category_name
+  category_name?: string;
   difficulty?: string;
   is_trial_mcq?: boolean;
 }
@@ -34,13 +33,13 @@ const BulkUploadMcqsPage = () => {
   const [jsonData, setJsonData] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isPageLoading, setIsPageLoading] = useState(true); // New loading state for initial check
+  const [isPageLoading, setIsPageLoading] = useState(true);
 
-  const { hasCheckedInitialSession } = useSession(); // Get hasCheckedInitialSession
+  const { hasCheckedInitialSession } = useSession();
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      setIsPageLoading(false); // Once initial session check is done, stop page loading
+      setIsPageLoading(false);
     }
   }, [hasCheckedInitialSession]);
 
@@ -140,13 +139,13 @@ const BulkUploadMcqsPage = () => {
         loadingToastId = showLoading(`Parsing spreadsheet "${selectedFile.name}"...`);
         mcqsToUpload = await parseSpreadsheet(selectedFile);
         dismissToast(loadingToastId);
-        loadingToastId = showLoading(`Uploading ${mcqsToUpload.length} MCQs from spreadsheet. This may take a moment.`);
+        loadingToastId = showLoading(`Uploading ${mcqsToUpload.length} MCQs. This may take a moment.`);
       } else if (jsonData.trim()) {
         loadingToastId = showLoading(`Processing JSON data...`);
         const parsedJson = JSON.parse(jsonData);
         mcqsToUpload = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
         dismissToast(loadingToastId);
-        loadingToastId = showLoading(`Uploading ${mcqsToUpload.length} MCQs from JSON. This may take a moment.`);
+        loadingToastId = showLoading(`Uploading ${mcqsToUpload.length} MCQs. This may take a moment.`);
       } else {
         showError("Please provide either a spreadsheet file or JSON data.");
         setIsUploading(false);
@@ -171,14 +170,12 @@ const BulkUploadMcqsPage = () => {
         body: { mcqs: mcqsToUpload },
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (loadingToastId) dismissToast(loadingToastId);
 
       if (data.errorCount > 0) {
-        showError(`Successfully uploaded ${data.successCount} MCQs. ${data.errorCount} failed. Check console for details.`);
+        showError(`Uploaded ${data.successCount} MCQs. ${data.errorCount} failed. Check console for details.`);
         console.error("Bulk MCQ Upload Errors:", data.errors);
       } else {
         showSuccess(`Successfully uploaded ${data.successCount} MCQs.`);
@@ -194,7 +191,7 @@ const BulkUploadMcqsPage = () => {
     }
   };
 
-  if (!hasCheckedInitialSession || isPageLoading) { // Use hasCheckedInitialSession for initial loading
+  if (!hasCheckedInitialSession || isPageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading bulk upload page...</p>
@@ -210,16 +207,18 @@ const BulkUploadMcqsPage = () => {
           <CardDescription>Upload multiple choice questions using either a JSON array or a spreadsheet file.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Spreadsheet Upload Section */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <Upload className="h-5 w-5" /> Upload from Spreadsheet (.xlsx, .csv)
             </h3>
-            <p className="text-sm text-muted-foreground">
-              Your spreadsheet should have the following **exact** column headers: `Question`, `Option A`, `Option B`, `Option C`, `Option D`, `Correct Answer` (A, B, C, or D).
-              <br />
-              Optional columns: `Explanation` (defaults to "No explanation provided." if empty), `Image URL`, `Category Name`, `Difficulty` (Easy, Medium, Hard), `Is Trial MCQ` (TRUE or FALSE).
-            </p>
+            <div className="text-sm text-muted-foreground bg-muted p-4 rounded-md border">
+              <p className="font-medium mb-1">Spreadsheet Formatting:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Required Headers: `Question`, `Option A`, `Option B`, `Option C`, `Option D`, `Correct Answer`.</li>
+                <li><strong>Multiple Categories:</strong> You can link an MCQ to multiple categories by separating them with commas in the `Category Name` column (e.g., <code className="bg-gray-200 px-1 rounded">Anatomy, Cardiology, Surgery</code>).</li>
+                <li>Optional columns: `Explanation`, `Image URL`, `Difficulty` (Easy, Medium, Hard), `Is Trial MCQ` (TRUE or FALSE).</li>
+              </ul>
+            </div>
             <a href="/example_mcqs.xlsx" download="example_mcqs.xlsx" className="inline-flex items-center text-primary hover:underline text-sm">
               <Download className="h-4 w-4 mr-1" /> Download Example Spreadsheet
             </a>
@@ -231,56 +230,29 @@ const BulkUploadMcqsPage = () => {
               disabled={isUploading}
             />
             {selectedFile && (
-              <p className="text-sm text-muted-foreground">Selected file: {selectedFile.name}</p>
+              <p className="text-sm text-muted-foreground font-medium">Selected file: {selectedFile.name}</p>
             )}
           </div>
 
           <Separator />
 
-          {/* JSON Upload Section */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Or, Paste JSON Data:</h3>
-            <div className="space-y-2">
-              <h4 className="text-md font-medium">JSON Format Example:</h4>
-              <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-md text-sm overflow-x-auto">
-                {`[
-  {
-    "question": "Your question text here...",
-    "options": {
-      "A": "Option A text",
-      "B": "Option B text",
-      "C": "Option C text",
-      "D": "Option D text"
-    },
-    "correct_answer": "A",
-    "explanation": "Detailed explanation for the correct answer.", // Optional, will default if empty
-    "image_url": "https://example.com/image.jpg", // Optional
-    "category_name": "Biology", // Optional
-    "difficulty": "Easy", // Optional: "Easy", "Medium", "Hard"
-    "is_trial_mcq": true // Optional: defaults to false
-  },
-  // ... more MCQs
-]`}
-              </pre>
-            </div>
-
-            <div className="space-y-2">
-              <Textarea
-                placeholder="Paste your MCQ JSON array here..."
-                rows={15}
-                value={jsonData}
-                onChange={(e) => setJsonData(e.target.value)}
-                className="font-mono"
-                disabled={isUploading || !!selectedFile}
-              />
-            </div>
+            <Textarea
+              placeholder='[ { "question": "...", "category_name": "Cat1, Cat2", ... } ]'
+              rows={10}
+              value={jsonData}
+              onChange={(e) => setJsonData(e.target.value)}
+              className="font-mono"
+              disabled={isUploading || !!selectedFile}
+            />
           </div>
 
           <Button onClick={handleUpload} className="w-full" disabled={isUploading || (!jsonData.trim() && !selectedFile)}>
             {isUploading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
+                Uploading Questions...
               </>
             ) : (
               "Upload MCQs"

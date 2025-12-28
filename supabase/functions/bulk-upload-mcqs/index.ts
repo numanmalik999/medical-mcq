@@ -20,7 +20,7 @@ interface IncomingMcq {
   correct_answer: 'A' | 'B' | 'C' | 'D';
   explanation: string;
   image_url?: string;
-  category_name?: string; // Changed from category_id to category_name
+  category_name?: string; 
   difficulty?: string;
   is_trial_mcq?: boolean;
 }
@@ -32,7 +32,6 @@ serve(async (req: Request) => {
   }
 
   // Initialize Supabase client with service role key
-  // This bypasses RLS, which is necessary for bulk admin inserts
   // @ts-ignore
   const supabaseAdmin = createClient(
     // @ts-ignore
@@ -42,7 +41,6 @@ serve(async (req: Request) => {
   );
 
   try {
-    // Basic authentication check (optional, but good practice for admin functions)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Unauthorized: No Authorization header' }), {
@@ -67,54 +65,20 @@ serve(async (req: Request) => {
 
     for (const mcq of incomingMcqs) {
       try {
-        let categoryId: string | null = null;
-
-        // Handle Category
-        if (mcq.category_name) {
-          // Check if category exists
-          const { data: existingCategory, error: categoryFetchError } = await supabaseAdmin
-            .from('categories')
-            .select('id')
-            .eq('name', mcq.category_name)
-            .single();
-
-          if (categoryFetchError && categoryFetchError.code !== 'PGRST116') { // PGRST116 means no rows found
-            throw new Error(`Category fetch failed for "${mcq.category_name}": ${categoryFetchError.message}`);
-          }
-
-          if (existingCategory) {
-            categoryId = existingCategory.id;
-          } else {
-            // Create new category if it doesn't exist
-            const { data: newCategory, error: categoryInsertError } = await supabaseAdmin
-              .from('categories')
-              .insert({ name: mcq.category_name })
-              .select('id')
-              .single();
-
-            if (categoryInsertError) {
-              throw new Error(`Category insert failed for "${mcq.category_name}": ${categoryInsertError.message}`);
-            }
-            categoryId = newCategory.id;
-          }
-        }
-
         // 1. Insert explanation
         const { data: explanationData, error: explanationError } = await supabaseAdmin
           .from('mcq_explanations')
           .insert({
-            explanation_text: mcq.explanation,
+            explanation_text: mcq.explanation || 'No explanation provided.',
             image_url: mcq.image_url || null,
           })
           .select('id')
           .single();
 
-        if (explanationError) {
-          throw new Error(`Explanation insert failed: ${explanationError.message}`);
-        }
+        if (explanationError) throw new Error(`Explanation insert failed: ${explanationError.message}`);
 
         // 2. Insert MCQ
-        const { data: mcqData, error: mcqError } = await supabaseAdmin // Capture mcqData to get its ID
+        const { data: mcqData, error: mcqError } = await supabaseAdmin
           .from('mcqs')
           .insert({
             question_text: mcq.question,
@@ -127,24 +91,59 @@ serve(async (req: Request) => {
             difficulty: mcq.difficulty || null,
             is_trial_mcq: mcq.is_trial_mcq ?? false,
           })
-          .select('id') // Select the ID of the newly inserted MCQ
+          .select('id')
           .single();
 
-        if (mcqError) {
-          throw new Error(`MCQ insert failed: ${mcqError.message}`);
-        }
+        if (mcqError) throw new Error(`MCQ insert failed: ${mcqError.message}`);
 
-        // 3. Link MCQ to category if categoryId exists
-        if (categoryId) {
-          const { error: linkError } = await supabaseAdmin
-            .from('mcq_category_links')
-            .insert({
-              mcq_id: mcqData.id, // CORRECTED: Use mcqData.id here
-              category_id: categoryId,
-            });
+        // 3. Handle Categories (Multi-support)
+        if (mcq.category_name) {
+          // Split by comma and trim whitespace
+          const categoryNames = mcq.category_name
+            .split(',')
+            .map(name => name.trim())
+            .filter(name => name.length > 0);
 
-          if (linkError) {
-            throw new Error(`MCQ category link failed: ${linkError.message}`);
+          for (const catName of categoryNames) {
+            let categoryId: string | null = null;
+
+            // Check if category exists
+            const { data: existingCategory, error: categoryFetchError } = await supabaseAdmin
+              .from('categories')
+              .select('id')
+              .eq('name', catName)
+              .maybeSingle();
+
+            if (existingCategory) {
+              categoryId = existingCategory.id;
+            } else {
+              // Create new category
+              const { data: newCategory, error: categoryInsertError } = await supabaseAdmin
+                .from('categories')
+                .insert({ name: catName })
+                .select('id')
+                .single();
+
+              if (categoryInsertError) {
+                console.error(`Category insert failed for "${catName}":`, categoryInsertError);
+                continue; // Skip this specific category link but continue
+              }
+              categoryId = newCategory.id;
+            }
+
+            // Link MCQ to category
+            if (categoryId) {
+              const { error: linkError } = await supabaseAdmin
+                .from('mcq_category_links')
+                .insert({
+                  mcq_id: mcqData.id,
+                  category_id: categoryId,
+                });
+
+              if (linkError) {
+                console.error(`Link failed for "${catName}":`, linkError);
+              }
+            }
           }
         }
 

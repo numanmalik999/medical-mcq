@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import * as LucideIcons from 'lucide-react'; // Import all Lucide icons
+import * as LucideIcons from 'lucide-react'; 
 import { CalendarDays, Check, Loader2, Zap, Trophy, Globe, BookOpenText, GraduationCap } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,15 +15,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
-import { useLandingPageSettings } from '@/hooks/useLandingPageSettings'; // Import new hook
+import { useLandingPageSettings } from '@/hooks/useLandingPageSettings';
+import LoadingBar from '@/components/LoadingBar';
 
-// Helper to get Lucide Icon component by name
 const getIconComponent = (iconName: string) => {
   const Icon = (LucideIcons as any)[iconName];
   return Icon ? <Icon className="h-8 w-8 text-primary" /> : <Globe className="h-8 w-8 text-primary" />;
 };
 
-// Define a type for FAQ items (simplified for landing page display)
 interface FaqItem {
   question: string;
   answer: string;
@@ -84,12 +83,9 @@ const LandingPage = () => {
     },
   });
 
-  // --- SEO and Meta Tag Update ---
   useEffect(() => {
     if (!isLoadingSettings) {
       document.title = settings.seo.metaTitle;
-      
-      // Helper function to update or create meta tags
       const updateMetaTag = (name: string, content: string) => {
         let tag = document.querySelector(`meta[name="${name}"]`);
         if (!tag) {
@@ -193,11 +189,7 @@ const LandingPage = () => {
   };
 
   if (!hasCheckedInitialSession || isLoadingSettings) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-gray-700 dark:text-gray-300">Loading...</p>
-      </div>
-    );
+    return <LoadingBar />;
   }
 
   return (
@@ -286,11 +278,10 @@ const LandingPage = () => {
         </div>
       </section>
       
-      {/* New Section: Why We Are Different & Result Promise (Hardcoded for now) */}
+      {/* New Section: Why We Are Different & Result Promise */}
       <section className="py-16 md:py-24 bg-secondary text-secondary-foreground">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* What Makes Us Different */}
             <div className="space-y-6">
               <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
                 <Zap className="h-8 w-8 text-primary-foreground" /> What Makes Us Different?
@@ -311,7 +302,6 @@ const LandingPage = () => {
               </ul>
             </div>
 
-            {/* Result Promise */}
             <div className="space-y-6">
               <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
                 <Trophy className="h-8 w-8 text-primary-foreground" /> What’s the Result Promise?
@@ -434,7 +424,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* FAQ Section (Embedded) */}
+      {/* FAQ Section */}
       <section className="py-16 md:py-24 bg-background">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Frequently Asked Questions</h2>

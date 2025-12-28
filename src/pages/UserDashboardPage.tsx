@@ -9,7 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertCircle } from 'lucide-react'; // Imported missing icons
+import { CheckCircle2, AlertCircle } from 'lucide-react'; 
+import LoadingBar from '@/components/LoadingBar';
 
 interface QuizPerformance {
   totalAttempts: number;
@@ -20,7 +21,7 @@ interface QuizPerformance {
 interface RecentAttempt {
   id: string;
   mcq_id: string;
-  question_text: string; // From mcqs table
+  question_text: string; 
   selected_option: string;
   is_correct: boolean;
   attempt_timestamp: string;
@@ -34,16 +35,16 @@ interface Category {
 interface PerformanceSummary {
   id: string;
   name: string;
-  type: 'category'; // Simplified to only category
+  type: 'category'; 
   totalAttempts: number;
   correctAttempts: number;
-  accuracy: number; // Stored as a number for sorting
+  accuracy: number; 
 }
 
 const UserDashboardPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
-  const [isFetchingData, setIsFetchingData] = useState(true); // New combined loading state for data fetches
+  const [isFetchingData, setIsFetchingData] = useState(true); 
 
   const [quizPerformance, setQuizPerformance] = useState<QuizPerformance | null>(null);
   const [recentAttempts, setRecentAttempts] = useState<RecentAttempt[]>([]);
@@ -51,16 +52,15 @@ const UserDashboardPage = () => {
   const [areasForImprovement, setAreasForImprovement] = useState<PerformanceSummary[]>([]);
   const [suggestedPractice, setSuggestedPractice] = useState<PerformanceSummary[]>([]);
 
-  const isGuestMode = !user; // Determine if in guest mode
+  const isGuestMode = !user; 
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
       if (user) {
-        // Only fetch data if user is present and initial session check is complete
         const fetchData = async () => {
           setIsFetchingData(true);
           await Promise.all([
-            fetchAllCategories(), // Changed to only fetch categories
+            fetchAllCategories(), 
             fetchQuizPerformance(),
             fetchRecentAttempts(),
           ]);
@@ -68,24 +68,21 @@ const UserDashboardPage = () => {
         };
         fetchData();
       } else {
-        // If no user (guest mode), still fetch categories for recommendations, but no personal data
         const fetchDataForGuest = async () => {
           setIsFetchingData(true);
-          await fetchAllCategories(); // Changed to only fetch categories
-          // No personal quiz performance or attempts for guests
+          await fetchAllCategories(); 
           setQuizPerformance({ totalAttempts: 0, correctAttempts: 0, accuracy: '0.00%' });
           setRecentAttempts([]);
           setAreasForImprovement([]);
-          setSuggestedPractice([]); // Guests don't have personalized suggestions yet
+          setSuggestedPractice([]); 
           setIsFetchingData(false);
         };
         fetchDataForGuest();
       }
     }
-  }, [user, hasCheckedInitialSession]); // Dependencies changed
+  }, [user, hasCheckedInitialSession]); 
 
   const fetchAllCategories = async () => {
-    // No local loading state here, handled by parent isFetchingData
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*');
@@ -99,12 +96,11 @@ const UserDashboardPage = () => {
   };
 
   const fetchQuizPerformance = async () => {
-    if (!user) return; // Ensure user is available
-    // No local loading state here, handled by parent isFetchingData
+    if (!user) return; 
 
     const { data: attemptsData, error: attemptsError } = await supabase
       .from('user_quiz_attempts')
-      .select('is_correct, category_id') // Removed subcategory_id
+      .select('is_correct, category_id') 
       .eq('user_id', user.id);
 
     if (attemptsError) {
@@ -124,7 +120,6 @@ const UserDashboardPage = () => {
       accuracy: `${accuracy}%`,
     });
 
-    // Process data for recommendations
     generateRecommendations(attemptsData);
   };
 
@@ -145,7 +140,6 @@ const UserDashboardPage = () => {
 
     const performanceSummaries: PerformanceSummary[] = [];
 
-    // Categories
     Object.keys(categoryPerformance).forEach(catId => {
       const cat = allCategories.find(c => c.id === catId);
       if (cat) {
@@ -162,16 +156,14 @@ const UserDashboardPage = () => {
       }
     });
 
-    // Sort by accuracy (lowest first) for areas for improvement
     const sortedByAccuracy = [...performanceSummaries].sort((a, b) => a.accuracy - b.accuracy);
-    setAreasForImprovement(sortedByAccuracy.slice(0, 3)); // Top 3 lowest accuracy
+    setAreasForImprovement(sortedByAccuracy.slice(0, 3)); 
 
-    // Suggest practice in categories with fewer attempts or unattempted ones
     const attemptedCategoryIds = new Set(attemptsData.map(a => a.category_id).filter(Boolean));
     const unattemptedCategories = allCategories.filter(cat => !attemptedCategoryIds.has(cat.id));
 
     const suggested: PerformanceSummary[] = [];
-    unattemptedCategories.slice(0, 2).forEach(cat => { // Suggest up to 2 unattempted categories
+    unattemptedCategories.slice(0, 2).forEach(cat => { 
       suggested.push({
         id: cat.id,
         name: cat.name,
@@ -182,19 +174,17 @@ const UserDashboardPage = () => {
       });
     });
 
-    // Also suggest categories with low attempts but not necessarily low accuracy
     const lowAttemptCategories = performanceSummaries
-      .filter(p => p.type === 'category' && p.totalAttempts < 5 && p.accuracy > 50) // Example criteria
+      .filter(p => p.type === 'category' && p.totalAttempts < 5 && p.accuracy > 50) 
       .sort((a, b) => a.totalAttempts - b.totalAttempts)
-      .slice(0, 2 - suggested.length); // Fill up to 2 if unattempted are less
+      .slice(0, 2 - suggested.length); 
 
     suggested.push(...lowAttemptCategories);
     setSuggestedPractice(suggested);
   };
 
   const fetchRecentAttempts = async () => {
-    if (!user) return; // Ensure user is available
-    // No local loading state here, handled by parent isFetchingData
+    if (!user) return; 
 
     const { data, error } = await supabase
       .from('user_quiz_attempts')
@@ -208,7 +198,7 @@ const UserDashboardPage = () => {
       `)
       .eq('user_id', user.id)
       .order('attempt_timestamp', { ascending: false })
-      .limit(5); // Fetch last 5 attempts
+      .limit(5); 
 
     if (error) {
       console.error('Error fetching recent attempts:', error);
@@ -228,14 +218,9 @@ const UserDashboardPage = () => {
   };
 
   if (!hasCheckedInitialSession || isFetchingData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-gray-700">Loading user dashboard...</p>
-      </div>
-    );
+    return <LoadingBar />;
   }
 
-  // If user is null and not in guest mode (shouldn't happen with UserProtectedRoute, but as a fallback)
   if (!user && !isGuestMode) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">

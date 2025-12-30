@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import * as LucideIcons from 'lucide-react'; 
-import { CalendarDays, Check, Loader2, Zap, Trophy, Globe, BookOpenText, GraduationCap } from 'lucide-react';
+import { Check, Loader2, Globe, BookOpenText, ArrowRight, Calendar } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -17,21 +16,12 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { useLandingPageSettings } from '@/hooks/useLandingPageSettings';
 import LoadingBar from '@/components/LoadingBar';
+import { format } from 'date-fns';
 
 const getIconComponent = (iconName: string) => {
   const Icon = (LucideIcons as any)[iconName];
   return Icon ? <Icon className="h-8 w-8 text-primary" /> : <Globe className="h-8 w-8 text-primary" />;
 };
-
-interface FaqItem {
-  question: string;
-  answer: string;
-}
-
-interface FaqCategory {
-  category: string;
-  questions: FaqItem[];
-}
 
 interface SubscriptionTier {
   id: string;
@@ -44,22 +34,6 @@ interface SubscriptionTier {
   stripe_price_id: string | null;
 }
 
-const defaultFaqItems: FaqCategory[] = [
-  {
-    category: "General Questions",
-    questions: [
-      {
-        question: "What is Study Prometric MCQs?",
-        answer: "Study Prometric MCQs is an online platform designed to help medical students and professionals prepare for their exams through interactive quizzes, simulated tests, and AI-powered explanations.",
-      },
-      {
-        question: "How do I get started?",
-        answer: "You can start by signing up for a free trial to access a limited set of questions, or subscribe to one of our plans for full access to all features and our extensive question bank.",
-      },
-    ],
-  },
-];
-
 const marketingFormSchema = z.object({
   email: z.string().email("Invalid email address.").min(1, "Email is required."),
 });
@@ -69,12 +43,9 @@ const LandingPage = () => {
   const { toast } = useToast();
   const { settings, isLoading: isLoadingSettings } = useLandingPageSettings();
   
-  const [faqItems, setFaqItems] = useState<FaqCategory[]>(defaultFaqItems);
-  const [isLoadingFaq, setIsLoadingFaq] = useState(true);
   const [isSubscribing, setIsSubscribing] = useState(false);
-  
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
-  const [isFetchingTiers, setIsFetchingTiers] = useState(true);
+  const [recentBlogs, setRecentBlogs] = useState<any[]>([]);
 
   const marketingForm = useForm<z.infer<typeof marketingFormSchema>>({
     resolver: zodResolver(marketingFormSchema),
@@ -104,34 +75,7 @@ const LandingPage = () => {
   }, [isLoadingSettings, settings.seo]);
 
   useEffect(() => {
-    const fetchFaqContent = async () => {
-      setIsLoadingFaq(true);
-      const { data, error } = await supabase
-        .from('static_pages')
-        .select('content')
-        .eq('slug', 'faq')
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching FAQ content for landing page:', error);
-      } else if (data) {
-        try {
-          const parsedContent = JSON.parse(data.content || '[]');
-          if (Array.isArray(parsedContent) && parsedContent.every(item => 'category' in item && 'questions' in item)) {
-            const landingPageFaqs = parsedContent.slice(0, 1).flatMap(cat => cat.questions.slice(0, 4));
-            setFaqItems([{ category: "Frequently Asked Questions", questions: landingPageFaqs }]);
-          } else {
-            setFaqItems(defaultFaqItems);
-          }
-        } catch (parseError) {
-          setFaqItems(defaultFaqItems);
-        }
-      }
-      setIsLoadingFaq(false);
-    };
-
     const fetchSubscriptionTiers = async () => {
-      setIsFetchingTiers(true);
       const { data: tiersData, error: tiersError } = await supabase
         .from('subscription_tiers')
         .select('*, stripe_price_id')
@@ -144,11 +88,20 @@ const LandingPage = () => {
       } else {
         setSubscriptionTiers(tiersData || []);
       }
-      setIsFetchingTiers(false);
     };
 
-    fetchFaqContent();
+    const fetchRecentBlogs = async () => {
+      const { data } = await supabase
+        .from('blogs')
+        .select('title, slug, created_at, meta_description, image_url')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(3);
+      if (data) setRecentBlogs(data);
+    };
+
     fetchSubscriptionTiers();
+    fetchRecentBlogs();
   }, [toast]);
 
   const handleMarketingSubscribe = async (values: z.infer<typeof marketingFormSchema>) => {
@@ -160,29 +113,16 @@ const LandingPage = () => {
 
       if (error) {
         if (error.status === 409) {
-          toast({
-            title: "Already Subscribed",
-            description: "This email is already on our mailing list!",
-            variant: "default",
-          });
+          toast({ title: "Already Subscribed", description: "This email is already on our mailing list!" });
         } else {
           throw error;
         }
       } else {
-        toast({
-          title: "Subscription Successful!",
-          description: data.message || "Check your inbox for a confirmation email.",
-          variant: "default",
-        });
+        toast({ title: "Subscription Successful!", description: data.message || "Check your inbox for confirmation." });
         marketingForm.reset();
       }
     } catch (error: any) {
-      console.error("Client: Marketing subscription error:", error);
-      toast({
-        title: "Subscription Failed",
-        description: `Failed to subscribe: ${error.message || 'Unknown error'}`,
-        variant: "destructive",
-      });
+      toast({ title: "Subscription Failed", description: error.message, variant: "destructive" });
     } finally {
       setIsSubscribing(false);
     }
@@ -195,9 +135,7 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-background text-foreground pt-16">
       {/* Hero Section */}
-      <section
-        className="relative w-full py-20 md:py-32 bg-primary text-primary-foreground text-center overflow-hidden"
-      >
+      <section className="relative w-full py-20 md:py-32 bg-primary text-primary-foreground text-center overflow-hidden">
         <div className="container mx-auto px-4 relative z-10">
           <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-6 animate-fade-in-up">
             {settings.hero.mainTitle}
@@ -206,53 +144,16 @@ const LandingPage = () => {
             {settings.hero.subtitle}
           </p>
           <div className="flex flex-col justify-center gap-4 max-w-sm mx-auto sm:flex-row sm:max-w-none animate-fade-in-up delay-400">
-            {user ? (
-              <>
-                <Link to={user.is_admin ? "/admin/dashboard" : "/user/dashboard"} className="w-full sm:w-auto">
-                  <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full">
-                    Go to Dashboard
-                  </Button>
-                </Link>
-                <Link to="/quiz-of-the-day" className="w-full sm:w-auto">
-                  <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full">
-                    <CalendarDays className="h-5 w-5" /> Question of the Day
-                  </Button>
-                </Link>
-                <Link to="/quiz" className="w-full sm:w-auto">
-                  <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full">
-                    <BookOpenText className="h-5 w-5" /> Take a Quiz
-                  </Button>
-                </Link>
-                <Link to="/user/courses" className="w-full sm:w-auto">
-                  <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full">
-                    <GraduationCap className="h-5 w-5" /> Browse Courses
-                  </Button>
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link to="/signup" className="w-full sm:w-auto">
-                  <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full">
-                    {settings.hero.ctaPrimaryText}
-                  </Button>
-                </Link>
-                <Link to="/quiz" className="w-full sm:w-auto">
-                  <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full">
-                    <BookOpenText className="h-5 w-5" /> {settings.hero.ctaSecondaryText}
-                  </Button>
-                </Link>
-                <Link to="/quiz-of-the-day" className="w-full sm:w-auto">
-                  <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full">
-                    <CalendarDays className="h-5 w-5" /> Question of the Day
-                  </Button>
-                </Link>
-                <Link to="/user/courses" className="w-full sm:w-auto">
-                  <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full">
-                    <GraduationCap className="h-5 w-5" /> Browse Courses
-                  </Button>
-                </Link>
-              </>
-            )}
+            <Link to={user ? "/user/dashboard" : "/signup"} className="w-full sm:w-auto">
+              <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full">
+                {user ? "Go to Dashboard" : settings.hero.ctaPrimaryText}
+              </Button>
+            </Link>
+            <Link to="/quiz" className="w-full sm:w-auto">
+              <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full">
+                <BookOpenText className="h-5 w-5" /> Take a Free Quiz
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -260,13 +161,13 @@ const LandingPage = () => {
       {/* Features Section */}
       <section className="py-16 md:py-24 bg-background">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Choose Us?</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Powerful Learning Tools</h2>
           <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
-            Unlock your full potential with our comprehensive and intelligent learning tools.
+            Everything you need to master your medical licensing exams.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {settings.features.map((feature, index) => (
-              <Card key={index} className="flex flex-col items-center p-6 text-center hover:shadow-lg transition-shadow duration-300">
+              <Card key={index} className="flex flex-col items-center p-6 text-center hover:shadow-lg transition-all hover:-translate-y-1">
                 <div className="mb-4 p-3 rounded-full bg-primary/10">
                   {getIconComponent(feature.icon)}
                 </div>
@@ -277,124 +178,102 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
-      
-      {/* New Section: Why We Are Different & Result Promise */}
-      <section className="py-16 md:py-24 bg-secondary text-secondary-foreground">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <div className="space-y-6">
-              <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
-                <Zap className="h-8 w-8 text-primary-foreground" /> What Makes Us Different?
-              </h2>
-              <p className="text-lg">
-                We go beyond simple flashcards and static question banks. Our platform is built on three core pillars designed for modern medical education:
-              </p>
-              <ul className="space-y-4 text-base list-disc list-inside ml-4">
-                <li>
-                  <strong className="font-semibold">AI-Driven Insights:</strong> Every explanation is enhanced by AI to provide clinical context, diagnostic tests, and initial treatment plans, turning every question into a comprehensive learning module.
-                </li>
-                <li>
-                  <strong className="font-semibold">Community-Curated Content:</strong> Our question bank is constantly growing and validated by both experts and a community of peers, ensuring high relevance and accuracy for Prometric exams.
-                </li>
-                <li>
-                  <strong className="font-semibold">Adaptive Testing:</strong> Our system tracks your performance across categories and difficulties, allowing you to specifically target your weak areas with the "Attempt Incorrect" feature and personalized recommendations.
-                </li>
-              </ul>
-            </div>
 
-            <div className="space-y-6">
-              <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
-                <Trophy className="h-8 w-8 text-primary-foreground" /> What’s the Result Promise?
-              </h2>
-              <p className="text-lg">
-                Our commitment is simple: **Confidence and Competence.**
-              </p>
-              <ul className="space-y-4 text-base list-disc list-inside ml-4">
-                <li>
-                  <strong className="font-semibold">Maximize Retention:</strong> By focusing on detailed explanations and spaced repetition through targeted practice, you won't just memorize answers—you'll understand the underlying concepts.
-                </li>
-                <li>
-                  <strong className="font-semibold">Simulate Success:</strong> Our timed, full-length tests prepare you mentally and physically for the pressure of the actual exam, reducing anxiety on test day.
-                </li>
-                <li>
-                  <strong className="font-semibold">Guaranteed Improvement:</strong> Consistent use of our platform leads to measurable gains in accuracy and speed, transforming your weakest subjects into areas of strength. We aim to make you exam-ready, not just quiz-ready.
-                </li>
-              </ul>
+      {/* Blog/Articles Section */}
+      {recentBlogs.length > 0 && (
+        <section className="py-16 md:py-24 bg-gray-50 dark:bg-gray-900">
+          <div className="container mx-auto px-4">
+            <div className="flex justify-between items-end mb-12">
+              <div className="text-left">
+                <h2 className="text-3xl md:text-4xl font-bold mb-4">Educational Insights</h2>
+                <p className="text-muted-foreground">Expert advice and exam strategies from our team.</p>
+              </div>
+              <Button asChild variant="outline" className="hidden sm:flex">
+                <Link to="/blog">View All Articles <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {recentBlogs.map((blog: any) => (
+                <Card key={blog.slug} className="overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                  {blog.image_url && (
+                    <div className="h-48 overflow-hidden">
+                      <img src={blog.image_url} alt={blog.title} className="w-full h-full object-cover transition-transform hover:scale-105 duration-500" />
+                    </div>
+                  )}
+                  <CardHeader className="p-6">
+                    <div className="flex items-center text-xs text-muted-foreground mb-2 gap-2">
+                      <Calendar className="h-3 w-3" />
+                      {format(new Date(blog.created_at), 'MMM dd, yyyy')}
+                    </div>
+                    <CardTitle className="text-xl line-clamp-2 hover:text-primary transition-colors">
+                      <Link to={`/blog/${blog.slug}`}>{blog.title}</Link>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-6 flex-grow">
+                    <p className="text-sm text-muted-foreground line-clamp-3">{blog.meta_description}</p>
+                  </CardContent>
+                  <CardFooter className="p-6 pt-0">
+                    <Link to={`/blog/${blog.slug}`} className="text-sm font-bold text-primary flex items-center hover:underline">
+                      Read Article <ArrowRight className="ml-1 h-3 w-3" />
+                    </Link>
+                  </CardFooter>
+                </Card>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Subscription Tiers Section */}
-      <section className="py-16 md:py-24 bg-gray-50 dark:bg-gray-900">
+      <section className="py-16 md:py-24 bg-background">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">{settings.pricingCta.title}</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">{settings.pricingCta.title}</h2>
           <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
             {settings.pricingCta.subtitle}
           </p>
           
-          {isFetchingTiers ? (
-            <div className="flex justify-center items-center h-40">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : subscriptionTiers.length === 0 ? (
-            <p className="text-center text-muted-foreground">No subscription plans available at the moment.</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-              {subscriptionTiers.map((tier) => {
-                const isStripePlanAvailable = !!tier.stripe_price_id;
-                
-                const ctaLink = user 
-                  ? isStripePlanAvailable ? `/user/payment/${tier.id}?priceId=${tier.stripe_price_id}` : '#'
-                  : `/signup?tierId=${tier.id}`;
-                
-                const ctaText = user 
-                  ? isStripePlanAvailable ? 'Subscribe Now' : 'Payment Not Configured'
-                  : 'Sign Up & Subscribe';
-
-                return (
-                  <Card key={tier.id} className="flex flex-col text-left shadow-lg hover:shadow-xl transition-shadow duration-300">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="text-2xl">{tier.name}</CardTitle>
-                      <CardDescription>{tier.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-grow space-y-4 border-b pb-6">
-                      <p className="text-4xl font-bold">
-                        {tier.currency} {tier.price.toFixed(2)}
-                        <span className="text-lg font-normal text-muted-foreground"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
-                      </p>
-                      {tier.features && tier.features.length > 0 && (
-                        <ul className="space-y-2">
-                          {tier.features.map((feature, index) => (
-                            <li key={index} className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-600 mt-1 flex-shrink-0" />
-                              <span>{feature}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </CardContent>
-                    <CardFooter className="pt-6">
-                      <Link to={ctaLink} className="w-full">
-                        <Button className="w-full" disabled={!isStripePlanAvailable && !!user}>
-                          {ctaText}
-                        </Button>
-                      </Link>
-                    </CardFooter>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {subscriptionTiers.map((tier) => (
+              <Card key={tier.id} className="flex flex-col text-left shadow-lg hover:shadow-xl transition-all">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-2xl">{tier.name}</CardTitle>
+                  <CardDescription>{tier.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow space-y-4 border-b pb-6">
+                  <p className="text-4xl font-bold">
+                    {tier.currency} {tier.price.toFixed(2)}
+                    <span className="text-lg font-normal text-muted-foreground"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
+                  </p>
+                  {tier.features && tier.features.length > 0 && (
+                    <ul className="space-y-2">
+                      {tier.features.map((feature, index) => (
+                        <li key={index} className="flex items-start gap-2 text-sm">
+                          <Check className="h-4 w-4 text-green-600 mt-1 flex-shrink-0" />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+                <CardFooter className="pt-6">
+                  <Link to={user ? `/user/payment/${tier.id}?priceId=${tier.stripe_price_id}` : `/signup?tierId=${tier.id}`} className="w-full">
+                    <Button className="w-full" disabled={!tier.stripe_price_id && !!user}>
+                      {user ? 'Subscribe Now' : 'Sign Up & Subscribe'}
+                    </Button>
+                  </Link>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Marketing Email Subscription Section */}
-      <section className="py-16 md:py-24 bg-secondary text-secondary-foreground text-center">
+      <section className="py-16 md:py-24 bg-primary text-primary-foreground text-center">
         <div className="container mx-auto px-4 max-w-2xl">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Stay Updated!</h2>
-          <p className="text-lg mb-8">
-            Subscribe to our newsletter for daily quiz updates, study tips, and special offers.
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Join our community</h2>
+          <p className="text-lg mb-8 opacity-90">
+            Subscribe to our newsletter for daily quiz updates, clinical tips, and exclusive offers.
           </p>
           <Form {...marketingForm}>
             <form onSubmit={marketingForm.handleSubmit(handleMarketingSubscribe)} className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
@@ -407,7 +286,7 @@ const LandingPage = () => {
                       <Input
                         type="email"
                         placeholder="Enter your email"
-                        className="h-12 text-lg"
+                        className="h-12 text-lg bg-white text-black"
                         disabled={isSubscribing}
                         {...field}
                       />
@@ -416,39 +295,11 @@ const LandingPage = () => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" size="lg" className="h-12 text-lg w-full sm:w-auto" disabled={isSubscribing}>
-                {isSubscribing ? "Subscribing..." : "Subscribe"}
+              <Button type="submit" size="lg" variant="secondary" className="h-12 text-lg w-full sm:w-auto" disabled={isSubscribing}>
+                {isSubscribing ? <Loader2 className="animate-spin h-5 w-5" /> : "Subscribe"}
               </Button>
             </form>
           </Form>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section className="py-16 md:py-24 bg-background">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Frequently Asked Questions</h2>
-          <div className="max-w-3xl mx-auto">
-            {isLoadingFaq ? (
-              <p className="text-center text-gray-600 dark:text-gray-400">Loading FAQs...</p>
-            ) : (
-              <Accordion type="single" collapsible className="w-full">
-                {faqItems.flatMap((category, catIndex) =>
-                  category.questions.map((item, qIndex) => (
-                    <AccordionItem key={`${catIndex}-${qIndex}`} value={`item-${catIndex}-${qIndex}`}>
-                      <AccordionTrigger className="text-left text-lg font-medium">{item.question}</AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground text-base">
-                        {item.answer}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))
-                )}
-              </Accordion>
-            )}
-            <p className="text-center text-muted-foreground mt-8">
-              Have more questions? Visit our dedicated <Link to="/faq" className="text-primary hover:underline">FAQ Page</Link>.
-            </p>
-          </div>
         </div>
       </section>
     </div>

@@ -37,7 +37,6 @@ const BlogDetailsPage = () => {
 
       if (!error && data) {
         setBlog(data);
-        // Update Meta Tags for SEO
         document.title = data.title;
         const metaDesc = document.querySelector('meta[name="description"]');
         if (metaDesc) metaDesc.setAttribute('content', data.meta_description || '');
@@ -70,8 +69,8 @@ const BlogDetailsPage = () => {
         </Button>
 
         <header className="mb-10">
-          <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-6">{blog.title}</h1>
-          <div className="flex flex-wrap items-center gap-6 text-muted-foreground border-y py-4">
+          <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-6 text-black">{blog.title}</h1>
+          <div className="flex flex-wrap items-center gap-6 text-gray-600 border-y py-4">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               {format(new Date(blog.created_at), 'MMMM dd, yyyy')}
@@ -93,15 +92,15 @@ const BlogDetailsPage = () => {
           </div>
         )}
 
-        <div className="prose dark:prose-invert max-w-none prose-lg prose-headings:font-bold prose-a:text-primary">
+        <div className="prose dark:prose-invert max-w-none prose-lg prose-headings:font-bold prose-a:text-primary text-black prose-headings:text-black prose-p:text-black prose-li:text-black prose-strong:text-black">
           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
             {blog.content}
           </ReactMarkdown>
         </div>
 
         <div className="mt-16 p-8 bg-muted rounded-2xl text-center">
-          <h3 className="text-2xl font-bold mb-4">Ready to test your knowledge?</h3>
-          <p className="mb-6 text-muted-foreground">Join thousands of medical professionals preparing for their licensing exams with our AI-enhanced question bank.</p>
+          <h3 className="text-2xl font-bold mb-4 text-black">Ready to test your knowledge?</h3>
+          <p className="mb-6 text-gray-700">Join thousands of medical professionals preparing for their licensing exams with our AI-enhanced question bank.</p>
           <div className="flex justify-center gap-4">
             <Button asChild size="lg"><Link to="/signup">Start Free Trial</Link></Button>
             <Button asChild variant="outline" size="lg"><Link to="/quiz">Try a Quiz</Link></Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,24 +8,46 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Wand2, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { Loader2, Wand2, ShieldAlert, History, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { MadeWithDyad } from '@/components/made-with-dyad';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const ManageSeoPage = () => {
   const { toast } = useToast();
   
-  // Blog Generator State
+  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
+  const [auditReports, setAuditReports] = useState<any[]>([]);
+  const [selectedAuditCategory, setSelectedAuditCategory] = useState('');
+  
   const [blogTopic, setBlogTopic] = useState('');
   const [blogKeywords, setBlogKeywords] = useState('');
   const [isGeneratingBlog, setIsGeneratingBlog] = useState(false);
   const [generatedBlog, setGeneratedBlog] = useState<any>(null);
 
-  // Content Audit State
   const [mcqId, setMcqId] = useState('');
   const [isAuditing, setIsAuditing] = useState(false);
-  const [auditReport, setAuditReport] = useState<any>(null);
+  const [latestReport, setLatestReport] = useState<any>(null);
+
+  useEffect(() => {
+    fetchCategories();
+    fetchReports();
+  }, []);
+
+  const fetchCategories = async () => {
+    const { data } = await supabase.from('categories').select('id, name').order('name');
+    if (data) setCategories(data);
+  };
+
+  const fetchReports = async () => {
+    const { data } = await supabase
+      .from('content_audit_reports')
+      .select('*, mcqs(question_text)')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (data) setAuditReports(data);
+  };
 
   const handleGenerateBlog = async () => {
     if (!blogTopic) return;
@@ -65,21 +87,34 @@ const ManageSeoPage = () => {
     }
   };
 
-  const handleRunAudit = async () => {
-    if (!mcqId) return;
+  const handleRunAudit = async (type: 'single' | 'category') => {
     setIsAuditing(true);
-    setAuditReport(null);
     try {
-      const { data, error } = await supabase.functions.invoke('ai-content-audit', {
-        body: { mcq_id: mcqId },
-      });
+      const body = type === 'single' ? { mcq_id: mcqId } : { category_id: selectedAuditCategory };
+      const { data, error } = await supabase.functions.invoke('ai-content-audit', { body });
+      
       if (error) throw error;
-      setAuditReport(data);
+
+      if (type === 'single') {
+        setLatestReport(data);
+        fetchReports();
+      } else {
+        toast({ 
+          title: "Audit Started", 
+          description: "AI is checking the category in the background. Refresh in a few minutes to see reports." 
+        });
+      }
     } catch (error: any) {
       toast({ title: "Audit Failed", description: error.message, variant: "destructive" });
     } finally {
       setIsAuditing(false);
     }
+  };
+
+  const clearAllReports = async () => {
+    if (!window.confirm("Clear all audit history?")) return;
+    await supabase.from('content_audit_reports').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    fetchReports();
   };
 
   return (
@@ -155,73 +190,89 @@ const ManageSeoPage = () => {
         </TabsContent>
 
         <TabsContent value="audit" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>AI Content Audit</CardTitle>
-              <CardDescription>Enter an MCQ ID to check for clinical accuracy and SEO potential.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input 
-                  placeholder="Paste MCQ ID here..." 
-                  value={mcqId} 
-                  onChange={(e) => setMcqId(e.target.value)}
-                />
-                <Button onClick={handleRunAudit} disabled={isAuditing || !mcqId}>
-                  {isAuditing ? <Loader2 className="animate-spin" /> : "Audit Content"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {auditReport && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in zoom-in-95">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    Quality Score: 
-                    <span className={auditReport.score > 80 ? 'text-green-600' : 'text-yellow-600'}>
-                      {auditReport.score}%
-                    </span>
-                  </CardTitle>
+                  <CardTitle>Trigger Audit</CardTitle>
+                  <CardDescription>Check content quality and accuracy.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    {auditReport.is_clinically_sound ? 
-                      <CheckCircle2 className="text-green-600 h-5 w-5" /> : 
-                      <ShieldAlert className="text-red-600 h-5 w-5" />
-                    }
-                    <span className="font-semibold">
-                      {auditReport.is_clinically_sound ? "Clinically Accurate" : "Action Required: Potential Inaccuracy"}
-                    </span>
-                  </div>
+                <CardContent className="space-y-6">
                   <div className="space-y-2">
-                    <p className="text-sm font-bold">Identified Issues:</p>
-                    <ul className="list-disc list-inside text-sm space-y-1">
-                      {auditReport.issues.map((issue: string, i: number) => (
-                        <li key={i} className="text-muted-foreground">{issue}</li>
-                      ))}
-                    </ul>
+                    <Label>Single MCQ Audit</Label>
+                    <div className="flex gap-2">
+                      <Input placeholder="MCQ ID..." value={mcqId} onChange={(e) => setMcqId(e.target.value)} />
+                      <Button size="icon" onClick={() => handleRunAudit('single')} disabled={isAuditing || !mcqId}><Wand2 className="h-4 w-4" /></Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 border-t pt-4">
+                    <Label>Category Bulk Audit</Label>
+                    <Select value={selectedAuditCategory} onValueChange={setSelectedAuditCategory}>
+                      <SelectTrigger><SelectValue placeholder="Select Category..." /></SelectTrigger>
+                      <SelectContent>
+                        {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      className="w-full mt-2" 
+                      onClick={() => handleRunAudit('category')} 
+                      disabled={isAuditing || !selectedAuditCategory}
+                    >
+                      {isAuditing ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <ShieldAlert className="mr-2 h-4 w-4" />}
+                      Audit Whole Category
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
 
+              {latestReport && (
+                <Card className="border-primary">
+                  <CardHeader><CardTitle className="text-md">Latest Single Result</CardTitle></CardHeader>
+                  <CardContent className="text-sm space-y-2">
+                    <div className="flex justify-between"><span>Score:</span><Badge>{latestReport.score}%</Badge></div>
+                    <p className="font-bold">Suggestions:</p>
+                    <p className="text-muted-foreground">{latestReport.suggestions}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            <div className="lg:col-span-2">
               <Card>
-                <CardHeader><CardTitle className="text-lg">Optimization Suggestions</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm leading-relaxed">{auditReport.suggestions}</p>
-                  <div className="space-y-2">
-                    <p className="text-sm font-bold">SEO Keywords:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {auditReport.seo_keywords.map((kw: string, i: number) => (
-                        <Badge key={i} variant="secondary">{kw}</Badge>
-                      ))}
-                    </div>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Audit History</CardTitle>
+                    <CardDescription>Recent findings across your database.</CardDescription>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={clearAllReports} className="text-red-500"><Trash2 className="h-4 w-4" /></Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {auditReports.map((report) => (
+                      <div key={report.id} className="p-4 border rounded-lg bg-muted/30">
+                        <div className="flex justify-between items-start mb-2">
+                          <p className="text-xs font-mono text-muted-foreground">MCQ: {report.mcq_id.substring(0,8)}</p>
+                          <Badge variant={report.score > 80 ? 'default' : report.score > 50 ? 'secondary' : 'destructive'}>
+                            {report.score}% Quality
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-medium line-clamp-1 mb-2">"{report.mcqs?.question_text}"</p>
+                        <div className="flex gap-2 mb-2">
+                          {!report.is_clinically_sound && <Badge variant="destructive" className="text-[10px]">INACCURATE</Badge>}
+                          {report.seo_keywords?.slice(0,2).map((kw: string, i: number) => (
+                            <Badge key={i} variant="outline" className="text-[10px]">{kw}</Badge>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground italic">"{report.suggestions?.substring(0,100)}..."</p>
+                      </div>
+                    ))}
+                    {auditReports.length === 0 && <p className="text-center py-10 text-muted-foreground">No audit reports found.</p>}
                   </div>
                 </CardContent>
               </Card>
             </div>
-          )}
+          </div>
         </TabsContent>
       </Tabs>
       <MadeWithDyad />

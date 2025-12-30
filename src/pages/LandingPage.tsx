@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import * as LucideIcons from 'lucide-react'; 
-import { Check, Loader2, Globe, BookOpenText, ArrowRight, Calendar } from 'lucide-react';
+import { Check, Loader2, Globe, BookOpenText, ArrowRight, Calendar, Video, ClipboardCheck, GraduationCap } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -143,17 +143,40 @@ const LandingPage = () => {
           <p className="text-lg md:text-xl mb-10 max-w-3xl mx-auto opacity-90 animate-fade-in-up delay-200">
             {settings.hero.subtitle}
           </p>
-          <div className="flex flex-col justify-center gap-4 max-w-sm mx-auto sm:flex-row sm:max-w-none animate-fade-in-up delay-400">
-            <Link to={user ? "/user/dashboard" : "/signup"} className="w-full sm:w-auto">
-              <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full">
-                {user ? "Go to Dashboard" : settings.hero.ctaPrimaryText}
-              </Button>
-            </Link>
-            <Link to="/quiz" className="w-full sm:w-auto">
-              <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full">
-                <BookOpenText className="h-5 w-5" /> Take a Free Quiz
-              </Button>
-            </Link>
+          
+          <div className="flex flex-col items-center gap-6 animate-fade-in-up delay-400">
+            {/* Primary Action Row */}
+            <div className="flex flex-col justify-center gap-4 w-full max-w-md sm:flex-row sm:max-w-none">
+              <Link to={user ? "/user/dashboard" : "/signup"} className="w-full sm:w-auto">
+                <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full min-w-[200px]">
+                  {user ? "Go to Dashboard" : settings.hero.ctaPrimaryText}
+                </Button>
+              </Link>
+              <Link to="/quiz" className="w-full sm:w-auto">
+                <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full min-w-[200px]">
+                  <BookOpenText className="h-5 w-5" /> Take a Free Quiz
+                </Button>
+              </Link>
+            </div>
+
+            {/* Quick Feature Access Row */}
+            <div className="flex flex-wrap justify-center gap-3 mt-4">
+              <Link to="/subscription">
+                <Button variant="outline" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
+                  <ClipboardCheck className="h-4 w-4" /> Take a Test
+                </Button>
+              </Link>
+              <Link to="/subscription">
+                <Button variant="outline" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
+                  <Video className="h-4 w-4" /> Video Lessons
+                </Button>
+              </Link>
+              <Link to="/subscription">
+                <Button variant="outline" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4" /> Medical Courses
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -173,6 +196,13 @@ const LandingPage = () => {
                 </div>
                 <CardTitle className="text-xl mb-2">{feature.title}</CardTitle>
                 <CardDescription className="text-muted-foreground">{feature.description}</CardDescription>
+                <CardFooter className="mt-auto pt-6 w-full">
+                  <Link to="/subscription" className="w-full">
+                    <Button variant="ghost" className="w-full group">
+                      Learn More <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  </Link>
+                </CardFooter>
               </Card>
             ))}
           </div>

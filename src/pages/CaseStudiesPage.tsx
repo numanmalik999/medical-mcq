@@ -8,13 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Loader2, Wand2, BookOpen, CheckCircle2, AlertCircle, ArrowRight, RotateCcw, Trophy } from 'lucide-react'; // Added Trophy
+import { Loader2, Wand2, BookOpen, CheckCircle2, AlertCircle, ArrowRight, RotateCcw, Trophy, Share2 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
+import { useSession } from '@/components/SessionContextProvider';
 
 interface CaseQuestion {
   question_text: string;
@@ -30,6 +31,7 @@ interface ClinicalCase {
 }
 
 const CaseStudiesPage = () => {
+  const { user } = useSession();
   const { toast } = useToast();
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
@@ -43,6 +45,7 @@ const CaseStudiesPage = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [answers, setAnswers] = useState<Map<number, { selected: string, isCorrect: boolean }>>(new Map());
   const [showSummary, setShowSummary] = useState(false);
+  const [isContributing, setIsContributing] = useState(false);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -82,12 +85,40 @@ const CaseStudiesPage = () => {
     }
   };
 
+  const handleSubmitToBank = async () => {
+    if (!currentCase || !user) return;
+    setIsContributing(true);
+
+    try {
+      const category = categories.find(c => c.id === selectedCategoryId);
+      const submissions = currentCase.questions.map(q => ({
+        user_id: user.id,
+        question_text: `[Case Study: ${currentCase.case_title}]\n\n${currentCase.vignette.replace(/<[^>]*>/g, '')}\n\nQuestion: ${q.question_text}`,
+        option_a: q.options.A,
+        option_b: q.options.B,
+        option_c: q.options.C,
+        option_d: q.options.D,
+        correct_answer: q.correct_answer,
+        explanation_text: q.explanation,
+        suggested_category_name: category?.name || 'General Medicine',
+        status: 'pending'
+      }));
+
+      const { error } = await supabase.from('user_submitted_mcqs').insert(submissions);
+      if (error) throw error;
+
+      toast({ title: "Contribution Received", description: "This case has been submitted for admin review. Thank you!" });
+    } catch (error: any) {
+      toast({ title: "Submission Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsContributing(false);
+    }
+  };
+
   const handleSubmitAnswer = () => {
     if (!selectedAnswer || !currentCase) return;
-    
     const question = currentCase.questions[currentQuestionIndex];
     const isCorrect = selectedAnswer === question.correct_answer;
-    
     setAnswers(new Map(answers.set(currentQuestionIndex, { selected: selectedAnswer, isCorrect })));
     setIsSubmitted(true);
   };
@@ -112,7 +143,7 @@ const CaseStudiesPage = () => {
   if (showSummary && currentCase) {
     const correctCount = Array.from(answers.values()).filter(a => a.isCorrect).length;
     return (
-      <div className="max-w-4xl mx-auto py-8">
+      <div className="max-w-4xl mx-auto py-8 px-4">
         <Card className="border-primary/20 shadow-xl">
           <CardHeader className="text-center">
             <Trophy className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
@@ -120,30 +151,47 @@ const CaseStudiesPage = () => {
             <CardDescription>Review your performance on "{currentCase.case_title}"</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="text-center py-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">Overall Score</p>
-              <p className="text-5xl font-bold text-primary">{correctCount} / {currentCase.questions.length}</p>
+            <div className="text-center py-6 bg-muted rounded-lg border">
+              <p className="text-sm text-muted-foreground uppercase tracking-widest font-semibold">Your Final Score</p>
+              <p className="text-6xl font-bold text-primary mt-2">{correctCount} / {currentCase.questions.length}</p>
             </div>
             
             <div className="space-y-4">
               {currentCase.questions.map((q, idx) => {
                 const ans = answers.get(idx);
                 return (
-                  <div key={idx} className="p-4 border rounded-md flex items-start gap-3">
+                  <div key={idx} className="p-4 border rounded-md flex items-start gap-3 bg-card">
                     {ans?.isCorrect ? <CheckCircle2 className="h-5 w-5 text-green-500 mt-1" /> : <AlertCircle className="h-5 w-5 text-red-500 mt-1" />}
                     <div>
                       <p className="font-medium">{q.question_text}</p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Your answer: {ans?.selected} | Correct: {q.correct_answer}
+                        Your answer: <span className={ans?.isCorrect ? "text-green-600" : "text-red-600"}>{ans?.selected}</span> | Correct: <span className="text-green-600">{q.correct_answer}</span>
                       </p>
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            <Card className="bg-primary/5 border-dashed border-primary/30">
+              <CardContent className="pt-6 text-center space-y-4">
+                <div className="flex justify-center"><Share2 className="h-8 w-8 text-primary" /></div>
+                <h4 className="font-bold text-lg">Contribute this Case?</h4>
+                <p className="text-sm text-muted-foreground">Help fellow medical students! If you liked this clinical scenario, you can submit it to our official question bank for review.</p>
+                <Button 
+                  onClick={handleSubmitToBank} 
+                  disabled={isContributing || !user} 
+                  variant="outline" 
+                  className="border-primary text-primary hover:bg-primary hover:text-white"
+                >
+                  {isContributing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Share2 className="h-4 w-4 mr-2" />}
+                  {user ? "Submit to Question Bank" : "Login to Contribute"}
+                </Button>
+              </CardContent>
+            </Card>
           </CardContent>
-          <CardFooter className="flex justify-center gap-4">
-            <Button onClick={reset} variant="outline">Try Another Topic</Button>
+          <CardFooter className="flex justify-center gap-4 border-t pt-6">
+            <Button onClick={reset} variant="ghost">Try Another Topic</Button>
             <Button onClick={handleGenerate}><RotateCcw className="h-4 w-4 mr-2" /> Repeat Case</Button>
           </CardFooter>
         </Card>
@@ -152,7 +200,7 @@ const CaseStudiesPage = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6 px-4">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">AI Clinical Cases</h1>
         {currentCase && <Button variant="ghost" onClick={reset}><RotateCcw className="h-4 w-4 mr-2" /> Start Over</Button>}
@@ -162,12 +210,12 @@ const CaseStudiesPage = () => {
         <Card className="border-primary/10 shadow-md">
           <CardHeader>
             <CardTitle>Generate a New Case</CardTitle>
-            <CardDescription>Select a category or enter a specific medical topic to generate a unique clinical scenario.</CardDescription>
+            <CardDescription>Select a specialty or enter a specific topic to generate a unique medical case study.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Select Category</Label>
+                <Label>Select Specialty</Label>
                 <Select onValueChange={setSelectedCategoryId} value={selectedCategoryId}>
                   <SelectTrigger><SelectValue placeholder="Pick a specialty..." /></SelectTrigger>
                   <SelectContent>
@@ -178,7 +226,7 @@ const CaseStudiesPage = () => {
               <div className="space-y-2">
                 <Label>Specific Topic (Optional)</Label>
                 <Input 
-                  placeholder="e.g. Heart Failure, Diabetes Type 2" 
+                  placeholder="e.g. Heart Failure, COPD, Anemia" 
                   value={customTopic} 
                   onChange={(e) => setCustomTopic(e.target.value)}
                 />
@@ -195,27 +243,25 @@ const CaseStudiesPage = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4">
-          {/* Left Side: The Vignette */}
           <Card className="lg:col-span-1 h-fit sticky top-24">
-            <CardHeader className="bg-primary/5 rounded-t-lg">
+            <CardHeader className="bg-primary/5 rounded-t-lg border-b">
               <CardTitle className="text-xl flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-primary" /> Patient Presentation
               </CardTitle>
               <CardDescription>{currentCase.case_title}</CardDescription>
             </CardHeader>
-            <CardContent className="prose dark:prose-invert max-w-none pt-4 text-sm leading-relaxed">
+            <CardContent className="prose dark:prose-invert max-w-none pt-4 text-sm leading-relaxed overflow-y-auto max-h-[60vh]">
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                 {currentCase.vignette}
               </ReactMarkdown>
             </CardContent>
           </Card>
 
-          {/* Right Side: Questions */}
           <div className="lg:col-span-2 space-y-6">
              <Card className="border-primary/20 shadow-lg">
                <CardHeader>
                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-semibold text-primary uppercase tracking-wider">Question {currentQuestionIndex + 1} of {currentCase.questions.length}</span>
+                    <span className="text-xs font-bold text-primary uppercase tracking-wider bg-primary/10 px-2 py-1 rounded">Question {currentQuestionIndex + 1} of {currentCase.questions.length}</span>
                  </div>
                  <CardTitle className="text-xl">{currentCase.questions[currentQuestionIndex].question_text}</CardTitle>
                </CardHeader>
@@ -229,7 +275,6 @@ const CaseStudiesPage = () => {
                    {Object.entries(currentCase.questions[currentQuestionIndex].options).map(([key, value]) => {
                      const isCorrect = key === currentCase.questions[currentQuestionIndex].correct_answer;
                      const isSelected = selectedAnswer === key;
-                     
                      return (
                        <div 
                          key={key}
@@ -251,7 +296,7 @@ const CaseStudiesPage = () => {
                  </RadioGroup>
 
                  {isSubmitted && (
-                   <div className="p-4 bg-muted rounded-lg animate-in fade-in zoom-in-95">
+                   <div className="p-4 bg-muted rounded-lg animate-in fade-in zoom-in-95 border">
                      <h4 className="font-bold mb-2 flex items-center gap-2">
                        {answers.get(currentQuestionIndex)?.isCorrect ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <AlertCircle className="h-5 w-5 text-red-500" />}
                        Clinical Reasoning

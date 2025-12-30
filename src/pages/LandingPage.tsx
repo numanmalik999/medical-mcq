@@ -134,7 +134,7 @@ const LandingPage = () => {
           <div className="flex flex-col items-center gap-4 animate-fade-in-up delay-400">
             {/* Primary Action Row */}
             <div className="flex flex-col justify-center gap-3 w-full max-w-md sm:flex-row sm:max-w-none">
-              <Link to={user ? "/user/dashboard" : "/signup"} className="w-full sm:w-auto">
+              <Link to={user ? "/user/dashboard" : "/subscription"} className="w-full sm:w-auto">
                 <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full min-w-[200px]">
                   {user ? "Go to Dashboard" : settings.hero.ctaPrimaryText}
                 </Button>

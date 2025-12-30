@@ -96,11 +96,18 @@ const Header = () => {
         </div>
         <div className="flex justify-end items-center gap-2">
           {hasCheckedInitialSession && !user && (
-            <Link to="/login">
-              <Button variant="secondary" size="sm" className="text-primary">
-                Login
-              </Button>
-            </Link>
+            <>
+              <Link to="/login">
+                <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-white/10 hover:text-white">
+                  Login
+                </Button>
+              </Link>
+              <Link to="/signup">
+                <Button variant="secondary" size="sm" className="text-primary">
+                  Register
+                </Button>
+              </Link>
+            </>
           )}
         </div>
       </div>

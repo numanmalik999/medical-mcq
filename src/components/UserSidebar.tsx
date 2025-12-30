@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, User, BookOpenText, LogOut, ClipboardCheck, CreditCard, FilePlus, Bookmark, GraduationCap, Lightbulb, Youtube } from 'lucide-react';
+import { MenuIcon, LayoutDashboard, User, BookOpenText, LogOut, ClipboardCheck, CreditCard, FilePlus, Bookmark, GraduationCap, Lightbulb, Youtube, Stethoscope } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './SessionContextProvider';
@@ -65,6 +65,7 @@ const UserSidebar = () => {
     { to: "/user/profile", icon: <User className="h-4 w-4" />, label: "Profile" },
     { to: "/quiz", icon: <BookOpenText className="h-4 w-4" />, label: "Take Quiz" },
     { to: "/user/take-test", icon: <ClipboardCheck className="h-4 w-4" />, label: "Take A Test", disabled: !user?.has_active_subscription },
+    { to: "/user/case-studies", icon: <Stethoscope className="h-4 w-4" />, label: "Case Studies" },
     { to: "/user/courses", icon: <GraduationCap className="h-4 w-4" />, label: "Courses" },
     { to: "/user/videos", icon: <Youtube className="h-4 w-4" />, label: "Videos" },
     { to: "/user/subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "My Subscriptions" },

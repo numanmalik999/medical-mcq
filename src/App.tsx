@@ -48,10 +48,11 @@ import PasswordResetPage from "./pages/PasswordResetPage";
 import ReviewsPage from "./pages/ReviewsPage";
 import UserSuggestionsPage from "./pages/UserSuggestionsPage";
 import ManageSuggestionsPage from "./pages/ManageSuggestionsPage";
-
-// New Video Pages
 import ManageVideosPage from "./pages/ManageVideosPage";
 import UserVideosPage from "./pages/UserVideosPage";
+
+// New Page
+import CaseStudiesPage from "./pages/CaseStudiesPage";
 
 const queryClient = new QueryClient();
 
@@ -111,6 +112,7 @@ const AppContent = () => {
                 <Route path="courses" element={<UserCoursesPage />} />
                 <Route path="courses/:courseId" element={<UserCourseDetailsPage />} />
                 <Route path="videos" element={<UserVideosPage />} />
+                <Route path="case-studies" element={<CaseStudiesPage />} />
               </Route>
             </Route>
 

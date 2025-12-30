@@ -1590,11 +1590,11 @@ const QuizPage = () => {
 
                           let className = "";
                           if (isSelected && isCorrect) {
-                            className = "text-green-600 font-medium";
+                            className = "text-green-800 font-bold";
                           } else if (isSelected && !isCorrect) {
-                            className = "text-red-600 font-medium";
+                            className = "text-red-800 font-bold";
                           } else if (isCorrectOption) {
-                            className = "text-green-600 font-medium";
+                            className = "text-green-800 font-bold";
                           }
 
                           return (
@@ -1710,10 +1710,10 @@ const QuizPage = () => {
                   <div
                     key={optionKey}
                     className={cn(
-                      "flex items-center space-x-2 p-2 rounded-md cursor-pointer transition-colors duration-200",
-                      isSubmitted && userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect && "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-                      isSubmitted && userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect && "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-                      isSubmitted && !userSelectedThisOptionWhenSubmitted && isCorrectOption && "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+                      "flex items-center space-x-2 p-2 rounded-md cursor-pointer transition-colors duration-200 border",
+                      isSubmitted && userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect && "border-green-600 bg-green-50 text-green-900 dark:bg-green-900 dark:text-green-300 font-bold",
+                      isSubmitted && userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect && "border-red-600 bg-red-50 text-red-900 dark:bg-red-900 dark:text-red-300 font-bold",
+                      isSubmitted && !userSelectedThisOptionWhenSubmitted && isCorrectOption && "border-green-600 bg-green-50 text-green-900 dark:bg-green-900 dark:text-green-300 font-bold",
                       !isSubmitted && selectedAnswer === optionKey && "bg-accent text-accent-foreground dark:bg-accent dark:text-accent-foreground"
                     )}
                     onClick={() => !isSubmitted && handleOptionSelect(optionKey)}
@@ -1723,9 +1723,9 @@ const QuizPage = () => {
                       htmlFor={`option-${optionKey}`}
                       className={cn(
                         "cursor-pointer flex-grow",
-                        isSubmitted && userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect && "text-green-700 dark:text-green-300",
-                        isSubmitted && userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect && "text-red-700 dark:text-red-300",
-                        isSubmitted && !userSelectedThisOptionWhenSubmitted && isCorrectOption && "text-green-700 dark:text-green-300",
+                        isSubmitted && userSelectedThisOptionWhenSubmitted && currentAnswerData?.isCorrect && "text-green-900 dark:text-green-300 font-bold",
+                        isSubmitted && userSelectedThisOptionWhenSubmitted && !currentAnswerData?.isCorrect && "text-red-900 dark:text-red-300 font-bold",
+                        isSubmitted && !userSelectedThisOptionWhenSubmitted && isCorrectOption && "text-green-900 dark:text-green-300 font-bold",
                         !isSubmitted && selectedAnswer === optionKey && "text-accent-foreground dark:text-accent-foreground"
                       )}
                     >
@@ -1737,7 +1737,7 @@ const QuizPage = () => {
             </RadioGroup>
 
             {feedback && (
-              <p className={`mt-4 text-lg font-semibold flex items-center gap-2 ${feedback.startsWith('Correct') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`mt-4 text-lg font-semibold flex items-center gap-2 ${feedback.startsWith('Correct') ? 'text-green-700' : 'text-red-700'}`}>
                 {feedback.startsWith('Correct') ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
                 {feedback}
               </p>

@@ -165,7 +165,7 @@ const CaseStudiesPage = () => {
                     <div>
                       <p className="font-medium">{q.question_text}</p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Your answer: <span className={ans?.isCorrect ? "text-green-600" : "text-red-600"}>{ans?.selected}</span> | Correct: <span className="text-green-600">{q.correct_answer}</span>
+                        Your answer: <span className={ans?.isCorrect ? "text-green-800" : "text-red-800"}>{ans?.selected}</span> | Correct: <span className="text-green-800">{q.correct_answer}</span>
                       </p>
                     </div>
                   </div>
@@ -281,8 +281,8 @@ const CaseStudiesPage = () => {
                          className={cn(
                            "flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer hover:bg-muted/50",
                            isSelected && "border-primary bg-primary/5 shadow-sm",
-                           isSubmitted && isCorrect && "border-green-500 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300",
-                           isSubmitted && isSelected && !isCorrect && "border-red-500 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300"
+                           isSubmitted && isCorrect && "border-green-600 bg-green-50 dark:bg-green-950/20 text-green-900 dark:text-green-300 font-bold",
+                           isSubmitted && isSelected && !isCorrect && "border-red-600 bg-red-50 dark:bg-red-950/20 text-red-900 dark:text-red-300 font-bold"
                          )}
                          onClick={() => !isSubmitted && setSelectedAnswer(key)}
                        >
@@ -298,7 +298,7 @@ const CaseStudiesPage = () => {
                  {isSubmitted && (
                    <div className="p-4 bg-muted rounded-lg animate-in fade-in zoom-in-95 border">
                      <h4 className="font-bold mb-2 flex items-center gap-2">
-                       {answers.get(currentQuestionIndex)?.isCorrect ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <AlertCircle className="h-5 w-5 text-red-500" />}
+                       {answers.get(currentQuestionIndex)?.isCorrect ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <AlertCircle className="h-5 w-5 text-red-600" />}
                        Clinical Reasoning
                      </h4>
                      <div className="text-sm text-muted-foreground prose dark:prose-invert max-w-none">

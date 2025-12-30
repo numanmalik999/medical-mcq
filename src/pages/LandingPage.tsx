@@ -122,12 +122,12 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-background text-foreground pt-16">
       {/* Hero Section */}
-      <section className="relative w-full py-12 md:py-20 bg-primary text-primary-foreground text-center overflow-hidden">
+      <section className="relative w-full py-8 md:py-12 bg-primary text-primary-foreground text-center overflow-hidden">
         <div className="container mx-auto px-4 relative z-10">
-          <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-4 animate-fade-in-up">
+          <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-3 animate-fade-in-up">
             {settings.hero.mainTitle}
           </h1>
-          <p className="text-lg md:text-xl mb-8 max-w-3xl mx-auto opacity-90 animate-fade-in-up delay-200">
+          <p className="text-lg md:text-xl mb-6 max-w-3xl mx-auto opacity-90 animate-fade-in-up delay-200">
             {settings.hero.subtitle}
           </p>
           
@@ -147,7 +147,7 @@ const LandingPage = () => {
             </div>
 
             {/* Quick Feature Access Row */}
-            <div className="flex flex-wrap justify-center gap-2 mt-2">
+            <div className="flex flex-wrap justify-center gap-2">
               <Link to="/subscription">
                 <Button variant="outline" size="sm" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
                   <ClipboardCheck className="h-4 w-4" /> Take a Test
@@ -169,10 +169,10 @@ const LandingPage = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-12 md:py-16 bg-background">
+      <section className="py-10 md:py-14 bg-background">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-2">Powerful Learning Tools</h2>
-          <p className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
             Everything you need to master your medical licensing exams.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -183,7 +183,7 @@ const LandingPage = () => {
                 </div>
                 <CardTitle className="text-xl mb-2">{feature.title}</CardTitle>
                 <CardDescription className="text-muted-foreground">{feature.description}</CardDescription>
-                <CardFooter className="mt-auto pt-6 w-full">
+                <CardFooter className="mt-auto pt-4 w-full">
                   <Link to="/subscription" className="w-full">
                     <Button variant="ghost" className="w-full group">
                       Learn More <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
@@ -197,30 +197,30 @@ const LandingPage = () => {
       </section>
 
       {/* Subscription Tiers Section */}
-      <section className="py-12 md:py-16 bg-gray-50 dark:bg-gray-900">
+      <section className="py-12 md:py-16 bg-slate-900 text-white">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-2">{settings.pricingCta.title}</h2>
-          <p className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold mb-2 text-white">{settings.pricingCta.title}</h2>
+          <p className="text-lg text-slate-300 mb-10 max-w-2xl mx-auto">
             {settings.pricingCta.subtitle}
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {subscriptionTiers.map((tier) => (
-              <Card key={tier.id} className="flex flex-col text-left shadow-lg hover:shadow-xl transition-all">
+              <Card key={tier.id} className="flex flex-col text-left shadow-lg hover:shadow-xl transition-all border-slate-800 bg-slate-950">
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-2xl">{tier.name}</CardTitle>
-                  <CardDescription>{tier.description}</CardDescription>
+                  <CardTitle className="text-2xl text-white">{tier.name}</CardTitle>
+                  <CardDescription className="text-slate-400">{tier.description}</CardDescription>
                 </CardHeader>
-                <CardContent className="flex-grow space-y-4 border-b pb-6">
-                  <p className="text-4xl font-bold">
+                <CardContent className="flex-grow space-y-4 border-b border-slate-800 pb-6">
+                  <p className="text-4xl font-bold text-white">
                     {tier.currency} {tier.price.toFixed(2)}
-                    <span className="text-lg font-normal text-muted-foreground"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
+                    <span className="text-lg font-normal text-slate-400"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
                   </p>
                   {tier.features && tier.features.length > 0 && (
                     <ul className="space-y-2">
                       {tier.features.map((feature, index) => (
-                        <li key={index} className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-green-600 mt-1 flex-shrink-0" />
+                        <li key={index} className="flex items-start gap-2 text-sm text-slate-300">
+                          <Check className="h-4 w-4 text-green-500 mt-1 flex-shrink-0" />
                           <span>{feature}</span>
                         </li>
                       ))}
@@ -229,7 +229,7 @@ const LandingPage = () => {
                 </CardContent>
                 <CardFooter className="pt-6">
                   <Link to={user ? `/user/payment/${tier.id}?priceId=${tier.stripe_price_id}` : `/signup?tierId=${tier.id}`} className="w-full">
-                    <Button className="w-full" disabled={!tier.stripe_price_id && !!user}>
+                    <Button className="w-full bg-white text-slate-900 hover:bg-slate-200" disabled={!tier.stripe_price_id && !!user}>
                       {user ? 'Subscribe Now' : 'Sign Up & Subscribe'}
                     </Button>
                   </Link>

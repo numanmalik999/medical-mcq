@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import * as LucideIcons from 'lucide-react'; 
-import { Check, Loader2, Globe, BookOpenText, ArrowRight, Calendar, Video, ClipboardCheck, GraduationCap } from 'lucide-react';
+import { Check, Loader2, Globe, BookOpenText, ArrowRight, ClipboardCheck, Video, GraduationCap } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -16,7 +16,6 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { useLandingPageSettings } from '@/hooks/useLandingPageSettings';
 import LoadingBar from '@/components/LoadingBar';
-import { format } from 'date-fns';
 
 const getIconComponent = (iconName: string) => {
   const Icon = (LucideIcons as any)[iconName];
@@ -45,7 +44,6 @@ const LandingPage = () => {
   
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
-  const [recentBlogs, setRecentBlogs] = useState<any[]>([]);
 
   const marketingForm = useForm<z.infer<typeof marketingFormSchema>>({
     resolver: zodResolver(marketingFormSchema),
@@ -90,18 +88,7 @@ const LandingPage = () => {
       }
     };
 
-    const fetchRecentBlogs = async () => {
-      const { data } = await supabase
-        .from('blogs')
-        .select('title, slug, created_at, meta_description, image_url')
-        .eq('status', 'published')
-        .order('created_at', { ascending: false })
-        .limit(3);
-      if (data) setRecentBlogs(data);
-    };
-
     fetchSubscriptionTiers();
-    fetchRecentBlogs();
   }, [toast]);
 
   const handleMarketingSubscribe = async (values: z.infer<typeof marketingFormSchema>) => {
@@ -135,18 +122,18 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-background text-foreground pt-16">
       {/* Hero Section */}
-      <section className="relative w-full py-20 md:py-32 bg-primary text-primary-foreground text-center overflow-hidden">
+      <section className="relative w-full py-12 md:py-20 bg-primary text-primary-foreground text-center overflow-hidden">
         <div className="container mx-auto px-4 relative z-10">
-          <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-6 animate-fade-in-up">
+          <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-4 animate-fade-in-up">
             {settings.hero.mainTitle}
           </h1>
-          <p className="text-lg md:text-xl mb-10 max-w-3xl mx-auto opacity-90 animate-fade-in-up delay-200">
+          <p className="text-lg md:text-xl mb-8 max-w-3xl mx-auto opacity-90 animate-fade-in-up delay-200">
             {settings.hero.subtitle}
           </p>
           
-          <div className="flex flex-col items-center gap-6 animate-fade-in-up delay-400">
+          <div className="flex flex-col items-center gap-4 animate-fade-in-up delay-400">
             {/* Primary Action Row */}
-            <div className="flex flex-col justify-center gap-4 w-full max-w-md sm:flex-row sm:max-w-none">
+            <div className="flex flex-col justify-center gap-3 w-full max-w-md sm:flex-row sm:max-w-none">
               <Link to={user ? "/user/dashboard" : "/signup"} className="w-full sm:w-auto">
                 <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full min-w-[200px]">
                   {user ? "Go to Dashboard" : settings.hero.ctaPrimaryText}
@@ -160,19 +147,19 @@ const LandingPage = () => {
             </div>
 
             {/* Quick Feature Access Row */}
-            <div className="flex flex-wrap justify-center gap-3 mt-4">
+            <div className="flex flex-wrap justify-center gap-2 mt-2">
               <Link to="/subscription">
-                <Button variant="outline" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
+                <Button variant="outline" size="sm" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
                   <ClipboardCheck className="h-4 w-4" /> Take a Test
                 </Button>
               </Link>
               <Link to="/subscription">
-                <Button variant="outline" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
+                <Button variant="outline" size="sm" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
                   <Video className="h-4 w-4" /> Video Lessons
                 </Button>
               </Link>
               <Link to="/subscription">
-                <Button variant="outline" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
+                <Button variant="outline" size="sm" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
                   <GraduationCap className="h-4 w-4" /> Medical Courses
                 </Button>
               </Link>
@@ -182,13 +169,13 @@ const LandingPage = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-16 md:py-24 bg-background">
+      <section className="py-12 md:py-16 bg-background">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Powerful Learning Tools</h2>
-          <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold mb-2">Powerful Learning Tools</h2>
+          <p className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto">
             Everything you need to master your medical licensing exams.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {settings.features.map((feature, index) => (
               <Card key={index} className="flex flex-col items-center p-6 text-center hover:shadow-lg transition-all hover:-translate-y-1">
                 <div className="mb-4 p-3 rounded-full bg-primary/10">
@@ -209,60 +196,15 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Blog/Articles Section */}
-      {recentBlogs.length > 0 && (
-        <section className="py-16 md:py-24 bg-gray-50 dark:bg-gray-900">
-          <div className="container mx-auto px-4">
-            <div className="flex justify-between items-end mb-12">
-              <div className="text-left">
-                <h2 className="text-3xl md:text-4xl font-bold mb-4">Educational Insights</h2>
-                <p className="text-muted-foreground">Expert advice and exam strategies from our team.</p>
-              </div>
-              <Button asChild variant="outline" className="hidden sm:flex">
-                <Link to="/blog">View All Articles <ArrowRight className="ml-2 h-4 w-4" /></Link>
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {recentBlogs.map((blog: any) => (
-                <Card key={blog.slug} className="overflow-hidden flex flex-col hover:shadow-md transition-shadow">
-                  {blog.image_url && (
-                    <div className="h-48 overflow-hidden">
-                      <img src={blog.image_url} alt={blog.title} className="w-full h-full object-cover transition-transform hover:scale-105 duration-500" />
-                    </div>
-                  )}
-                  <CardHeader className="p-6">
-                    <div className="flex items-center text-xs text-muted-foreground mb-2 gap-2">
-                      <Calendar className="h-3 w-3" />
-                      {format(new Date(blog.created_at), 'MMM dd, yyyy')}
-                    </div>
-                    <CardTitle className="text-xl line-clamp-2 hover:text-primary transition-colors">
-                      <Link to={`/blog/${blog.slug}`}>{blog.title}</Link>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="px-6 flex-grow">
-                    <p className="text-sm text-muted-foreground line-clamp-3">{blog.meta_description}</p>
-                  </CardContent>
-                  <CardFooter className="p-6 pt-0">
-                    <Link to={`/blog/${blog.slug}`} className="text-sm font-bold text-primary flex items-center hover:underline">
-                      Read Article <ArrowRight className="ml-1 h-3 w-3" />
-                    </Link>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Subscription Tiers Section */}
-      <section className="py-16 md:py-24 bg-background">
+      <section className="py-12 md:py-16 bg-gray-50 dark:bg-gray-900">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">{settings.pricingCta.title}</h2>
-          <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold mb-2">{settings.pricingCta.title}</h2>
+          <p className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto">
             {settings.pricingCta.subtitle}
           </p>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {subscriptionTiers.map((tier) => (
               <Card key={tier.id} className="flex flex-col text-left shadow-lg hover:shadow-xl transition-all">
                 <CardHeader className="pb-4">
@@ -299,9 +241,9 @@ const LandingPage = () => {
       </section>
 
       {/* Marketing Email Subscription Section */}
-      <section className="py-16 md:py-24 bg-primary text-primary-foreground text-center">
+      <section className="py-12 md:py-16 bg-primary text-primary-foreground text-center">
         <div className="container mx-auto px-4 max-w-2xl">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Join our community</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-2">Join our community</h2>
           <p className="text-lg mb-8 opacity-90">
             Subscribe to our newsletter for daily quiz updates, clinical tips, and exclusive offers.
           </p>

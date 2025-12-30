@@ -37,10 +37,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const fetchUserProfile = useCallback(async (supabaseUser: User): Promise<AuthUser> => {
     if (!isMounted.current) return { ...supabaseUser } as AuthUser;
 
-    console.log(`[SessionContext] Hydrating session for: ${supabaseUser.id}`);
-
     try {
-      // 1. Fetch Profile and latest active subscription in parallel for speed and accuracy
+      // 1. Fetch Profile and latest active subscription in parallel
       const [profileResponse, subResponse] = await Promise.all([
         supabase
           .from('profiles')
@@ -60,31 +58,29 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       const profileData = profileResponse.data;
       const latestSub = subResponse.data;
 
-      // 2. Determine actual subscription status
-      // We trust the 'user_subscriptions' table as the source of truth over the profile flag
+      // 2. Determine subscription status
       let currentHasActiveSubscription = false;
 
-      if (latestSub && latestSub.end_date) {
+      if (latestSub?.end_date) {
         const endDate = parseISO(latestSub.end_date);
         if (!isPast(endDate)) {
           currentHasActiveSubscription = true;
         } else {
-          // It's expired - trigger background update if profile still says true
+          // Trigger background cleanup if needed, but don't await it
           if (profileData?.has_active_subscription) {
             supabase.functions.invoke('update-expired-subscription-status', {
               body: { user_id: supabaseUser.id, is_active: false },
-            });
+            }).catch(console.error);
           }
         }
       }
 
-      // 3. Fallback: if no record in sub table, but profile says true (could be a manual override or free award)
-      // but only if we didn't find an expired record above.
+      // 3. Fallback to profile flag if no sub record exists (covers manual awards/legacy)
       if (!latestSub && profileData?.has_active_subscription) {
         currentHasActiveSubscription = true;
       }
 
-      const hydratedUser: AuthUser = {
+      return {
         ...supabaseUser,
         is_admin: profileData?.is_admin || false,
         first_name: profileData?.first_name || null,
@@ -94,10 +90,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         has_active_subscription: currentHasActiveSubscription,
         trial_taken: profileData?.trial_taken || false,
       };
-
-      return hydratedUser;
     } catch (e: any) {
-      console.error(`[SessionContext] Hydration error:`, e.message);
+      console.error(`[SessionContext] Profile hydration failed:`, e.message);
       return { ...supabaseUser, has_active_subscription: false } as AuthUser;
     }
   }, []);
@@ -109,10 +103,10 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setSession(null);
       setUser(null);
     } else {
-      // Always fetch on initial load or user change to ensure accuracy
-      const needsDbProfileFetch = !user || user.id !== currentSession.user.id || event === 'USER_UPDATED' || event === 'INITIAL_LOAD';
-
-      if (needsDbProfileFetch) {
+      // Fetch details if it's the initial load or a user-specific change
+      const needsFullFetch = !user || user.id !== currentSession.user.id || event === 'SIGNED_IN' || event === 'INITIAL_LOAD';
+      
+      if (needsFullFetch) {
         const hydratedUser = await fetchUserProfile(currentSession.user);
         if (isMounted.current) {
           setSession(currentSession);
@@ -127,32 +121,34 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   useEffect(() => {
     isMounted.current = true;
 
-    const performInitialSessionCheck = async () => {
+    const initSession = async () => {
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         await updateSessionAndUser(initialSession, 'INITIAL_LOAD');
       } catch (e) {
-        console.error('[SessionContext] Initial check failed:', e);
+        console.error('[SessionContext] initialization error:', e);
       } finally {
         if (isMounted.current) setHasCheckedInitialSession(true);
       }
     };
 
-    performInitialSessionCheck();
+    initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      // Ensure we don't re-trigger initial check logic if already handled
       await updateSessionAndUser(currentSession, event);
+      if (isMounted.current && !hasCheckedInitialSession) setHasCheckedInitialSession(true);
     });
 
     return () => {
       isMounted.current = false;
       subscription.unsubscribe();
     };
-  }, [updateSessionAndUser]);
+  }, [updateSessionAndUser, hasCheckedInitialSession]);
 
   useEffect(() => {
     if (hasCheckedInitialSession && user && (location.pathname === '/login' || location.pathname === '/signup')) {
-      navigate(user.is_admin ? '/admin/dashboard' : '/user/dashboard');
+      navigate(user.is_admin ? '/admin/dashboard' : '/user/dashboard', { replace: true });
     }
   }, [user, hasCheckedInitialSession, navigate, location.pathname]);
 

@@ -51,9 +51,11 @@ import ManageSuggestionsPage from "./pages/ManageSuggestionsPage";
 import ManageVideosPage from "./pages/ManageVideosPage";
 import UserVideosPage from "./pages/UserVideosPage";
 import CaseStudiesPage from "./pages/CaseStudiesPage";
-
-// New Tools
 import ManageSeoPage from "./pages/ManageSeoPage";
+
+// Blog Pages
+import BlogListPage from "./pages/BlogListPage";
+import BlogDetailsPage from "./pages/BlogDetailsPage";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +78,10 @@ const AppContent = () => {
             <Route path="/quiz-of-the-day" element={<QuestionOfTheDayPage />} />
             <Route path="/reset-password" element={<PasswordResetPage />} />
             <Route path="/reviews" element={<ReviewsPage />} />
+            
+            {/* Public Blog Routes */}
+            <Route path="/blog" element={<BlogListPage />} />
+            <Route path="/blog/:slug" element={<BlogDetailsPage />} />
 
             <Route path="/admin" element={<AdminProtectedRoute />}>
               <Route element={<AdminLayout />}>

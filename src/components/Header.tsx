@@ -37,7 +37,6 @@ const Header = () => {
         setHeaderLinks(data || []);
       }
     };
-    // Re-fetch whenever the route changes (to reflect potential slug changes made in admin panel)
     fetchHeaderLinks();
   }, [location.pathname, toast]);
 
@@ -71,7 +70,6 @@ const Header = () => {
           >
             Study Prometric MCQs
           </Button>
-          {/* Header Navigation Links */}
           <nav className="hidden md:flex space-x-4">
             {headerLinks.map((link) => (
               <Link
@@ -82,6 +80,12 @@ const Header = () => {
                 {link.title}
               </Link>
             ))}
+            <Link
+              to="/blog"
+              className="text-sm font-medium text-primary-foreground/80 hover:text-primary-foreground transition-colors"
+            >
+              Blog
+            </Link>
             <Link
               to="/subscription"
               className="text-sm font-medium text-primary-foreground/80 hover:text-primary-foreground transition-colors"

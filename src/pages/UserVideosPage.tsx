@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Search, PlayCircle } from 'lucide-react';
+import { Search, PlayCircle, Lock, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useSession } from '@/components/SessionContextProvider';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { MadeWithDyad } from '@/components/made-with-dyad';
 
 interface Video {
   id: string;
@@ -16,19 +20,60 @@ interface Video {
 }
 
 const UserVideosPage = () => {
+  const { user, hasCheckedInitialSession } = useSession();
   const [videos, setVideos] = useState<Video[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
 
   useEffect(() => {
-    const fetchVideos = async () => {
-      const { data } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
-      setVideos(data || []);
+    if (user?.has_active_subscription) {
+      const fetchVideos = async () => {
+        const { data } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
+        setVideos(data || []);
+        setIsLoading(false);
+      };
+      fetchVideos();
+    } else if (hasCheckedInitialSession) {
       setIsLoading(false);
-    };
-    fetchVideos();
-  }, []);
+    }
+  }, [user, hasCheckedInitialSession]);
+
+  if (!hasCheckedInitialSession) {
+    return <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>;
+  }
+
+  if (!user?.has_active_subscription) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 px-4 text-center">
+        <Card className="border-primary/20 shadow-xl py-8">
+          <CardHeader>
+            <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
+              <Lock className="h-10 w-10 text-primary" />
+            </div>
+            <CardTitle className="text-3xl">Premium Video Library</CardTitle>
+            <CardDescription className="text-lg">
+              Our curated library of high-quality medical educational videos is for subscribers only.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Gain access to the best tutorials from Ninja Nerd, Osmosis, and more, all organized by topic.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+              <Link to="/user/subscriptions">
+                <Button size="lg" className="w-full">View Subscription Plans</Button>
+              </Link>
+              <Link to="/user/dashboard">
+                <Button variant="outline" size="lg" className="w-full">Back to Dashboard</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+        <MadeWithDyad />
+      </div>
+    );
+  }
 
   const filteredVideos = videos.filter(v => 
     v.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -105,6 +150,7 @@ const UserVideosPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+      <MadeWithDyad />
     </div>
   );
 };

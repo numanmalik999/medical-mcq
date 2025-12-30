@@ -8,29 +8,31 @@ import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { Link } from 'react-router-dom';
-import { BookOpenText } from 'lucide-react';
+import { BookOpenText, Lock, Loader2 } from 'lucide-react';
 
 interface Course {
   id: string;
   title: string;
   description: string | null;
-  image_url: string | null; // Added image_url
+  image_url: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
 }
 
 const UserCoursesPage = () => {
-  const { hasCheckedInitialSession } = useSession();
+  const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
   const [courses, setCourses] = useState<Course[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
 
   useEffect(() => {
-    if (hasCheckedInitialSession) {
+    if (user?.has_active_subscription) {
       fetchCourses();
+    } else if (hasCheckedInitialSession) {
+      setIsPageLoading(false);
     }
-  }, [hasCheckedInitialSession]);
+  }, [user, hasCheckedInitialSession]);
 
   const fetchCourses = async () => {
     setIsPageLoading(true);
@@ -50,9 +52,37 @@ const UserCoursesPage = () => {
   };
 
   if (!hasCheckedInitialSession || isPageLoading) {
+    return <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>;
+  }
+
+  if (!user?.has_active_subscription) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-gray-700 dark:text-gray-300">Loading courses...</p>
+      <div className="max-w-2xl mx-auto py-12 px-4 text-center">
+        <Card className="border-primary/20 shadow-xl py-8">
+          <CardHeader>
+            <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
+              <Lock className="h-10 w-10 text-primary" />
+            </div>
+            <CardTitle className="text-3xl">Premium Content</CardTitle>
+            <CardDescription className="text-lg">
+              Our structured medical courses are available exclusively to subscribed members.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Unlock comprehensive learning paths, detailed topic breakdowns, and expert-curated medical content.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+              <Link to="/user/subscriptions">
+                <Button size="lg" className="w-full">View Subscription Plans</Button>
+              </Link>
+              <Link to="/user/dashboard">
+                <Button variant="outline" size="lg" className="w-full">Back to Dashboard</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+        <MadeWithDyad />
       </div>
     );
   }

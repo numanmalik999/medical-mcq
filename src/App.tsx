@@ -50,9 +50,10 @@ import UserSuggestionsPage from "./pages/UserSuggestionsPage";
 import ManageSuggestionsPage from "./pages/ManageSuggestionsPage";
 import ManageVideosPage from "./pages/ManageVideosPage";
 import UserVideosPage from "./pages/UserVideosPage";
-
-// New Page
 import CaseStudiesPage from "./pages/CaseStudiesPage";
+
+// New Tools
+import ManageSeoPage from "./pages/ManageSeoPage";
 
 const queryClient = new QueryClient();
 
@@ -94,6 +95,7 @@ const AppContent = () => {
                 <Route path="manage-users" element={<ManageUsersPage />} />
                 <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />
                 <Route path="manage-suggestions" element={<ManageSuggestionsPage />} />
+                <Route path="seo" element={<ManageSeoPage />} />
                 <Route path="settings" element={<AdminSettingsPage />} />
               </Route>
             </Route>

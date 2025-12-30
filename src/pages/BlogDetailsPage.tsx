@@ -5,12 +5,13 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Calendar, Tag } from 'lucide-react';
+import { Loader2, ArrowLeft, Calendar, Tag, Share2, Facebook, Twitter, Link as LinkIcon, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 interface Blog {
   title: string;
@@ -23,8 +24,11 @@ interface Blog {
 
 const BlogDetailsPage = () => {
   const { slug } = useParams();
+  const { toast } = useToast();
   const [blog, setBlog] = useState<Blog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
 
   useEffect(() => {
     const fetchBlog = async () => {
@@ -46,6 +50,28 @@ const BlogDetailsPage = () => {
     fetchBlog();
   }, [slug]);
 
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(currentUrl);
+    toast({
+      title: "Link Copied!",
+      description: "The article link has been copied to your clipboard.",
+    });
+  };
+
+  const shareOnFacebook = () => {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentUrl)}`, '_blank');
+  };
+
+  const shareOnTwitter = () => {
+    const text = `Check out this article: ${blog?.title}`;
+    window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(currentUrl)}&text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const shareOnWhatsApp = () => {
+    const text = `Check out this article: ${blog?.title} - ${currentUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
   }
@@ -63,26 +89,47 @@ const BlogDetailsPage = () => {
     <div className="min-h-screen bg-background pt-24 pb-12">
       <article className="container mx-auto px-4 max-w-4xl">
         <Button asChild variant="ghost" className="mb-8 pl-0 hover:bg-transparent hover:text-primary">
-          <Link to="/blog" className="flex items-center gap-2">
+          <Link to="/blog" className="flex items-center gap-2 text-black">
             <ArrowLeft className="h-4 w-4" /> Back to Articles
           </Link>
         </Button>
 
         <header className="mb-10">
           <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-6 text-black">{blog.title}</h1>
-          <div className="flex flex-wrap items-center gap-6 text-gray-600 border-y py-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              {format(new Date(blog.created_at), 'MMMM dd, yyyy')}
-            </div>
-            {blog.keywords && blog.keywords.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <Tag className="h-4 w-4" />
-                {blog.keywords.map((kw, i) => (
-                  <Badge key={i} variant="secondary" className="text-[10px] uppercase tracking-wider">{kw}</Badge>
-                ))}
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-y py-6 mb-8">
+            <div className="flex flex-wrap items-center gap-6 text-gray-600">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                {format(new Date(blog.created_at), 'MMMM dd, yyyy')}
               </div>
-            )}
+              {blog.keywords && blog.keywords.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Tag className="h-4 w-4" />
+                  {blog.keywords.map((kw, i) => (
+                    <Badge key={i} variant="secondary" className="text-[10px] uppercase tracking-wider">{kw}</Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-black flex items-center gap-1 mr-2">
+                <Share2 className="h-4 w-4" /> Share:
+              </span>
+              <Button size="icon" variant="outline" className="rounded-full h-9 w-9" onClick={shareOnFacebook} title="Share on Facebook">
+                <Facebook className="h-4 w-4 text-blue-600" />
+              </Button>
+              <Button size="icon" variant="outline" className="rounded-full h-9 w-9" onClick={shareOnTwitter} title="Share on Twitter/X">
+                <Twitter className="h-4 w-4 text-sky-500" />
+              </Button>
+              <Button size="icon" variant="outline" className="rounded-full h-9 w-9" onClick={shareOnWhatsApp} title="Share on WhatsApp">
+                <MessageCircle className="h-4 w-4 text-green-600" />
+              </Button>
+              <Button size="icon" variant="outline" className="rounded-full h-9 w-9" onClick={handleCopyLink} title="Copy Link">
+                <LinkIcon className="h-4 w-4 text-gray-600" />
+              </Button>
+            </div>
           </div>
         </header>
 

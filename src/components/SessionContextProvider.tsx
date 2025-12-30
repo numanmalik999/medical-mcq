@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { isPast, parseISO } from 'date-fns'; // Import date-fns helpers
+import { isPast, parseISO } from 'date-fns';
 
 // Extend the User type to include profile fields
 interface AuthUser extends User {
@@ -21,7 +21,7 @@ interface AuthUser extends User {
 interface SessionContextType {
   session: Session | null;
   user: AuthUser | null;
-  hasCheckedInitialSession: boolean; // Flag to indicate if the initial check is complete
+  hasCheckedInitialSession: boolean;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -33,99 +33,57 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const navigate = useNavigate();
   const location = useLocation();
   const isMounted = useRef(true);
-  const lastFetchedUserId = useRef<string | null>(null); // To track the last user whose profile was fetched
 
-  // Memoized function to fetch a single user profile from the database
   const fetchUserProfile = useCallback(async (supabaseUser: User): Promise<AuthUser> => {
-    if (!isMounted.current) {
-      console.warn('[fetchUserProfile] Component unmounted during profile fetch, returning default AuthUser.');
-      return {
-        ...supabaseUser,
-        is_admin: false,
-        has_active_subscription: false,
-        trial_taken: false,
-      } as AuthUser;
-    }
-    console.log(`[fetchUserProfile] START: Fetching profile and subscription for user ID: ${supabaseUser.id}`);
+    if (!isMounted.current) return { ...supabaseUser } as AuthUser;
 
-    let profileData = null;
-    let fetchError = null;
-
-    const timeoutPromise = new Promise<null>((resolve) =>
-      setTimeout(() => {
-        console.warn(`[fetchUserProfile] WARNING: Supabase profile fetch timed out after 5 seconds for user ID: ${supabaseUser.id}.`);
-        resolve(null);
-      }, 5000)
-    );
+    console.log(`[SessionContext] Hydrating session for: ${supabaseUser.id}`);
 
     try {
-      // 1. Fetch Profile Data
-      const { data: profileDataArray, error: selectError } = await Promise.race([
+      // 1. Fetch Profile and latest active subscription in parallel for speed and accuracy
+      const [profileResponse, subResponse] = await Promise.all([
         supabase
           .from('profiles')
           .select('is_admin, first_name, last_name, phone_number, whatsapp_number, has_active_subscription, trial_taken')
           .eq('id', supabaseUser.id)
-          .then(res => ({ data: res.data, error: res.error })),
-        timeoutPromise.then(() => ({ data: null, error: { message: 'Profile fetch timed out', code: 'TIMEOUT' } }))
-      ]);
-      
-      fetchError = selectError;
-      if (fetchError && fetchError.code !== 'PGRST116' && fetchError.code !== 'TIMEOUT') {
-        console.error(`[fetchUserProfile] ERROR: fetching profile (code: ${fetchError.code}):`, fetchError);
-      } else if (profileDataArray && profileDataArray[0]) {
-        profileData = profileDataArray[0];
-      }
-
-      let currentHasActiveSubscription = profileData?.has_active_subscription || false;
-
-      // 2. Check Subscription Status (Only if profile claims to be active)
-      if (currentHasActiveSubscription) {
-        const { data: latestSub, error: subError } = await supabase
+          .maybeSingle(),
+        supabase
           .from('user_subscriptions')
           .select('end_date, status')
           .eq('user_id', supabaseUser.id)
           .eq('status', 'active')
           .order('end_date', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle()
+      ]);
 
-        if (subError && subError.code !== 'PGRST116') {
-            console.error('[fetchUserProfile] ERROR: fetching latest active subscription:', subError);
-        } else if (latestSub && latestSub.end_date) {
-            const endDate = parseISO(latestSub.end_date);
-            if (isPast(endDate)) {
-                console.log(`[fetchUserProfile] Subscription expired for user ${supabaseUser.id}. End Date: ${latestSub.end_date}`);
-                currentHasActiveSubscription = false;
-                
-                // Update the database profile flag via Edge Function (Service Role)
-                const { error: updateError } = await supabase.functions.invoke('update-expired-subscription-status', {
-                    body: { user_id: supabaseUser.id, is_active: false },
-                });
-                
-                if (updateError) {
-                    console.error('[fetchUserProfile] ERROR: Failed to update expired status via Edge Function:', updateError);
-                }
-            } else {
-                console.log(`[fetchUserProfile] Subscription is active for user ${supabaseUser.id}. Expires: ${latestSub.end_date}`);
-            }
+      const profileData = profileResponse.data;
+      const latestSub = subResponse.data;
+
+      // 2. Determine actual subscription status
+      // We trust the 'user_subscriptions' table as the source of truth over the profile flag
+      let currentHasActiveSubscription = false;
+
+      if (latestSub && latestSub.end_date) {
+        const endDate = parseISO(latestSub.end_date);
+        if (!isPast(endDate)) {
+          currentHasActiveSubscription = true;
         } else {
-            // No active subscription found in user_subscriptions table, despite profile flag being true
-            if (profileData?.has_active_subscription) {
-                console.warn(`[fetchUserProfile] Profile flag mismatch: profile.has_active_subscription=TRUE but no active record found. Setting to FALSE.`);
-                currentHasActiveSubscription = false;
-                
-                // Update the database profile flag via Edge Function (Service Role)
-                const { error: updateError } = await supabase.functions.invoke('update-expired-subscription-status', {
-                    body: { user_id: supabaseUser.id, is_active: false },
-                });
-                
-                if (updateError) {
-                    console.error('[fetchUserProfile] ERROR: Failed to correct profile flag via Edge Function:', updateError);
-                }
-            }
+          // It's expired - trigger background update if profile still says true
+          if (profileData?.has_active_subscription) {
+            supabase.functions.invoke('update-expired-subscription-status', {
+              body: { user_id: supabaseUser.id, is_active: false },
+            });
+          }
         }
       }
-    
+
+      // 3. Fallback: if no record in sub table, but profile says true (could be a manual override or free award)
+      // but only if we didn't find an expired record above.
+      if (!latestSub && profileData?.has_active_subscription) {
+        currentHasActiveSubscription = true;
+      }
+
       const hydratedUser: AuthUser = {
         ...supabaseUser,
         is_admin: profileData?.is_admin || false,
@@ -133,131 +91,68 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         last_name: profileData?.last_name || null,
         phone_number: profileData?.phone_number || null,
         whatsapp_number: profileData?.whatsapp_number || null,
-        has_active_subscription: currentHasActiveSubscription, // Use the verified status
+        has_active_subscription: currentHasActiveSubscription,
         trial_taken: profileData?.trial_taken || false,
       };
-      console.log('[fetchUserProfile] END: Hydrated user object:', hydratedUser);
+
       return hydratedUser;
     } catch (e: any) {
-      console.error(`[fetchUserProfile] UNEXPECTED EXCEPTION during Supabase profile fetch:`, e.message || e);
-      fetchError = { message: e.message || 'Unknown error during fetch', code: 'UNEXPECTED_EXCEPTION' }; 
-      
-      // Return a default user object on catastrophic failure
-      return {
-        ...supabaseUser,
-        is_admin: profileData?.is_admin || false,
-        has_active_subscription: profileData?.has_active_subscription || false,
-        trial_taken: profileData?.trial_taken || false,
-      } as AuthUser;
+      console.error(`[SessionContext] Hydration error:`, e.message);
+      return { ...supabaseUser, has_active_subscription: false } as AuthUser;
     }
   }, []);
 
-  // This function will be called on initial load and on auth state changes
   const updateSessionAndUser = useCallback(async (currentSession: Session | null, event: string) => {
-    if (!isMounted.current) {
-      console.warn(`[updateSessionAndUser] Skipping event ${event} - component unmounted.`);
-      return;
-    }
-
-    console.log(`[updateSessionAndUser] Event: ${event}, Session present: ${!!currentSession}.`);
+    if (!isMounted.current) return;
 
     if (!currentSession) {
-      console.log('[updateSessionAndUser] No session, clearing user and session states.');
       setSession(null);
       setUser(null);
-      lastFetchedUserId.current = null; // Clear last fetched user on logout
     } else {
-      let hydratedUser: AuthUser | null = null;
-
-      // Condition to decide if we need to fetch profile from DB
-      // We fetch if:
-      // 1. There's no user object in our local state yet (first time loading for this session or after logout).
-      // 2. The user ID in the current session is different from the user ID in our local state.
-      // 3. The event explicitly indicates a user profile update.
-      // We *do not* fetch from DB for 'SIGNED_IN', 'TOKEN_REFRESHED', or 'INITIAL_SESSION'
-      // if the user is already in state and their ID matches.
-      const needsDbProfileFetch = 
-        !user || // No user in state (first load or after logout)
-        user.id !== currentSession.user.id || // Different user logged in
-        event === 'USER_UPDATED'; // Explicit user profile update
+      // Always fetch on initial load or user change to ensure accuracy
+      const needsDbProfileFetch = !user || user.id !== currentSession.user.id || event === 'USER_UPDATED' || event === 'INITIAL_LOAD';
 
       if (needsDbProfileFetch) {
-        console.log(`[updateSessionAndUser] Fetching profile for user ID: ${currentSession.user.id} due to event: ${event}`);
-        hydratedUser = await fetchUserProfile(currentSession.user);
-        lastFetchedUserId.current = currentSession.user.id; // Mark as fetched
+        const hydratedUser = await fetchUserProfile(currentSession.user);
+        if (isMounted.current) {
+          setSession(currentSession);
+          setUser(hydratedUser);
+        }
       } else {
-        console.log(`[updateSessionAndUser] Reusing existing profile for user ID: ${currentSession.user.id} (event: ${event}).`);
-        // If we don't need to fetch from DB, use the current user state
-        hydratedUser = user; // Reuse the existing user object
-      }
-
-      if (isMounted.current) {
         setSession(currentSession);
-        setUser(hydratedUser); // Set the hydrated or reused user
-        console.log('[updateSessionAndUser] User and Session states updated.');
-      } else {
-        console.warn('[updateSessionAndUser] Component unmounted before setting session and user states.');
       }
     }
-  }, [fetchUserProfile, user]); // 'user' dependency is still important for '!user' and 'user.id !== currentSession.user.id'
+  }, [fetchUserProfile, user]);
 
-  // Main effect for setting up auth listener and initial session check
   useEffect(() => {
     isMounted.current = true;
-    console.log('SessionContextProvider: Main useEffect mounted.');
 
     const performInitialSessionCheck = async () => {
       try {
-        console.log('SessionContextProvider: Starting initial session fetch...');
-        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('SessionContextProvider: Error during initial getSession:', error);
-          await updateSessionAndUser(null, 'INITIAL_LOAD_ERROR');
-        } else if (isMounted.current) {
-          console.log('SessionContextProvider: Initial Session Check Result:', initialSession ? 'Session found' : 'No session');
-          await updateSessionAndUser(initialSession, 'INITIAL_LOAD');
-        }
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        await updateSessionAndUser(initialSession, 'INITIAL_LOAD');
       } catch (e) {
-        console.error('SessionContextProvider: UNEXPECTED ERROR during initial session check:', e);
-        await updateSessionAndUser(null, 'INITIAL_LOAD_UNEXPECTED_ERROR');
+        console.error('[SessionContext] Initial check failed:', e);
       } finally {
-        if (isMounted.current) {
-          console.log('SessionContextProvider: Initial load process finished, setting hasCheckedInitialSession to TRUE.');
-          setHasCheckedInitialSession(true);
-        } else {
-          console.warn('SessionContextProvider: Component unmounted before setting hasCheckedInitialSession in finally block of initial check.');
-        }
+        if (isMounted.current) setHasCheckedInitialSession(true);
       }
     };
 
     performInitialSessionCheck();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      if (!isMounted.current) {
-        console.warn(`SessionContextProvider: onAuthStateChange: Skipping event ${event} - component unmounted.`);
-        return;
-      }
-      console.log('SessionContextProvider: onAuthStateChange: Event:', event, 'Session:', currentSession ? 'present' : 'null');
       await updateSessionAndUser(currentSession, event);
     });
 
     return () => {
       isMounted.current = false;
-      console.log('SessionContextProvider: Main useEffect cleanup, unsubscribing from auth state changes.');
       subscription.unsubscribe();
     };
   }, [updateSessionAndUser]);
 
-  // Dedicated useEffect for redirection after login/signup
   useEffect(() => {
-    console.log('Redirection useEffect: Current state - hasCheckedInitialSession:', hasCheckedInitialSession, 'user:', user ? `(ID: ${user.id}, Admin: ${user.is_admin}, Subscribed: ${user.has_active_subscription})` : 'null', 'pathname:', location.pathname);
     if (hasCheckedInitialSession && user && (location.pathname === '/login' || location.pathname === '/signup')) {
-      console.log('Redirection triggered. User is_admin:', user.is_admin, 'User has_active_subscription:', user.has_active_subscription);
-      if (user.is_admin) {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/user/dashboard');
-      }
+      navigate(user.is_admin ? '/admin/dashboard' : '/user/dashboard');
     }
   }, [user, hasCheckedInitialSession, navigate, location.pathname]);
 

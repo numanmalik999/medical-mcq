@@ -53,6 +53,7 @@ import ManageVideosPage from "./pages/ManageVideosPage";
 import UserVideosPage from "./pages/UserVideosPage";
 import CaseStudiesPage from "./pages/CaseStudiesPage";
 import ManageSeoPage from "./pages/ManageSeoPage";
+import ContactPage from "./pages/ContactPage";
 
 // Blog Pages
 import BlogListPage from "./pages/BlogListPage";
@@ -80,6 +81,7 @@ const AppContent = () => {
             <Route path="/quiz-of-the-day" element={<QuestionOfTheDayPage />} />
             <Route path="/reset-password" element={<PasswordResetPage />} />
             <Route path="/reviews" element={<ReviewsPage />} />
+            <Route path="/contact" element={<ContactPage />} />
             
             {/* Public Blog Routes */}
             <Route path="/blog" element={<BlogListPage />} />

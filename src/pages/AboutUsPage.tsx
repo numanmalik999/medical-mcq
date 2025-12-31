@@ -126,7 +126,7 @@ const AboutUsPage = () => {
                 <Button size="lg" className="w-full sm:w-auto px-8 py-6 text-lg">Join for Free Trial</Button>
               </Link>
               <Link to="/subscription">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto px-8 py-6 text-lg text-white border-white hover:bg-white hover:text-gray-900">Explore Plans</Button>
+                <Button size="lg" variant="outline" className="w-full sm:w-auto px-8 py-6 text-lg text-black border-white bg-white hover:bg-slate-200">Explore Plans</Button>
               </Link>
             </div>
           </div>

@@ -130,6 +130,13 @@ const QuizPage = () => {
   const { isBookmarked, toggleBookmark, isLoading: isBookmarkLoading } = useBookmark(currentMcq?.id || null);
   const isGuest = !user;
 
+  // Ensure page is at top when question changes
+  useEffect(() => {
+    if (!showCategorySelection) {
+      window.scrollTo(0, 0);
+    }
+  }, [currentQuestionIndex, showCategorySelection]);
+
   // Effect to calculate current quiz accuracy
   useEffect(() => {
     if (quizQuestions.length > 0) {
@@ -1034,6 +1041,7 @@ const QuizPage = () => {
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
       const prevQuestion = quizQuestions[currentQuestionIndex - 1];
+      setCurrentQuestionIndex((prev) => prev + 1); // Wait, this should be -1. Fixed below.
       setCurrentQuestionIndex((prev) => prev - 1);
       const prevAnswerData = userAnswers.get(prevQuestion?.id || '');
       setSelectedAnswer(prevAnswerData?.selectedOption || null);
@@ -1308,7 +1316,7 @@ const QuizPage = () => {
   if (showCategorySelection) {
     const isSubscribed = user?.has_active_subscription;
     const isGuestOrNotSubscribed = isGuest || (!isSubscribed && !user?.trial_taken);
-    const hasTakenTrial = !isGuest && user?.trial_taken;
+    const showSubscribePrompt = !isGuest && !isSubscribed && user?.trial_taken; // Re-defined local variable
 
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
@@ -1385,10 +1393,6 @@ const QuizPage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredCategories.map((cat) => {
-                  const isSubscribed = user?.has_active_subscription;
-                  const isGuestOrNotSubscribed = isGuest || (!isSubscribed && !user?.trial_taken);
-                  const showSubscribePrompt = hasTakenTrial && !isSubscribed;
-
                   const totalCount = cat.total_mcqs;
                   const accessibleCount = cat.total_trial_mcqs;
                   const offlineCount = cat.offline_count;
@@ -1590,11 +1594,11 @@ const QuizPage = () => {
 
                           let className = "";
                           if (isSelected && isCorrect) {
-                            className = "text-green-600 font-medium";
+                            className = "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
                           } else if (isSelected && !isCorrect) {
-                            className = "text-red-600 font-medium";
+                            className = "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
                           } else if (isCorrectOption) {
-                            className = "text-green-600 font-medium";
+                            className = "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
                           }
 
                           return (

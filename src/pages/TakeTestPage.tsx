@@ -122,6 +122,13 @@ const TakeTestPage = () => {
   const currentMcq = mcqs[currentQuestionIndex];
   const { isBookmarked, toggleBookmark, isLoading: isBookmarkLoading } = useBookmark(currentMcq?.id || null);
 
+  // Ensure page is at top when question changes
+  useEffect(() => {
+    if (!showConfiguration && !showInstructions) {
+      window.scrollTo(0, 0);
+    }
+  }, [currentQuestionIndex, showConfiguration, showInstructions]);
+
   // Memoized function to fetch a single explanation
   const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
     if (explanations.has(explanationId)) {

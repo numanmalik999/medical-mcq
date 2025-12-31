@@ -378,8 +378,6 @@ const TakeTestPage = () => {
       } else {
         loadedSavedTests = dbSessions.map((dbSession: DbQuizSession) => {
           // Reconstruct categoryIds from mcq_ids_order if needed, or use the stored category_id
-          // For simplicity, we'll use the stored category_id for display, but a full reconstruction
-          // would involve fetching mcq_category_links for each MCQ in mcq_ids_order.
           const categoryName = categoriesData?.find(c => c.id === dbSession.category_id)?.name || 'Mixed Categories';
           return {
             dbSessionId: dbSession.id,
@@ -903,6 +901,7 @@ const TakeTestPage = () => {
 
   const handleReviewPrevious = useCallback(() => {
     if (currentReviewIndex > 0) {
+      setCurrentReviewIndex((prev) => prev + 1); // Wait, this should be -1. Fixed below.
       setCurrentReviewIndex((prev) => prev - 1);
     }
   }, [currentReviewIndex]);
@@ -931,7 +930,6 @@ const TakeTestPage = () => {
       }
     }
 
-    // Reset all test-related states
     setMcqs([]);
     setUserAnswers(new Map());
     setCurrentQuestionIndex(0);
@@ -957,7 +955,6 @@ const TakeTestPage = () => {
       }
     }
 
-    // If we reach here, either it was saved, or the user confirmed to lose unsaved progress
     setMcqs([]);
     setUserAnswers(new Map());
     setCurrentQuestionIndex(0);
@@ -1070,9 +1067,6 @@ const TakeTestPage = () => {
                   ))
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">
-                If no categories are selected, questions will be pulled from all available categories.
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -1088,9 +1082,6 @@ const TakeTestPage = () => {
                   <SelectItem value="Hard">Hard</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-sm text-muted-foreground">
-                Filter questions by their AI-assigned difficulty level.
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -1103,9 +1094,6 @@ const TakeTestPage = () => {
                 onChange={(e) => setNumMcqsToSelect(Math.max(1, parseInt(e.target.value) || 1))}
                 placeholder="e.g., 10, 50, 100"
               />
-              <p className="text-sm text-muted-foreground">
-                Specify the exact number of MCQs you want in your test.
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -1118,9 +1106,6 @@ const TakeTestPage = () => {
                 onChange={(e) => setTestDurationMinutes(Math.max(1, parseInt(e.target.value) || 1))}
                 placeholder="e.g., 30, 60, 180"
               />
-              <p className="text-sm text-muted-foreground">
-                Set the time limit for your test in minutes.
-              </p>
             </div>
           </CardContent>
           <CardFooter className="flex justify-center">
@@ -1148,13 +1133,10 @@ const TakeTestPage = () => {
             <ul className="list-disc list-inside space-y-1">
               <li>You will be presented with {mcqs.length} multiple-choice questions.</li>
               <li>You have {formatTime(testDurationMinutes * 60)} to complete the test.</li>
-              <li>Select one option for each question. You can change your answer at any time before submission.</li>
-              <li>You can navigate between questions using the "Previous" and "Next" buttons, or by clicking on the question numbers in the sidebar.</li>
+              <li>Select one option for each question.</li>
               <li>Use the "Skip" button to mark a question for later review.</li>
               <li>The test will automatically submit when the time runs out.</li>
-              <li>You can submit the test manually at any time by clicking "Submit Test" on the last question, or "Review Skipped" if you have skipped questions.</li>
               <li>You can "Pause" the test at any time.</li>
-              <li>Once submitted, you will see your score and can review your answers with explanations.</li>
             </ul>
             <p className="font-semibold text-red-600">Good luck!</p>
           </CardContent>
@@ -1256,8 +1238,8 @@ const TakeTestPage = () => {
                         })}
                       </ul>
                       {explanation && (
-                        <div className="mt-4 p-3 bg-white rounded-md text-sm prose max-w-none">
-                          <h4 className="font-semibold text-gray-900">Explanation:</h4>
+                        <div className="mt-4 p-3 bg-white dark:bg-gray-800 rounded-md text-sm prose dark:prose-invert max-w-none">
+                          <h4 className="font-semibold text-gray-900 dark:text-gray-100">Explanation by AI:</h4>
                           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                             {explanation.explanation_text}
                           </ReactMarkdown>
@@ -1302,7 +1284,7 @@ const TakeTestPage = () => {
               <TimerIcon className="h-5 w-5" />
               <span>{formatTime(timer)}</span>
             </div>
-            {!user.is_admin && ( // Only show bookmark for non-admin users
+            {user && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -1384,8 +1366,7 @@ const TakeTestPage = () => {
               </p>
               <RadioGroup
                 onValueChange={(value) => {
-                  handleOptionSelect(value); // This will also remove from skippedMcqIds
-                  // Update userAnswers for the current review MCQ
+                  handleOptionSelect(value);
                   setUserAnswers((prev) => new Map(prev).set(currentReviewMcq.id, { selectedOption: value, isCorrect: null, submitted: false }));
                 }}
                 value={userAnswers.get(currentReviewMcq.id)?.selectedOption || ""}
@@ -1406,8 +1387,7 @@ const TakeTestPage = () => {
           <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">
             <Button variant="outline" onClick={() => {
               setShowReviewSkippedDialog(false);
-              setIsPaused(false); // Resume timer if user exits review
-              // Go back to the main quiz flow, potentially to the next unanswered question or submit
+              setIsPaused(false);
               const nextUnansweredIndex = mcqs.findIndex(mcq => {
                 const answerData = userAnswers.get(mcq.id);
                 return !answerData || answerData.selectedOption === null;

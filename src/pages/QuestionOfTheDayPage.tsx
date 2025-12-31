@@ -139,7 +139,7 @@ const QuestionOfTheDayPage = () => {
 
     if (userIds.length > 0) {
       // The Edge Function now returns email as well
-      const { data: publicProfiles, error: profilesError } = await supabase.functions.invoke('get-public-profiles', {
+      const { data: publicProfiles, error: profilesError = null } = await supabase.functions.invoke('get-public-profiles', {
         body: { user_ids: userIds },
       });
 
@@ -525,7 +525,7 @@ const QuestionOfTheDayPage = () => {
 
                 {explanation && (
                   <div className="p-4 bg-white rounded-md border border-gray-200">
-                    <h3 className="text-lg font-semibold mb-2 text-gray-900">Explanation:</h3>
+                    <h3 className="text-lg font-semibold mb-2 text-gray-900">Explanation by AI:</h3>
                     <div className="prose max-w-none">
                       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                         {explanation.explanation_text}

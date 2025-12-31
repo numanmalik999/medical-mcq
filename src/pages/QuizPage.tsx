@@ -1612,7 +1612,7 @@ const QuizPage = () => {
                       </ul>
                       {explanation && (
                         <div className="mt-4 p-3 bg-white rounded-md text-sm prose max-w-none">
-                          <h4 className="font-semibold text-gray-900">Explanation:</h4>
+                          <h4 className="font-semibold text-gray-900">Explanation by AI:</h4>
                           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                             {explanation.explanation_text}
                           </ReactMarkdown>
@@ -1749,7 +1749,7 @@ const QuizPage = () => {
 
             {showExplanation && explanations.has(currentMcq.explanation_id || '') && (
               <div className="mt-6 p-4 bg-white rounded-md border border-gray-200">
-                <h3 className="text-lg font-semibold mb-2 text-gray-900">Explanation:</h3>
+                <h3 className="text-lg font-semibold mb-2 text-gray-900">Explanation by AI:</h3>
                 <div className="prose max-w-none">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                     {explanations.get(currentMcq.explanation_id || '')?.explanation_text || ""}

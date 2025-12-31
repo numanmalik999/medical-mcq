@@ -165,12 +165,8 @@ const BookmarkedMcqsPage = () => {
       await toggleBookmark();
       // After toggling, re-fetch bookmarks to update the list if it was removed
       if (isBookmarked) { // If it was bookmarked and now removed
-        // Use a slight delay to allow DB to update before refetching
         setTimeout(() => fetchBookmarkedMcqs(), 300);
       } else { // If it was not bookmarked and now added
-        // No need to refetch the whole list if we just added one, but we do it for simplicity here
-        // In a real app, you might just update the local state if the list order doesn't matter.
-        // Since we rely on the fetched order, we refetch.
         setTimeout(() => fetchBookmarkedMcqs(), 300);
       }
     }
@@ -200,7 +196,9 @@ const BookmarkedMcqsPage = () => {
               <Button className="w-full sm:w-auto">Go to Login</Button>
             </Link>
           </CardContent>
-          <MadeWithDyad />
+          <CardFooter className="flex justify-center">
+            <MadeWithDyad />
+          </CardFooter>
         </Card>
       </div>
     );
@@ -222,7 +220,9 @@ const BookmarkedMcqsPage = () => {
               <Button className="w-full sm:w-auto">Start a Quiz</Button>
             </Link>
           </CardContent>
-          <MadeWithDyad />
+          <CardFooter className="flex justify-center">
+            <MadeWithDyad />
+          </CardFooter>
         </Card>
       </div>
     );
@@ -277,8 +277,8 @@ const BookmarkedMcqsPage = () => {
           </RadioGroup>
 
           {showExplanation && explanations.has(currentMcq?.explanation_id || '') && (
-            <div className="mt-6 p-4 bg-white rounded-md border border-gray-200 prose max-w-none">
-              <h3 className="text-lg font-semibold mb-2 text-gray-900">Explanation:</h3>
+            <div className="mt-6 p-4 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 prose dark:prose-invert max-w-none">
+              <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">Explanation by AI:</h3>
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                 {explanations.get(currentMcq?.explanation_id || '')?.explanation_text || ""}
               </ReactMarkdown>

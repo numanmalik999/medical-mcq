@@ -54,6 +54,8 @@ import UserVideosPage from "./pages/UserVideosPage";
 import CaseStudiesPage from "./pages/CaseStudiesPage";
 import ManageSeoPage from "./pages/ManageSeoPage";
 import ContactPage from "./pages/ContactPage";
+import FaqPage from "./pages/FaqPage";
+import AboutUsPage from "./pages/AboutUsPage";
 
 // Blog Pages
 import BlogListPage from "./pages/BlogListPage";
@@ -82,6 +84,8 @@ const AppContent = () => {
             <Route path="/reset-password" element={<PasswordResetPage />} />
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/faq" element={<FaqPage />} />
+            <Route path="/about" element={<AboutUsPage />} />
             
             {/* Public Blog Routes */}
             <Route path="/blog" element={<BlogListPage />} />

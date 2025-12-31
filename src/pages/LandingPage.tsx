@@ -45,6 +45,8 @@ const LandingPage = () => {
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
 
+  const isSubscribed = user?.has_active_subscription;
+
   const marketingForm = useForm<z.infer<typeof marketingFormSchema>>({
     resolver: zodResolver(marketingFormSchema),
     defaultValues: {
@@ -148,17 +150,17 @@ const LandingPage = () => {
 
             {/* Quick Feature Access Row */}
             <div className="flex flex-wrap justify-center gap-2">
-              <Link to="/subscription">
+              <Link to={isSubscribed ? "/user/take-test" : "/subscription"}>
                 <Button variant="outline" size="sm" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
                   <ClipboardCheck className="h-4 w-4" /> Take a Test
                 </Button>
               </Link>
-              <Link to="/subscription">
+              <Link to={isSubscribed ? "/user/videos" : "/subscription"}>
                 <Button variant="outline" size="sm" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
                   <Video className="h-4 w-4" /> Video Lessons
                 </Button>
               </Link>
-              <Link to="/subscription">
+              <Link to={isSubscribed ? "/user/courses" : "/subscription"}>
                 <Button variant="outline" size="sm" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2">
                   <GraduationCap className="h-4 w-4" /> Medical Courses
                 </Button>

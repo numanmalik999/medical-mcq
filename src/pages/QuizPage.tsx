@@ -111,7 +111,6 @@ const QuizPage = () => {
   const [score, setScore] = useState(0);
   const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
 
-  const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
   const [isTrialActiveSession, setIsTrialActiveSession] = useState(false);
   const [allTrialMcqsCount, setAllTrialMcqsCount] = useState(0);
   const [isOfflineQuiz, setIsOfflineQuiz] = useState(false); // New state for offline mode
@@ -1212,7 +1211,7 @@ const QuizPage = () => {
   const handleBackToSelection = () => {
     const isCurrentQuizSaved = currentDbSessionId && activeSavedQuizzes.some(session => session.dbSessionId === currentDbSessionId);
 
-    if (!isCurrentTestSaved && quizQuestions.length > 0 && !showResults) {
+    if (!isCurrentQuizSaved && quizQuestions.length > 0 && !showResults) {
       if (!window.confirm("Are you sure you want to end this quiz session and go back to category selection? Your current progress will be lost.")) {
         return;
       }
@@ -1267,31 +1266,6 @@ const QuizPage = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 pt-16">
         <p className="text-gray-700 dark:text-gray-300">Loading quiz overview...</p>
-      </div>
-    );
-  }
-
-  if (showSubscriptionPrompt) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
-        <Card className="w-full max-w-2xl text-center">
-          <CardHeader>
-            <CardTitle className="text-2xl">Premium Feature</CardTitle>
-            <CardDescription>
-              To unlock full categories and all practice features, please subscribe.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-lg">Enjoy unlimited practice with thousands of questions!</p>
-            <Button onClick={() => navigate('/user/subscriptions')} className="w-full sm:w-auto">
-              View Subscription Plans
-            </Button>
-            <Button onClick={() => setShowCategorySelection(true)} variant="outline" className="w-full sm:w-auto">
-              Back to Quiz Selection
-            </Button>
-          </CardContent>
-          <MadeWithDyad />
-        </Card>
       </div>
     );
   }

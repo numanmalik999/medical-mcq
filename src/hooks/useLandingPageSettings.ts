@@ -29,12 +29,13 @@ const defaultHero: HeroSection = {
 };
 
 const defaultFeatures: FeatureItem[] = [
-  { icon: "Stethoscope", title: "AI Clinical Cases", description: "Immerse yourself in complex patient scenarios with multi-step interactive clinical cases designed to test your diagnostic logic." },
-  { icon: "ShieldCheck", title: "Verified Accuracy", description: "Our content is continuously audited by clinical AI to ensure 100% accuracy, clarity, and relevance to the latest exam standards." },
-  { icon: "ClipboardCheck", title: "Simulated Tests", description: "Prepare with timed, customizable tests. Configure question count, difficulty, and time limits to mirror real exam conditions." },
-  { icon: "Youtube", title: "Curated Video Library", description: "Access a hand-picked selection of high-yield medical videos from Ninja Nerd, Osmosis, and more, all mapped to specific topics." },
-  { icon: "BrainCircuit", title: "AI Medical Assistant", description: "Get instant answers to your clinical queries with our integrated AI chatbot, available 24/7 to support your learning journey." },
-  { icon: "Trophy", title: "Daily Challenge", description: "Compete in our Question of the Day leaderboard. Earn points for correct answers and win free premium subscription months!" },
+  { icon: "BookOpen", title: "Interactive Quizzes", description: "Engage with dynamic questions that provide instant feedback and adapt to your learning pace." },
+  { icon: "Map", title: "Structured Learning Path", description: "Follow a logically organized curriculum that takes you from foundational concepts to clinical mastery." },
+  { icon: "BrainCircuit", title: "AI-Powered Explanations", description: "Get deep clinical insights and reasoning for every answer choice, powered by advanced medical AI." },
+  { icon: "Bookmark", title: "Bookmark & Review", description: "Save challenging questions and create your own personalized revision lists for focused study sessions." },
+  { icon: "BarChart", title: "Personalized Learning", description: "Track your progress with detailed analytics that highlight your strengths and identify areas for improvement." },
+  { icon: "FilePlus", title: "Submit Your Own MCQs", description: "Contribute to the medical community by sharing your own high-yield questions and explanations." },
+  { icon: "ShieldCheck", title: "Secure & Reliable", description: "Your study progress and data are protected by industry-standard security and cloud-sync technology." },
 ];
 
 const defaultPricingCta: PricingCta = {

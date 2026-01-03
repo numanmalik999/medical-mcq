@@ -29,7 +29,14 @@ const getFeatureBlogLink = (title: string) => {
     "Simulated Tests": "/blog/simulated-tests",
     "Curated Video Library": "/blog/curated-video-library",
     "AI Medical Assistant": "/blog/ai-medical-assistant",
-    "Daily Challenge": "/blog/daily-challenge"
+    "Daily Challenge": "/blog/daily-challenge",
+    "Interactive Quizzes": "/blog/interactive-quizzes",
+    "Structured Learning Path": "/blog/structured-learning-path",
+    "AI-Powered Explanations": "/blog/ai-powered-explanations",
+    "Bookmark & Review": "/blog/bookmark-review",
+    "Personalized Learning": "/blog/personalized-learning",
+    "Submit Your Own MCQs": "/blog/submit-your-own-mcqs",
+    "Secure & Reliable": "/blog/secure-reliable"
   };
   return mapping[title] || "/subscription";
 };

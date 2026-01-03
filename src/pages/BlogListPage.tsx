@@ -46,16 +46,16 @@ const BlogListPage = () => {
     <div className="min-h-screen bg-background pt-24 pb-12">
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-extrabold mb-4 text-black">Medical Education Blog</h1>
-          <p className="text-gray-700 text-lg">Expert insights, study tips, and updates for your Prometric exam journey.</p>
+          <h1 className="text-4xl font-extrabold mb-4 text-foreground">Medical Education Blog</h1>
+          <p className="text-muted-foreground text-lg">Expert insights, study tips, and updates for your Prometric exam journey.</p>
         </div>
 
         {blogs.length === 0 ? (
           <Card className="text-center py-20">
             <CardContent>
               <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-xl font-medium text-black">No articles published yet.</p>
-              <p className="text-gray-600">Check back soon for new content!</p>
+              <p className="text-xl font-medium">No articles published yet.</p>
+              <p className="text-muted-foreground">Check back soon for new content!</p>
             </CardContent>
           </Card>
         ) : (
@@ -70,16 +70,16 @@ const BlogListPage = () => {
                   )}
                   <div className="flex-1 p-6">
                     <CardHeader className="p-0 mb-4">
-                      <div className="flex items-center text-sm text-gray-500 mb-2 gap-2">
+                      <div className="flex items-center text-sm text-muted-foreground mb-2 gap-2">
                         <Calendar className="h-4 w-4" />
                         {format(new Date(blog.created_at), 'MMMM dd, yyyy')}
                       </div>
-                      <CardTitle className="text-2xl hover:text-primary transition-colors text-black">
+                      <CardTitle className="text-2xl hover:text-primary transition-colors">
                         <Link to={`/blog/${blog.slug}`}>{blog.title}</Link>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0 mb-6">
-                      <p className="text-black line-clamp-3">{blog.meta_description}</p>
+                      <p className="text-foreground line-clamp-3">{blog.meta_description}</p>
                     </CardContent>
                     <CardFooter className="p-0">
                       <Button asChild variant="link" className="p-0 h-auto font-semibold">

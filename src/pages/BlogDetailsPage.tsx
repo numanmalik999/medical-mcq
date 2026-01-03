@@ -89,16 +89,16 @@ const BlogDetailsPage = () => {
     <div className="min-h-screen bg-background pt-24 pb-12">
       <article className="container mx-auto px-4 max-w-4xl">
         <Button asChild variant="ghost" className="mb-8 pl-0 hover:bg-transparent hover:text-primary">
-          <Link to="/blog" className="flex items-center gap-2 text-black">
+          <Link to="/blog" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" /> Back to Articles
           </Link>
         </Button>
 
         <header className="mb-10">
-          <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-6 text-black">{blog.title}</h1>
+          <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-6 text-foreground">{blog.title}</h1>
           
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-y py-6 mb-8">
-            <div className="flex flex-wrap items-center gap-6 text-gray-600">
+            <div className="flex flex-wrap items-center gap-6 text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 {format(new Date(blog.created_at), 'MMMM dd, yyyy')}
@@ -114,7 +114,7 @@ const BlogDetailsPage = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-black flex items-center gap-1 mr-2">
+              <span className="text-sm font-bold flex items-center gap-1 mr-2">
                 <Share2 className="h-4 w-4" /> Share:
               </span>
               <Button size="icon" variant="outline" className="rounded-full h-9 w-9" onClick={shareOnFacebook} title="Share on Facebook">
@@ -127,7 +127,7 @@ const BlogDetailsPage = () => {
                 <MessageCircle className="h-4 w-4 text-green-600" />
               </Button>
               <Button size="icon" variant="outline" className="rounded-full h-9 w-9" onClick={handleCopyLink} title="Copy Link">
-                <LinkIcon className="h-4 w-4 text-gray-600" />
+                <LinkIcon className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -139,15 +139,15 @@ const BlogDetailsPage = () => {
           </div>
         )}
 
-        <div className="prose dark:prose-invert max-w-none prose-lg prose-headings:font-bold prose-a:text-primary text-black prose-headings:text-black prose-p:text-black prose-li:text-black prose-strong:text-black">
+        <div className="prose dark:prose-invert max-w-none prose-lg prose-headings:font-bold prose-a:text-primary text-foreground prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground">
           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
             {blog.content}
           </ReactMarkdown>
         </div>
 
         <div className="mt-16 p-8 bg-muted rounded-2xl text-center">
-          <h3 className="text-2xl font-bold mb-4 text-black">Ready to test your knowledge?</h3>
-          <p className="mb-6 text-gray-700">Join thousands of medical professionals preparing for their licensing exams with our AI-enhanced question bank.</p>
+          <h3 className="text-2xl font-bold mb-4">Ready to test your knowledge?</h3>
+          <p className="mb-6 text-muted-foreground">Join thousands of medical professionals preparing for their licensing exams with our AI-enhanced question bank.</p>
           <div className="flex justify-center gap-4">
             <Button asChild size="lg"><Link to="/signup">Start Free Trial</Link></Button>
             <Button asChild variant="outline" size="lg"><Link to="/quiz">Try a Quiz</Link></Button>

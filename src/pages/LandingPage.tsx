@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import * as LucideIcons from 'lucide-react'; 
-import { Check, Loader2, Globe, BookOpenText, ArrowRight, ClipboardCheck, Video, GraduationCap } from 'lucide-react';
+import { Check, Loader2, Globe, BookOpenText, ArrowRight, ClipboardCheck, Video, GraduationCap, Trophy } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -135,15 +135,20 @@ const LandingPage = () => {
           
           <div className="flex flex-col items-center gap-4 animate-fade-in-up delay-400">
             {/* Primary Action Row */}
-            <div className="flex flex-col justify-center gap-3 w-full max-w-md sm:flex-row sm:max-w-none">
-              <Link to={user ? "/user/dashboard" : "/subscription"} className="w-full sm:w-auto">
+            <div className="flex flex-col justify-center gap-3 w-full max-w-md lg:max-w-none lg:flex-row">
+              <Link to={user ? "/user/dashboard" : "/subscription"} className="w-full lg:w-auto">
                 <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full min-w-[200px]">
                   {user ? "Go to Dashboard" : settings.hero.ctaPrimaryText}
                 </Button>
               </Link>
-              <Link to="/quiz" className="w-full sm:w-auto">
+              <Link to="/quiz" className="w-full lg:w-auto">
                 <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full min-w-[200px]">
                   <BookOpenText className="h-5 w-5" /> Take a Free Quiz
+                </Button>
+              </Link>
+              <Link to="/quiz-of-the-day" className="w-full lg:w-auto">
+                <Button size="lg" variant="outline" className="bg-white/10 hover:bg-white/20 border-white/30 text-white flex items-center gap-2 w-full min-w-[200px]">
+                  <Trophy className="h-5 w-5 text-yellow-400" /> Quiz of the Day
                 </Button>
               </Link>
             </div>

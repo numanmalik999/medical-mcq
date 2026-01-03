@@ -22,6 +22,18 @@ const getIconComponent = (iconName: string) => {
   return Icon ? <Icon className="h-8 w-8 text-primary" /> : <Globe className="h-8 w-8 text-primary" />;
 };
 
+const getFeatureBlogLink = (title: string) => {
+  const mapping: { [key: string]: string } = {
+    "AI Clinical Cases": "/blog/ai-clinical-cases",
+    "Verified Accuracy": "/blog/verified-accuracy",
+    "Simulated Tests": "/blog/simulated-tests",
+    "Curated Video Library": "/blog/curated-video-library",
+    "AI Medical Assistant": "/blog/ai-medical-assistant",
+    "Daily Challenge": "/blog/daily-challenge"
+  };
+  return mapping[title] || "/subscription";
+};
+
 interface SubscriptionTier {
   id: string;
   name: string;
@@ -191,7 +203,7 @@ const LandingPage = () => {
                 <CardTitle className="text-xl mb-2">{feature.title}</CardTitle>
                 <CardDescription className="text-muted-foreground">{feature.description}</CardDescription>
                 <CardFooter className="mt-auto pt-4 w-full">
-                  <Link to="/subscription" className="w-full">
+                  <Link to={getFeatureBlogLink(feature.title)} className="w-full">
                     <Button variant="ghost" className="w-full group">
                       Learn More <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                     </Button>

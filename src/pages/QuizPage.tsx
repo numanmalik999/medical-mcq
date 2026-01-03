@@ -293,17 +293,7 @@ const QuizPage = () => {
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      if (!user) { // Guest mode
-        setIsTrialActiveSession(true);
-        fetchQuizOverview();
-      } else { // Logged-in user
-        if (!user.has_active_subscription && !user.trial_taken) {
-          setIsTrialActiveSession(true);
-        } else {
-          setIsTrialActiveSession(false);
-        }
-        fetchQuizOverview();
-      }
+      fetchQuizOverview();
     }
   }, [user, hasCheckedInitialSession, isDbInitialized]); // Added isDbInitialized dependency
 
@@ -592,16 +582,10 @@ const QuizPage = () => {
     let sessionIsTrial = false;
     if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
       sessionIsTrial = true;
-    } else if (isGuest || (!isSubscribed && !hasTakenTrial)) {
+    } else if (isGuest || !isSubscribed) { // Now any non-subscriber session is a trial
       sessionIsTrial = true;
     }
     
-    // If logged in, not subscribed, and already took trial, and it's NOT a trial session, show prompt
-    if (!isGuest && !isSubscribed && hasTakenTrial && !sessionIsTrial && !isOffline) {
-      setShowSubscriptionPrompt(true);
-      return;
-    }
-
     // If it's a trial session and mode is 'incorrect', restrict it.
     if (sessionIsTrial && mode === 'incorrect') {
       toast({ title: "Feature Restricted", description: "This feature is only available for subscribed users.", variant: "default" });
@@ -800,7 +784,7 @@ const QuizPage = () => {
         console.error('Error marking trial_taken:', updateError);
         toast({ title: "Error", description: "Failed to update trial status.", variant: "destructive" });
       } else {
-        toast({ title: "Trial Started!", description: `You have started your free trial. Enjoy ${TRIAL_MCQ_LIMIT} trial questions!`, variant: "default" });
+        toast({ title: "Trial Started!", description: `You have started your free trial. Enjoy practice!`, variant: "default" });
       }
     }
     setIsTrialActiveSession(sessionIsTrial);
@@ -1018,7 +1002,7 @@ const QuizPage = () => {
 
   const handleNextQuestion = () => {
     if (isTrialActiveSession && currentQuestionIndex + 1 >= TRIAL_MCQ_LIMIT) {
-      toast({ title: "Trial Limit Reached", description: `You have reached the limit of ${TRIAL_MCQ_LIMIT} trial questions. Please subscribe to continue.`, variant: "default" });
+      toast({ title: "Trial Limit Reached", description: `You have reached the end of this trial session. Please subscribe to unlock all questions!`, variant: "default" });
       submitFullQuiz();
       return;
     }
@@ -1041,7 +1025,6 @@ const QuizPage = () => {
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
       const prevQuestion = quizQuestions[currentQuestionIndex - 1];
-      setCurrentQuestionIndex((prev) => prev + 1); // Wait, this should be -1. Fixed below.
       setCurrentQuestionIndex((prev) => prev - 1);
       const prevAnswerData = userAnswers.get(prevQuestion?.id || '');
       setSelectedAnswer(prevAnswerData?.selectedOption || null);
@@ -1229,7 +1212,7 @@ const QuizPage = () => {
   const handleBackToSelection = () => {
     const isCurrentQuizSaved = currentDbSessionId && activeSavedQuizzes.some(session => session.dbSessionId === currentDbSessionId);
 
-    if (!isCurrentQuizSaved && quizQuestions.length > 0 && !showResults) {
+    if (!isCurrentTestSaved && quizQuestions.length > 0 && !showResults) {
       if (!window.confirm("Are you sure you want to end this quiz session and go back to category selection? Your current progress will be lost.")) {
         return;
       }
@@ -1293,13 +1276,13 @@ const QuizPage = () => {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
         <Card className="w-full max-w-2xl text-center">
           <CardHeader>
-            <CardTitle className="text-2xl">Trial Completed!</CardTitle>
+            <CardTitle className="text-2xl">Premium Feature</CardTitle>
             <CardDescription>
-              You have completed your free trial or already used it.
+              To unlock full categories and all practice features, please subscribe.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-lg">To unlock all questions and features, please subscribe.</p>
+            <p className="text-lg">Enjoy unlimited practice with thousands of questions!</p>
             <Button onClick={() => navigate('/user/subscriptions')} className="w-full sm:w-auto">
               View Subscription Plans
             </Button>
@@ -1315,8 +1298,7 @@ const QuizPage = () => {
 
   if (showCategorySelection) {
     const isSubscribed = user?.has_active_subscription;
-    const isGuestOrNotSubscribed = isGuest || (!isSubscribed && !user?.trial_taken);
-    const showSubscribePrompt = !isGuest && !isSubscribed && user?.trial_taken; // Re-defined local variable
+    const isGuestOrNotSubscribed = isGuest || !isSubscribed;
 
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
@@ -1405,15 +1387,10 @@ const QuizPage = () => {
                   let buttonText = "Start Quiz";
                   let buttonDisabled = false;
                   
-                  if (showSubscribePrompt) {
-                    buttonText = "Subscribe to Start";
-                    buttonDisabled = true;
-                  } else if (isSubscribed && totalCount > 0) {
+                  if (isSubscribed && totalCount > 0) {
                     buttonText = "Start Quiz";
-                    buttonDisabled = false;
                   } else if (isGuestOrNotSubscribed && accessibleCount > 0) {
                     buttonText = "Start Trial Quiz";
-                    buttonDisabled = false;
                   } else {
                     buttonText = "No MCQs Available";
                     buttonDisabled = true;
@@ -1426,7 +1403,6 @@ const QuizPage = () => {
                   }
 
                   const showSubscriptionCTA = !isSubscribed && totalCount > accessibleCount;
-
 
                   return (
                     <Card key={cat.id} className="flex flex-col">
@@ -1497,13 +1473,6 @@ const QuizPage = () => {
                             </Button>
                         )}
 
-                        {showSubscribePrompt && (
-                          <Link to="/user/subscriptions" className="w-full">
-                            <Button variant="link" className="w-full text-red-500 dark:text-red-400 hover:underline">
-                              Subscribe to unlock this category.
-                            </Button>
-                          </Link>
-                        )}
                         {!isGuest && (
                           <Button
                             onClick={() => handleResetProgress(cat.id)}

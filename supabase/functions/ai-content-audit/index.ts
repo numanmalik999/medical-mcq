@@ -80,7 +80,6 @@ serve(async (req: Request) => {
         for (const id of mcqIds) {
           const { data: mcq } = await supabaseAdmin.from('mcqs').select('*, mcq_explanations(explanation_text)').eq('id', id).single();
           if (mcq) await auditSingleMcq(mcq, category_id, supabaseAdmin, model);
-          // Small delay to prevent rate limiting
           await new Promise(r => setTimeout(r, 1000));
         }
       })();

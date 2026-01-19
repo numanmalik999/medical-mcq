@@ -730,9 +730,9 @@ const QuizPage = () => {
                 const isSel = selectedAnswer === k;
                 return (
                   <div key={k} className={cn("flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer", 
-                    isSub && isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
-                    isSub && isSel && !isCorrectOpt && "border-red-600 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
-                    isSub && !isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
+                    isSub && isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300",
+                    isSub && isSel && !isCorrectOpt && "border-red-600 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300",
+                    isSub && !isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300",
                     !isSub && isSel && "border-primary bg-primary/5 dark:bg-primary/10"
                   )} onClick={() => !isSub && handleOptionSelect(k)}>
                     <RadioGroupItem value={k} id={`opt-${k}`} />
@@ -747,8 +747,8 @@ const QuizPage = () => {
             {feedback && (
               <div className={cn("mt-8 p-6 rounded-2xl flex items-center gap-4 font-bold text-lg border animate-in fade-in zoom-in-95", 
                 feedback.startsWith('Correct') 
-                    ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300" 
-                    : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300")}>
+                    ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-700 dark:text-green-200" 
+                    : "bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-700 dark:text-red-200")}>
                 {feedback.startsWith('Correct') ? <CheckCircle2 className="h-8 w-8" /> : <AlertCircle className="h-8 w-8" />}
                 {feedback}
               </div>

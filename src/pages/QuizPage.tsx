@@ -149,16 +149,14 @@ const QuizPage = () => {
     }
   }, [userAnswers, quizQuestions]);
 
-  const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
-    if (!currentMcq) return null;
-    const mcqId = currentMcq.id;
-
+  const fetchExplanation = useCallback(async (mcqId: string, explanationId: string): Promise<MCQExplanation | null> => {
     if (isOfflineQuiz) {
-      if (currentMcq && (currentMcq as any).explanation_text) {
+      const localMcq = quizQuestions.find(q => q.id === mcqId);
+      if (localMcq && (localMcq as any).explanation_text) {
         const localExplanation: MCQExplanation = {
           id: mcqId,
-          explanation_text: (currentMcq as any).explanation_text,
-          image_url: (currentMcq as any).image_url || null,
+          explanation_text: (localMcq as any).explanation_text,
+          image_url: (localMcq as any).image_url || null,
         };
         setExplanations(prev => new Map(prev).set(mcqId, localExplanation));
         return localExplanation;
@@ -189,7 +187,7 @@ const QuizPage = () => {
       return formattedExplanation;
     }
     return null;
-  }, [explanations, toast, isOfflineQuiz, currentMcq]);
+  }, [explanations, toast, isOfflineQuiz, quizQuestions]);
 
   const saveQuizState = useCallback(async (
     dbSessionId: string | null,
@@ -486,7 +484,7 @@ const QuizPage = () => {
     setSelectedAnswer(ans?.selectedOption || null);
     setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${cur.correct_answer}.`) : null);
     setShowExplanation(ans?.submitted || false);
-    if (ans?.submitted && cur.explanation_id) fetchExplanation(cur.explanation_id);
+    if (ans?.submitted && cur.explanation_id) fetchExplanation(cur.id, cur.explanation_id);
 
     setShowCategorySelection(false);
     setIsPageLoading(false);
@@ -514,7 +512,7 @@ const QuizPage = () => {
       setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${quizQuestions[index].correct_answer}.`) : null);
       setShowExplanation(ans?.submitted || false);
       if (ans?.submitted && quizQuestions[index].explanation_id) {
-          fetchExplanation(quizQuestions[index].explanation_id!);
+          fetchExplanation(quizQuestions[index].id, quizQuestions[index].explanation_id!);
       }
     }
   };
@@ -556,7 +554,7 @@ const QuizPage = () => {
     if (user && !isOfflineQuiz) {
       await supabase.from('user_quiz_attempts').insert({ user_id: user.id, mcq_id: currentMcq.id, category_id: currentMcq.category_links?.[0]?.category_id || null, selected_option: selectedAnswer, is_correct: isCorrect });
     }
-    if (currentMcq.explanation_id) fetchExplanation(currentMcq.explanation_id);
+    if (currentMcq.explanation_id) fetchExplanation(currentMcq.id, currentMcq.explanation_id);
   };
 
   const handleSaveProgress = async () => {
@@ -629,16 +627,16 @@ const QuizPage = () => {
           </CardHeader>
           <CardContent className="pt-8 space-y-8">
             {activeSavedQuizzes.length > 0 && !isGuest && (
-              <div className="bg-primary/5 p-6 rounded-2xl border border-primary/20">
-                <h3 className="text-xl font-bold flex items-center gap-2 mb-4"><RotateCcw className="h-5 w-5 text-primary" /> Continue Recent Practice</h3>
+              <div className="p-6 rounded-2xl border border-border">
+                <h3 className="text-xl font-bold flex items-center gap-2 mb-4 text-foreground"><RotateCcw className="h-5 w-5 text-primary" /> Continue Recent Practice</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {activeSavedQuizzes.map((s) => (
-                    <div key={s.dbSessionId} className="bg-white dark:bg-slate-900 p-4 rounded-xl border flex justify-between items-center shadow-sm">
+                    <div key={s.dbSessionId} className="bg-primary p-4 rounded-xl border border-primary flex justify-between items-center shadow-md">
                       <div>
-                        <p className="font-bold text-foreground">{s.categoryName}</p>
-                        <p className="text-xs text-muted-foreground">Progress: {s.currentQuestionIndex + 1} / {s.mcqs.length}</p>
+                        <p className="font-bold text-white">{s.categoryName}</p>
+                        <p className="text-xs text-primary-foreground/80">Progress: {s.currentQuestionIndex + 1} / {s.mcqs.length}</p>
                       </div>
-                      <Button onClick={() => continueQuizSession(s)} size="sm" className="rounded-full">Resume</Button>
+                      <Button onClick={() => continueQuizSession(s)} size="sm" variant="secondary" className="rounded-full">Resume</Button>
                     </div>
                   ))}
                 </div>
@@ -653,10 +651,10 @@ const QuizPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCategories.map((cat) => (
                 <Card key={cat.id} className="flex flex-col hover:shadow-lg transition-all border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-                  <CardHeader className="bg-muted/30 pb-4">
+                  <CardHeader className="pb-4">
                     <div className="flex justify-between items-start mb-2">
                         <CardTitle className="text-xl font-bold text-foreground">{cat.name}</CardTitle>
-                        <Badge variant="outline" className="bg-white dark:bg-slate-950 font-bold">{cat.total_mcqs} MCQs</Badge>
+                        <Badge variant="outline" className="font-bold">{cat.total_mcqs} MCQs</Badge>
                     </div>
                     <CardDescription className="text-sm line-clamp-3 min-h-[4.5rem] text-foreground/80 leading-relaxed italic">
                         {cat.description || 'Comprehensive prep material for this medical specialty.'}
@@ -710,7 +708,7 @@ const QuizPage = () => {
       </div>
       <div className="flex flex-col md:flex-row w-full max-w-6xl gap-6">
         <Card className="flex-1 border-none shadow-lg rounded-2xl overflow-hidden">
-          <CardHeader className="bg-muted/20 border-b flex flex-row items-center justify-between py-6">
+          <CardHeader className="border-b flex flex-row items-center justify-between py-6">
             <div className="space-y-1">
               <CardTitle className="text-2xl font-bold">Question {currentQuestionIndex + 1} of {quizQuestions.length}</CardTitle>
               {isOfflineQuiz && <Badge variant="destructive" className="flex items-center gap-1"><WifiOff className="h-3 w-3" /> Offline Practice</Badge>}
@@ -733,8 +731,9 @@ const QuizPage = () => {
                 const isSel = selectedAnswer === k;
                 return (
                   <div key={k} className={cn("flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer", 
-                    isSub && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
+                    isSub && isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
                     isSub && isSel && !isCorrectOpt && "border-red-600 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
+                    isSub && !isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
                     !isSub && isSel && "border-primary bg-primary/5 dark:bg-primary/10"
                   )} onClick={() => !isSub && handleOptionSelect(k)}>
                     <RadioGroupItem value={k} id={`opt-${k}`} />
@@ -749,15 +748,15 @@ const QuizPage = () => {
             {feedback && (
               <div className={cn("mt-8 p-6 rounded-2xl flex items-center gap-4 font-bold text-lg border animate-in fade-in zoom-in-95", 
                 feedback.startsWith('Correct') 
-                    ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300" 
-                    : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300")}>
+                    ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-700 dark:text-green-200" 
+                    : "bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-700 dark:text-red-200")}>
                 {feedback.startsWith('Correct') ? <CheckCircle2 className="h-8 w-8" /> : <AlertCircle className="h-8 w-8" />}
                 {feedback}
               </div>
             )}
 
             {showExplanation && (
-              <div className="mt-8 p-8 bg-muted/30 rounded-2xl border-2 border-dashed border-muted-foreground/20 animate-in slide-in-from-bottom-4 duration-500">
+              <div className="mt-8 p-8 bg-background rounded-2xl border-2 border-dashed border-border animate-in slide-in-from-bottom-4 duration-500">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground"><Info className="h-5 w-5 text-primary" /> Clinical AI Explanation</h3>
                 <div className="prose dark:prose-invert max-w-none text-foreground/90 leading-relaxed">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{explanations.get(currentMcq.id || '')?.explanation_text || "Analyzing clinical scenario..."}</ReactMarkdown>
@@ -768,7 +767,7 @@ const QuizPage = () => {
               </div>
             )}
           </CardContent>
-          <CardFooter className="bg-muted/10 border-t py-6 px-8 flex justify-between">
+          <CardFooter className="border-t py-6 px-8 flex justify-between">
               <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} variant="outline" className="rounded-full h-12 px-6">Previous</Button>
               {!isSub ? (
                 <Button onClick={handleSubmitAnswer} disabled={!isSelected} className="px-10 rounded-full font-bold h-12">Check Answer</Button>

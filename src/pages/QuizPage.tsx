@@ -435,7 +435,7 @@ const QuizPage = () => {
         const categorized = Array.from(new Set(links?.map(l => l.mcq_id) || []));
         if (categorized.length > 0) baseMcqQuery = baseMcqQuery.not('id', 'in', `(${categorized.join(',')})`);
       } else if (selectedCategoryId) {
-        const { data: links } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', selectedCategoryId);
+        const { data: links = [] } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', selectedCategoryId);
         baseMcqQuery = baseMcqQuery.in('id', Array.from(new Set(links?.map(l => l.mcq_id) || [])));
       }
       if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
@@ -727,7 +727,7 @@ const QuizPage = () => {
             <CheckCircle2 className="h-5 w-5" /> Live Session Accuracy: {currentCorrectnessPercentage}
           </p>
           <div className="flex gap-2">
-             <Button variant="outline" size="sm" className="text-white border-white hover:bg-white/10" onClick={handleSaveProgress} disabled={isOfflineQuiz}><Save className="h-4 w-4 mr-2" /> Save Progress</Button>
+             <Button variant="outline" size="sm" className="text-black border-white hover:bg-white/10" onClick={handleSaveProgress} disabled={isOfflineQuiz}><Save className="h-4 w-4 mr-2" /> Save Progress</Button>
              <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={handleBackToSelection}><ArrowLeft className="h-4 w-4 mr-2" /> Exit Quiz</Button>
           </div>
         </Card>

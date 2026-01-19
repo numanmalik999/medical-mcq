@@ -10,7 +10,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw, Save, Bookmark, BookmarkCheck, ArrowLeft, WifiOff, Info, Search, Lock, ArrowRight } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RotateCcw, Save, Bookmark, BookmarkCheck, ArrowLeft, WifiOff, Info, Search, Lock, ArrowRight, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import QuizNavigator from '@/components/QuizNavigator';
@@ -149,14 +149,16 @@ const QuizPage = () => {
     }
   }, [userAnswers, quizQuestions]);
 
-  const fetchExplanation = useCallback(async (mcqId: string, explanationId: string): Promise<MCQExplanation | null> => {
+  const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
+    if (!currentMcq) return null;
+    const mcqId = currentMcq.id;
+
     if (isOfflineQuiz) {
-      const localMcq = quizQuestions.find(q => q.id === mcqId);
-      if (localMcq && (localMcq as any).explanation_text) {
+      if (currentMcq && (currentMcq as any).explanation_text) {
         const localExplanation: MCQExplanation = {
           id: mcqId,
-          explanation_text: (localMcq as any).explanation_text,
-          image_url: (localMcq as any).image_url || null,
+          explanation_text: (currentMcq as any).explanation_text,
+          image_url: (currentMcq as any).image_url || null,
         };
         setExplanations(prev => new Map(prev).set(mcqId, localExplanation));
         return localExplanation;
@@ -187,7 +189,7 @@ const QuizPage = () => {
       return formattedExplanation;
     }
     return null;
-  }, [explanations, toast, isOfflineQuiz, quizQuestions]);
+  }, [explanations, toast, isOfflineQuiz, currentMcq]);
 
   const saveQuizState = useCallback(async (
     dbSessionId: string | null,
@@ -484,7 +486,7 @@ const QuizPage = () => {
     setSelectedAnswer(ans?.selectedOption || null);
     setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${cur.correct_answer}.`) : null);
     setShowExplanation(ans?.submitted || false);
-    if (ans?.submitted && cur.explanation_id) fetchExplanation(cur.id, cur.explanation_id);
+    if (ans?.submitted && cur.explanation_id) fetchExplanation(cur.explanation_id);
 
     setShowCategorySelection(false);
     setIsPageLoading(false);
@@ -512,7 +514,7 @@ const QuizPage = () => {
       setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${quizQuestions[index].correct_answer}.`) : null);
       setShowExplanation(ans?.submitted || false);
       if (ans?.submitted && quizQuestions[index].explanation_id) {
-          fetchExplanation(quizQuestions[index].id, quizQuestions[index].explanation_id!);
+          fetchExplanation(quizQuestions[index].explanation_id!);
       }
     }
   };
@@ -554,7 +556,7 @@ const QuizPage = () => {
     if (user && !isOfflineQuiz) {
       await supabase.from('user_quiz_attempts').insert({ user_id: user.id, mcq_id: currentMcq.id, category_id: currentMcq.category_links?.[0]?.category_id || null, selected_option: selectedAnswer, is_correct: isCorrect });
     }
-    if (currentMcq.explanation_id) fetchExplanation(currentMcq.id, currentMcq.explanation_id);
+    if (currentMcq.explanation_id) fetchExplanation(currentMcq.explanation_id);
   };
 
   const handleSaveProgress = async () => {
@@ -636,7 +638,10 @@ const QuizPage = () => {
                         <p className="font-bold text-white">{s.categoryName}</p>
                         <p className="text-xs text-primary-foreground/80">Progress: {s.currentQuestionIndex + 1} / {s.mcqs.length}</p>
                       </div>
-                      <Button onClick={() => continueQuizSession(s)} size="sm" variant="secondary" className="rounded-full">Resume</Button>
+                      <div className="flex gap-2">
+                        <Button onClick={() => continueQuizSession(s)} size="sm" variant="secondary" className="rounded-full">Resume</Button>
+                        <Button onClick={() => clearSpecificQuizState(s.dbSessionId)} size="sm" variant="ghost" className="text-white hover:bg-white/10 rounded-full"><Trash2 className="h-4 w-4" /></Button>
+                      </div>
                     </div>
                   ))}
                 </div>

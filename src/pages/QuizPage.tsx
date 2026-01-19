@@ -100,6 +100,7 @@ const QuizPage = () => {
   const [isPageLoading, setIsPageLoading] = useState(true);
 
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
+  const [currentQuizCategoryId, setCurrentQuizCategoryId] = useState<string | null>(null); // Restored
   const [currentDbSessionId, setCurrentDbSessionId] = useState<string | null>(null);
   const [showCategorySelection, setShowCategorySelection] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -181,7 +182,7 @@ const QuizPage = () => {
         variant: "destructive",
       });
     } else if (data) {
-      const formattedExplanation = { ...data, id: mcqId }; // Use MCQ ID as the key
+      const formattedExplanation = { ...data, id: mcqId };
       setExplanations(prev => new Map(prev).set(mcqId, formattedExplanation));
       return formattedExplanation;
     }
@@ -455,11 +456,13 @@ const QuizPage = () => {
       await saveQuizState(null, selectedCategoryId, mcqsToLoad, initialAnswers, 0, sessionIsTrial, user.id, false);
     }
     setIsTrialActiveSession(sessionIsTrial);
+    setCurrentQuizCategoryId(selectedCategoryId); // Restored
   };
 
   const continueQuizSession = useCallback(async (loadedSession: LoadedQuizSession) => {
     setIsPageLoading(true);
     setCurrentDbSessionId(loadedSession.dbSessionId);
+    setCurrentQuizCategoryId(loadedSession.categoryId); // Restored
     setIsTrialActiveSession(loadedSession.isTrialActiveSession);
     setIsOfflineQuiz(loadedSession.isOffline);
 
@@ -491,9 +494,14 @@ const QuizPage = () => {
     if (!user) return;
     if (!window.confirm("Reset all progress for this category?")) return;
     setIsPageLoading(true);
-    await supabase.from('user_quiz_attempts').delete().eq('user_id', user.id).eq('category_id', categoryId);
-    await supabase.from('user_quiz_sessions').delete().eq('user_id', user.id).eq('category_id', categoryId);
-    fetchQuizOverview();
+    try {
+        await supabase.from('user_quiz_attempts').delete().eq('user_id', user.id).eq('category_id', categoryId);
+        await supabase.from('user_quiz_sessions').delete().eq('user_id', user.id).eq('category_id', categoryId);
+        fetchQuizOverview();
+    } catch (e: any) {
+        toast({ title: "Reset Failed", description: e.message, variant: "destructive" });
+        setIsPageLoading(false);
+    }
   };
 
   const goToQuestion = (index: number) => {
@@ -503,6 +511,9 @@ const QuizPage = () => {
       setSelectedAnswer(ans?.selectedOption || null);
       setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${quizQuestions[index].correct_answer}.`) : null);
       setShowExplanation(ans?.submitted || false);
+      if (ans?.submitted && quizQuestions[index].explanation_id) {
+          fetchExplanation(quizQuestions[index].id, quizQuestions[index].explanation_id!);
+      }
     }
   };
 
@@ -548,7 +559,7 @@ const QuizPage = () => {
 
   const handleSaveProgress = async () => {
     if (!user) return;
-    const res = await saveQuizState(currentDbSessionId, null, quizQuestions, userAnswers, currentQuestionIndex, isTrialActiveSession, user.id, isOfflineQuiz);
+    const res = await saveQuizState(currentDbSessionId, currentQuizCategoryId, quizQuestions, userAnswers, currentQuestionIndex, isTrialActiveSession, user.id, isOfflineQuiz);
     if (res) toast({ title: "Progress Saved" });
   };
 
@@ -719,10 +730,10 @@ const QuizPage = () => {
                 const isSel = selectedAnswer === k;
                 return (
                   <div key={k} className={cn("flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer", 
-                    isSub && isSel && isCorrectOpt && "border-green-500 bg-green-50 dark:bg-green-950/20 text-green-700",
-                    isSub && isSel && !isCorrectOpt && "border-red-500 bg-red-50 dark:bg-red-950/20 text-red-700",
-                    isSub && !isSel && isCorrectOpt && "border-green-500 bg-green-50 dark:bg-green-950/20 text-green-700",
-                    !isSub && isSel && "border-primary bg-primary/5"
+                    isSub && isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
+                    isSub && isSel && !isCorrectOpt && "border-red-600 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
+                    isSub && !isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
+                    !isSub && isSel && "border-primary bg-primary/5 dark:bg-primary/10"
                   )} onClick={() => !isSub && handleOptionSelect(k)}>
                     <RadioGroupItem value={k} id={`opt-${k}`} />
                     <Label htmlFor={`opt-${k}`} className="cursor-pointer text-lg font-semibold flex-grow">
@@ -734,31 +745,33 @@ const QuizPage = () => {
             </RadioGroup>
 
             {feedback && (
-              <div className={cn("mt-8 p-6 rounded-2xl flex items-center gap-4 font-bold text-lg", 
-                feedback.startsWith('Correct') ? "bg-green-500 text-white" : "bg-red-500 text-white")}>
+              <div className={cn("mt-8 p-6 rounded-2xl flex items-center gap-4 font-bold text-lg border animate-in fade-in zoom-in-95", 
+                feedback.startsWith('Correct') 
+                    ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300" 
+                    : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300")}>
                 {feedback.startsWith('Correct') ? <CheckCircle2 className="h-8 w-8" /> : <AlertCircle className="h-8 w-8" />}
                 {feedback}
               </div>
             )}
 
             {showExplanation && (
-              <div className="mt-8 p-8 bg-muted/30 rounded-2xl border-2 border-dashed border-muted-foreground/20">
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><Info className="h-5 w-5 text-primary" /> Clinical AI Explanation</h3>
+              <div className="mt-8 p-8 bg-muted/30 rounded-2xl border-2 border-dashed border-muted-foreground/20 animate-in slide-in-from-bottom-4 duration-500">
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground"><Info className="h-5 w-5 text-primary" /> Clinical AI Explanation</h3>
                 <div className="prose dark:prose-invert max-w-none text-foreground/90 leading-relaxed">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{explanations.get(currentMcq.id || '')?.explanation_text || "Analyzing scenario..."}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{explanations.get(currentMcq.id || '')?.explanation_text || "Analyzing clinical scenario..."}</ReactMarkdown>
                 </div>
                 {!isOfflineQuiz && (
-                  <Button variant="link" className="mt-6 p-0 text-muted-foreground hover:text-primary" onClick={() => setIsFeedbackDialogOpen(true)}>Report a clinical error or add note</Button>
+                  <Button variant="link" className="mt-6 p-0 text-muted-foreground hover:text-primary transition-colors" onClick={() => setIsFeedbackDialogOpen(true)}>Report a clinical error or add note</Button>
                 )}
               </div>
             )}
           </CardContent>
           <CardFooter className="bg-muted/10 border-t py-6 px-8 flex justify-between">
-              <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} variant="outline" className="rounded-full">Previous</Button>
+              <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} variant="outline" className="rounded-full h-12 px-6">Previous</Button>
               {!isSub ? (
-                <Button onClick={handleSubmitAnswer} disabled={!selectedAnswer} className="px-10 rounded-full font-bold">Check Answer</Button>
+                <Button onClick={handleSubmitAnswer} disabled={!selectedAnswer} className="px-10 rounded-full font-bold h-12">Check Answer</Button>
               ) : (
-                <Button onClick={handleNextQuestion} className="px-10 rounded-full font-bold">Next Question <ArrowRight className="ml-2 h-4 w-4" /></Button>
+                <Button onClick={handleNextQuestion} className="px-10 rounded-full font-bold h-12">Next Question <ArrowRight className="ml-2 h-4 w-4" /></Button>
               )}
           </CardFooter>
         </Card>
@@ -772,7 +785,7 @@ const QuizPage = () => {
             <p className="text-sm text-muted-foreground">Your notes help our review board maintain the highest standard of accuracy.</p>
             <Textarea placeholder="e.g. Current ESC guidelines suggest..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} rows={6} className="rounded-xl" />
           </div>
-          <DialogFooter><Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()} className="w-full rounded-xl">Submit to Clinical Board</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()} className="w-full rounded-xl h-12 font-bold">Submit to Clinical Board</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

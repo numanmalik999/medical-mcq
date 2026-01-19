@@ -10,7 +10,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw, Save, Bookmark, BookmarkCheck, ArrowLeft, WifiOff, Info, Search, Lock, ArrowRight, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RotateCcw, Save, Bookmark, BookmarkCheck, ArrowLeft, WifiOff, Info, Search, Lock, ArrowRight, Trash2, Zap } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import QuizNavigator from '@/components/QuizNavigator';
@@ -41,6 +41,7 @@ interface CategoryStat {
   user_incorrect: number;
   user_accuracy: string;
   offline_count: number;
+  is_trial_virtual?: boolean;
 }
 
 interface UserAnswerData {
@@ -299,6 +300,8 @@ const QuizPage = () => {
     });
 
     const { count: totalMcqCount } = await supabase.from('mcqs').select('id', { count: 'exact', head: true });
+    const { count: globalTrialCount } = await supabase.from('mcqs').select('id', { count: 'exact', head: true }).eq('is_trial_mcq', true);
+    
     const uncategorizedTotal = (totalMcqCount || 0) - uniqueLinkedMcqIds.length;
     let uncategorizedTrial = 0;
     if (uncategorizedTotal > 0) {
@@ -328,6 +331,21 @@ const QuizPage = () => {
 
     let offlineCounts = new Map<string, number>();
     if (isNative && isDbInitialized) offlineCounts = await getOfflineCategoryCounts();
+
+    // Add Global Trial Category at the top
+    categoriesWithStats.push({
+        id: ALL_TRIAL_MCQS_ID,
+        name: 'All Trial MCQs',
+        description: 'Explore our complete collection of free trial questions from all medical specialties.',
+        total_mcqs: globalTrialCount || 0,
+        total_trial_mcqs: globalTrialCount || 0,
+        user_attempts: 0,
+        user_correct: 0,
+        user_incorrect: 0,
+        user_accuracy: '0.00%',
+        offline_count: 0,
+        is_trial_virtual: true,
+    });
 
     categoriesData?.forEach(category => {
       const mcqCounts = categoryMcqCounts.get(category.id) || { total: 0, trial: 0 };
@@ -655,11 +673,14 @@ const QuizPage = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCategories.map((cat) => (
-                <Card key={cat.id} className="flex flex-col hover:shadow-lg transition-all border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+                <Card key={cat.id} className={cn("flex flex-col hover:shadow-lg transition-all border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden", cat.is_trial_virtual && "border-primary/30 ring-1 ring-primary/20 bg-primary/5")}>
                   <CardHeader className="pb-4">
                     <div className="flex justify-between items-start mb-2">
-                        <CardTitle className="text-xl font-bold text-foreground">{cat.name}</CardTitle>
-                        <Badge variant="outline" className="font-bold">{cat.total_mcqs} MCQs</Badge>
+                        <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
+                            {cat.is_trial_virtual && <Zap className="h-5 w-5 text-primary fill-primary" />}
+                            {cat.name}
+                        </CardTitle>
+                        <Badge variant={cat.is_trial_virtual ? "default" : "outline"} className="font-bold">{cat.total_mcqs} MCQs</Badge>
                     </div>
                     <CardDescription className="text-sm line-clamp-3 min-h-[4.5rem] text-foreground/80 leading-relaxed italic">
                         {cat.description || `High-yield questions and detailed explanations focusing on ${cat.name} to help you master this specialty.`}
@@ -670,7 +691,7 @@ const QuizPage = () => {
                         <span>Accuracy: <span className="text-foreground font-bold">{cat.user_accuracy}</span></span>
                         <span>Attempts: <span className="text-foreground font-bold">{cat.user_attempts}</span></span>
                     </div>
-                    {!user?.has_active_subscription && cat.total_trial_mcqs < cat.total_mcqs && (
+                    {!user?.has_active_subscription && !cat.is_trial_virtual && cat.total_trial_mcqs < cat.total_mcqs && (
                         <div className="flex items-center gap-1.5 text-xs text-orange-600 font-bold bg-orange-50 dark:bg-orange-950/20 p-2 rounded-lg">
                             <Lock className="h-3 w-3" />
                             <span>{cat.total_mcqs - cat.total_trial_mcqs} premium questions locked</span>
@@ -680,7 +701,7 @@ const QuizPage = () => {
                   <CardFooter className="flex flex-col gap-2 p-4 pt-0">
                     <Button onClick={() => startQuizSession(cat.id, 'random', false)} className="w-full rounded-xl font-bold">Practice Now</Button>
                     <div className="grid grid-cols-2 gap-2 w-full">
-                         <Button variant="outline" size="sm" className="rounded-xl text-[10px]" disabled={cat.user_incorrect === 0} onClick={() => startQuizSession(cat.id, 'incorrect', false)}>Review Mistakes ({cat.user_incorrect})</Button>
+                         <Button variant="outline" size="sm" className="rounded-xl text-[10px]" disabled={cat.user_incorrect === 0 || cat.is_trial_virtual} onClick={() => startQuizSession(cat.id, 'incorrect', false)}>Review Mistakes ({cat.user_incorrect})</Button>
                          <Button variant="ghost" size="sm" className="rounded-xl text-[10px] text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleResetProgress(cat.id)}>Reset Statistics</Button>
                     </div>
                   </CardFooter>

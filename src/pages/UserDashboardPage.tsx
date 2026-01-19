@@ -1,21 +1,22 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertCircle } from 'lucide-react'; 
+import { CheckCircle2, AlertCircle, TrendingUp, BookOpen, Clock, Target, ArrowRight } from 'lucide-react'; 
 import LoadingBar from '@/components/LoadingBar';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
+import { cn } from '@/lib/utils';
 
 interface QuizPerformance {
   totalAttempts: number;
   correctAttempts: number;
-  accuracy: string;
+  accuracy: number;
 }
 
 interface RecentAttempt {
@@ -43,54 +44,41 @@ interface PerformanceSummary {
 
 const UserDashboardPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
-  const { toast } = useToast();
-  const [isFetchingData, setIsFetchingData] = useState(true); 
+  const [isPageLoading, setIsPageLoading] = useState(true); 
 
   const [quizPerformance, setQuizPerformance] = useState<QuizPerformance | null>(null);
   const [recentAttempts, setRecentAttempts] = useState<RecentAttempt[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [areasForImprovement, setAreasForImprovement] = useState<PerformanceSummary[]>([]);
-  const [suggestedPractice, setSuggestedPractice] = useState<PerformanceSummary[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [courseProgress, setCourseProgress] = useState({ completed: 0, total: 0 });
 
   const isGuestMode = !user; 
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      if (user) {
-        const fetchData = async () => {
-          setIsFetchingData(true);
-          await fetchAllCategories(); 
-          await fetchQuizPerformance();
-          await fetchRecentAttempts();
-          setIsFetchingData(false);
-        };
-        fetchData();
-      } else {
-        const fetchDataForGuest = async () => {
-          setIsFetchingData(true);
-          await fetchAllCategories(); 
-          setQuizPerformance({ totalAttempts: 0, correctAttempts: 0, accuracy: '0.00%' });
-          setRecentAttempts([]);
-          setAreasForImprovement([]);
-          setSuggestedPractice([]); 
-          setIsFetchingData(false);
-        };
-        fetchDataForGuest();
-      }
+      const fetchData = async () => {
+        setIsPageLoading(true);
+        await fetchAllCategories(); 
+        await fetchQuizPerformance();
+        await fetchRecentAttempts();
+        await fetchCourseProgress();
+        setIsPageLoading(false);
+      };
+      fetchData();
     }
-  }, [user, hasCheckedInitialSession]); 
+  }, [user, hasCheckedInitialSession]);
 
   const fetchAllCategories = async () => {
-    const { data: categoriesData, error: categoriesError } = await supabase
-      .from('categories')
-      .select('*');
-    if (categoriesError) {
-      console.error('Error fetching categories:', categoriesError);
-      toast({ title: "Error", description: "Failed to load categories for recommendations.", variant: "destructive" });
-      setAllCategories([]);
-    } else {
-      setAllCategories(categoriesData || []);
-    }
+    const { data: categoriesData } = await supabase.from('categories').select('*');
+    setAllCategories(categoriesData || []);
+  };
+
+  const fetchCourseProgress = async () => {
+    if (!user) return;
+    const { count: totalTopics } = await supabase.from('course_topics').select('*', { count: 'exact', head: true });
+    const { count: completedTopics } = await supabase.from('user_topic_progress').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
+    setCourseProgress({ completed: completedTopics || 0, total: totalTopics || 0 });
   };
 
   const fetchQuizPerformance = async () => {
@@ -103,31 +91,30 @@ const UserDashboardPage = () => {
 
     if (attemptsError) {
       console.error('Error fetching quiz performance:', attemptsError);
-      toast({ title: "Error", description: "Failed to load quiz performance.", variant: "destructive" });
       setQuizPerformance(null);
       return;
     }
 
     const totalAttempts = attemptsData.length;
     const correctAttempts = attemptsData.filter(attempt => attempt.is_correct).length;
-    const accuracy = totalAttempts > 0 ? ((correctAttempts / totalAttempts) * 100).toFixed(2) : '0.00';
+    const accuracy = totalAttempts > 0 ? (correctAttempts / totalAttempts) * 100 : 0;
 
     setQuizPerformance({
       totalAttempts,
       correctAttempts,
-      accuracy: `${accuracy}%`,
+      accuracy,
     });
 
-    generateRecommendations(attemptsData);
+    generateRecommendationsAndCharts(attemptsData);
   };
 
-  const generateRecommendations = (attemptsData: any[]) => {
-    const categoryPerformance: { [key: string]: { total: number; correct: number; name: string } } = {};
+  const generateRecommendationsAndCharts = (attemptsData: any[]) => {
+    const categoryPerformance: { [key: string]: { total: number; correct: number } } = {};
 
     attemptsData.forEach(attempt => {
       if (attempt.category_id) {
         if (!categoryPerformance[attempt.category_id]) {
-          categoryPerformance[attempt.category_id] = { total: 0, correct: 0, name: '' };
+          categoryPerformance[attempt.category_id] = { total: 0, correct: 0 };
         }
         categoryPerformance[attempt.category_id].total++;
         if (attempt.is_correct) {
@@ -137,6 +124,7 @@ const UserDashboardPage = () => {
     });
 
     const performanceSummaries: PerformanceSummary[] = [];
+    const visualData: any[] = [];
 
     Object.keys(categoryPerformance).forEach(catId => {
       const cat = allCategories.find(c => c.id === catId);
@@ -151,40 +139,24 @@ const UserDashboardPage = () => {
           correctAttempts: perf.correct,
           accuracy: accuracy,
         });
+
+        visualData.push({
+          name: cat.name.length > 10 ? cat.name.substring(0, 10) + '...' : cat.name,
+          accuracy: parseFloat(accuracy.toFixed(1)),
+          attempts: perf.total,
+          fullName: cat.name
+        });
       }
     });
 
-    const sortedByAccuracy = [...performanceSummaries].sort((a, b) => a.accuracy - b.accuracy);
-    setAreasForImprovement(sortedByAccuracy.slice(0, 3)); 
-
-    const attemptedCategoryIds = new Set(attemptsData.map(a => a.category_id).filter(Boolean));
-    const unattemptedCategories = allCategories.filter(cat => !attemptedCategoryIds.has(cat.id));
-
-    const suggested: PerformanceSummary[] = [];
-    unattemptedCategories.slice(0, 2).forEach(cat => { 
-      suggested.push({
-        id: cat.id,
-        name: cat.name,
-        type: 'category',
-        totalAttempts: 0,
-        correctAttempts: 0,
-        accuracy: 0,
-      });
-    });
-
-    const lowAttemptCategories = performanceSummaries
-      .filter(p => p.type === 'category' && p.totalAttempts < 5 && p.accuracy > 50) 
-      .sort((a, b) => a.totalAttempts - b.totalAttempts)
-      .slice(0, 2 - suggested.length); 
-
-    suggested.push(...lowAttemptCategories);
-    setSuggestedPractice(suggested);
+    setChartData(visualData.sort((a, b) => b.accuracy - a.accuracy).slice(0, 8));
+    setAreasForImprovement([...performanceSummaries].sort((a, b) => a.accuracy - b.accuracy).slice(0, 4)); 
   };
 
   const fetchRecentAttempts = async () => {
     if (!user) return; 
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('user_quiz_attempts')
       .select(`
         id,
@@ -198,11 +170,7 @@ const UserDashboardPage = () => {
       .order('attempt_timestamp', { ascending: false })
       .limit(5); 
 
-    if (error) {
-      console.error('Error fetching recent attempts:', error);
-      toast({ title: "Error", description: "Failed to load recent quiz activity.", variant: "destructive" });
-      setRecentAttempts([]);
-    } else {
+    if (data) {
       const formattedAttempts: RecentAttempt[] = data.map((attempt: any) => ({
         id: attempt.id,
         mcq_id: attempt.mcq_id,
@@ -215,252 +183,240 @@ const UserDashboardPage = () => {
     }
   };
 
-  if (!hasCheckedInitialSession || isFetchingData) {
+  if (!hasCheckedInitialSession || isPageLoading) {
     return <LoadingBar />;
   }
 
-  if (!user && !isGuestMode) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-red-500">You must be logged in to view your dashboard.</p>
-      </div>
-    );
-  }
-
-  const userEmail = user?.email || 'Guest User';
-  const hasActiveSubscription = user?.has_active_subscription;
-  const trialTaken = user?.trial_taken;
-
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Welcome, {userEmail}!</h1>
+    <div className="space-y-8 pb-12">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Student Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back, {user?.email || 'Guest'}. Tracking your exam readiness.</p>
+        </div>
+        <div className="flex gap-3">
+           <Link to="/quiz"><Button className="rounded-full px-6">Start Practice</Button></Link>
+           <Link to="/user/take-test"><Button variant="outline" className="rounded-full px-6">Take Mock Exam</Button></Link>
+        </div>
+      </div>
 
       {isGuestMode && (
-        <Card className="border-blue-500 bg-blue-50">
-          <CardHeader>
-            <CardTitle className="text-blue-700">Guest Mode Active</CardTitle>
-            <CardDescription className="text-blue-600">
-              You are currently browsing as a guest. Some features are limited.
-            </CardDescription>
+        <Card className="border-blue-500 bg-blue-50 dark:bg-blue-950/20 border-l-4">
+          <CardHeader className="py-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+                <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <CardTitle className="text-lg text-blue-700 dark:text-blue-300">Guest Mode - Limited Progress Tracking</CardTitle>
+                <CardDescription className="text-blue-600/80 dark:text-blue-400/80">
+                  <Link to="/subscription" className="font-bold underline">Subscribe</Link> to unlock detailed analytics and save your test history.
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-blue-800">
-              <Link to="/user/subscriptions" className="font-semibold underline">Sign up and subscribe</Link> to unlock full access, track your progress, and personalize your learning experience.
-            </p>
-          </CardContent>
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Dashboard</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-700">
-            This is your personal space. Here you can find your quiz progress, profile settings, and more.
-          </p>
-          <p className="mt-4 text-gray-700">
-            Use the sidebar to navigate.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Stats Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-primary text-primary-foreground">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-primary-foreground/70 flex items-center gap-2">
+                <Target className="h-4 w-4" /> Overall Accuracy
+            </CardDescription>
+            <CardTitle className="text-3xl font-bold">{quizPerformance?.accuracy.toFixed(1) || '0.0'}%</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-2 w-full bg-white/20 rounded-full mt-2">
+                <div className="h-full bg-white rounded-full" style={{ width: `${quizPerformance?.accuracy || 0}%` }}></div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Subscription Status Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Subscription Status</CardTitle>
-          <CardDescription>Your current access level to premium content.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isGuestMode ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-blue-600 font-semibold">
-                <AlertCircle className="h-5 w-5" />
-                <span>Trial Mode (Guest)</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                You can take a limited number of trial quizzes. <Link to="/user/subscriptions" className="font-semibold underline">Sign up and subscribe</Link> for full access.
-              </p>
-              <Link to="/user/subscriptions">
-                <Button className="mt-2">View Subscription Plans</Button>
-              </Link>
-            </div>
-          ) : hasActiveSubscription ? (
-            <div className="flex items-center gap-2 text-green-600 font-semibold">
-              <CheckCircle2 className="h-5 w-5" />
-              <span>You have an active subscription!</span>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-red-600 font-semibold">
-                <AlertCircle className="h-5 w-5" />
-                <span>No active subscription.</span>
-              </div>
-              {trialTaken ? (
-                <p className="text-sm text-muted-foreground">
-                  You have already taken your free trial. Please subscribe to unlock all features.
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  You are eligible for a free trial! Start a quiz to begin your trial.
-                </p>
-              )}
-              <Link to="/user/subscriptions">
-                <Button className="mt-2">View Subscription Plans</Button>
-              </Link>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" /> Total Practice
+            </CardDescription>
+            <CardTitle className="text-3xl font-bold">{quizPerformance?.totalAttempts || 0}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">MCQs attempted across all specialties</p>
+          </CardContent>
+        </Card>
 
-      {/* Quick Actions Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Jump right into your learning journey.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-4">
-          <Link to="/quiz">
-            <Button>Take a Quiz</Button>
-          </Link>
-          <Link to="/user/take-test">
-            <Button disabled={isGuestMode || !hasActiveSubscription} variant="secondary">
-              Take a Test
-            </Button>
-          </Link>
-          {!hasActiveSubscription && !isGuestMode && (
-            <Link to="/user/subscriptions">
-              <Button variant="outline">Subscribe Now</Button>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4" /> Course Progress
+            </CardDescription>
+            <CardTitle className="text-3xl font-bold">{courseProgress.completed}/{courseProgress.total}</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <div className="h-2 w-full bg-muted rounded-full mt-2">
+                <div className="h-full bg-primary rounded-full" style={{ width: `${(courseProgress.completed / (courseProgress.total || 1)) * 100}%` }}></div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2">
+                <Clock className="h-4 w-4" /> Trial Status
+            </CardDescription>
+            <CardTitle className="text-2xl font-bold">{user?.has_active_subscription ? 'Premium' : 'Free Trial'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Link to="/subscription" className="text-xs text-primary hover:underline font-semibold">
+                {user?.has_active_subscription ? 'Manage Subscription' : 'Upgrade for Full Access'}
             </Link>
-          )}
-          {isGuestMode && (
-            <Link to="/user/subscriptions">
-              <Button variant="outline">Sign Up & Subscribe</Button>
-            </Link>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Quiz Performance Summary Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quiz Performance Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="text-center p-4 border rounded-md">
-            <p className="text-2xl font-bold">{quizPerformance?.totalAttempts || 0}</p>
-            <p className="text-sm text-muted-foreground">Total Attempts</p>
-          </div>
-          <div className="text-center p-4 border rounded-md">
-            <p className="text-2xl font-bold">{quizPerformance?.correctAttempts || 0}</p>
-            <p className="text-sm text-muted-foreground">Correct Answers</p>
-          </div>
-          <div className="text-center p-4 border rounded-md">
-            <p className="text-2xl font-bold">{quizPerformance?.accuracy || '0.00%'}</p>
-            <p className="text-sm text-muted-foreground">Accuracy</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+        {/* Performance Chart */}
+        <Card className="md:col-span-4 shadow-sm">
+          <CardHeader>
+            <CardTitle>Performance by Specialty</CardTitle>
+            <CardDescription>Visual breakdown of your accuracy across different medical fields.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[350px] pl-2">
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                  <XAxis type="number" domain={[0, 100]} hide />
+                  <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} style={{ fontSize: '12px' }} />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                            return (
+                                <div className="bg-white p-3 border rounded-lg shadow-xl text-xs">
+                                    <p className="font-bold mb-1">{payload[0].payload.fullName}</p>
+                                    <p className="text-blue-600">Accuracy: {payload[0].value}%</p>
+                                    <p className="text-muted-foreground">Attempts: {payload[0].payload.attempts}</p>
+                                </div>
+                            );
+                        }
+                        return null;
+                    }}
+                  />
+                  <Bar dataKey="accuracy" radius={[0, 4, 4, 0]} barSize={25}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.accuracy > 70 ? '#16a34a' : entry.accuracy > 40 ? '#2563eb' : '#dc2626'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-muted/20 rounded-xl border-2 border-dashed">
+                  <TrendingUp className="h-10 w-10 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground font-medium">Not enough data to visualize.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Complete more quizzes to unlock charts.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Areas for Improvement Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Areas for Improvement</CardTitle>
-          <CardDescription>Based on your quiz performance, these areas might need more practice.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isGuestMode ? (
-            <p className="text-center text-gray-600">
-              <Link to="/user/subscriptions" className="font-semibold underline">Sign up</Link> to track your performance and get personalized recommendations here!
-            </p>
-          ) : areasForImprovement.length > 0 ? (
-            <div className="space-y-3">
-              {areasForImprovement.map((area) => (
-                <div key={area.id} className="flex items-center justify-between p-2 border rounded-md">
-                  <p className="font-medium">{area.name} ({area.type === 'category' ? 'Category' : 'Subcategory'})</p>
-                  <Badge variant={area.accuracy < 50 ? "destructive" : "secondary"}>
-                    Accuracy: {area.accuracy.toFixed(2)}%
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-gray-600">
-              Keep taking quizzes to get personalized recommendations here!
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Suggested Practice Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Suggested Practice</CardTitle>
-          <CardDescription>Explore new topics or revisit areas with fewer attempts.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isGuestMode ? (
-            <p className="text-center text-gray-600">
-              <Link to="/user/subscriptions" className="font-semibold underline">Sign up</Link> to get personalized practice suggestions here!
-            </p>
-          ) : suggestedPractice.length > 0 ? (
-            <div className="space-y-3">
-              {suggestedPractice.map((suggestion) => (
-                <div key={suggestion.id} className="flex items-center justify-between p-2 border rounded-md">
-                  <p className="font-medium">{suggestion.name} ({suggestion.type === 'category' ? 'Category' : 'Subcategory'})</p>
+        {/* Improvement Areas */}
+        <Card className="md:col-span-3 shadow-sm">
+          <CardHeader>
+            <CardTitle>Focus Areas</CardTitle>
+            <CardDescription>Categories with the lowest accuracy.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {areasForImprovement.length > 0 ? (
+              areasForImprovement.map((area) => (
+                <div key={area.id} className="group relative flex items-center justify-between p-4 border rounded-xl hover:bg-muted/50 transition-colors">
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold">{area.name}</p>
+                    <div className="flex items-center gap-2">
+                        <Badge variant={area.accuracy < 40 ? "destructive" : "secondary"} className="text-[10px]">
+                            {area.accuracy.toFixed(1)}% Accuracy
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">{area.totalAttempts} Attempts</span>
+                    </div>
+                  </div>
                   <Link to="/quiz">
-                    <Button variant="outline" size="sm">Practice</Button>
+                    <Button size="icon" variant="ghost" className="rounded-full"><ArrowRight className="h-4 w-4" /></Button>
                   </Link>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-gray-600">
-              No specific suggestions at the moment. Keep up the great work!
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Recent Quiz Activity Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Quiz Activity</CardTitle>
-          <CardDescription>Your last 5 quiz attempts.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isGuestMode ? (
-            <p className="text-center text-gray-600">
-              <Link to="/user/subscriptions" className="font-semibold underline">Sign up</Link> to see your quiz activity here!
-            </p>
-          ) : recentAttempts.length > 0 ? (
-            <div className="space-y-4">
-              {recentAttempts.map((attempt) => (
-                <div key={attempt.id} className="border-b pb-3 last:border-b-0 last:pb-0">
-                  <p className="font-semibold text-gray-900 line-clamp-2">
-                    Q: {attempt.question_text}
-                  </p>
-                  <p className="text-sm text-gray-700 mt-1">
-                    Your Answer: {attempt.selected_option}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant={attempt.is_correct ? "default" : "destructive"}>
-                      {attempt.is_correct ? "Correct" : "Incorrect"}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(attempt.attempt_timestamp).toLocaleString()}
-                    </span>
-                  </div>
+              ))
+            ) : (
+                <div className="text-center py-10 opacity-50">
+                    <p>Continue practicing to see your focus areas.</p>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-gray-600">
-              No recent quiz attempts found. Start a quiz to see your activity here!
-            </p>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+          <CardFooter>
+             <Link to="/quiz" className="w-full">
+                <Button variant="outline" className="w-full">Improve Score</Button>
+             </Link>
+          </CardFooter>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Recent Activity */}
+        <Card className="shadow-sm overflow-hidden">
+          <CardHeader className="bg-muted/30 border-b">
+            <CardTitle className="text-lg">Recent Quiz Activity</CardTitle>
+            <CardDescription>Your last 5 individual question attempts.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            {recentAttempts.length > 0 ? (
+              <div className="divide-y">
+                {recentAttempts.map((attempt) => (
+                  <div key={attempt.id} className="p-4 hover:bg-muted/30 transition-colors flex items-start gap-4">
+                    <div className={cn("mt-1 p-1 rounded-full", attempt.is_correct ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600")}>
+                        {attempt.is_correct ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground line-clamp-1">
+                        {attempt.question_text}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{new Date(attempt.attempt_timestamp).toLocaleDateString()}</span>
+                        <span className="text-[10px] bg-muted px-2 py-0.5 rounded font-bold">Answer: {attempt.selected_option}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-20 text-center text-muted-foreground italic">No recent attempts. Start practicing today!</div>
+            )}
+          </CardContent>
+          <CardFooter className="bg-muted/10 p-4 border-t text-center">
+             <Link to="/user/bookmarked-mcqs" className="text-xs text-primary font-bold hover:underline mx-auto">View Your Saved Questions</Link>
+          </CardFooter>
+        </Card>
+
+        {/* Course Roadmap */}
+        <Card className="shadow-sm">
+           <CardHeader>
+             <CardTitle className="text-lg">Specialty Mastery Roadmap</CardTitle>
+             <CardDescription>Completion status of clinical courses.</CardDescription>
+           </CardHeader>
+           <CardContent className="space-y-4">
+              <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                 <div className="flex justify-between items-center mb-3">
+                    <h4 className="font-bold text-sm">Overall Content Mastery</h4>
+                    <span className="text-xs font-black">{Math.round((courseProgress.completed / (courseProgress.total || 1)) * 100)}%</span>
+                 </div>
+                 <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-primary animate-pulse" style={{ width: `${(courseProgress.completed / (courseProgress.total || 1)) * 100}%` }}></div>
+                 </div>
+                 <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">Based on your completed topics and quiz scores, you are currently on track to master the medical blueprint.</p>
+              </div>
+              <Link to="/user/courses" className="block">
+                <Button className="w-full gap-2"><BookOpen className="h-4 w-4" /> Continue Study Path</Button>
+              </Link>
+           </CardContent>
+        </Card>
+      </div>
 
       <MadeWithDyad />
     </div>

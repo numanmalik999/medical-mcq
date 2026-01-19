@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import ScrollToTop from "./components/ScrollToTop"; // Import ScrollToTop
+import ScrollToTop from "./components/ScrollToTop";
 import LandingPage from "./pages/LandingPage";
 import DashboardRedirect from "./pages/DashboardRedirect";
 import NotFound from "./pages/NotFound";
@@ -56,6 +56,7 @@ import ManageSeoPage from "./pages/ManageSeoPage";
 import ContactPage from "./pages/ContactPage";
 import FaqPage from "./pages/FaqPage";
 import AboutUsPage from "./pages/AboutUsPage";
+import AdSenseManager from "./components/AdSenseManager"; // Import AdSenseManager
 
 // Blog Pages
 import BlogListPage from "./pages/BlogListPage";
@@ -69,7 +70,8 @@ const AppContent = () => {
 
   return (
     <>
-      <ScrollToTop /> {/* Add ScrollToTop here */}
+      <ScrollToTop />
+      <AdSenseManager /> {/* Add AdSenseManager here */}
       <Header />
       <div className="flex flex-col min-h-screen">
         <div className="flex-grow">

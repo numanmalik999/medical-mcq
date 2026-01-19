@@ -115,7 +115,6 @@ const QuizPage = () => {
   const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<LoadedQuizSession[]>([]);
   const [currentCorrectnessPercentage, setCurrentCorrectnessPercentage] = useState('0.00%');
   
-  // Missing states restored
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
 
@@ -149,24 +148,25 @@ const QuizPage = () => {
     }
   }, [userAnswers, quizQuestions]);
 
-  const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
+  const fetchExplanation = useCallback(async (mcqId: string, explanationId: string): Promise<MCQExplanation | null> => {
     if (isOfflineQuiz) {
-      const localMcq = quizQuestions.find(q => q.id === explanationId);
+      const localMcq = quizQuestions.find(q => q.id === mcqId);
       if (localMcq && (localMcq as any).explanation_text) {
         const localExplanation: MCQExplanation = {
-          id: localMcq.id,
+          id: mcqId,
           explanation_text: (localMcq as any).explanation_text,
           image_url: (localMcq as any).image_url || null,
         };
-        setExplanations(prev => new Map(prev).set(explanationId, localExplanation));
+        setExplanations(prev => new Map(prev).set(mcqId, localExplanation));
         return localExplanation;
       }
       return null;
     }
 
-    if (explanations.has(explanationId)) {
-      return explanations.get(explanationId)!;
+    if (explanations.has(mcqId)) {
+      return explanations.get(mcqId)!;
     }
+
     const { data, error } = await supabase
       .from('mcq_explanations')
       .select('*')
@@ -181,8 +181,9 @@ const QuizPage = () => {
         variant: "destructive",
       });
     } else if (data) {
-      setExplanations(prev => new Map(prev).set(explanationId, data));
-      return data;
+      const formattedExplanation = { ...data, id: mcqId }; // Use MCQ ID as the key
+      setExplanations(prev => new Map(prev).set(mcqId, formattedExplanation));
+      return formattedExplanation;
     }
     return null;
   }, [explanations, toast, isOfflineQuiz, quizQuestions]);
@@ -480,7 +481,7 @@ const QuizPage = () => {
     setSelectedAnswer(ans?.selectedOption || null);
     setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${cur.correct_answer}.`) : null);
     setShowExplanation(ans?.submitted || false);
-    if (ans?.submitted && cur.explanation_id) fetchExplanation(cur.explanation_id);
+    if (ans?.submitted && cur.explanation_id) fetchExplanation(cur.id, cur.explanation_id);
 
     setShowCategorySelection(false);
     setIsPageLoading(false);
@@ -542,7 +543,7 @@ const QuizPage = () => {
     if (user && !isOfflineQuiz) {
       await supabase.from('user_quiz_attempts').insert({ user_id: user.id, mcq_id: currentMcq.id, category_id: currentMcq.category_links?.[0]?.category_id || null, selected_option: selectedAnswer, is_correct: isCorrect });
     }
-    if (currentMcq.explanation_id) fetchExplanation(currentMcq.explanation_id);
+    if (currentMcq.explanation_id) fetchExplanation(currentMcq.id, currentMcq.explanation_id);
   };
 
   const handleSaveProgress = async () => {
@@ -678,7 +679,6 @@ const QuizPage = () => {
   }
 
   const ansData = userAnswers.get(currentMcq.id);
-  const isAnswered = ansData?.selectedOption !== null;
   const isSub = ansData?.submitted;
 
   return (
@@ -756,7 +756,7 @@ const QuizPage = () => {
           <CardFooter className="bg-muted/10 border-t py-6 px-8 flex justify-between">
               <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} variant="outline" className="rounded-full">Previous</Button>
               {!isSub ? (
-                <Button onClick={handleSubmitAnswer} disabled={!isAnswered} className="px-10 rounded-full font-bold">Check Answer</Button>
+                <Button onClick={handleSubmitAnswer} disabled={!selectedAnswer} className="px-10 rounded-full font-bold">Check Answer</Button>
               ) : (
                 <Button onClick={handleNextQuestion} className="px-10 rounded-full font-bold">Next Question <ArrowRight className="ml-2 h-4 w-4" /></Button>
               )}

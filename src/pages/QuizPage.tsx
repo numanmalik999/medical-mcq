@@ -100,7 +100,7 @@ const QuizPage = () => {
   const [isPageLoading, setIsPageLoading] = useState(true);
 
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
-  const [currentQuizCategoryId, setCurrentQuizCategoryId] = useState<string | null>(null); // Restored
+  const [currentQuizCategoryId, setCurrentQuizCategoryId] = useState<string | null>(null);
   const [currentDbSessionId, setCurrentDbSessionId] = useState<string | null>(null);
   const [showCategorySelection, setShowCategorySelection] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -458,13 +458,13 @@ const QuizPage = () => {
       await saveQuizState(null, selectedCategoryId, mcqsToLoad, initialAnswers, 0, sessionIsTrial, user.id, false);
     }
     setIsTrialActiveSession(sessionIsTrial);
-    setCurrentQuizCategoryId(selectedCategoryId); // Restored
+    setCurrentQuizCategoryId(selectedCategoryId);
   };
 
   const continueQuizSession = useCallback(async (loadedSession: LoadedQuizSession) => {
     setIsPageLoading(true);
     setCurrentDbSessionId(loadedSession.dbSessionId);
-    setCurrentQuizCategoryId(loadedSession.categoryId); // Restored
+    setCurrentQuizCategoryId(loadedSession.categoryId);
     setIsTrialActiveSession(loadedSession.isTrialActiveSession);
     setIsOfflineQuiz(loadedSession.isOffline);
 
@@ -662,7 +662,7 @@ const QuizPage = () => {
                         <Badge variant="outline" className="font-bold">{cat.total_mcqs} MCQs</Badge>
                     </div>
                     <CardDescription className="text-sm line-clamp-3 min-h-[4.5rem] text-foreground/80 leading-relaxed italic">
-                        {cat.description || 'Comprehensive prep material for this medical specialty.'}
+                        {cat.description || `High-yield questions and detailed explanations focusing on ${cat.name} to help you master this specialty.`}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex-grow pt-6 space-y-3">

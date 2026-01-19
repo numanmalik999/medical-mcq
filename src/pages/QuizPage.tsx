@@ -149,14 +149,16 @@ const QuizPage = () => {
     }
   }, [userAnswers, quizQuestions]);
 
-  const fetchExplanation = useCallback(async (mcqId: string, explanationId: string): Promise<MCQExplanation | null> => {
+  const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
+    if (!currentMcq) return null;
+    const mcqId = currentMcq.id;
+
     if (isOfflineQuiz) {
-      const localMcq = quizQuestions.find(q => q.id === mcqId);
-      if (localMcq && (localMcq as any).explanation_text) {
+      if (currentMcq && (currentMcq as any).explanation_text) {
         const localExplanation: MCQExplanation = {
           id: mcqId,
-          explanation_text: (localMcq as any).explanation_text,
-          image_url: (localMcq as any).image_url || null,
+          explanation_text: (currentMcq as any).explanation_text,
+          image_url: (currentMcq as any).image_url || null,
         };
         setExplanations(prev => new Map(prev).set(mcqId, localExplanation));
         return localExplanation;
@@ -187,7 +189,7 @@ const QuizPage = () => {
       return formattedExplanation;
     }
     return null;
-  }, [explanations, toast, isOfflineQuiz, quizQuestions]);
+  }, [explanations, toast, isOfflineQuiz, currentMcq]);
 
   const saveQuizState = useCallback(async (
     dbSessionId: string | null,
@@ -484,7 +486,7 @@ const QuizPage = () => {
     setSelectedAnswer(ans?.selectedOption || null);
     setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${cur.correct_answer}.`) : null);
     setShowExplanation(ans?.submitted || false);
-    if (ans?.submitted && cur.explanation_id) fetchExplanation(cur.id, cur.explanation_id);
+    if (ans?.submitted && cur.explanation_id) fetchExplanation(cur.explanation_id);
 
     setShowCategorySelection(false);
     setIsPageLoading(false);
@@ -512,7 +514,7 @@ const QuizPage = () => {
       setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${quizQuestions[index].correct_answer}.`) : null);
       setShowExplanation(ans?.submitted || false);
       if (ans?.submitted && quizQuestions[index].explanation_id) {
-          fetchExplanation(quizQuestions[index].id, quizQuestions[index].explanation_id!);
+          fetchExplanation(quizQuestions[index].explanation_id!);
       }
     }
   };
@@ -554,7 +556,7 @@ const QuizPage = () => {
     if (user && !isOfflineQuiz) {
       await supabase.from('user_quiz_attempts').insert({ user_id: user.id, mcq_id: currentMcq.id, category_id: currentMcq.category_links?.[0]?.category_id || null, selected_option: selectedAnswer, is_correct: isCorrect });
     }
-    if (currentMcq.explanation_id) fetchExplanation(currentMcq.id, currentMcq.explanation_id);
+    if (currentMcq.explanation_id) fetchExplanation(currentMcq.explanation_id);
   };
 
   const handleSaveProgress = async () => {
@@ -690,18 +692,19 @@ const QuizPage = () => {
   }
 
   const ansData = userAnswers.get(currentMcq.id);
+  const isSelected = ansData?.selectedOption !== null;
   const isSub = ansData?.submitted;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
       <div className="w-full max-w-6xl mb-4">
-        <Card className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-primary/5 border-primary/20">
-          <p className="font-bold text-primary flex items-center gap-2">
+        <Card className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-primary border-none shadow-md">
+          <p className="font-bold text-white flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5" /> Live Session Accuracy: {currentCorrectnessPercentage}
           </p>
           <div className="flex gap-2">
-             <Button variant="outline" size="sm" onClick={handleSaveProgress} disabled={isOfflineQuiz}><Save className="h-4 w-4 mr-2" /> Save Progress</Button>
-             <Button variant="ghost" size="sm" onClick={handleBackToSelection}><ArrowLeft className="h-4 w-4 mr-2" /> Exit Quiz</Button>
+             <Button variant="outline" size="sm" className="text-white border-white hover:bg-white/10" onClick={handleSaveProgress} disabled={isOfflineQuiz}><Save className="h-4 w-4 mr-2" /> Save Progress</Button>
+             <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={handleBackToSelection}><ArrowLeft className="h-4 w-4 mr-2" /> Exit Quiz</Button>
           </div>
         </Card>
       </div>
@@ -730,9 +733,8 @@ const QuizPage = () => {
                 const isSel = selectedAnswer === k;
                 return (
                   <div key={k} className={cn("flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer", 
-                    isSub && isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300",
-                    isSub && isSel && !isCorrectOpt && "border-red-600 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300",
-                    isSub && !isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300",
+                    isSub && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
+                    isSub && isSel && !isCorrectOpt && "border-red-600 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
                     !isSub && isSel && "border-primary bg-primary/5 dark:bg-primary/10"
                   )} onClick={() => !isSub && handleOptionSelect(k)}>
                     <RadioGroupItem value={k} id={`opt-${k}`} />
@@ -747,8 +749,8 @@ const QuizPage = () => {
             {feedback && (
               <div className={cn("mt-8 p-6 rounded-2xl flex items-center gap-4 font-bold text-lg border animate-in fade-in zoom-in-95", 
                 feedback.startsWith('Correct') 
-                    ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-700 dark:text-green-200" 
-                    : "bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-700 dark:text-red-200")}>
+                    ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300" 
+                    : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300")}>
                 {feedback.startsWith('Correct') ? <CheckCircle2 className="h-8 w-8" /> : <AlertCircle className="h-8 w-8" />}
                 {feedback}
               </div>
@@ -769,7 +771,7 @@ const QuizPage = () => {
           <CardFooter className="bg-muted/10 border-t py-6 px-8 flex justify-between">
               <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} variant="outline" className="rounded-full h-12 px-6">Previous</Button>
               {!isSub ? (
-                <Button onClick={handleSubmitAnswer} disabled={!selectedAnswer} className="px-10 rounded-full font-bold h-12">Check Answer</Button>
+                <Button onClick={handleSubmitAnswer} disabled={!isSelected} className="px-10 rounded-full font-bold h-12">Check Answer</Button>
               ) : (
                 <Button onClick={handleNextQuestion} className="px-10 rounded-full font-bold h-12">Next Question <ArrowRight className="ml-2 h-4 w-4" /></Button>
               )}

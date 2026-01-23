@@ -155,7 +155,6 @@ const LandingPage = () => {
                   <BookOpenText className="h-5 w-5" /> {settings.hero.ctaSecondaryText}
                 </Button>
               </Link>
-              {/* New Question of the Day Button - Updated to Black Text on White */}
               <Link to="/quiz-of-the-day" className="w-full lg:w-auto">
                 <Button size="lg" className="flex items-center gap-2 w-full min-w-[220px] text-lg font-bold bg-white text-black hover:bg-white/90 shadow-md border-2 border-white">
                   <Trophy className="h-5 w-5" /> {settings.hero.ctaQodText}
@@ -211,7 +210,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Latest from Blog Section (AUTHORITY SIGNAL) */}
+      {/* Latest from Blog Section */}
       {recentBlogs.length > 0 && (
         <section className="py-16 md:py-24 bg-muted/20">
           <div className="container mx-auto px-4">

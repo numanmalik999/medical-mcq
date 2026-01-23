@@ -143,8 +143,8 @@ const BlogDetailsPage = () => {
               </ReactMarkdown>
             </div>
 
-            {/* Author Section (E-E-A-T Signal) */}
-            <div className="mt-12 p-8 bg-muted/50 rounded-2xl border border-border flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
+            {/* Author Section */}
+            <section className="mt-12 p-8 bg-muted/50 rounded-2xl border border-border flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
               <Avatar className="h-20 w-20">
                 <AvatarFallback className="bg-primary text-primary-foreground"><User className="h-10 w-10" /></AvatarFallback>
               </Avatar>
@@ -155,21 +155,21 @@ const BlogDetailsPage = () => {
                   Learn about our review process <ExternalLink className="h-3 w-3" />
                 </Link>
               </div>
-            </div>
+            </section>
 
-            <div className="mt-16 p-8 bg-primary/5 rounded-2xl text-center border border-primary/20">
+            <section className="mt-16 p-8 bg-primary/5 rounded-2xl text-center border border-primary/20">
               <h3 className="text-2xl font-bold mb-4">Ready to test your knowledge?</h3>
               <p className="mb-6 text-muted-foreground max-w-xl mx-auto">Join thousands of medical professionals preparing for their licensing exams with our AI-enhanced question bank.</p>
               <div className="flex justify-center gap-4 flex-wrap">
                 <Button asChild size="lg"><Link to="/signup">Start Free Trial</Link></Button>
                 <Button asChild variant="outline" size="lg"><Link to="/quiz">Try a Quiz</Link></Button>
               </div>
-            </div>
+            </section>
           </article>
 
           {/* Sidebar */}
           <aside className="lg:col-span-1 space-y-8">
-             <div className="space-y-4">
+             <section className="space-y-4">
                 <h4 className="font-bold text-lg border-b pb-2">Recent Guides</h4>
                 <div className="space-y-6">
                   {relatedBlogs.map((item) => (
@@ -181,7 +181,7 @@ const BlogDetailsPage = () => {
                     </div>
                   ))}
                 </div>
-             </div>
+             </section>
 
              <Card className="bg-primary text-primary-foreground">
                 <CardHeader>

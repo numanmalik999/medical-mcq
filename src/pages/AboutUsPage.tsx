@@ -11,7 +11,7 @@ const AboutUsPage = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      <section className="relative py-20 bg-primary text-primary-foreground overflow-hidden">
+      <header className="relative py-20 bg-primary text-primary-foreground overflow-hidden">
         <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 left-0 w-64 h-64 bg-white rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl"></div>
             <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full translate-x-1/3 translate-y-1/3 blur-3xl"></div>
@@ -23,7 +23,7 @@ const AboutUsPage = () => {
             We bridge the gap between medical knowledge and exam success with AI-powered tools and expert-curated content.
           </p>
         </div>
-      </section>
+      </header>
 
       {/* Mission Section */}
       <section className="py-20 container mx-auto px-4">

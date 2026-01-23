@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { HelpCircle, BookOpen, CreditCard } from "lucide-react";
 
@@ -88,14 +88,14 @@ const FaqPage = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-12 pt-24">
       <div className="container mx-auto px-4 max-w-4xl">
-        <div className="text-center mb-12">
+        <header className="text-center mb-12">
           <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white mb-4">Frequently Asked Questions</h1>
           <p className="text-lg text-slate-600 dark:text-slate-400">Everything you need to know about preparing with Study Prometric.</p>
-        </div>
+        </header>
 
         <div className="space-y-10">
           {faqs.map((section, idx) => (
-            <div key={idx} className="space-y-4">
+            <section key={idx} className="space-y-4">
               <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
                 <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
                     {section.icon}
@@ -114,11 +114,11 @@ const FaqPage = () => {
                   </AccordionItem>
                 ))}
               </Accordion>
-            </div>
+            </section>
           ))}
         </div>
 
-        <Card className="mt-16 bg-blue-600 text-white border-none shadow-xl rounded-3xl overflow-hidden relative">
+        <section className="mt-16 bg-blue-600 text-white border-none shadow-xl rounded-3xl overflow-hidden relative">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full translate-x-1/2 -translate-y-1/2 blur-2xl"></div>
           <CardHeader className="text-center relative z-10 pt-10">
             <CardTitle className="text-2xl text-white">Still have questions?</CardTitle>
@@ -129,7 +129,7 @@ const FaqPage = () => {
               <Button variant="secondary" size="lg" className="bg-white text-blue-600 hover:bg-slate-100 px-8 py-6 text-lg font-bold shadow-lg">Contact Support Team</Button>
             </Link>
           </CardContent>
-        </Card>
+        </section>
         
         <MadeWithDyad />
       </div>

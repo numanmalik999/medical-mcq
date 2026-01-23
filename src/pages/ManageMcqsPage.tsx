@@ -104,7 +104,7 @@ const ManageMcqsPage = () => {
 
       const uncategorizedMcqCount = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
 
-      setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'Uncategorized', mcq_count: Math.max(0, uncategorizedMcqCount) }]);
+      setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'General Medical Practice', mcq_count: Math.max(0, uncategorizedMcqCount) }]);
     }
   };
 

@@ -279,7 +279,7 @@ const QuizPage = () => {
       return;
     }
     const categoriesMap = new Map(categoriesData?.map(cat => [cat.id, cat]) || []);
-    categoriesMap.set(UNCATEGORIZED_ID, { id: UNCATEGORIZED_ID, name: 'Uncategorized', description: 'Questions that have not yet been assigned to a specific specialty category.' });
+    categoriesMap.set(UNCATEGORIZED_ID, { id: UNCATEGORIZED_ID, name: 'General Medical Practice', description: 'Comprehensive clinical questions covering essential foundations of medicine and shared specialty knowledge.' });
 
     const limit = 1000;
     let allMcqCategoryLinks: { category_id: string; mcq_id: string }[] = [];
@@ -386,8 +386,8 @@ const QuizPage = () => {
       const acc = userAtt.total > 0 ? ((userAtt.correct / userAtt.total) * 100).toFixed(2) : '0.00';
       categoriesWithStats.push({
         id: UNCATEGORIZED_ID,
-        name: 'Uncategorized',
-        description: 'Questions that have not yet been assigned to a specific specialty category.',
+        name: 'General Medical Practice',
+        description: 'Comprehensive clinical questions covering essential foundations of medicine and shared specialty knowledge.',
         total_mcqs: uncategorizedStats.total,
         total_trial_mcqs: uncategorizedStats.trial,
         user_attempts: userAtt.total,
@@ -409,7 +409,7 @@ const QuizPage = () => {
           currentQuestionIndex: dbSession.current_question_index,
           isTrialActiveSession: dbSession.is_trial_session,
           userId: user.id,
-          categoryName: dbSession.category_id === ALL_TRIAL_MCQS_ID ? 'All Trial MCQs' : dbSession.category_id === UNCATEGORIZED_ID ? 'Uncategorized' : categoriesMap.get(dbSession.category_id || '')?.name || 'Unknown',
+          categoryName: dbSession.category_id === ALL_TRIAL_MCQS_ID ? 'All Trial MCQs' : dbSession.category_id === UNCATEGORIZED_ID ? 'General Medical Practice' : categoriesMap.get(dbSession.category_id || '')?.name || 'Unknown',
           isOffline: false,
         } as LoadedQuizSession)));
       }

@@ -358,8 +358,8 @@ const TakeTestPage = () => {
       setIsPageLoading(false);
       return;
     } else {
-      // Add the virtual "Uncategorized" category
-      setAllCategories([...(categoriesData || []), { id: UNCATEGORIZED_ID, name: 'Uncategorized' }]);
+      // Add the virtual "General Medical Practice" category
+      setAllCategories([...(categoriesData || []), { id: UNCATEGORIZED_ID, name: 'General Medical Practice' }]);
     }
 
     // Fetch saved test sessions
@@ -378,7 +378,7 @@ const TakeTestPage = () => {
       } else {
         loadedSavedTests = dbSessions.map((dbSession: DbQuizSession) => {
           // Reconstruct categoryIds from mcq_ids_order if needed, or use the stored category_id
-          const categoryName = categoriesData?.find(c => c.id === dbSession.category_id)?.name || 'Mixed Categories';
+          const categoryName = categoriesData?.find(c => c.id === dbSession.category_id)?.name || (dbSession.category_id === UNCATEGORIZED_ID ? 'General Medical Practice' : 'Mixed Categories');
           return {
             dbSessionId: dbSession.id,
             categoryIds: dbSession.category_id ? [dbSession.category_id] : [], // Simplified for display
@@ -477,11 +477,11 @@ const TakeTestPage = () => {
 
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategoryIds((prev) => {
-      // If 'Uncategorized' is selected, it's exclusive
+      // If 'General Medical Practice' is selected, it's exclusive
       if (categoryId === UNCATEGORIZED_ID) {
         return prev.includes(UNCATEGORIZED_ID) ? [] : [UNCATEGORIZED_ID];
       }
-      // If another category is selected, remove 'Uncategorized' if present
+      // If another category is selected, remove 'General Medical Practice' if present
       const newSelection = prev.filter(id => id !== UNCATEGORIZED_ID);
       return newSelection.includes(categoryId)
         ? newSelection.filter((id) => id !== categoryId)
@@ -511,14 +511,14 @@ const TakeTestPage = () => {
     const regularCategoryIds = selectedCategoryIds.filter(id => id !== UNCATEGORIZED_ID);
 
     if (isUncategorizedSelected && regularCategoryIds.length === 0) {
-      // Logic for Uncategorized MCQs
+      // Logic for General Medical Practice MCQs
       const { data: categorizedMcqLinks, error: linksError } = await supabase
         .from('mcq_category_links')
         .select('mcq_id');
 
       if (linksError) {
         console.error('Error fetching categorized MCQ links:', linksError);
-        toast({ title: "Error", description: "Failed to identify uncategorized questions.", variant: "destructive" });
+        toast({ title: "Error", description: "Failed to identify General Medical Practice questions.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
@@ -529,8 +529,8 @@ const TakeTestPage = () => {
         .select('id');
 
       if (allMcqIdsError) {
-        console.error('Error fetching all MCQ IDs for uncategorized filter:', allMcqIdsError);
-        toast({ title: "Error", description: "Failed to fetch all MCQs for uncategorized filter.", variant: "destructive" });
+        console.error('Error fetching all MCQ IDs for General Medical Practice filter:', allMcqIdsError);
+        toast({ title: "Error", description: "Failed to fetch all MCQs for General Medical Practice filter.", variant: "destructive" });
         setIsPageLoading(false);
         return;
       }
@@ -659,7 +659,7 @@ const TakeTestPage = () => {
         user.id
       );
       if (savedSessionResult) {
-        const categoryNames = selectedCategoryIds.map(id => allCategories.find(c => c.id === id)?.name || 'Unknown').filter(Boolean) as string[];
+        const categoryNames = selectedCategoryIds.map(id => allCategories.find(c => c.id === id)?.name || (id === UNCATEGORIZED_ID ? 'General Medical Practice' : 'Unknown')).filter(Boolean) as string[];
         setActiveSavedTests(prev => [
           {
             dbSessionId: savedSessionResult.id,
@@ -759,7 +759,7 @@ const TakeTestPage = () => {
       );
 
       if (savedSessionResult) {
-        const categoryNames = selectedCategoryIds.map(id => allCategories.find(c => c.id === id)?.name || 'Unknown').filter(Boolean) as string[];
+        const categoryNames = selectedCategoryIds.map(id => allCategories.find(c => c.id === id)?.name || (id === UNCATEGORIZED_ID ? 'General Medical Practice' : 'Unknown')).filter(Boolean) as string[];
         setActiveSavedTests(prev => {
           const existingIndex = prev.findIndex(session => session.dbSessionId === savedSessionResult.id);
           if (existingIndex > -1) {
@@ -901,7 +901,6 @@ const TakeTestPage = () => {
 
   const handleReviewPrevious = useCallback(() => {
     if (currentReviewIndex > 0) {
-      setCurrentReviewIndex((prev) => prev + 1); // Wait, this should be -1. Fixed below.
       setCurrentReviewIndex((prev) => prev - 1);
     }
   }, [currentReviewIndex]);
@@ -1175,7 +1174,7 @@ const TakeTestPage = () => {
 
   if (!currentMcq) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="min-h-screen items-center justify-center bg-gray-100 dark:bg-gray-900">
         <p className="text-gray-700 dark:text-gray-300">Loading current question...</p>
       </div>
     );

@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import * as LucideIcons from 'lucide-react'; 
-import { Check, Loader2, Globe, BookOpenText, ArrowRight, Calendar } from 'lucide-react';
+import { Check, Loader2, Globe, BookOpenText, ArrowRight, Calendar, Trophy } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -146,13 +146,19 @@ const LandingPage = () => {
           <div className="flex flex-col items-center gap-4 animate-fade-in-up delay-400">
             <div className="flex flex-col justify-center gap-4 w-full max-w-md lg:max-w-none lg:flex-row">
               <Link to={user ? "/user/dashboard" : "/subscription"} className="w-full lg:w-auto">
-                <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full min-w-[220px] text-lg font-bold">
+                <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full min-w-[220px] text-lg font-bold shadow-lg">
                   {user ? "Go to Dashboard" : settings.hero.ctaPrimaryText}
                 </Button>
               </Link>
               <Link to="/quiz" className="w-full lg:w-auto">
-                <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full min-w-[220px] text-lg font-bold">
-                  <BookOpenText className="h-5 w-5" /> Take a Free Quiz
+                <Button size="lg" variant="secondary" className="flex items-center gap-2 w-full min-w-[220px] text-lg font-bold shadow-md">
+                  <BookOpenText className="h-5 w-5" /> {settings.hero.ctaSecondaryText}
+                </Button>
+              </Link>
+              {/* New Question of the Day Button */}
+              <Link to="/quiz-of-the-day" className="w-full lg:w-auto">
+                <Button size="lg" variant="outline" className="flex items-center gap-2 w-full min-w-[220px] text-lg font-bold border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10 shadow-md">
+                  <Trophy className="h-5 w-5" /> {settings.hero.ctaQodText}
                 </Button>
               </Link>
             </div>

@@ -26,6 +26,7 @@ const defaultHero: HeroSection = {
   subtitle: "Your ultimate platform for interactive quizzes, simulated tests, and AI-powered explanations to ace your Prometric MCQs.",
   ctaPrimaryText: "Get Started",
   ctaSecondaryText: "Take a Free Quiz",
+  ctaQodText: "Question of the Day", // Default value
 };
 
 const defaultFeatures: FeatureItem[] = [
@@ -80,7 +81,10 @@ export const useLandingPageSettings = () => {
               newSettings.seo = seoMetadataSchema.parse(setting.value);
               break;
             case 'landing_page_hero':
-              newSettings.hero = heroSectionSchema.parse(setting.value);
+              // Handle case where ctaQodText might be missing in existing DB settings
+              const val = setting.value as any;
+              if (!val.ctaQodText) val.ctaQodText = defaultHero.ctaQodText;
+              newSettings.hero = heroSectionSchema.parse(val);
               break;
             case 'landing_page_features':
               newSettings.features = featuresSectionSchema.parse(setting.value);

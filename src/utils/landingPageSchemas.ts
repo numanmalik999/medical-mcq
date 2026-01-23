@@ -11,6 +11,7 @@ export const heroSectionSchema = z.object({
   subtitle: z.string().min(1, "Subtitle is required."),
   ctaPrimaryText: z.string().min(1, "Primary CTA text is required."),
   ctaSecondaryText: z.string().min(1, "Secondary CTA text is required."),
+  ctaQodText: z.string().min(1, "QOD CTA text is required."), // Added this field
 });
 
 export const featureItemSchema = z.object({

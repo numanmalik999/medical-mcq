@@ -27,6 +27,7 @@ const defaultHero: z.infer<typeof heroSectionSchema> = {
   subtitle: "Your ultimate platform for interactive quizzes, simulated tests, and AI-powered explanations to ace your Prometric MCQs.",
   ctaPrimaryText: "Get Started",
   ctaSecondaryText: "Take a Free Quiz",
+  ctaQodText: "Question of the Day",
 };
 
 const defaultFeatures: z.infer<typeof featuresSectionSchema> = [
@@ -130,6 +131,17 @@ const ManageLandingPage = () => {
         render={({ field }) => (
           <FormItem>
             <FormLabel>Secondary CTA Button Text</FormLabel>
+            <FormControl><Input {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={form.control}
+        name="ctaQodText"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Question of the Day Button Text</FormLabel>
             <FormControl><Input {...field} /></FormControl>
             <FormMessage />
           </FormItem>

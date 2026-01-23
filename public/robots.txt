@@ -1,28 +1,5 @@
-# https://www.robotstxt.org/robotstxt.html
 User-agent: *
-
-# Allow indexing of public educational and trust content
 Allow: /
-Allow: /blog/
-Allow: /quiz
-Allow: /quiz-of-the-day
-Allow: /about
-Allow: /faq
-Allow: /contact
-Allow: /privacy
-Allow: /terms
-Allow: /refund
-Allow: /road-to-gulf
-Allow: /reviews
 
-# Prevent indexing of private or functional paths
-Disallow: /admin/
-Disallow: /user/
-Disallow: /login
-Disallow: /signup
-Disallow: /redirect
-Disallow: /reset-password
-Disallow: /payment/
-
-# Sitemap location (update this if you generate a sitemap later)
+# Sitemap Location
 Sitemap: https://www.studyprometric.com/sitemap.xml

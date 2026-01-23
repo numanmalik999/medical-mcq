@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -67,6 +69,21 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   useSession();
   useGoogleAnalytics();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Dynamic Canonical Tag Management
+    let link = document.querySelector("link[rel='canonical']") as HTMLLinkElement;
+    if (!link) {
+      link = document.createElement("link");
+      link.setAttribute("rel", "canonical");
+      document.head.appendChild(link);
+    }
+    // Set the canonical URL based on the current location
+    const baseUrl = "https://www.studyprometric.com";
+    const cleanPath = location.pathname === "/" ? "" : location.pathname;
+    link.setAttribute("href", `${baseUrl}${cleanPath}`);
+  }, [location]);
 
   return (
     <>

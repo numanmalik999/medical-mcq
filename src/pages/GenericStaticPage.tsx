@@ -40,7 +40,7 @@ const GenericStaticPage = () => {
       if (dbError || !data) {
         console.error(`Error fetching static page for slug "${slug}":`, dbError);
         setError(`The page you're looking for at "/${slug}" could not be found.`);
-        if (dbError && dbError.code !== 'PGRST116') { // PGRST116 means no rows found, which is a valid "not found" case
+        if (dbError && dbError.code !== 'PGRST116') {
           toast({ title: "Error", description: "Failed to load page content.", variant: "destructive" });
         }
       } else {
@@ -85,14 +85,16 @@ const GenericStaticPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16 pb-12">
-      <Card className="w-full max-w-6xl">
-        <CardHeader>
-          <CardTitle className="text-3xl text-center">{pageTitle}</CardTitle>
-        </CardHeader>
-        <CardContent className="prose dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-primary hover:prose-a:underline">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{pageContent || ""}</ReactMarkdown>
-        </CardContent>
-      </Card>
+      <article className="w-full max-w-6xl">
+        <Card className="border-none shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-3xl text-center">{pageTitle}</CardTitle>
+          </CardHeader>
+          <CardContent className="prose dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-primary hover:prose-a:underline">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{pageContent || ""}</ReactMarkdown>
+          </CardContent>
+        </Card>
+      </article>
       <MadeWithDyad />
     </div>
   );

@@ -56,7 +56,7 @@ import ManageSeoPage from "./pages/ManageSeoPage";
 import ContactPage from "./pages/ContactPage";
 import FaqPage from "./pages/FaqPage";
 import AboutUsPage from "./pages/AboutUsPage";
-import AdSenseManager from "./components/AdSenseManager"; // Import AdSenseManager
+import AdSenseManager from "./components/AdSenseManager";
 
 // Blog Pages
 import BlogListPage from "./pages/BlogListPage";
@@ -71,10 +71,11 @@ const AppContent = () => {
   return (
     <>
       <ScrollToTop />
-      <AdSenseManager /> {/* Add AdSenseManager here */}
+      <AdSenseManager />
       <Header />
       <div className="flex flex-col min-h-screen">
-        <div className="flex-grow">
+        {/* Semantic <main> tag for SEO optimization */}
+        <main id="main-content" className="flex-grow">
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/redirect" element={<DashboardRedirect />} />
@@ -89,7 +90,6 @@ const AppContent = () => {
             <Route path="/faq" element={<FaqPage />} />
             <Route path="/about" element={<AboutUsPage />} />
             
-            {/* Public Blog Routes */}
             <Route path="/blog" element={<BlogListPage />} />
             <Route path="/blog/:slug" element={<BlogDetailsPage />} />
 
@@ -137,7 +137,7 @@ const AppContent = () => {
             <Route path="/:slug" element={<GenericStaticPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </div>
+        </main>
         <Footer />
       </div>
       <AiChatbot />

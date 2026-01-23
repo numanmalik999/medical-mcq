@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { MadeWithDyad } from './made-with-dyad';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { MessageSquare, Twitter, Facebook, Instagram, Linkedin, Globe, Youtube } from 'lucide-react';
+import { MessageSquare, Mail, MapPin, Twitter, Facebook, Instagram, Linkedin, Globe, Youtube, ShieldCheck } from 'lucide-react';
 import { useGlobalSettings, SocialLink } from '@/hooks/useGlobalSettings';
 
 interface StaticPageLink {
@@ -65,57 +65,87 @@ const Footer = () => {
     link.title.toLowerCase().includes('terms')
   );
 
-  const whatsappNumber = "+923174636479";
+  const whatsappNumber = "+92 317 4636479";
+  const contactEmail = "support@studyprometric.com";
+  const officeAddress = "Healthcare City, Phase 2, Dubai, UAE";
 
   return (
-    <footer className="bg-card text-card-foreground py-8 border-t border-border mt-12">
+    <footer className="bg-card text-card-foreground py-12 border-t border-border mt-12">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
-          <div className="space-y-2">
-            <h4 className="text-lg font-semibold">Study Prometric MCQs</h4>
-            <p className="text-sm text-muted-foreground mb-4">Your partner in medical education excellence.</p>
-            <div className="flex items-center justify-center md:justify-start space-x-2 text-sm text-muted-foreground">
-              <MessageSquare className="h-4 w-4 text-green-500 flex-shrink-0 fill-green-500" />
-              <a href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">{whatsappNumber}</a>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 text-center md:text-left">
+          
+          {/* Brand & Mission */}
+          <div className="space-y-4">
+            <h4 className="text-xl font-bold tracking-tight">Study Prometric MCQs</h4>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Empowering healthcare professionals to master their Gulf licensing exams with AI-enhanced clinical questions and expert-curated study paths.
+            </p>
+            <div className="flex items-center justify-center md:justify-start gap-4 pt-2">
+              {settings.socialLinks.map((link: SocialLink, index: number) => (
+                <a key={index} href={link.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title={link.platform}>
+                  {getSocialIcon(link.platform)}
+                </a>
+              ))}
             </div>
-            {settings.socialLinks.length > 0 && (
-              <div className="flex items-center justify-center md:justify-start space-x-4 pt-4">
-                {settings.socialLinks.map((link: SocialLink, index: number) => (
-                  <a key={index} href={link.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
-                    {getSocialIcon(link.platform)}
-                  </a>
-                ))}
-              </div>
-            )}
           </div>
 
-          <div className="space-y-2">
-            <h4 className="text-lg font-semibold">Quick Links</h4>
-            <nav className="flex flex-col space-y-1 text-sm">
-              <Link to="/blog" className="text-muted-foreground hover:text-foreground">Blog</Link>
-              <Link to="/sitemap" className="text-muted-foreground hover:text-foreground">HTML Sitemap</Link>
+          {/* Contact Details (EEAT) */}
+          <div className="space-y-4">
+            <h4 className="text-lg font-semibold">Contact & Support</h4>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <div className="flex items-center justify-center md:justify-start gap-3">
+                <MapPin className="h-4 w-4 text-primary shrink-0" />
+                <span>{officeAddress}</span>
+              </div>
+              <div className="flex items-center justify-center md:justify-start gap-3">
+                <Mail className="h-4 w-4 text-primary shrink-0" />
+                <a href={`mailto:${contactEmail}`} className="hover:text-primary transition-colors">{contactEmail}</a>
+              </div>
+              <div className="flex items-center justify-center md:justify-start gap-3">
+                <MessageSquare className="h-4 w-4 text-green-500 shrink-0 fill-green-500/10" />
+                <a href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">{whatsappNumber}</a>
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation Links */}
+          <div className="space-y-4">
+            <h4 className="text-lg font-semibold">Quick Access</h4>
+            <nav className="flex flex-col space-y-2 text-sm">
+              <Link to="/blog" className="text-muted-foreground hover:text-primary transition-colors">Exam Insights Blog</Link>
+              <Link to="/sitemap" className="text-muted-foreground hover:text-primary transition-colors">Site Map</Link>
               {quickLinks.map((link) => (
-                <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-foreground">
+                <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-primary transition-colors">
                   {link.title}
                 </Link>
               ))}
             </nav>
           </div>
 
-          <div className="space-y-2">
-            <h4 className="text-lg font-semibold">Legal & Trust</h4>
-            <nav className="flex flex-col space-y-1 text-sm">
+          {/* Legal & Trust */}
+          <div className="space-y-4">
+            <h4 className="text-lg font-semibold">Legal & Compliance</h4>
+            <nav className="flex flex-col space-y-2 text-sm">
               {legalLinks.map((link) => (
-                <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-foreground">
+                <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-primary transition-colors">
                   {link.title}
                 </Link>
               ))}
+              <div className="pt-4 flex items-center justify-center md:justify-start gap-2 text-xs text-muted-foreground">
+                <ShieldCheck className="h-4 w-4 text-blue-500" />
+                <span>DMCA Protected & Secure</span>
+              </div>
             </nav>
           </div>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-border text-center text-sm text-muted-foreground">
-          <p>&copy; {currentYear} Study Prometric MCQs. All rights reserved.</p>
+        {/* Bottom Bar */}
+        <div className="mt-12 pt-8 border-t border-border flex flex-col items-center gap-4 text-sm text-muted-foreground">
+          <p className="font-medium">
+            &copy; {currentYear} Study Prometric MCQs. All rights reserved. 
+            <span className="hidden sm:inline mx-2">|</span> 
+            <span className="block sm:inline">Certified Medical Education Provider</span>
+          </p>
           <MadeWithDyad />
         </div>
       </div>

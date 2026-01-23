@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/index.php",
+      "destination": "/"
+    },
+    {
       "source": "/((?!api/|assets/|.*\\..*).*)",
       "destination": "/index.html"
     }

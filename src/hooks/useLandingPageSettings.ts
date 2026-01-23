@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from './use-toast';
 import {
   SeoMetadata,
   HeroSection,
@@ -14,7 +13,7 @@ import {
   pricingCtaSchema,
 } from '@/utils/landingPageSchemas';
 
-// Default values
+// Default values synced with ManageLandingPage
 const defaultSeo: SeoMetadata = {
   metaTitle: "Prometric Exam Preparation for Gulf Countries | StudyPrometric – Online MCQs & Practice Tests",
   metaDescription: "Prepare for Prometric exams for Saudi Arabia, UAE, Qatar, Oman, Kuwait & Bahrain. Thousands of updated MCQs for doctors, nurses, and medical professionals. Start your free trial today!",
@@ -26,24 +25,22 @@ const defaultHero: HeroSection = {
   subtitle: "Your ultimate platform for interactive quizzes, simulated tests, and AI-powered explanations to ace your Prometric MCQs.",
   ctaPrimaryText: "Get Started",
   ctaSecondaryText: "Take a Free Quiz",
-  ctaQodText: "Question of the Day", // Default value
+  ctaQodText: "Question of the Day",
 };
 
 const defaultFeatures: FeatureItem[] = [
-  { icon: "BookOpen", title: "Interactive Quizzes", description: "Engage with dynamic questions that provide instant feedback and adapt to your learning pace." },
-  { icon: "Map", title: "Structured Learning Path", description: "Follow a logically organized curriculum that takes you from foundational concepts to clinical mastery." },
-  { icon: "BrainCircuit", title: "AI-Powered Explanations", description: "Get deep clinical insights and reasoning for every answer choice, powered by advanced medical AI." },
-  { icon: "Bookmark", title: "Bookmark & Review", description: "Save challenging questions and create your own personalized revision lists for focused study sessions." },
-  { icon: "BarChart", title: "Personalized Learning", description: "Track your progress with detailed analytics that highlight your strengths and identify areas for improvement." },
-  { icon: "FilePlus", title: "Submit Your Own MCQs", description: "Contribute to the medical community by sharing your own high-yield questions and explanations." },
-  { icon: "ShieldCheck", title: "Secure & Reliable", description: "Your study progress and data are protected by industry-standard security and cloud-sync technology." },
+  { icon: "Stethoscope", title: "AI Clinical Cases", description: "Immerse yourself in complex patient scenarios with multi-step interactive clinical cases designed to test your diagnostic logic." },
+  { icon: "ShieldCheck", title: "Verified Accuracy", description: "Our content is continuously audited by clinical AI to ensure 100% accuracy, clarity, and relevance to the latest exam standards." },
+  { icon: "ClipboardCheck", title: "Simulated Tests", description: "Prepare with timed, customizable tests. Configure question count, difficulty, and time limits to mirror real exam conditions." },
+  { icon: "Youtube", title: "Curated Video Library", description: "Access a hand-picked selection of high-yield medical videos from Ninja Nerd, Osmosis, and more, all mapped to specific topics." },
+  { icon: "BrainCircuit", title: "AI Medical Assistant", description: "Get instant answers to your clinical queries with our integrated AI chatbot, available 24/7 to support your learning journey." },
+  { icon: "Trophy", title: "Daily Challenge", description: "Compete in our Question of the Day leaderboard. Earn points for correct answers and win free premium subscription months!" },
 ];
 
 const defaultPricingCta: PricingCta = {
   title: "Pricing Plans",
   subtitle: "Choose the plan that fits your study schedule and unlock premium features instantly.",
 };
-
 
 interface LandingPageSettings {
   seo: SeoMetadata;
@@ -53,17 +50,17 @@ interface LandingPageSettings {
 }
 
 export const useLandingPageSettings = () => {
-  const { toast } = useToast();
+  // Initialize with defaults and set isLoading to false initially 
+  // so the page renders immediately with words for SEO/Bots
   const [settings, setSettings] = useState<LandingPageSettings>({
     seo: defaultSeo,
     hero: defaultHero,
     features: defaultFeatures,
     pricingCta: defaultPricingCta,
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading] = useState(false);
 
   const fetchSettings = useCallback(async () => {
-    setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('global_settings')
@@ -81,7 +78,6 @@ export const useLandingPageSettings = () => {
               newSettings.seo = seoMetadataSchema.parse(setting.value);
               break;
             case 'landing_page_hero':
-              // Handle case where ctaQodText might be missing in existing DB settings
               const val = setting.value as any;
               if (!val.ctaQodText) val.ctaQodText = defaultHero.ctaQodText;
               newSettings.hero = heroSectionSchema.parse(val);
@@ -107,17 +103,8 @@ export const useLandingPageSettings = () => {
 
     } catch (error: any) {
       console.error("Error fetching landing page settings:", error);
-      toast({ title: "Error", description: "Failed to load dynamic landing page content.", variant: "destructive" });
-      setSettings({
-        seo: defaultSeo,
-        hero: defaultHero,
-        features: defaultFeatures,
-        pricingCta: defaultPricingCta,
-      });
-    } finally {
-      setIsLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     fetchSettings();

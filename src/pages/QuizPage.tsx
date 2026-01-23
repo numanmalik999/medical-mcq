@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -91,7 +92,9 @@ const QuizPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
   const { isNative, isDbInitialized, getOfflineCategoryCounts, getOfflineMcqIdsByCategory, getOfflineMcqs } = useOfflineMcqs();
+  const [searchParams] = useSearchParams();
 
+  // Core Quiz State
   const [quizQuestions, setQuizQuestions] = useState<MCQ[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Map<string, UserAnswerData>>(new Map());
@@ -100,6 +103,7 @@ const QuizPage = () => {
   const [showExplanation, setShowExplanation] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true);
 
+  // Categories & Filtering
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
   const [currentQuizCategoryId, setCurrentQuizCategoryId] = useState<string | null>(null);
   const [currentDbSessionId, setCurrentDbSessionId] = useState<string | null>(null);
@@ -107,9 +111,11 @@ const QuizPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
 
+  // Session Flags
   const [isTrialActiveSession, setIsTrialActiveSession] = useState(false);
   const [isOfflineQuiz, setIsOfflineQuiz] = useState(false);
 
+  // Feedback Dialog
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
@@ -120,9 +126,20 @@ const QuizPage = () => {
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
 
+  // --- Derived Values ---
   const currentMcq = quizQuestions[currentQuestionIndex];
-  const { isBookmarked, toggleBookmark, isLoading: isBookmarkLoading } = useBookmark(currentMcq?.id || null);
   const isGuest = !user;
+
+  // --- Hooks that depend on currentMcq ---
+  const { isBookmarked, toggleBookmark, isLoading: isBookmarkLoading } = useBookmark(currentMcq?.id || null);
+
+  // Sync search query from URL to state
+  useEffect(() => {
+    const query = searchParams.get('search');
+    if (query) {
+      setSearchTerm(query);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!showCategorySelection) {
@@ -402,18 +419,12 @@ const QuizPage = () => {
     setIsPageLoading(false);
   };
 
-  useEffect(() => {
-    if (hasCheckedInitialSession) {
-      fetchQuizOverview();
-    }
-  }, [user, hasCheckedInitialSession, isDbInitialized]);
-
   const startQuizSession = async (selectedCategoryId: string | null, mode: 'random' | 'incorrect', isOffline: boolean) => {
     setIsOfflineQuiz(isOffline);
     const isSubscribed = user?.has_active_subscription;
-    const isGuest = !user;
+    const isGuestUser = !user;
 
-    let sessionIsTrial = selectedCategoryId === ALL_TRIAL_MCQS_ID || isGuest || !isSubscribed;
+    let sessionIsTrial = selectedCategoryId === ALL_TRIAL_MCQS_ID || isGuestUser || !isSubscribed;
     
     if (sessionIsTrial && mode === 'incorrect') {
       toast({ title: "Feature Restricted", description: "This feature is only available for subscribed users.", variant: "default" });
@@ -616,6 +627,12 @@ const QuizPage = () => {
   };
 
   const filteredCategories = categoryStats.filter(cat => cat.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  useEffect(() => {
+    if (hasCheckedInitialSession) {
+      fetchQuizOverview();
+    }
+  }, [hasCheckedInitialSession]);
 
   if (!hasCheckedInitialSession || isPageLoading) return <LoadingBar />;
 

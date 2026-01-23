@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ScrollToTop from "./components/ScrollToTop";
+import BackToTop from "./components/BackToTop";
 import LandingPage from "./pages/LandingPage";
 import DashboardRedirect from "./pages/DashboardRedirect";
 import NotFound from "./pages/NotFound";
@@ -90,6 +91,7 @@ const AppContent = () => {
   return (
     <>
       <ScrollToTop />
+      <BackToTop />
       <AdSenseManager />
       <SchemaMarkup />
       <Header />

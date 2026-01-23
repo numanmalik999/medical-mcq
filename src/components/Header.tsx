@@ -68,7 +68,7 @@ const Header = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground p-3 shadow-lg backdrop-blur-md bg-opacity-95">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground p-3 shadow-lg backdrop-blur-md bg-opacity-95 border-b border-white/10">
       <div className="container mx-auto flex justify-between items-center h-full gap-4">
         <div className="flex items-center gap-6 shrink-0">
           <Button
@@ -78,7 +78,7 @@ const Header = () => {
               "focus-visible:ring-offset-primary focus-visible:ring-primary"
             )}
             onClick={handleAppTitleClick}
-            aria-label="Go to Dashboard"
+            aria-label="Study Prometric - Home"
           >
             <Logo />
           </Button>

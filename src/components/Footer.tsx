@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { MadeWithDyad } from './made-with-dyad';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { MessageSquare, Mail, MapPin, Twitter, Facebook, Instagram, Linkedin, Globe, Youtube, ShieldCheck } from 'lucide-react';
+import { MessageSquare, Mail, MapPin, Twitter, Facebook, Instagram, Linkedin, Globe, Youtube, ShieldCheck, Rss, Music2 } from 'lucide-react';
 import { useGlobalSettings, SocialLink } from '@/hooks/useGlobalSettings';
 
 interface StaticPageLink {
@@ -32,6 +32,7 @@ const getSocialIcon = (platform: string) => {
   if (lowerPlatform.includes('instagram')) return <Instagram className="h-5 w-5" />;
   if (lowerPlatform.includes('linkedin')) return <Linkedin className="h-5 w-5" />;
   if (lowerPlatform.includes('youtube')) return <Youtube className="h-5 w-5" />;
+  if (lowerPlatform.includes('tiktok')) return <Music2 className="h-5 w-5" />;
   return <Globe className="h-5 w-5" />;
 };
 
@@ -68,6 +69,7 @@ const Footer = () => {
   const whatsappNumber = "+92 317 4636479";
   const contactEmail = "support@studyprometric.com";
   const officeAddress = "Healthcare City, Phase 2, Dubai, UAE";
+  const rssUrl = "https://uvhlyitcrogvssmcqtni.supabase.co/functions/v1/rss-feed";
 
   return (
     <footer className="bg-card text-card-foreground py-12 border-t border-border mt-12">
@@ -86,6 +88,9 @@ const Footer = () => {
                   {getSocialIcon(link.platform)}
                 </a>
               ))}
+              <a href={rssUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-orange-500 transition-colors" title="RSS Feed">
+                <Rss className="h-5 w-5" />
+              </a>
             </div>
           </div>
 
@@ -114,6 +119,7 @@ const Footer = () => {
             <nav className="flex flex-col space-y-2 text-sm">
               <Link to="/blog" className="text-muted-foreground hover:text-primary transition-colors">Exam Insights Blog</Link>
               <Link to="/sitemap" className="text-muted-foreground hover:text-primary transition-colors">Site Map</Link>
+              <a href={rssUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">RSS Content Feed</a>
               {quickLinks.map((link) => (
                 <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-primary transition-colors">
                   {link.title}

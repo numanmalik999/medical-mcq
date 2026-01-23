@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -57,6 +58,33 @@ const faqs = [
 ];
 
 const FaqPage = () => {
+  useEffect(() => {
+    const faqSchema = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": faqs.flatMap(section => 
+        section.items.map(item => ({
+          "@type": "Question",
+          "name": item.question,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": item.answer
+          }
+        }))
+      )
+    };
+
+    const script = document.createElement('script');
+    script.id = 'faq-schema';
+    script.setAttribute('type', 'application/ld+json');
+    script.innerHTML = JSON.stringify(faqSchema);
+    document.head.appendChild(script);
+
+    return () => {
+      document.getElementById('faq-schema')?.remove();
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-12 pt-24">
       <div className="container mx-auto px-4 max-w-4xl">

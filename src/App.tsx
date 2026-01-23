@@ -59,6 +59,7 @@ import ContactPage from "./pages/ContactPage";
 import FaqPage from "./pages/FaqPage";
 import AboutUsPage from "./pages/AboutUsPage";
 import AdSenseManager from "./components/AdSenseManager";
+import SchemaMarkup from "./components/SchemaMarkup";
 
 // Blog Pages
 import BlogListPage from "./pages/BlogListPage";
@@ -89,6 +90,7 @@ const AppContent = () => {
     <>
       <ScrollToTop />
       <AdSenseManager />
+      <SchemaMarkup />
       <Header />
       <div className="flex flex-col min-h-screen">
         {/* Semantic <main> tag for SEO optimization */}

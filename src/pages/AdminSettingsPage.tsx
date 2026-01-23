@@ -127,6 +127,8 @@ const defaultPages = [
   { slug: 'refund', title: 'Return & Refund Policy', content: '# Return and Refund Policy...', location: ['footer'] },
   { slug: 'reviews', title: 'Reviews', content: 'This page is dynamically generated.', location: ['footer'] },
   { slug: 'road-to-gulf', title: 'Road to Gulf', content: roadToGulfContent, location: ['header', 'footer'] },
+  { slug: 'editorial-guidelines', title: 'Editorial Guidelines', content: '# Editorial Guidelines\n\nAt Study Prometric, we maintain strict clinical accuracy...', location: ['footer'] },
+  { slug: 'team', title: 'Our Team', content: '# Our Team\n\nMeet the experts behind the question bank...', location: ['footer'] },
 ];
 
 const AdminSettingsPage = () => {

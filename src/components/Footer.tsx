@@ -20,6 +20,8 @@ const getRouteFromSlug = (slug: string): string => {
   if (slug.includes('contact')) return '/contact';
   if (slug.includes('faq')) return '/faq';
   if (slug.includes('road-to-gulf')) return '/road-to-gulf';
+  if (slug.includes('editorial-guidelines')) return '/editorial-guidelines';
+  if (slug.includes('team')) return '/team';
   return `/${slug}`;
 };
 
@@ -54,8 +56,14 @@ const Footer = () => {
     fetchFooterLinks();
   }, [location.pathname]);
 
-  const quickLinks = footerLinks.filter(link => !link.title.toLowerCase().includes('policy') && !link.title.toLowerCase().includes('terms'));
-  const legalLinks = footerLinks.filter(link => link.title.toLowerCase().includes('policy') || link.title.toLowerCase().includes('terms'));
+  const quickLinks = footerLinks.filter(link => 
+    !link.title.toLowerCase().includes('policy') && 
+    !link.title.toLowerCase().includes('terms')
+  );
+  const legalLinks = footerLinks.filter(link => 
+    link.title.toLowerCase().includes('policy') || 
+    link.title.toLowerCase().includes('terms')
+  );
 
   const whatsappNumber = "+923174636479";
 
@@ -85,6 +93,7 @@ const Footer = () => {
             <h4 className="text-lg font-semibold">Quick Links</h4>
             <nav className="flex flex-col space-y-1 text-sm">
               <Link to="/blog" className="text-muted-foreground hover:text-foreground">Blog</Link>
+              <Link to="/sitemap" className="text-muted-foreground hover:text-foreground">HTML Sitemap</Link>
               {quickLinks.map((link) => (
                 <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-foreground">
                   {link.title}
@@ -94,7 +103,7 @@ const Footer = () => {
           </div>
 
           <div className="space-y-2">
-            <h4 className="text-lg font-semibold">Legal</h4>
+            <h4 className="text-lg font-semibold">Legal & Trust</h4>
             <nav className="flex flex-col space-y-1 text-sm">
               {legalLinks.map((link) => (
                 <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-foreground">

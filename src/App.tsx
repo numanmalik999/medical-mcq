@@ -60,6 +60,7 @@ import FaqPage from "./pages/FaqPage";
 import AboutUsPage from "./pages/AboutUsPage";
 import AdSenseManager from "./components/AdSenseManager";
 import SchemaMarkup from "./components/SchemaMarkup";
+import SitemapPage from "./pages/SitemapPage";
 
 // Blog Pages
 import BlogListPage from "./pages/BlogListPage";
@@ -108,6 +109,7 @@ const AppContent = () => {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/faq" element={<FaqPage />} />
             <Route path="/about" element={<AboutUsPage />} />
+            <Route path="/sitemap" element={<SitemapPage />} />
             
             <Route path="/blog" element={<BlogListPage />} />
             <Route path="/blog/:slug" element={<BlogDetailsPage />} />

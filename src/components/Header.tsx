@@ -44,21 +44,6 @@ const Header = () => {
     fetchHeaderLinks();
   }, [location.pathname, toast]);
 
-  const handleAppTitleClick = () => {
-    if (!hasCheckedInitialSession) {
-      return;
-    }
-    if (user) {
-      if (user.is_admin) {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/user/dashboard');
-      }
-    } else {
-      navigate('/');
-    }
-  };
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -67,21 +52,25 @@ const Header = () => {
     }
   };
 
+  // Determine the primary 'home' destination
+  const homeDestination = user 
+    ? (user.is_admin ? "/admin/dashboard" : "/user/dashboard") 
+    : "/";
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground p-3 shadow-xl backdrop-blur-md bg-opacity-95 border-b border-white/10 h-16 flex items-center">
       <div className="container mx-auto flex justify-between items-center h-full gap-4">
         <div className="flex items-center gap-6 shrink-0 h-full">
-          <Button
-            variant="ghost"
+          {/* Standard Link for SEO instead of Button with onClick */}
+          <Link
+            to={homeDestination}
             className={cn(
-              "p-0 h-full hover:bg-transparent hover:opacity-90 transition-opacity",
-              "focus-visible:ring-offset-primary focus-visible:ring-primary"
+              "flex items-center hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-primary focus-visible:ring-white rounded-xl"
             )}
-            onClick={handleAppTitleClick}
             aria-label="Study Prometric - Home"
           >
             <Logo />
-          </Button>
+          </Link>
           <nav className="hidden xl:flex space-x-6 items-center h-full">
             {headerLinks.map((link) => (
               <Link
@@ -136,14 +125,15 @@ const Header = () => {
             </>
           )}
           {user && (
-             <Button 
-                variant="outline" 
-                size="sm" 
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-full font-bold uppercase"
-                onClick={handleAppTitleClick}
-              >
-                Dashboard
-              </Button>
+             <Link to={homeDestination}>
+               <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-full font-bold uppercase"
+                >
+                  Dashboard
+                </Button>
+              </Link>
           )}
         </div>
       </div>

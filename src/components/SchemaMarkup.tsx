@@ -53,7 +53,7 @@ const SchemaMarkup = () => {
           "url": `${siteUrl}/quiz`
         },
         {
-          "@type": "Site-specific QOD",
+          "@type": "SiteNavigationElement",
           "position": 2,
           "name": "Question of the Day",
           "url": `${siteUrl}/quiz-of-the-day`

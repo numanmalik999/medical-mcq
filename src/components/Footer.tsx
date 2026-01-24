@@ -116,7 +116,7 @@ const Footer = () => {
           {/* Navigation Links */}
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Quick Access</h4>
-            <nav className="flex flex-col space-y-2 text-sm">
+            <nav className="flex flex-col space-y-2 text-sm" aria-label="Footer Quick Links">
               <Link to="/blog" className="text-muted-foreground hover:text-primary transition-colors">Exam Insights Blog</Link>
               <Link to="/sitemap" className="text-muted-foreground hover:text-primary transition-colors">Site Map</Link>
               <a href={rssUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">RSS Content Feed</a>
@@ -131,7 +131,7 @@ const Footer = () => {
           {/* Legal & Trust */}
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Legal & Compliance</h4>
-            <nav className="flex flex-col space-y-2 text-sm">
+            <nav className="flex flex-col space-y-2 text-sm" aria-label="Footer Legal Links">
               {legalLinks.map((link) => (
                 <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-primary transition-colors">
                   {link.title}

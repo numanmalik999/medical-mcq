@@ -132,9 +132,9 @@ const LandingPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground pt-16">
+    <div className="bg-background text-foreground pt-16">
       {/* Hero Section */}
-      <section className="relative w-full py-12 md:py-20 bg-primary text-primary-foreground text-center overflow-hidden">
+      <section className="relative w-full py-12 md:py-20 bg-primary text-primary-foreground text-center overflow-hidden" aria-label="Introduction">
         <div className="container mx-auto px-4 relative z-10">
           <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-4 animate-fade-in-up">
             {settings.hero.mainTitle}
@@ -166,7 +166,7 @@ const LandingPage = () => {
       </section>
 
       {/* Trust Badges / Stats Section */}
-      <section className="py-8 bg-muted/50 border-y">
+      <section className="py-8 bg-muted/50 border-y" aria-label="Key Statistics">
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap justify-center gap-8 md:gap-16 text-center">
             <div>
@@ -190,7 +190,7 @@ const LandingPage = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-16 md:py-24 bg-background">
+      <section className="py-16 md:py-24 bg-background" aria-label="Platform Features">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-5xl font-bold mb-4">Master Your Licensing Journey</h2>
           <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
@@ -212,7 +212,7 @@ const LandingPage = () => {
 
       {/* Latest from Blog Section */}
       {recentBlogs.length > 0 && (
-        <section className="py-16 md:py-24 bg-muted/20">
+        <section className="py-16 md:py-24 bg-muted/20" aria-label="Latest Blog Posts">
           <div className="container mx-auto px-4">
             <div className="flex justify-between items-end mb-12">
               <div className="text-left">
@@ -249,7 +249,7 @@ const LandingPage = () => {
       )}
 
       {/* Subscription Tiers Section */}
-      <section className="py-16 md:py-24 bg-slate-900 text-white">
+      <section className="py-16 md:py-24 bg-slate-900 text-white" aria-label="Pricing and Subscription Plans">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white">{settings.pricingCta.title}</h2>
           <p className="text-xl text-slate-300 mb-12 max-w-2xl mx-auto">
@@ -293,7 +293,7 @@ const LandingPage = () => {
       </section>
 
       {/* Marketing Email Subscription Section */}
-      <section className="py-16 md:py-24 bg-primary text-primary-foreground text-center">
+      <section className="py-16 md:py-24 bg-primary text-primary-foreground text-center" aria-label="Newsletter Signup">
         <div className="container mx-auto px-4 max-w-3xl">
           <h2 className="text-3xl md:text-5xl font-bold mb-4">Join our community</h2>
           <p className="text-xl mb-10 opacity-90">

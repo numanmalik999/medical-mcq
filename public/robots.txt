@@ -1,5 +1,32 @@
+# https://www.robotstxt.org/robotstxt.html
+
 User-agent: *
+# Block indexing of internal search results and specific dynamic parameters
+Disallow: /quiz?search=
+Disallow: /user/payment/
+Disallow: /redirect
+Disallow: /admin/
+Disallow: /user/take-test
+
+# Block aggressive scrapers and known "Bad Bots"
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: Rogiebot
+Disallow: /
+
+# Specifically allow Googlebot for better indexing
+User-agent: Googlebot
 Allow: /
 
-# Sitemap Location
+# Sitemap declaration
 Sitemap: https://www.studyprometric.com/sitemap.xml

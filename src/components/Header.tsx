@@ -68,13 +68,13 @@ const Header = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground p-3 shadow-lg backdrop-blur-md bg-opacity-95 border-b border-white/10">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground p-3 shadow-xl backdrop-blur-md bg-opacity-95 border-b border-white/10 h-16 flex items-center">
       <div className="container mx-auto flex justify-between items-center h-full gap-4">
-        <div className="flex items-center gap-6 shrink-0">
+        <div className="flex items-center gap-6 shrink-0 h-full">
           <Button
             variant="ghost"
             className={cn(
-              "p-0 h-auto hover:bg-transparent hover:opacity-90 transition-opacity",
+              "p-0 h-full hover:bg-transparent hover:opacity-90 transition-opacity",
               "focus-visible:ring-offset-primary focus-visible:ring-primary"
             )}
             onClick={handleAppTitleClick}
@@ -82,7 +82,7 @@ const Header = () => {
           >
             <Logo />
           </Button>
-          <nav className="hidden xl:flex space-x-6">
+          <nav className="hidden xl:flex space-x-6 items-center h-full">
             {headerLinks.map((link) => (
               <Link
                 key={link.slug}
@@ -108,14 +108,14 @@ const Header = () => {
         </div>
 
         {/* Global Search Bar */}
-        <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md relative group">
+        <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md relative group mx-4">
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search specialties (e.g. Surgery)..."
-            className="bg-white/10 border-white/20 text-white placeholder:text-white/50 h-10 pr-10 focus-visible:bg-white/20 transition-all rounded-full"
+            placeholder="Search specialties..."
+            className="bg-white/10 border-white/20 text-white placeholder:text-white/40 h-10 pr-10 focus-visible:bg-white/20 transition-all rounded-full border-2"
           />
-          <Button type="submit" variant="ghost" size="icon" className="absolute right-0 top-0 h-10 w-10 text-white/50 group-hover:text-white">
+          <Button type="submit" variant="ghost" size="icon" className="absolute right-0 top-0 h-10 w-10 text-white/40 group-hover:text-white">
             <Search className="h-4 w-4" />
           </Button>
         </form>
@@ -129,11 +129,21 @@ const Header = () => {
                 </Button>
               </Link>
               <Link to="/signup">
-                <Button variant="secondary" size="sm" className="text-primary font-bold shadow-sm uppercase tracking-wider">
+                <Button variant="secondary" size="sm" className="text-primary font-extrabold shadow-sm uppercase tracking-wider px-6 rounded-full">
                   Register
                 </Button>
               </Link>
             </>
+          )}
+          {user && (
+             <Button 
+                variant="outline" 
+                size="sm" 
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-full font-bold uppercase"
+                onClick={handleAppTitleClick}
+              >
+                Dashboard
+              </Button>
           )}
         </div>
       </div>

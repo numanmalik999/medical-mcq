@@ -39,6 +39,7 @@ interface RecentBlog {
   slug: string;
   created_at: string;
   meta_description: string;
+  image_url: string | null;
 }
 
 const marketingFormSchema = z.object({
@@ -65,7 +66,7 @@ const LandingPage = () => {
     if (!isLoadingSettings) {
       document.title = settings.seo.metaTitle;
       const updateMetaTag = (name: string, content: string) => {
-        let tag = document.querySelector(`meta[name="${name}"]`);
+        let tag = document.querySelector(`meta[name="\${name}"]`);
         if (!tag) {
           tag = document.createElement('meta');
           tag.setAttribute('name', name);
@@ -93,11 +94,11 @@ const LandingPage = () => {
       // Fetch Recent Blogs (for SEO/Authority)
       const { data: blogsData } = await supabase
         .from('blogs')
-        .select('title, slug, created_at, meta_description')
+        .select('title, slug, created_at, meta_description, image_url')
         .eq('status', 'published')
         .order('created_at', { ascending: false })
         .limit(3);
-      if (blogsData) setRecentBlogs(blogsData);
+      if (blogsData) setRecentBlogs(blogsData as RecentBlog[]);
     };
 
     fetchData();
@@ -210,7 +211,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Outbound Links Section - Resolving "No Outgoing Links" SEO Error */}
+      {/* Outbound Links Section */}
       <section className="py-12 bg-white border-y" aria-label="Official Licensing Resources">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-xl font-bold mb-6 text-muted-foreground uppercase tracking-widest">Official Licensing Resources</h2>
@@ -252,6 +253,16 @@ const LandingPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {recentBlogs.map((blog) => (
                 <Card key={blog.slug} className="flex flex-col h-full hover:shadow-md transition-shadow overflow-hidden">
+                  {blog.image_url && (
+                    <div className="aspect-video w-full overflow-hidden">
+                      <img 
+                        src={blog.image_url} 
+                        alt={blog.title} 
+                        className="w-full h-full object-cover transition-transform hover:scale-105"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
                   <CardHeader className="flex-grow">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
                       <Calendar className="h-3 w-3" />
@@ -306,7 +317,7 @@ const LandingPage = () => {
                   )}
                 </CardContent>
                 <CardFooter className="pt-8">
-                  <Link to={user ? `/user/payment/${tier.id}?priceId=${tier.stripe_price_id}` : `/signup?tierId=${tier.id}`} className="w-full">
+                  <Link to={user ? `/user/payment/\${tier.id}?priceId=\${tier.stripe_price_id}` : `/signup?tierId=\${tier.id}`} className="w-full">
                     <Button className="w-full h-12 text-lg bg-white text-slate-900 hover:bg-slate-200 font-bold" disabled={!tier.stripe_price_id && !!user}>
                       {user ? 'Subscribe Now' : 'Sign Up & Subscribe'}
                     </Button>

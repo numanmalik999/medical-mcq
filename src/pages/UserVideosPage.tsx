@@ -101,7 +101,7 @@ const UserVideosPage = () => {
 
       toast({
         title: newStatus ? "Marked as watched" : "Marked as unwatched",
-        description: `Status updated for the video.`,
+        description: "Status updated for the video.",
       });
     } catch (error: any) {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
@@ -186,6 +186,7 @@ const UserVideosPage = () => {
                     src={`https://img.youtube.com/vi/${video.youtube_video_id}/maxresdefault.jpg`} 
                     className="w-full h-full object-cover"
                     alt={video.title}
+                    loading="lazy"
                   />
                   <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 flex items-center justify-center transition-colors">
                     <PlayCircle className="h-12 w-12 text-white opacity-80 group-hover:opacity-100 transition-opacity" />

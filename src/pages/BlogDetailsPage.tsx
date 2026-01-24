@@ -118,10 +118,10 @@ const BlogDetailsPage = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Button size="icon" variant="outline" className="rounded-full" onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentUrl)}`, '_blank')}>
+                  <Button size="icon" variant="outline" className="rounded-full" onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=\${encodeURIComponent(currentUrl)}`, '_blank')}>
                     <Facebook className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="outline" className="rounded-full" onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(currentUrl)}`, '_blank')}>
+                  <Button size="icon" variant="outline" className="rounded-full" onClick={() => window.open(`https://twitter.com/intent/tweet?url=\${encodeURIComponent(currentUrl)}`, '_blank')}>
                     <Twitter className="h-4 w-4" />
                   </Button>
                   <Button size="icon" variant="outline" className="rounded-full" onClick={handleCopyLink}>
@@ -133,7 +133,12 @@ const BlogDetailsPage = () => {
 
             {blog.image_url && (
               <div className="mb-10 rounded-xl overflow-hidden shadow-lg border border-border">
-                <img src={blog.image_url} alt={blog.title} className="w-full h-auto object-cover max-h-[500px]" />
+                <img 
+                    src={blog.image_url} 
+                    alt={blog.title} 
+                    className="w-full h-auto object-cover max-h-[500px]" 
+                    loading="lazy"
+                />
               </div>
             )}
 
@@ -175,7 +180,7 @@ const BlogDetailsPage = () => {
                   {relatedBlogs.map((item) => (
                     <div key={item.slug} className="group">
                       <p className="text-xs text-muted-foreground mb-1">{format(new Date(item.created_at), 'MMM dd, yyyy')}</p>
-                      <Link to={`/blog/${item.slug}`} className="font-semibold text-sm group-hover:text-primary transition-colors line-clamp-2">
+                      <Link to={`/blog/\${item.slug}`} className="font-semibold text-sm group-hover:text-primary transition-colors line-clamp-2">
                         {item.title}
                       </Link>
                     </div>

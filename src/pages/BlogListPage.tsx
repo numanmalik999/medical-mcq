@@ -65,7 +65,12 @@ const BlogListPage = () => {
                 <div className="flex flex-col md:flex-row">
                   {blog.image_url && (
                     <div className="md:w-1/3 h-48 md:h-auto">
-                      <img src={blog.image_url} alt={blog.title} className="w-full h-full object-cover" />
+                      <img 
+                        src={blog.image_url} 
+                        alt={blog.title} 
+                        className="w-full h-full object-cover" 
+                        loading="lazy"
+                      />
                     </div>
                   )}
                   <div className="flex-1 p-6">
@@ -75,7 +80,7 @@ const BlogListPage = () => {
                         {format(new Date(blog.created_at), 'MMMM dd, yyyy')}
                       </div>
                       <CardTitle className="text-2xl hover:text-primary transition-colors">
-                        <Link to={`/blog/${blog.slug}`}>{blog.title}</Link>
+                        <Link to={`/blog/\${blog.slug}`}>{blog.title}</Link>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0 mb-6">
@@ -83,7 +88,7 @@ const BlogListPage = () => {
                     </CardContent>
                     <CardFooter className="p-0">
                       <Button asChild variant="link" className="p-0 h-auto font-semibold">
-                        <Link to={`/blog/${blog.slug}`} className="flex items-center gap-2">
+                        <Link to={`/blog/\${blog.slug}`} className="flex items-center gap-2">
                           Read Full Article <ArrowRight className="h-4 w-4" />
                         </Link>
                       </Button>

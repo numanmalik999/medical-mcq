@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import * as LucideIcons from 'lucide-react'; 
-import { Check, Loader2, Globe, BookOpenText, ArrowRight, Calendar, Trophy } from 'lucide-react';
+import { Check, Loader2, Globe, BookOpenText, ArrowRight, Calendar, Trophy, ExternalLink } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -205,6 +205,32 @@ const LandingPage = () => {
                 <CardTitle className="text-2xl mb-3">{feature.title}</CardTitle>
                 <CardDescription className="text-base leading-relaxed">{feature.description}</CardDescription>
               </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Outbound Links Section - Resolving "No Outgoing Links" SEO Error */}
+      <section className="py-12 bg-white border-y" aria-label="Official Licensing Resources">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-xl font-bold mb-6 text-muted-foreground uppercase tracking-widest">Official Licensing Resources</h2>
+          <div className="flex flex-wrap justify-center gap-6 md:gap-12">
+            {[
+              { name: "Dubai Health Authority (DHA)", url: "https://www.dha.gov.ae" },
+              { name: "Saudi Commission for Health Specialties (SCFHS)", url: "https://www.scfhs.org.sa" },
+              { name: "Department of Health - Abu Dhabi (DOH)", url: "https://www.doh.gov.ae" },
+              { name: "Oman Medical Specialty Board (OMSB)", url: "https://www.omsb.gov.om" }
+            ].map((body, i) => (
+              <a 
+                key={i} 
+                href={body.url} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-primary transition-colors group"
+              >
+                {body.name}
+                <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </a>
             ))}
           </div>
         </div>

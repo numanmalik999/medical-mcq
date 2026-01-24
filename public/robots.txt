@@ -1,14 +1,25 @@
 # https://www.robotstxt.org/robotstxt.html
 
+# 1. Allow Googlebot explicitly
+User-agent: Googlebot
+Allow: /
+Disallow: /admin/
+Disallow: /user/take-test
+Disallow: /redirect
+
+# 2. Prevent indexing of all parameterized URLs (fixes "URL Parameters Blocked")
 User-agent: *
-# Block indexing of internal search results and specific dynamic parameters
+Disallow: /*?*
 Disallow: /quiz?search=
 Disallow: /user/payment/
 Disallow: /redirect
 Disallow: /admin/
 Disallow: /user/take-test
 
-# Block aggressive scrapers and known "Bad Bots"
+# Set a crawl delay for generic bots to prevent server overload
+Crawl-delay: 5
+
+# 3. Block aggressive SEO crawlers (fixes Majestic, Moz, Ahrefs, Semrush, Xenu)
 User-agent: AhrefsBot
 Disallow: /
 
@@ -21,12 +32,30 @@ Disallow: /
 User-agent: MJ12bot
 Disallow: /
 
-User-agent: Rogiebot
+User-agent: Rogerbot
 Disallow: /
 
-# Specifically allow Googlebot for better indexing
-User-agent: Googlebot
-Allow: /
+User-agent: Mozlila
+Disallow: /
 
-# Sitemap declaration
+User-agent: Majestic-12
+Disallow: /
+
+User-agent: Majestic-SEO
+Disallow: /
+
+User-agent: Xenu Link Sleuth
+Disallow: /
+
+# 4. Block known "Bad Bots" and scrapers
+User-agent: BLEXBot
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+# 5. Sitemap declaration
 Sitemap: https://www.studyprometric.com/sitemap.xml

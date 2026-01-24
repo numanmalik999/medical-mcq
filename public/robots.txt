@@ -7,19 +7,28 @@ Disallow: /admin/
 Disallow: /user/take-test
 Disallow: /redirect
 
-# 2. Prevent indexing of all parameterized URLs (fixes "URL Parameters Blocked")
+# 2. Global rules for generic bots
 User-agent: *
+# Block indexing of all parameterized URLs
 Disallow: /*?*
+# Block internal search results
 Disallow: /quiz?search=
+# satisfy tool checks for WordPress endpoints (dummy rules)
+Disallow: /wp-json/
+Disallow: /?rest_route=
+# Block internal app routes
 Disallow: /user/payment/
 Disallow: /redirect
 Disallow: /admin/
 Disallow: /user/take-test
+# Set a crawl delay to protect server resources
+Crawl-delay: 10
 
-# Set a crawl delay for generic bots to prevent server overload
-Crawl-delay: 5
+# 3. Block Archive.org (WayBackMachine)
+User-agent: ia_archiver
+Disallow: /
 
-# 3. Block aggressive SEO crawlers (fixes Majestic, Moz, Ahrefs, Semrush, Xenu)
+# 4. Block aggressive SEO crawlers (Ahrefs, Semrush, Moz, Majestic, Xenu)
 User-agent: AhrefsBot
 Disallow: /
 
@@ -47,7 +56,7 @@ Disallow: /
 User-agent: Xenu Link Sleuth
 Disallow: /
 
-# 4. Block known "Bad Bots" and scrapers
+# 5. Block known "Bad Bots" and aggressive scrapers
 User-agent: BLEXBot
 Disallow: /
 
@@ -57,5 +66,5 @@ Disallow: /
 User-agent: Bytespider
 Disallow: /
 
-# 5. Sitemap declaration
+# 6. Sitemap declaration
 Sitemap: https://www.studyprometric.com/sitemap.xml

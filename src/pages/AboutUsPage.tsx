@@ -18,9 +18,9 @@ const AboutUsPage = () => {
         </div>
         <div className="container mx-auto px-4 text-center relative z-10">
           <Badge className="mb-4 bg-white/20 hover:bg-white/30 text-white border-none px-4 py-1">Empowering Healthcare Professionals</Badge>
-          <h1 className="text-4xl md:text-6xl font-extrabold mb-6 leading-tight">Your Partner in Medical <br/>Licensing Excellence</h1>
+          <h1 className="text-4xl md:text-6xl font-extrabold mb-6 leading-tight">Your Partner in DHA, SMLE & <br/>MOH Licensing Success</h1>
           <p className="text-xl max-w-2xl mx-auto opacity-90 leading-relaxed">
-            We bridge the gap between medical knowledge and exam success with AI-powered tools and expert-curated content.
+            We bridge the gap between medical knowledge and <strong>Prometric exam preparation</strong> with AI-powered tools and expert-curated question banks.
           </p>
         </div>
       </header>
@@ -31,14 +31,14 @@ const AboutUsPage = () => {
           <div className="space-y-6">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Our Mission</h2>
             <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
-              At Study Prometric, our mission is to simplify the complex journey of medical licensing. We believe that every healthcare professional deserves access to high-quality, relevant, and engaging study materials that reflect the reality of modern medical practice.
+              At Study Prometric, our mission is to simplify the complex journey of medical licensing in the Gulf. We believe that every professional deserves access to high-quality <strong>DHA exam questions</strong>, <strong>SMLE MCQs</strong>, and <strong>MOH practice tests</strong> that reflect the reality of modern medical practice.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                {[
                  { icon: <ShieldCheck className="text-green-500" />, text: "Verified Clinical Accuracy" },
-                 { icon: <Zap className="text-yellow-500" />, text: "AI-Driven Insights" },
-                 { icon: <Heart className="text-red-500" />, text: "Student-First Support" },
-                 { icon: <Award className="text-blue-500" />, text: "Exam-Aligned Content" }
+                 { icon: <Zap className="text-yellow-500" />, text: "DHA & SMLE Insights" },
+                 { icon: <Heart className="text-red-500" />, text: "Professional Support" },
+                 { icon: <Award className="text-blue-500" />, text: "Prometric Aligned Content" }
                ].map((item, i) => (
                  <div key={i} className="flex items-center gap-2 font-medium">
                    {item.icon}
@@ -51,7 +51,7 @@ const AboutUsPage = () => {
             <div className="aspect-video bg-muted rounded-2xl overflow-hidden shadow-2xl border">
                 <img 
                     src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=1000" 
-                    alt="Medical Professionals" 
+                    alt="DHA and SMLE Medical Professionals" 
                     className="w-full h-full object-cover"
                 />
             </div>
@@ -68,15 +68,15 @@ const AboutUsPage = () => {
           </div>
           <div>
             <p className="text-4xl font-bold text-primary">5,000+</p>
-            <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">Updated MCQs</p>
+            <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">DHA & MOH MCQs</p>
           </div>
           <div>
             <p className="text-4xl font-bold text-primary">95%</p>
-            <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">Success Rate</p>
+            <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">Exam Success Rate</p>
           </div>
           <div>
             <p className="text-4xl font-bold text-primary">24/7</p>
-            <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">AI Assistance</p>
+            <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">AI Case Support</p>
           </div>
         </div>
       </section>
@@ -90,8 +90,8 @@ const AboutUsPage = () => {
               <div className="mb-4 bg-primary/10 w-12 h-12 flex items-center justify-center rounded-lg">
                 <Users className="text-primary h-6 w-6" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Expert Community</h3>
-              <p className="text-muted-foreground">Join a network of thousands of peers sharing tips and strategies for the Gulf exams.</p>
+              <h3 className="text-xl font-bold mb-2">Gulf Expert Community</h3>
+              <p className="text-muted-foreground">Join a network of thousands sharing tips for DHA, HAAD, and SMLE exam strategies.</p>
             </CardContent>
           </Card>
           <Card className="hover:shadow-lg transition-all border-t-4 border-t-primary">
@@ -100,7 +100,7 @@ const AboutUsPage = () => {
                 <BookOpen className="text-primary h-6 w-6" />
               </div>
               <h3 className="text-xl font-bold mb-2">Simulated Testing</h3>
-              <p className="text-muted-foreground">Our testing engine replicates the actual Prometric interface to build your confidence.</p>
+              <p className="text-muted-foreground">Our engine replicates the actual Prometric interface for MOH and QCHP to build your confidence.</p>
             </CardContent>
           </Card>
           <Card className="hover:shadow-lg transition-all border-t-4 border-t-primary">
@@ -108,8 +108,8 @@ const AboutUsPage = () => {
               <div className="mb-4 bg-primary/10 w-12 h-12 flex items-center justify-center rounded-lg">
                 <Award className="text-primary h-6 w-6" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Gamified Learning</h3>
-              <p className="text-muted-foreground">Win free subscriptions and track your leaderboard rank while you master the material.</p>
+              <h3 className="text-xl font-bold mb-2">Verified Content</h3>
+              <p className="text-muted-foreground">Master the clinical blueprints for OMSB and NHRA with our updated question bank.</p>
             </CardContent>
           </Card>
         </div>
@@ -119,14 +119,14 @@ const AboutUsPage = () => {
       <section className="py-16 container mx-auto px-4 text-center">
         <div className="bg-gray-900 text-white rounded-3xl p-12 shadow-2xl relative overflow-hidden">
           <div className="relative z-10">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Start Your Success Story Today</h2>
-            <p className="text-gray-400 mb-8 max-w-xl mx-auto">Take the first step towards practicing in the Gulf with the most advanced preparation platform.</p>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Start Your Gulf Career Today</h2>
+            <p className="text-gray-400 mb-8 max-w-xl mx-auto">Take the first step towards your DHA or SMLE success with the most advanced preparation platform.</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/signup">
                 <Button size="lg" className="w-full sm:w-auto px-8 py-6 text-lg">Join for Free Trial</Button>
               </Link>
               <Link to="/subscription">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto px-8 py-6 text-lg text-black border-white bg-white hover:bg-slate-200">Explore Plans</Button>
+                <Button size="lg" variant="outline" className="w-full sm:w-auto px-8 py-6 text-lg text-black border-white bg-white hover:bg-slate-200">View SMLE/DHA Plans</Button>
               </Link>
             </div>
           </div>

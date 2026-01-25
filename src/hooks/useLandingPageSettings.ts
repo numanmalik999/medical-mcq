@@ -13,33 +13,33 @@ import {
   pricingCtaSchema,
 } from '@/utils/landingPageSchemas';
 
-// Default values synced with ManageLandingPage
+// Default values synced with target keywords
 const defaultSeo: SeoMetadata = {
-  metaTitle: "Prometric Exam Preparation for Gulf Countries | StudyPrometric – Online MCQs & Practice Tests",
-  metaDescription: "Prepare for Prometric exams for Saudi Arabia, UAE, Qatar, Oman, Kuwait & Bahrain. Thousands of updated MCQs for doctors, nurses, and medical professionals. Start your free trial today!",
-  keywords: "Prometric exam, Prometric exam preparation, DHA MOH HAAD exam questions, Gulf medical exam, SMLE MCQs, QCHP exam, OMSB exam, online Prometric test, Prometric practice test.",
+  metaTitle: "Prometric Exam Preparation for Gulf | DHA, MOH, HAAD, SMLE, OMSB & QCHP MCQs",
+  metaDescription: "Master your Gulf licensing with Study Prometric. Access thousands of DHA exam questions, SMLE MCQs, and MOH practice tests for doctors and nurses. Pass HAAD, OMSB, and QCHP today!",
+  keywords: "Prometric exam preparation, DHA exam questions, SMLE MCQs, MOH exam, HAAD exam prep, Gulf medical exam, online Prometric test, Prometric practice test, Saudi medical licensing, DHA Dubai exam.",
 };
 
 const defaultHero: HeroSection = {
-  mainTitle: "Master Your Medical Exams",
-  subtitle: "Your ultimate platform for interactive quizzes, simulated tests, and AI-powered explanations to ace your Prometric MCQs.",
-  ctaPrimaryText: "Get Started",
-  ctaSecondaryText: "Take a Free Quiz",
+  mainTitle: "Ace Your Prometric & Gulf Medical Licensing Exams",
+  subtitle: "The #1 platform for DHA, SMLE, MOH, and HAAD preparation. Master high-yield MCQs with AI-powered clinical explanations and simulated practice tests.",
+  ctaPrimaryText: "Start Preparation",
+  ctaSecondaryText: "Free DHA & SMLE Quiz",
   ctaQodText: "Question of the Day",
 };
 
 const defaultFeatures: FeatureItem[] = [
-  { icon: "Stethoscope", title: "AI Clinical Cases", description: "Immerse yourself in complex patient scenarios with multi-step interactive clinical cases designed to test your diagnostic logic." },
-  { icon: "ShieldCheck", title: "Verified Accuracy", description: "Our content is continuously audited by clinical AI to ensure 100% accuracy, clarity, and relevance to the latest exam standards." },
-  { icon: "ClipboardCheck", title: "Simulated Tests", description: "Prepare with timed, customizable tests. Configure question count, difficulty, and time limits to mirror real exam conditions." },
-  { icon: "Youtube", title: "Curated Video Library", description: "Access a hand-picked selection of high-yield medical videos from Ninja Nerd, Osmosis, and more, all mapped to specific topics." },
-  { icon: "BrainCircuit", title: "AI Medical Assistant", description: "Get instant answers to your clinical queries with our integrated AI chatbot, available 24/7 to support your learning journey." },
-  { icon: "Trophy", title: "Daily Challenge", description: "Compete in our Question of the Day leaderboard. Earn points for correct answers and win free premium subscription months!" },
+  { icon: "Stethoscope", title: "AI Clinical Cases", description: "Immerse yourself in complex patient scenarios for DHA and SMLE with interactive clinical cases designed to test your diagnostic logic." },
+  { icon: "ShieldCheck", title: "Exam-Aligned Accuracy", description: "Our question bank is mapped to current DHA, MOH, and SCFHS blueprints to ensure you are studying the most relevant exam patterns." },
+  { icon: "ClipboardCheck", title: "Simulated Mock Exams", description: "Prepare for your Prometric test with timed simulations that mirror the real DHA, HAAD, and SMLE testing interface." },
+  { icon: "Youtube", title: "Video Explanations", description: "Access high-yield medical videos from Ninja Nerd and Osmosis, curated to help you master difficult DHA and MOH exam topics." },
+  { icon: "BrainCircuit", title: "24/7 AI Medical Tutor", description: "Get instant clinical clarifications for your SMLE and HAAD study questions with our integrated AI assistant." },
+  { icon: "Trophy", title: "Daily SMLE Challenge", description: "Answer our Question of the Day correctly to earn points toward free premium months for your Prometric exam preparation." },
 ];
 
 const defaultPricingCta: PricingCta = {
-  title: "Pricing Plans",
-  subtitle: "Choose the plan that fits your study schedule and unlock premium features instantly.",
+  title: "Specialty Access Plans",
+  subtitle: "Choose the right plan to unlock full access to DHA, MOH, HAAD, and SMLE question banks.",
 };
 
 interface LandingPageSettings {
@@ -50,8 +50,6 @@ interface LandingPageSettings {
 }
 
 export const useLandingPageSettings = () => {
-  // Initialize with defaults and set isLoading to false initially 
-  // so the page renders immediately with words for SEO/Bots
   const [settings, setSettings] = useState<LandingPageSettings>({
     seo: defaultSeo,
     hero: defaultHero,
@@ -90,7 +88,7 @@ export const useLandingPageSettings = () => {
               break;
           }
         } catch (e) {
-          console.error(`Validation failed for setting key ${setting.key}:`, e);
+          console.error(`Validation failed for setting key \${setting.key}:`, e);
         }
       });
 

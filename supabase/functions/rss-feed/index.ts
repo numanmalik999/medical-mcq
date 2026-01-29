@@ -5,7 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Content-Type': 'application/xml',
+  'Content-Type': 'application/xml; charset=utf-8',
 };
 
 interface BlogItem {
@@ -25,7 +25,7 @@ serve(async (_req: Request) => {
 
   const { data: blogs, error } = await supabase
     .from('blogs')
-    .select('title, slug, content, meta_description, created_at')
+    .select('title, slug, meta_description, created_at')
     .eq('status', 'published')
     .order('created_at', { ascending: false })
     .limit(20);
@@ -46,18 +46,19 @@ serve(async (_req: Request) => {
     </item>
   `).join('') || '';
 
+  // Ensure the XML declaration starts at the very first character of the string
   const rssFeed = `<?xml version="1.0" encoding="UTF-8" ?>
-    <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-      <channel>
-        <title>Study Prometric Medical Blog</title>
-        <link>${siteUrl}/blog</link>
-        <description>Expert insights, study tips, and updates for your Prometric exam journey.</description>
-        <language>en-us</language>
-        <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-        <atom:link href="${siteUrl}/functions/v1/rss-feed" rel="self" type="application/rss+xml" />
-        ${rssItems}
-      </channel>
-    </rss>`;
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Study Prometric Medical Blog</title>
+    <link>${siteUrl}/blog</link>
+    <description>Expert insights, study tips, and updates for your Prometric exam journey.</description>
+    <language>en-us</language>
+    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+    <atom:link href="${siteUrl}/functions/v1/rss-feed" rel="self" type="application/rss+xml" />
+    ${rssItems}
+  </channel>
+</rss>`.trim();
 
   return new Response(rssFeed, { headers: corsHeaders });
 });

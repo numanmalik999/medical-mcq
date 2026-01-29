@@ -30,6 +30,14 @@
   ],
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "https://uvhlyitcrogvssmcqtni.supabase.co/functions/v1/generate-sitemap"
+    },
+    {
+      "source": "/rss.xml",
+      "destination": "https://uvhlyitcrogvssmcqtni.supabase.co/functions/v1/rss-feed"
+    },
+    {
       "source": "/index.php",
       "destination": "/"
     },

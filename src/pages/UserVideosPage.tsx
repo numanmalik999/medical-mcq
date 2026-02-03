@@ -137,7 +137,7 @@ const UserVideosPage = () => {
     }
   };
 
-  const VideoCard = ({ video }: { video: Video }) => {
+  const VideoCard = ({ video, orderNumber }: { video: Video; orderNumber: number }) => {
     const isWatched = progressMap.get(video.id) || false;
     const thumb = getThumbnail(video);
     
@@ -160,8 +160,10 @@ const UserVideosPage = () => {
         </div>
         <div className="p-3">
           <div className="flex justify-between items-start gap-2">
-            <h4 className="text-sm font-bold line-clamp-2 leading-tight">{video.title}</h4>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => toggleWatched(video.id, e)}>
+            <h4 className="text-sm font-bold line-clamp-2 leading-tight">
+              <span className="text-primary mr-1">{orderNumber}.</span> {video.title}
+            </h4>
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => toggleWatched(video.id, e)}>
               {isWatched ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
             </Button>
           </div>
@@ -220,7 +222,7 @@ const UserVideosPage = () => {
               <AccordionContent className="p-6 bg-muted/5 border-t space-y-6">
                 {group.standaloneVideos.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {group.standaloneVideos.map(v => <VideoCard key={v.id} video={v} />)}
+                    {group.standaloneVideos.map((v, idx) => <VideoCard key={v.id} video={v} orderNumber={idx + 1} />)}
                   </div>
                 )}
 
@@ -231,7 +233,7 @@ const UserVideosPage = () => {
                       <Badge variant="outline" className="text-[10px] uppercase">{sg.videos.length} Videos</Badge>
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {sg.videos.map(v => <VideoCard key={v.id} video={v} />)}
+                      {sg.videos.map((v, idx) => <VideoCard key={v.id} video={v} orderNumber={idx + 1} />)}
                     </div>
                   </div>
                 ))}

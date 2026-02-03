@@ -83,7 +83,6 @@ const ManageVideosPage = () => {
         };
       });
 
-      // Handle videos with no group at all
       const uncategorized = allVideos.filter(v => !v.group_id);
       if (uncategorized.length > 0) {
         structured.push({
@@ -190,11 +189,11 @@ const ManageVideosPage = () => {
                   <span className="font-bold text-lg">{group.name}</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="p-6 bg-muted/5 border-t">
+              <AccordionContent className="p-6 bg-muted/5 border-t space-y-8">
                 
                 {/* Standalone Videos */}
                 {group.standaloneVideos.length > 0 && (
-                  <div className="space-y-3 mb-8">
+                  <div className="space-y-3">
                     <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Foundation Lessons</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {group.standaloneVideos.map(v => <VideoRow key={v.id} video={v} />)}
@@ -202,26 +201,34 @@ const ManageVideosPage = () => {
                   </div>
                 )}
 
-                {/* Subgroups */}
-                <div className="space-y-6">
-                  {group.subgroups.map(sg => (
-                    <div key={sg.id} className="space-y-3">
-                      <div className="flex items-center gap-2 px-1">
-                        <FolderTree className="h-3 w-3 text-primary" />
-                        <h4 className="text-xs font-bold uppercase tracking-tight">{sg.name}</h4>
-                        <div className="h-px flex-1 bg-border" />
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {sg.videos.map(v => <VideoRow key={v.id} video={v} />)}
-                        {sg.videos.length === 0 && (
-                          <div className="md:col-span-2 py-4 border border-dashed rounded-lg text-center text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
-                            No lessons in this sub-group
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {/* Subgroups with internal Accordion */}
+                {group.subgroups.length > 0 && (
+                  <div className="space-y-4">
+                    <Accordion type="multiple" className="space-y-4">
+                      {group.subgroups.map(sg => (
+                        <AccordionItem key={sg.id} value={sg.id} className="border rounded-lg bg-background shadow-sm overflow-hidden">
+                          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/20">
+                            <div className="flex items-center gap-2 text-left">
+                              <FolderTree className="h-4 w-4 text-primary/60" />
+                              <span className="font-bold text-xs uppercase tracking-tight">{sg.name}</span>
+                              <Badge variant="outline" className="ml-2 text-[10px] font-bold">{sg.videos.length} items</Badge>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="p-4 bg-muted/5 border-t">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {sg.videos.map(v => <VideoRow key={v.id} video={v} />)}
+                              {sg.videos.length === 0 && (
+                                <p className="md:col-span-2 text-center py-4 text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
+                                  No lessons in this sub-group
+                                </p>
+                              )}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </div>
+                )}
 
                 {group.standaloneVideos.length === 0 && group.subgroups.length === 0 && (
                   <p className="text-center py-4 text-sm text-muted-foreground">This group is empty.</p>

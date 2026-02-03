@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, User, BookOpenText, LogOut, ClipboardCheck, CreditCard, FilePlus, Bookmark, GraduationCap, Lightbulb, Youtube, Stethoscope, Lock } from 'lucide-react';
+import { MenuIcon, LayoutDashboard, User, BookOpenText, LogOut, ClipboardCheck, CreditCard, FilePlus, Bookmark, Lightbulb, Youtube, Stethoscope, Lock } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './SessionContextProvider';
@@ -70,7 +70,6 @@ const UserSidebar = () => {
     { to: "/quiz", icon: <BookOpenText className="h-4 w-4" />, label: "Take Quiz", premium: false },
     { to: "/user/take-test", icon: <ClipboardCheck className="h-4 w-4" />, label: "Take A Test", premium: true },
     { to: "/user/case-studies", icon: <Stethoscope className="h-4 w-4" />, label: "Case Studies", premium: true },
-    { to: "/user/courses", icon: <GraduationCap className="h-4 w-4" />, label: "Courses", premium: true },
     { to: "/user/videos", icon: <Youtube className="h-4 w-4" />, label: "Videos", premium: true },
     { to: "/user/subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "My Subscriptions", premium: false },
     { to: "/user/submit-mcq", icon: <FilePlus className="h-4 w-4" />, label: "Submit MCQ", premium: false },

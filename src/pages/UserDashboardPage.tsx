@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, TrendingUp, BookOpen, Clock, Target, ArrowRight } from 'lucide-react'; 
+import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight } from 'lucide-react'; 
 import LoadingBar from '@/components/LoadingBar';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { cn } from '@/lib/utils';
@@ -51,7 +51,6 @@ const UserDashboardPage = () => {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [areasForImprovement, setAreasForImprovement] = useState<PerformanceSummary[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
-  const [courseProgress, setCourseProgress] = useState({ completed: 0, total: 0 });
 
   const isGuestMode = !user; 
 
@@ -62,7 +61,6 @@ const UserDashboardPage = () => {
         await fetchAllCategories(); 
         await fetchQuizPerformance();
         await fetchRecentAttempts();
-        await fetchCourseProgress();
         setIsPageLoading(false);
       };
       fetchData();
@@ -72,13 +70,6 @@ const UserDashboardPage = () => {
   const fetchAllCategories = async () => {
     const { data: categoriesData } = await supabase.from('categories').select('*');
     setAllCategories(categoriesData || []);
-  };
-
-  const fetchCourseProgress = async () => {
-    if (!user) return;
-    const { count: totalTopics } = await supabase.from('course_topics').select('*', { count: 'exact', head: true });
-    const { count: completedTopics } = await supabase.from('user_topic_progress').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
-    setCourseProgress({ completed: completedTopics || 0, total: totalTopics || 0 });
   };
 
   const fetchQuizPerformance = async () => {
@@ -218,8 +209,8 @@ const UserDashboardPage = () => {
         </Card>
       )}
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Stats Grid - Optimized to 3 columns */}
+      <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-primary text-primary-foreground">
           <CardHeader className="pb-2">
             <CardDescription className="text-primary-foreground/70 flex items-center gap-2">
@@ -249,26 +240,12 @@ const UserDashboardPage = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4" /> Course Progress
-            </CardDescription>
-            <CardTitle className="text-3xl font-bold">{courseProgress.completed}/{courseProgress.total}</CardTitle>
-          </CardHeader>
-          <CardContent>
-             <div className="h-2 w-full bg-muted rounded-full mt-2">
-                <div className="h-full bg-primary rounded-full" style={{ width: `${(courseProgress.completed / (courseProgress.total || 1)) * 100}%` }}></div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
                 <Clock className="h-4 w-4" /> Trial Status
             </CardDescription>
             <CardTitle className="text-2xl font-bold">{user?.has_active_subscription ? 'Premium' : 'Free Trial'}</CardTitle>
           </CardHeader>
           <CardContent>
-            <Link to="/subscription" className="text-xs text-primary hover:underline font-semibold">
+            <Link to="/subscription" className="text-xs text-primary font-bold hover:underline">
                 {user?.has_active_subscription ? 'Manage Subscription' : 'Upgrade for Full Access'}
             </Link>
           </CardContent>
@@ -358,8 +335,8 @@ const UserDashboardPage = () => {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Recent Activity */}
+      <div className="grid gap-6">
+        {/* Recent Activity - Full Width */}
         <Card className="shadow-sm overflow-hidden">
           <CardHeader className="bg-muted/30 border-b">
             <CardTitle className="text-lg">Recent Quiz Activity</CardTitle>
@@ -392,29 +369,6 @@ const UserDashboardPage = () => {
           <CardFooter className="bg-muted/10 p-4 border-t text-center">
              <Link to="/user/bookmarked-mcqs" className="text-xs text-primary font-bold hover:underline mx-auto">View Your Saved Questions</Link>
           </CardFooter>
-        </Card>
-
-        {/* Course Roadmap */}
-        <Card className="shadow-sm">
-           <CardHeader>
-             <CardTitle className="text-lg">Specialty Mastery Roadmap</CardTitle>
-             <CardDescription>Completion status of clinical courses.</CardDescription>
-           </CardHeader>
-           <CardContent className="space-y-4">
-              <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10">
-                 <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-bold text-sm">Overall Content Mastery</h4>
-                    <span className="text-xs font-black">{Math.round((courseProgress.completed / (courseProgress.total || 1)) * 100)}%</span>
-                 </div>
-                 <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary animate-pulse" style={{ width: `${(courseProgress.completed / (courseProgress.total || 1)) * 100}%` }}></div>
-                 </div>
-                 <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">Based on your completed topics and quiz scores, you are currently on track to master the medical blueprint.</p>
-              </div>
-              <Link to="/user/courses" className="block">
-                <Button className="w-full gap-2"><BookOpen className="h-4 w-4" /> Continue Study Path</Button>
-              </Link>
-           </CardContent>
         </Card>
       </div>
 

@@ -34,7 +34,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [groups, setGroups] = useState<any[]>([]);
-  const [topic, setTopic] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -66,24 +66,23 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
       });
     } else if (!open) {
       form.reset({ title: "", description: "", youtube_video_id: "", platform: 'youtube', group_id: 'none' });
-      setTopic('');
+      setSearchQuery('');
     }
   }, [video, open, form]);
 
   const handleAiSearch = async () => {
-    if (form.getValues('platform') !== 'youtube') {
-      toast({ title: "YouTube Only", description: "AI Search currently only supports YouTube content." });
-      return;
-    }
-    if (!topic.trim()) {
-      toast({ title: "Topic Required", description: "What should I search for?", variant: "destructive" });
+    const currentId = form.getValues('youtube_video_id');
+    const query = searchQuery.trim() || currentId;
+
+    if (!query) {
+      toast({ title: "Input Required", description: "Enter a Video ID or a search topic.", variant: "destructive" });
       return;
     }
 
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('ai-find-video', {
-        body: { topic },
+        body: { topic: query },
       });
 
       if (error) throw error;
@@ -92,16 +91,13 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
       form.setValue('title', data.title);
       form.setValue('description', data.description);
       
-      if (data.youtube_video_id) {
+      if (data.youtube_video_id && !currentId) {
         form.setValue('youtube_video_id', data.youtube_video_id);
-        toast({ title: "Match Found", description: "Video details updated." });
-      } else {
-        toast({ title: "Topic Found", description: "Details added. Please paste the Video ID manually." });
-        window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(data.search_query)}`, '_blank');
       }
       
+      toast({ title: "Data Fetched", description: "Video details updated successfully." });
     } catch (error: any) {
-      toast({ title: "Search Error", description: error.message, variant: "destructive" });
+      toast({ title: "Fetch Error", description: error.message, variant: "destructive" });
     } finally {
       setIsGenerating(false);
     }
@@ -153,19 +149,17 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
         </DialogHeader>
 
         <div className="space-y-6 pt-2">
-          {platform === 'youtube' && (
-            <div className="flex gap-2 p-3 bg-muted rounded-md border">
-              <Input 
-                placeholder="Search topic (e.g. 'Ninja Nerd MI')" 
-                value={topic} 
-                onChange={(e) => setTopic(e.target.value)} 
-              />
-              <Button onClick={handleAiSearch} disabled={isGenerating} size="sm" type="button">
-                {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
-                AI Find
-              </Button>
-            </div>
-          )}
+          <div className="flex gap-2 p-3 bg-muted rounded-md border">
+            <Input 
+              placeholder="Search topic or use existing ID above" 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+            />
+            <Button onClick={handleAiSearch} disabled={isGenerating} size="sm" type="button" variant="outline">
+              {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
+              Fetch Info
+            </Button>
+          </div>
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -200,10 +194,6 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
                 )} />
               </div>
 
-              <FormField control={form.control} name="title" render={({ field }) => (
-                <FormItem><FormLabel>Video Title</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              
               <FormField control={form.control} name="youtube_video_id" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex justify-between">
@@ -219,17 +209,17 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
                 </FormItem>
               )} />
 
+              <FormField control={form.control} name="title" render={({ field }) => (
+                <FormItem><FormLabel>Video Title</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+
               <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               
-              {currentId ? (
+              {currentId && (
                 <div className="aspect-video rounded border overflow-hidden bg-black">
                    <iframe width="100%" height="100%" src={getEmbedUrl() || ''} frameBorder="0" allowFullScreen></iframe>
-                </div>
-              ) : (
-                <div className="aspect-video rounded border border-dashed flex items-center justify-center bg-muted/30 text-muted-foreground text-sm">
-                  Video preview will appear here
                 </div>
               )}
 

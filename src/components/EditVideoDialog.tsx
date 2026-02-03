@@ -19,7 +19,7 @@ const formSchema = z.object({
   description: z.string().min(1, "Description is required."),
   youtube_video_id: z.string().min(1, "Video ID is required."),
   platform: z.enum(['youtube', 'vimeo', 'dailymotion']),
-  group_id: z.string().uuid().nullable().optional(),
+  group_id: z.string().optional().or(z.literal('none')),
 });
 
 interface EditVideoDialogProps {
@@ -43,7 +43,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
       description: "", 
       youtube_video_id: "", 
       platform: 'youtube',
-      group_id: null
+      group_id: 'none'
     },
   });
 
@@ -52,8 +52,8 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
       const { data } = await supabase.from('video_groups').select('id, name').order('order');
       setGroups(data || []);
     };
-    fetchGroups();
-  }, []);
+    if (open) fetchGroups();
+  }, [open]);
 
   useEffect(() => {
     if (video && open) {
@@ -62,10 +62,10 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
         description: video.description || "",
         youtube_video_id: video.youtube_video_id,
         platform: video.platform || 'youtube',
-        group_id: video.group_id
+        group_id: video.group_id || 'none'
       });
     } else if (!open) {
-      form.reset({ title: "", description: "", youtube_video_id: "", platform: 'youtube', group_id: null });
+      form.reset({ title: "", description: "", youtube_video_id: "", platform: 'youtube', group_id: 'none' });
       setTopic('');
     }
   }, [video, open, form]);
@@ -110,9 +110,17 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
+      const payload = {
+        title: values.title,
+        description: values.description,
+        youtube_video_id: values.youtube_video_id,
+        platform: values.platform,
+        group_id: values.group_id === 'none' ? null : values.group_id
+      };
+
       const { error } = video?.id 
-        ? await supabase.from('videos').update(values).eq('id', video.id)
-        : await supabase.from('videos').insert(values);
+        ? await supabase.from('videos').update(payload).eq('id', video.id)
+        : await supabase.from('videos').insert(payload);
 
       if (error) throw error;
       toast({ title: "Success", description: "Video library updated." });
@@ -165,7 +173,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
                 <FormField control={form.control} name="platform" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Video Platform</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select platform" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="youtube">YouTube</SelectItem>
@@ -180,7 +188,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
                 <FormField control={form.control} name="group_id" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Video Group</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                    <Select onValueChange={field.onChange} value={field.value || 'none'}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Uncategorized" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="none">Uncategorized</SelectItem>

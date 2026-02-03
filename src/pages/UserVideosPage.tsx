@@ -125,46 +125,44 @@ const UserVideosPage = () => {
     }
   };
 
-  const getThumbnail = (video: Video) => {
-    const id = video.youtube_video_id;
-    switch (video.platform) {
-      case 'dailymotion':
-        return `https://www.dailymotion.com/thumbnail/video/${id}`;
-      case 'vimeo':
-        return "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=400&h=225&auto=format&fit=crop";
-      default:
-        return `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
-    }
-  };
-
   const VideoCard = ({ video, orderNumber }: { video: Video; orderNumber: number }) => {
     const isWatched = progressMap.get(video.id) || false;
-    const thumb = getThumbnail(video);
     
     return (
       <Card 
-        className={cn("overflow-hidden cursor-pointer hover:shadow-md transition-all border-2", isWatched ? "border-green-500/20 bg-green-50/5" : "border-transparent")}
+        className={cn(
+          "overflow-hidden cursor-pointer hover:shadow-lg transition-all border-2 relative group flex flex-col justify-center min-h-[140px]", 
+          isWatched ? "border-green-500/20 bg-green-50/5" : "border-transparent bg-muted/20"
+        )}
         onClick={() => setSelectedVideo(video)}
       >
-        <div className="relative aspect-video bg-muted group">
-          <img src={thumb} className="w-full h-full object-cover" alt={video.title} />
-          <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <PlayCircle className="h-10 w-10 text-white" />
-          </div>
-          {isWatched && <div className="absolute top-2 right-2 bg-green-500 text-white p-1 rounded-full shadow-lg"><CheckCircle2 className="h-4 w-4" /></div>}
-          <div className="absolute bottom-2 right-2">
-            <Badge variant="secondary" className="bg-black/60 text-white border-none text-[10px] uppercase">
+        <div className="p-6 text-center flex flex-col items-center justify-center gap-2">
+          {/* Platform Badge */}
+          <div className="absolute top-2 left-2">
+            <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[9px] uppercase font-black tracking-widest">
               {video.platform}
             </Badge>
           </div>
-        </div>
-        <div className="p-3">
-          <div className="flex justify-between items-start gap-2">
-            <h4 className="text-sm font-bold line-clamp-2 leading-tight">
-              <span className="text-primary mr-1">{orderNumber}.</span> {video.title}
-            </h4>
-            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => toggleWatched(video.id, e)}>
-              {isWatched ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+
+          {/* Video Title as primary visual */}
+          <h4 className="text-sm font-extrabold leading-relaxed text-foreground px-4">
+            <span className="text-primary mr-1 opacity-40">{orderNumber}.</span> {video.title}
+          </h4>
+
+          {/* Hover Play State */}
+          <div className="absolute inset-0 bg-primary/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <PlayCircle className="h-12 w-12 text-primary/40" />
+          </div>
+
+          {/* Status/Completion Toggle */}
+          <div className="absolute top-2 right-2">
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-7 w-7 rounded-full hover:bg-background/80 shadow-sm" 
+                onClick={(e) => toggleWatched(video.id, e)}
+            >
+              {isWatched ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <Circle className="h-5 w-5 text-muted-foreground/40" />}
             </Button>
           </div>
         </div>
@@ -195,52 +193,60 @@ const UserVideosPage = () => {
     );
   }
 
+  const filteredLibrary = library.map(group => {
+    const matchingStandalone = group.standaloneVideos.filter(v => v.title.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchingSubgroups = group.subgroups.map(sg => ({
+      ...sg,
+      videos: sg.videos.filter(v => v.title.toLowerCase().includes(searchTerm.toLowerCase()))
+    })).filter(sg => sg.videos.length > 0);
+
+    return { ...group, standaloneVideos: matchingStandalone, subgroups: matchingSubgroups };
+  }).filter(group => group.standaloneVideos.length > 0 || group.subgroups.length > 0);
+
   return (
     <div className="space-y-10">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Resource Library</h1>
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search high-yield lessons..." className="pl-10 rounded-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <Input 
+            placeholder="Search topics..." 
+            className="pl-10 rounded-full h-11" 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+          />
         </div>
       </div>
 
       <Accordion type="multiple" defaultValue={library.map(g => g.id)} className="space-y-6">
-        {library.map((group) => {
-          const hasStandalone = group.standaloneVideos.length > 0;
-          const hasSubgroups = group.subgroups.length > 0;
-          if (!hasStandalone && !hasSubgroups) return null;
-
-          return (
-            <AccordionItem key={group.id} value={group.id} className="border rounded-2xl overflow-hidden shadow-sm bg-card">
-              <AccordionTrigger className="px-6 py-4 hover:bg-muted/30 hover:no-underline">
-                <div className="flex items-center gap-4 text-left">
-                  <div className="p-2 bg-primary/5 rounded-lg text-primary"><Layers className="h-6 w-6" /></div>
-                  <h2 className="text-xl font-bold">{group.name}</h2>
+        {filteredLibrary.map((group) => (
+          <AccordionItem key={group.id} value={group.id} className="border rounded-2xl overflow-hidden shadow-sm bg-card">
+            <AccordionTrigger className="px-6 py-5 hover:bg-muted/30 hover:no-underline">
+              <div className="flex items-center gap-4 text-left">
+                <div className="p-2 bg-primary/5 rounded-lg text-primary"><Layers className="h-6 w-6" /></div>
+                <h2 className="text-xl font-bold">{group.name}</h2>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="p-6 bg-muted/5 border-t space-y-8">
+              {group.standaloneVideos.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {group.standaloneVideos.map((v, idx) => <VideoCard key={v.id} video={v} orderNumber={idx + 1} />)}
                 </div>
-              </AccordionTrigger>
-              <AccordionContent className="p-6 bg-muted/5 border-t space-y-6">
-                {group.standaloneVideos.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {group.standaloneVideos.map((v, idx) => <VideoCard key={v.id} video={v} orderNumber={idx + 1} />)}
-                  </div>
-                )}
+              )}
 
-                {group.subgroups.map(sg => (
-                  <div key={sg.id} className="space-y-3 bg-white/50 dark:bg-slate-900/50 p-4 rounded-xl border border-dashed">
-                    <h3 className="text-md font-bold flex items-center gap-2 text-primary">
-                      <FolderTree className="h-4 w-4" /> {sg.name}
-                      <Badge variant="outline" className="text-[10px] uppercase">{sg.videos.length} Videos</Badge>
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {sg.videos.map((v, idx) => <VideoCard key={v.id} video={v} orderNumber={idx + 1} />)}
-                    </div>
+              {group.subgroups.map(sg => (
+                <div key={sg.id} className="space-y-4">
+                  <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-primary/60 px-2">
+                    <FolderTree className="h-4 w-4" /> {sg.name}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {sg.videos.map((v, idx) => <VideoCard key={v.id} video={v} orderNumber={idx + 1} />)}
                   </div>
-                ))}
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
+                </div>
+              ))}
+            </AccordionContent>
+          </AccordionItem>
+        ))}
       </Accordion>
 
       {/* Video Player Modal */}

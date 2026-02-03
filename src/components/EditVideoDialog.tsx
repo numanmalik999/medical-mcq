@@ -7,11 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2, Wand2 } from 'lucide-react';
+import { Loader2, Wand2, Hash } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const formSchema = z.object({
@@ -165,71 +165,57 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{video ? 'Edit Video Details' : 'Add New Video'}</DialogTitle>
+          <DialogTitle>{video ? 'Edit Lesson' : 'Add New Lesson'}</DialogTitle>
           <DialogDescription>
-            Enter the Video ID and choose a platform. Manually set the display order for numbering in the library.
+            Configure the metadata and positioning for this educational video.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 pt-4">
-          <div className="flex gap-2 p-4 bg-muted/50 rounded-xl border border-dashed">
+          {/* AI Helper */}
+          <div className="flex gap-2 p-4 bg-primary/5 rounded-xl border border-dashed border-primary/20">
             <Input 
-              placeholder="Search topic (e.g. ECG Basics) to auto-fill..." 
+              placeholder="Topic search (e.g. Heart Failure)..." 
               value={searchTopic} 
               onChange={(e) => setSearchTopic(e.target.value)} 
               className="bg-background"
             />
             <Button onClick={handleAiFetch} disabled={isGenerating} variant="secondary">
               {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
-              Fetch
+              Auto-fill
             </Button>
           </div>
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField control={form.control} name="platform" render={({ field }) => (
-                  <FormItem className="md:col-span-1">
-                    <FormLabel>Platform</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Platform" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="youtube">YouTube</SelectItem>
-                        <SelectItem value="vimeo">Vimeo</SelectItem>
-                        <SelectItem value="dailymotion">Dailymotion</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
+              
+              {/* Critical Positioning Info */}
+              <div className="bg-muted/30 p-4 rounded-xl border space-y-4">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <Hash className="h-4 w-4" /> Lesson Placement
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="group_id" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parent Category</FormLabel>
+                      <Select onValueChange={(v) => { field.onChange(v); form.setValue('subgroup_id', 'none'); }} value={field.value || 'none'}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Uncategorized" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">Uncategorized</SelectItem>
+                          {groups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
 
-                <FormField control={form.control} name="youtube_video_id" render={({ field }) => (
-                  <FormItem className="md:col-span-1">
-                    <FormLabel>Video ID</FormLabel>
-                    <FormControl><Input placeholder="ID" {...field} /></FormControl>
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="order" render={({ field }) => (
-                  <FormItem className="md:col-span-1">
-                    <FormLabel>Display Order</FormLabel>
-                    <FormControl><Input type="number" {...field} /></FormControl>
-                  </FormItem>
-                )} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="group_id" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Main Category / Group</FormLabel>
-                    <Select onValueChange={(v) => { field.onChange(v); form.setValue('subgroup_id', 'none'); }} value={field.value || 'none'}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Uncategorized" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Uncategorized</SelectItem>
-                        {groups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
+                  <FormField control={form.control} name="order" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-primary font-bold">Display Number (Order)</FormLabel>
+                      <FormControl><Input type="number" placeholder="e.g. 1" {...field} className="border-primary/50 focus-visible:ring-primary" /></FormControl>
+                      <FormDescription className="text-[10px]">Sets the 'no. X' shown to students.</FormDescription>
+                    </FormItem>
+                  )} />
+                </div>
 
                 <FormField control={form.control} name="subgroup_id" render={({ field }) => (
                   <FormItem>
@@ -245,24 +231,49 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
                 )} />
               </div>
 
+              {/* Video Source Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={form.control} name="platform" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Video Platform</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Platform" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="youtube">YouTube</SelectItem>
+                        <SelectItem value="vimeo">Vimeo</SelectItem>
+                        <SelectItem value="dailymotion">Dailymotion</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="youtube_video_id" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Video ID (11 chars for YT)</FormLabel>
+                    <FormControl><Input placeholder="e.g. dQw4w9WgXcQ" {...field} /></FormControl>
+                  </FormItem>
+                )} />
+              </div>
+
+              {/* Content Info */}
               <FormField control={form.control} name="title" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Video Title</FormLabel>
-                  <FormControl><Input placeholder="Enter a compelling title" {...field} /></FormControl>
+                  <FormLabel>Lesson Title</FormLabel>
+                  <FormControl><Input placeholder="Title as seen by students" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
 
               <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
-                  <FormControl><Textarea placeholder="Brief summary of the lesson..." rows={3} {...field} /></FormControl>
+                  <FormLabel>Summary</FormLabel>
+                  <FormControl><Textarea placeholder="Quick lesson takeaway..." rows={3} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
 
               <div className="pt-2">
-                <Button type="submit" disabled={isSubmitting} className="w-full h-11 text-lg">
+                <Button type="submit" disabled={isSubmitting} className="w-full h-11 text-lg font-bold">
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Lesson"}
                 </Button>
               </div>

@@ -28,7 +28,6 @@ interface Video {
 interface VideoSubgroup {
   id: string;
   name: string;
-  description: string | null;
   videos: Video[];
 }
 
@@ -37,7 +36,7 @@ interface VideoGroup {
   name: string;
   description: string | null;
   subgroups: VideoSubgroup[];
-  standaloneVideos: Video[]; // Videos in the group but not in a subgroup
+  standaloneVideos: Video[];
 }
 
 const UserVideosPage = () => {
@@ -114,9 +113,33 @@ const UserVideosPage = () => {
     }
   };
 
+  const getEmbedUrl = (video: Video) => {
+    const id = video.youtube_video_id;
+    switch (video.platform) {
+      case 'vimeo':
+        return `https://player.vimeo.com/video/${id}?autoplay=1`;
+      case 'dailymotion':
+        return `https://www.dailymotion.com/embed/video/${id}?autoplay=1`;
+      default:
+        return `https://www.youtube.com/embed/${id}?autoplay=1`;
+    }
+  };
+
+  const getThumbnail = (video: Video) => {
+    const id = video.youtube_video_id;
+    switch (video.platform) {
+      case 'dailymotion':
+        return `https://www.dailymotion.com/thumbnail/video/${id}`;
+      case 'vimeo':
+        return "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=400&h=225&auto=format&fit=crop";
+      default:
+        return `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+    }
+  };
+
   const VideoCard = ({ video }: { video: Video }) => {
     const isWatched = progressMap.get(video.id) || false;
-    const thumb = `https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`;
+    const thumb = getThumbnail(video);
     
     return (
       <Card 
@@ -129,6 +152,11 @@ const UserVideosPage = () => {
             <PlayCircle className="h-10 w-10 text-white" />
           </div>
           {isWatched && <div className="absolute top-2 right-2 bg-green-500 text-white p-1 rounded-full shadow-lg"><CheckCircle2 className="h-4 w-4" /></div>}
+          <div className="absolute bottom-2 right-2">
+            <Badge variant="secondary" className="bg-black/60 text-white border-none text-[10px] uppercase">
+              {video.platform}
+            </Badge>
+          </div>
         </div>
         <div className="p-3">
           <div className="flex justify-between items-start gap-2">
@@ -230,7 +258,7 @@ const UserVideosPage = () => {
             {selectedVideo && (
               <iframe 
                 width="100%" height="100%" 
-                src={`https://www.youtube.com/embed/${selectedVideo.youtube_video_id}?autoplay=1`}
+                src={getEmbedUrl(selectedVideo)}
                 frameBorder="0" allowFullScreen
               ></iframe>
             )}

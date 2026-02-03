@@ -243,7 +243,7 @@ const UserVideosPage = () => {
 
       {/* Video Player Modal */}
       <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
-        <DialogContent className="max-w-5xl p-0 overflow-hidden bg-black border-none rounded-3xl">
+        <DialogContent className="max-w-3xl p-0 overflow-hidden bg-black border-none rounded-3xl">
           <DialogHeader className="p-6 bg-background border-b flex-row items-center justify-between space-y-0">
              <DialogTitle className="flex-1 font-bold text-xl">{selectedVideo?.title}</DialogTitle>
              <Button 

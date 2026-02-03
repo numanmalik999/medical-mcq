@@ -53,6 +53,7 @@ const ReviewsPage = lazy(() => import("./pages/ReviewsPage"));
 const UserSuggestionsPage = lazy(() => import("./pages/UserSuggestionsPage"));
 const ManageSuggestionsPage = lazy(() => import("./pages/ManageSuggestionsPage"));
 const ManageVideosPage = lazy(() => import("./pages/ManageVideosPage"));
+const ManageVideoGroupsPage = lazy(() => import("./pages/ManageVideoGroupsPage"));
 const UserVideosPage = lazy(() => import("./pages/UserVideosPage"));
 const CaseStudiesPage = lazy(() => import("./pages/CaseStudiesPage"));
 const ManageSeoPage = lazy(() => import("./pages/ManageSeoPage"));
@@ -130,6 +131,7 @@ const AppContent = () => {
                   <Route path="manage-courses" element={<ManageCoursesPage />} />
                   <Route path="manage-courses/:courseId/topics" element={<ManageCourseTopicsPage />} />
                   <Route path="manage-videos" element={<ManageVideosPage />} />
+                  <Route path="manage-video-groups" element={<ManageVideoGroupsPage />} />
                   <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
                   <Route path="manage-users" element={<ManageUsersPage />} />
                   <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />

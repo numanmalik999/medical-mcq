@@ -67,6 +67,8 @@ const AdminSidebar = () => {
     { to: "/admin/manage-categories", icon: <FolderKanban className="h-4 w-4" />, label: "Manage Categories" },
     { to: "/admin/manage-courses", icon: <GraduationCap className="h-4 w-4" />, label: "Manage Courses" },
     { to: "/admin/manage-videos", icon: <Youtube className="h-4 w-4" />, label: "Manage Videos" },
+    { to: "/admin/manage-video-groups", icon: <LayoutDashboard className="h-4 w-4" />, label: "Manage Video Groups" },
+    { to: "/admin/manage-video-subgroups", icon: <LayoutDashboard className="h-4 w-4" />, label: "Manage Video Sub-groups" },
     { to: "/admin/manage-subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "Manage Subscriptions" },
     { to: "/admin/manage-users", icon: <Users className="h-4 w-4" />, label: "Manage Users" },
     { to: "/admin/manage-feedback", icon: <MessageSquareWarning className="h-4 w-4" />, label: "Manage Feedback" },

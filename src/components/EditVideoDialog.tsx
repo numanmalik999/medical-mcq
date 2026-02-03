@@ -168,6 +168,21 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={form.control} name="platform" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Platform</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="YouTube" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="youtube">YouTube</SelectItem>
+                        <SelectItem value="vimeo">Vimeo</SelectItem>
+                        <SelectItem value="dailymotion">Dailymotion</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
                 <FormField control={form.control} name="group_id" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Main Group</FormLabel>
@@ -180,20 +195,20 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
                     </Select>
                   </FormItem>
                 )} />
-
-                <FormField control={form.control} name="subgroup_id" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sub-group</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || 'none'} disabled={!selectedGroupId || selectedGroupId === 'none'}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="No Sub-group" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No Sub-group</SelectItem>
-                        {subgroups.map(sg => <SelectItem key={sg.id} value={sg.id}>{sg.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
               </div>
+
+              <FormField control={form.control} name="subgroup_id" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sub-group</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || 'none'} disabled={!selectedGroupId || selectedGroupId === 'none'}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="No Sub-group" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">No Sub-group</SelectItem>
+                      {subgroups.map(sg => <SelectItem key={sg.id} value={sg.id}>{sg.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )} />
 
               <FormField control={form.control} name="youtube_video_id" render={({ field }) => (
                 <FormItem><FormLabel>Video ID</FormLabel><FormControl><Input placeholder="e.g. dQw4w9WgXcQ" {...field} /></FormControl><FormMessage /></FormItem>

@@ -29,6 +29,7 @@ interface Video {
 interface VideoSubgroup {
   id: string;
   name: string;
+  description: string | null;
   videos: Video[];
 }
 
@@ -225,22 +226,40 @@ const UserVideosPage = () => {
               </div>
             </AccordionTrigger>
             <AccordionContent className="p-6 bg-muted/5 border-t space-y-8">
+              
+              {/* Standalone Intro Videos */}
               {group.standaloneVideos.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {group.standaloneVideos.map((v) => <VideoCard key={v.id} video={v} />)}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-primary/60 px-2">Core Foundation Lessons</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {group.standaloneVideos.map((v) => <VideoCard key={v.id} video={v} />)}
+                  </div>
                 </div>
               )}
 
-              {group.subgroups.map(sg => (
-                <div key={sg.id} className="space-y-4">
-                  <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-primary/60 px-2">
-                    <FolderTree className="h-4 w-4" /> {sg.name}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {sg.videos.map((v) => <VideoCard key={v.id} video={v} />)}
-                  </div>
+              {/* Nested Subgroups */}
+              {group.subgroups.length > 0 && (
+                <div className="space-y-4">
+                  <Accordion type="multiple" className="space-y-4">
+                    {group.subgroups.map(sg => (
+                      <AccordionItem key={sg.id} value={sg.id} className="border rounded-xl bg-background shadow-sm">
+                        <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/20">
+                          <div className="flex items-center gap-2 text-left">
+                            <FolderTree className="h-4 w-4 text-primary/60" />
+                            <span className="font-bold text-sm uppercase tracking-tight">{sg.name}</span>
+                            <Badge variant="outline" className="ml-2 text-[10px] font-bold">{sg.videos.length} lessons</Badge>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="p-4 bg-muted/5 border-t">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {sg.videos.map((v) => <VideoCard key={v.id} video={v} />)}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
                 </div>
-              ))}
+              )}
             </AccordionContent>
           </AccordionItem>
         ))}

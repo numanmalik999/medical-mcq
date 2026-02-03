@@ -23,6 +23,7 @@ interface Video {
   platform: string;
   group_id: string | null;
   subgroup_id: string | null;
+  order: number;
 }
 
 interface VideoSubgroup {
@@ -58,7 +59,7 @@ const UserVideosPage = () => {
       const [groupsRes, subRes, videoRes, progRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
         supabase.from('video_subgroups').select('*').order('order'),
-        supabase.from('videos').select('*').order('created_at', { ascending: false }),
+        supabase.from('videos').select('*').order('order', { ascending: true }),
         supabase.from('user_video_progress').select('video_id, is_watched').eq('user_id', user.id)
       ]);
 
@@ -125,7 +126,7 @@ const UserVideosPage = () => {
     }
   };
 
-  const VideoCard = ({ video, orderNumber }: { video: Video; orderNumber: number }) => {
+  const VideoCard = ({ video }: { video: Video }) => {
     const isWatched = progressMap.get(video.id) || false;
     
     return (
@@ -137,24 +138,20 @@ const UserVideosPage = () => {
         onClick={() => setSelectedVideo(video)}
       >
         <div className="p-6 text-center flex flex-col items-center justify-center gap-2">
-          {/* Platform Badge */}
           <div className="absolute top-2 left-2">
             <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[9px] uppercase font-black tracking-widest">
               {video.platform}
             </Badge>
           </div>
 
-          {/* Video Title as primary visual */}
           <h4 className="text-sm font-extrabold leading-relaxed text-foreground px-4">
-            <span className="text-primary mr-1 opacity-40">{orderNumber}.</span> {video.title}
+            <span className="text-primary mr-1 opacity-40">{video.order}.</span> {video.title}
           </h4>
 
-          {/* Hover Play State */}
           <div className="absolute inset-0 bg-primary/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             <PlayCircle className="h-12 w-12 text-primary/40" />
           </div>
 
-          {/* Status/Completion Toggle */}
           <div className="absolute top-2 right-2">
             <Button 
                 variant="ghost" 
@@ -230,7 +227,7 @@ const UserVideosPage = () => {
             <AccordionContent className="p-6 bg-muted/5 border-t space-y-8">
               {group.standaloneVideos.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {group.standaloneVideos.map((v, idx) => <VideoCard key={v.id} video={v} orderNumber={idx + 1} />)}
+                  {group.standaloneVideos.map((v) => <VideoCard key={v.id} video={v} />)}
                 </div>
               )}
 
@@ -240,7 +237,7 @@ const UserVideosPage = () => {
                     <FolderTree className="h-4 w-4" /> {sg.name}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {sg.videos.map((v, idx) => <VideoCard key={v.id} video={v} orderNumber={idx + 1} />)}
+                    {sg.videos.map((v) => <VideoCard key={v.id} video={v} />)}
                   </div>
                 </div>
               ))}
@@ -249,7 +246,6 @@ const UserVideosPage = () => {
         ))}
       </Accordion>
 
-      {/* Video Player Modal */}
       <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden bg-black border-none rounded-3xl">
           <DialogHeader className="p-6 bg-background border-b flex-row items-center justify-between space-y-0">

@@ -21,6 +21,7 @@ const formSchema = z.object({
   platform: z.enum(['youtube', 'vimeo', 'dailymotion']),
   group_id: z.string().optional().or(z.literal('none')),
   subgroup_id: z.string().optional().or(z.literal('none')),
+  order: z.preprocess((val) => parseInt(String(val), 10), z.number().min(0)),
 });
 
 interface EditVideoDialogProps {
@@ -46,7 +47,8 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
       youtube_video_id: "", 
       platform: 'youtube',
       group_id: 'none',
-      subgroup_id: 'none'
+      subgroup_id: 'none',
+      order: 0
     },
   });
 
@@ -84,10 +86,11 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
         youtube_video_id: video.youtube_video_id,
         platform: video.platform || 'youtube',
         group_id: video.group_id || 'none',
-        subgroup_id: video.subgroup_id || 'none'
+        subgroup_id: video.subgroup_id || 'none',
+        order: video.order || 0
       });
     } else if (!open) {
-      form.reset({ title: "", description: "", youtube_video_id: "", platform: 'youtube', group_id: 'none', subgroup_id: 'none' });
+      form.reset({ title: "", description: "", youtube_video_id: "", platform: 'youtube', group_id: 'none', subgroup_id: 'none', order: 0 });
       setSearchTopic('');
     }
   }, [video, open, form]);
@@ -113,7 +116,6 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
       form.setValue('title', data.title);
       form.setValue('description', data.description || "");
       
-      // If we searched by topic and AI found an ID, update the ID field
       if (data.youtube_video_id && !currentId) {
         form.setValue('youtube_video_id', data.youtube_video_id);
       }
@@ -140,7 +142,8 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
         youtube_video_id: values.youtube_video_id,
         platform: values.platform,
         group_id: values.group_id === 'none' ? null : values.group_id,
-        subgroup_id: values.subgroup_id === 'none' ? null : values.subgroup_id
+        subgroup_id: values.subgroup_id === 'none' ? null : values.subgroup_id,
+        order: values.order
       };
 
       const { error } = video?.id 
@@ -164,12 +167,11 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
         <DialogHeader>
           <DialogTitle>{video ? 'Edit Video Details' : 'Add New Video'}</DialogTitle>
           <DialogDescription>
-            Enter the Video ID and choose a platform. Use the AI tool to auto-fill details based on a topic.
+            Enter the Video ID and choose a platform. Manually set the display order for numbering in the library.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 pt-4">
-          {/* AI Fetcher Row */}
           <div className="flex gap-2 p-4 bg-muted/50 rounded-xl border border-dashed">
             <Input 
               placeholder="Search topic (e.g. ECG Basics) to auto-fill..." 
@@ -185,31 +187,32 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField control={form.control} name="platform" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Video Platform</FormLabel>
+                  <FormItem className="md:col-span-1">
+                    <FormLabel>Platform</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select platform" />
-                        </SelectTrigger>
-                      </FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Platform" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="youtube">YouTube</SelectItem>
                         <SelectItem value="vimeo">Vimeo</SelectItem>
                         <SelectItem value="dailymotion">Dailymotion</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormMessage />
                   </FormItem>
                 )} />
 
                 <FormField control={form.control} name="youtube_video_id" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-1">
                     <FormLabel>Video ID</FormLabel>
-                    <FormControl><Input placeholder="e.g. dQw4w9WgXcQ" {...field} /></FormControl>
-                    <FormMessage />
+                    <FormControl><Input placeholder="ID" {...field} /></FormControl>
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="order" render={({ field }) => (
+                  <FormItem className="md:col-span-1">
+                    <FormLabel>Display Order</FormLabel>
+                    <FormControl><Input type="number" {...field} /></FormControl>
                   </FormItem>
                 )} />
               </div>
@@ -219,11 +222,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
                   <FormItem>
                     <FormLabel>Main Category / Group</FormLabel>
                     <Select onValueChange={(v) => { field.onChange(v); form.setValue('subgroup_id', 'none'); }} value={field.value || 'none'}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Uncategorized" />
-                        </SelectTrigger>
-                      </FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Uncategorized" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="none">Uncategorized</SelectItem>
                         {groups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
@@ -236,11 +235,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
                   <FormItem>
                     <FormLabel>Sub-group (Optional)</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || 'none'} disabled={!selectedGroupId || selectedGroupId === 'none'}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="No Sub-group" />
-                        </SelectTrigger>
-                      </FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder="No Sub-group" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="none">No Sub-group</SelectItem>
                         {subgroups.map(sg => <SelectItem key={sg.id} value={sg.id}>{sg.name}</SelectItem>)}

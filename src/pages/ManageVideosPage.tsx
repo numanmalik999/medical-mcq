@@ -20,6 +20,7 @@ interface Video {
   youtube_video_id: string;
   platform: string;
   group_id: string | null;
+  order: number;
   created_at: string;
   video_groups?: { name: string };
 }
@@ -34,7 +35,7 @@ const ManageVideosPage = () => {
     const { data, error } = await supabase
       .from('videos')
       .select('*, video_groups(name)')
-      .order('created_at', { ascending: false });
+      .order('order', { ascending: true });
     if (!error) setVideos(data || []);
   };
 
@@ -59,6 +60,7 @@ const ManageVideosPage = () => {
   };
 
   const columns: ColumnDef<Video>[] = [
+    { accessorKey: "order", header: "Order" },
     {
       id: "platform",
       header: "Type",

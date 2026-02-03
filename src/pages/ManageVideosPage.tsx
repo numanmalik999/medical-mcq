@@ -11,7 +11,9 @@ import {
   Video as VideoIcon,
   Plus,
   FolderPlus,
-  MoreHorizontal
+  MoreHorizontal,
+  PlayCircle,
+  GripVertical
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import EditVideoDialog from '@/components/EditVideoDialog';
@@ -50,6 +52,7 @@ interface StructuredLibrary {
   subgroups: {
     id: string;
     name: string;
+    description: string | null;
     videos: Video[];
   }[];
 }
@@ -100,6 +103,7 @@ const ManageVideosPage = () => {
           .map(sg => ({
             id: sg.id,
             name: sg.name,
+            description: sg.description,
             videos: allVideos.filter(v => v.subgroup_id === sg.id)
           }));
 
@@ -161,12 +165,12 @@ const ManageVideosPage = () => {
     }
   };
 
-  // --- Column Definitions ---
+  // --- Column Definitions for Management Tabs ---
 
   const groupColumns: ColumnDef<VideoGroup>[] = [
     { accessorKey: "order", header: "Order" },
     { accessorKey: "name", header: "Group Name" },
-    { accessorKey: "description", header: "Description", cell: ({ row }) => <span className="truncate max-w-xs block">{row.original.description}</span> },
+    { accessorKey: "description", header: "Description", cell: ({ row }) => <span className="truncate max-w-xs block text-xs">{row.original.description || '-'}</span> },
     {
       id: "actions",
       cell: ({ row }) => (
@@ -212,28 +216,28 @@ const ManageVideosPage = () => {
   ];
 
   const VideoRow = ({ video }: { video: Video }) => (
-    <div className="flex items-center justify-between p-3 border rounded-lg bg-background hover:bg-muted/30 transition-colors group">
+    <div className="flex items-center justify-between p-2 pl-3 border rounded-lg bg-background/50 hover:bg-muted/50 transition-all group">
       <div className="flex items-center gap-3 overflow-hidden">
-        <div className="flex flex-col items-center justify-center bg-muted px-2 py-1 rounded text-[10px] font-bold min-w-[32px]">
-          {video.order}
-        </div>
+        <PlayCircle className="h-4 w-4 text-primary/40 shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm truncate">{video.title}</p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <Badge variant="secondary" className="text-[9px] h-4 uppercase tracking-tighter">
+          <p className="font-bold text-[13px] truncate leading-none mb-1">
+            <span className="text-muted-foreground mr-1">#{video.order}</span> {video.title}
+          </p>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-[8px] h-3 px-1 uppercase font-black">
               {video.platform}
             </Badge>
-            <span className="text-[10px] text-muted-foreground font-mono truncate">{video.youtube_video_id}</span>
+            <span className="text-[9px] text-muted-foreground font-mono truncate">{video.youtube_video_id}</span>
           </div>
         </div>
       </div>
       
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedVideo(video); setIsVideoDialogOpen(true); }}>
-          <Edit className="h-4 w-4" />
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setSelectedVideo(video); setIsVideoDialogOpen(true); }}>
+          <Edit className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteVideo(video.id)}>
-          <Trash2 className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteVideo(video.id)}>
+          <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>
     </div>
@@ -245,72 +249,109 @@ const ManageVideosPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Video Manager</h1>
-          <p className="text-muted-foreground text-sm">Organize your educational curriculum.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Curriculum Manager</h1>
+          <p className="text-muted-foreground text-sm">Organize medical lessons into structured categories and topics.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => { setSelectedVideo(null); setIsVideoDialogOpen(true); }}>
-            <Plus className="h-4 w-4 mr-2" /> Add Video
+          <Button size="sm" onClick={() => { setSelectedVideo(null); setIsVideoDialogOpen(true); }} className="rounded-full shadow-md">
+            <Plus className="h-4 w-4 mr-2" /> New Lesson
           </Button>
         </div>
       </div>
 
       <Tabs defaultValue="library" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-3 mb-8">
-          <TabsTrigger value="library">Library</TabsTrigger>
-          <TabsTrigger value="groups">Groups</TabsTrigger>
-          <TabsTrigger value="subgroups">Sub-groups</TabsTrigger>
+        <TabsList className="inline-flex h-11 items-center justify-center rounded-full bg-muted p-1 mb-8">
+          <TabsTrigger value="library" className="rounded-full px-6">Curriculum View</TabsTrigger>
+          <TabsTrigger value="groups" className="rounded-full px-6">Groups</TabsTrigger>
+          <TabsTrigger value="subgroups" className="rounded-full px-6">Sub-groups</TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Structured Library */}
-        <TabsContent value="library">
+        {/* Tab 1: Structured Library (Curriculum View) */}
+        <TabsContent value="library" className="space-y-6">
           {library.length === 0 ? (
             <Card className="border-dashed py-20 text-center">
               <VideoIcon className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-bold">No Videos Found</h3>
-              <p className="text-muted-foreground">Start by creating groups and adding videos.</p>
+              <h3 className="text-lg font-bold">Your Library is Empty</h3>
+              <p className="text-muted-foreground">Start by creating groups and adding your first video lessons.</p>
             </Card>
           ) : (
-            <Accordion type="multiple" defaultValue={[library[0]?.id]} className="space-y-4">
+            <Accordion type="multiple" defaultValue={[library[0]?.id]} className="space-y-6">
               {library.map((group) => (
-                <AccordionItem key={group.id} value={group.id} className="border rounded-xl bg-card overflow-hidden shadow-sm">
-                  <AccordionTrigger className="px-6 py-4 hover:bg-muted/30 hover:no-underline">
-                    <div className="flex items-center gap-3 text-left">
-                      <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-none px-2 py-0.5">
-                        {group.standaloneVideos.length + group.subgroups.reduce((acc, sg) => acc + sg.videos.length, 0)} Items
-                      </Badge>
-                      <span className="font-bold text-lg">{group.name}</span>
+                <AccordionItem key={group.id} value={group.id} className="border rounded-2xl bg-card overflow-hidden shadow-sm border-border/60">
+                  <AccordionTrigger className="px-6 py-5 hover:bg-muted/30 hover:no-underline border-b bg-muted/10">
+                    <div className="flex items-center gap-4 text-left">
+                      <div className="p-2 bg-primary/5 rounded-xl text-primary">
+                        <GripVertical className="h-5 w-5 opacity-40" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="font-extrabold text-xl tracking-tight">{group.name}</span>
+                        <div className="flex items-center gap-2">
+                           <Badge variant="outline" className="text-[10px] uppercase font-black bg-background">
+                            {group.standaloneVideos.length + group.subgroups.reduce((acc, sg) => acc + sg.videos.length, 0)} Items Total
+                           </Badge>
+                        </div>
+                      </div>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="p-6 bg-muted/5 border-t space-y-8">
+                  <AccordionContent className="p-6 bg-muted/5 space-y-10">
+                    
+                    {/* Standalone Videos */}
                     {group.standaloneVideos.length > 0 && (
-                      <div className="space-y-3">
-                        <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Foundation Lessons</h3>
+                      <section className="space-y-4">
+                        <div className="flex items-center gap-2 px-1">
+                           <Badge variant="secondary" className="h-1.5 w-1.5 rounded-full p-0" />
+                           <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-muted-foreground">Foundation Lessons</h3>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {group.standaloneVideos.map(v => <VideoRow key={v.id} video={v} />)}
                         </div>
-                      </div>
+                      </section>
                     )}
+
+                    {/* Subgroups organized into distinct section cards */}
                     {group.subgroups.length > 0 && (
-                      <div className="space-y-4">
+                      <section className="space-y-4">
+                        <div className="flex items-center gap-2 px-1">
+                           <Badge variant="secondary" className="h-1.5 w-1.5 rounded-full p-0" />
+                           <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-muted-foreground">Topic Sub-groups</h3>
+                        </div>
                         <Accordion type="multiple" className="space-y-4">
                           {group.subgroups.map(sg => (
-                            <AccordionItem key={sg.id} value={sg.id} className="border rounded-lg bg-background shadow-sm overflow-hidden">
-                              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/20">
-                                <div className="flex items-center gap-2 text-left">
-                                  <FolderTree className="h-4 w-4 text-primary/60" />
-                                  <span className="font-bold text-xs uppercase tracking-tight">{sg.name}</span>
-                                  <Badge variant="outline" className="ml-2 text-[10px] font-bold">{sg.videos.length} videos</Badge>
+                            <AccordionItem key={sg.id} value={sg.id} className="border rounded-xl bg-background shadow-sm border-border/40 overflow-hidden">
+                              <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/20">
+                                <div className="flex items-center gap-3 text-left">
+                                  <div className="p-1.5 bg-primary/5 rounded-lg">
+                                    <FolderTree className="h-4 w-4 text-primary/60" />
+                                  </div>
+                                  <div>
+                                    <span className="font-bold text-sm text-foreground">{sg.name}</span>
+                                    <p className="text-[10px] text-muted-foreground line-clamp-1">{sg.description || 'Section items'}</p>
+                                  </div>
+                                  <Badge variant="secondary" className="ml-2 text-[10px] font-bold rounded-full">
+                                    {sg.videos.length} videos
+                                  </Badge>
                                 </div>
                               </AccordionTrigger>
-                              <AccordionContent className="p-4 bg-muted/5 border-t">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <AccordionContent className="px-5 pb-5 pt-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                                   {sg.videos.map(v => <VideoRow key={v.id} video={v} />)}
+                                  {sg.videos.length === 0 && (
+                                    <p className="col-span-full text-center py-8 text-xs text-muted-foreground italic border-2 border-dashed rounded-xl bg-muted/10">
+                                      This sub-group is currently empty.
+                                    </p>
+                                  )}
                                 </div>
                               </AccordionContent>
                             </AccordionItem>
                           ))}
                         </Accordion>
+                      </section>
+                    )}
+
+                    {group.standaloneVideos.length === 0 && group.subgroups.length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-3xl opacity-40">
+                         <Plus className="h-10 w-10 mb-2" />
+                         <p className="text-sm font-bold">No content assigned to this group yet.</p>
                       </div>
                     )}
                   </AccordionContent>
@@ -322,14 +363,14 @@ const ManageVideosPage = () => {
 
         {/* Tab 2: Manage Groups */}
         <TabsContent value="groups">
-          <Card>
+          <Card className="shadow-sm border-none bg-muted/20">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Main Categories</CardTitle>
-                <CardDescription>Top-level navigation for your library.</CardDescription>
+                <CardTitle>Category Management</CardTitle>
+                <CardDescription className="text-xs">Define top-level curriculum categories.</CardDescription>
               </div>
-              <Button size="sm" onClick={() => { setSelectedGroup(null); setIsGroupDialogOpen(true); }}>
-                <FolderPlus className="h-4 w-4 mr-2" /> Add Group
+              <Button size="sm" variant="secondary" onClick={() => { setSelectedGroup(null); setIsGroupDialogOpen(true); }}>
+                <FolderPlus className="h-4 w-4 mr-2" /> New Category
               </Button>
             </CardHeader>
             <CardContent>
@@ -340,14 +381,14 @@ const ManageVideosPage = () => {
 
         {/* Tab 3: Manage Subgroups */}
         <TabsContent value="subgroups">
-          <Card>
+          <Card className="shadow-sm border-none bg-muted/20">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Nested Sub-groups</CardTitle>
-                <CardDescription>Specific topics within your main categories.</CardDescription>
+                <CardTitle>Nested Topic Management</CardTitle>
+                <CardDescription className="text-xs">Group specific lessons into topics within categories.</CardDescription>
               </div>
-              <Button size="sm" onClick={() => { setSelectedSubgroup(null); setIsSubgroupDialogOpen(true); }}>
-                <FolderPlus className="h-4 w-4 mr-2" /> Add Sub-group
+              <Button size="sm" variant="secondary" onClick={() => { setSelectedSubgroup(null); setIsSubgroupDialogOpen(true); }}>
+                <FolderPlus className="h-4 w-4 mr-2" /> New Topic
               </Button>
             </CardHeader>
             <CardContent>

@@ -3,6 +3,14 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
+declare global {
+  namespace Deno {
+    namespace env {
+      function get(key: string): string | undefined;
+    }
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -14,7 +22,7 @@ interface IncomingVideo {
   video_title: string;
   order: number;
   video_id: string;
-  platform?: 'youtube' | 'vimeo' | 'dailymotion';
+  platform?: 'vimeo';
 }
 
 serve(async (req: Request) => {
@@ -22,11 +30,9 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // @ts-ignore
+  // Initialize Supabase client with service role key
   const supabaseAdmin = createClient(
-    // @ts-ignore
     Deno.env.get('SUPABASE_URL') ?? '',
-    // @ts-ignore
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
@@ -40,23 +46,27 @@ serve(async (req: Request) => {
       });
     }
 
+    console.log(`[bulk-upload-videos] Processing ${videos.length} videos.`);
+
     let successCount = 0;
     let errorCount = 0;
     const errors: string[] = [];
 
-    // Local caches to avoid extra DB hits during this run
+    // Local caches for this specific request to prevent duplicate creation
     const groupCache = new Map<string, string>();
     const subgroupCache = new Map<string, string>();
 
     for (const video of (videos as IncomingVideo[])) {
       try {
-        // 1. Clean and Resolve Parent Group
+        const videoIdStr = String(video.video_id).trim();
+        const videoTitle = video.video_title.trim();
+
+        // 1. Resolve Parent Group (Category)
         const parentName = video.parent_category.trim();
-        const parentLower = parentName.toLowerCase();
-        let groupId = groupCache.get(parentLower);
+        const parentKey = parentName.toLowerCase();
+        let groupId = groupCache.get(parentKey);
 
         if (!groupId) {
-          // Check DB with ilike for safety
           const { data: existingGroup } = await supabaseAdmin
             .from('video_groups')
             .select('id')
@@ -71,18 +81,18 @@ serve(async (req: Request) => {
               .insert({ name: parentName, order: 0 })
               .select('id')
               .single();
-            if (groupErr) throw groupErr;
+            if (groupErr) throw new Error(`Failed to create group: ${groupErr.message}`);
             groupId = newGroup.id;
           }
-          groupCache.set(parentLower, groupId!);
+          groupCache.set(parentKey, groupId!);
         }
 
-        // 2. Clean and Resolve Subgroup
+        // 2. Resolve Sub-category (Subgroup)
         let subgroupId = null;
         if (video.sub_category && video.sub_category.trim()) {
           const subName = video.sub_category.trim();
-          const cacheKey = `${groupId}_${subName.toLowerCase()}`;
-          subgroupId = subgroupCache.get(cacheKey);
+          const subKey = `${groupId}_${subName.toLowerCase()}`;
+          subgroupId = subgroupCache.get(subKey);
 
           if (!subgroupId) {
             const { data: existingSub } = await supabaseAdmin
@@ -100,38 +110,54 @@ serve(async (req: Request) => {
                 .insert({ name: subName, group_id: groupId, order: 0 })
                 .select('id')
                 .single();
-              if (subErr) throw subErr;
+              if (subErr) throw new Error(`Failed to create sub-category: ${subErr.message}`);
               subgroupId = newSub.id;
             }
-            subgroupCache.set(cacheKey, subgroupId!);
+            subgroupCache.set(subKey, subgroupId!);
           }
         }
 
-        // 3. Upsert Video
-        const videoData = {
-          title: video.video_title.trim(),
-          youtube_video_id: String(video.video_id).trim(),
+        // 3. Handle Video Insertion/Update (Check by Vimeo ID)
+        const { data: existingVideo } = await supabaseAdmin
+          .from('videos')
+          .select('id')
+          .eq('youtube_video_id', videoIdStr)
+          .maybeSingle();
+
+        const videoPayload = {
+          title: videoTitle,
+          youtube_video_id: videoIdStr,
           platform: 'vimeo',
           group_id: groupId,
           subgroup_id: subgroupId,
-          order: parseInt(String(video.order)) || 0
+          order: parseInt(String(video.order)) || 0,
+          updated_at: new Date().toISOString()
         };
 
-        const { error: videoErr } = await supabaseAdmin
-          .from('videos')
-          .upsert(videoData, { onConflict: 'youtube_video_id' });
+        if (existingVideo) {
+          const { error: updateErr } = await supabaseAdmin
+            .from('videos')
+            .update(videoPayload)
+            .eq('id', existingVideo.id);
+          if (updateErr) throw updateErr;
+        } else {
+          const { error: insertErr } = await supabaseAdmin
+            .from('videos')
+            .insert(videoPayload);
+          if (insertErr) throw insertErr;
+        }
 
-        if (videoErr) throw videoErr;
         successCount++;
 
       } catch (e: any) {
+        console.error(`[bulk-upload-videos] Row failure:`, e.message);
         errorCount++;
-        errors.push(`Failed to process "${video.video_title}": ${e.message}`);
+        errors.push(`Row failed ("${video.video_title}"): ${e.message}`);
       }
     }
 
     return new Response(JSON.stringify({
-      message: 'Bulk upload completed.',
+      message: 'Bulk process finished.',
       successCount,
       errorCount,
       errors: errors.length > 0 ? errors : undefined,
@@ -141,6 +167,7 @@ serve(async (req: Request) => {
     });
 
   } catch (error: any) {
+    console.error(`[bulk-upload-videos] Critical function error:`, error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

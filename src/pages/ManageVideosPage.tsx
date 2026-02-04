@@ -169,6 +169,7 @@ const ManageVideosPage = () => {
         const videosToUpload = json.map(row => ({
           parent_category: row['Parent Category'],
           sub_category: row['Sub-Category'],
+          sub_category_order: parseInt(row['Sub-Category Order']) || 0,
           video_title: row['Video Title'],
           order: parseInt(row['Display Number (Order)']) || 0,
           video_id: String(row['Vimeo ID']),
@@ -176,7 +177,7 @@ const ManageVideosPage = () => {
         })).filter(v => v.parent_category && v.video_title && v.video_id);
 
         if (videosToUpload.length === 0) {
-          throw new Error("No valid data found. Ensure column headers match exactly: Parent Category, Sub-Category, Video Title, Display Number (Order), Vimeo ID");
+          throw new Error("No valid data found. Ensure column headers match exactly.");
         }
 
         const { data: _res, error } = await supabase.functions.invoke('bulk-upload-videos', {
@@ -210,24 +211,6 @@ const ManageVideosPage = () => {
     }
   };
 
-  const handleDeleteGroup = async (id: string) => {
-    if (!window.confirm("Delete this group? Videos in this group will be moved to 'Uncategorized'.")) return;
-    const { error } = await supabase.from('video_groups').delete().eq('id', id);
-    if (!error) {
-      toast({ title: "Deleted", description: "Group removed." });
-      fetchAllData();
-    }
-  };
-
-  const handleDeleteSubgroup = async (id: string) => {
-    if (!window.confirm("Delete this sub-group? Videos will be unlinked.")) return;
-    const { error } = await supabase.from('video_subgroups').delete().eq('id', id);
-    if (!error) {
-      toast({ title: "Deleted", description: "Sub-group removed." });
-      fetchAllData();
-    }
-  };
-
   const groupColumns: ColumnDef<VideoGroup>[] = [
     { accessorKey: "order", header: "Order" },
     { accessorKey: "name", header: "Group Name" },
@@ -241,7 +224,7 @@ const ManageVideosPage = () => {
             <DropdownMenuItem onClick={() => { setSelectedGroup(row.original); setIsGroupDialogOpen(true); }}>
               <Edit className="h-4 w-4 mr-2" /> Edit
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteGroup(row.original.id)}>
+            <DropdownMenuItem className="text-red-600" onClick={() => { if(window.confirm("Delete this group?")) supabase.from('video_groups').delete().eq('id', row.original.id).then(() => fetchAllData()) }}>
               <Trash2 className="h-4 w-4 mr-2" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -267,7 +250,7 @@ const ManageVideosPage = () => {
             <DropdownMenuItem onClick={() => { setSelectedSubgroup(row.original); setIsSubgroupDialogOpen(true); }}>
               <Edit className="h-4 w-4 mr-2" /> Edit
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteSubgroup(row.original.id)}>
+            <DropdownMenuItem className="text-red-600" onClick={() => { if(window.confirm("Delete this sub-group?")) supabase.from('video_subgroups').delete().eq('id', row.original.id).then(() => fetchAllData()) }}>
               <Trash2 className="h-4 w-4 mr-2" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -439,10 +422,10 @@ const ManageVideosPage = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileSpreadsheet className="h-6 w-6 text-primary" />
-                Vimeo Bulk Import
+                Excel Curriculum Import
               </CardTitle>
               <CardDescription>
-                Import your entire curriculum in seconds using an Excel spreadsheet.
+                Import categories, topics, and lessons in bulk.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
@@ -453,15 +436,16 @@ const ManageVideosPage = () => {
                   </h4>
                   <div className="space-y-2">
                     {[
-                      { h: "Parent Category", d: "e.g., Cardiology, Surgery" },
-                      { h: "Sub-Category", d: "e.g., Heart Failure (Optional)" },
+                      { h: "Parent Category", d: "e.g., Cardiology" },
+                      { h: "Sub-Category", d: "e.g., Heart Failure" },
+                      { h: "Sub-Category Order", d: "e.g., 1, 2, 3" },
                       { h: "Video Title", d: "e.g., Intro to CHF" },
                       { h: "Display Number (Order)", d: "e.g., 1, 2, 3" },
                       { h: "Vimeo ID", d: "e.g., 123456789" }
                     ].map((col, i) => (
                       <div key={i} className="flex items-center justify-between text-[11px] bg-background p-2 rounded-lg border">
                         <code className="font-bold text-primary">{col.h}</code>
-                        <span className="text-muted-foreground italic">{col.d}</span>
+                        <span className="text-muted-foreground italic text-right">{col.d}</span>
                       </div>
                     ))}
                   </div>
@@ -485,12 +469,6 @@ const ManageVideosPage = () => {
                     </div>
                   </Label>
                 </div>
-              </div>
-
-              <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl">
-                 <p className="text-[11px] text-orange-800 font-medium leading-relaxed">
-                   <strong>Note:</strong> The system automatically matches existing categories and sub-categories by name. If a video with the same Vimeo ID already exists, it will be updated with the new details from your file.
-                 </p>
               </div>
             </CardContent>
             <CardFooter className="bg-muted/30 p-6 rounded-b-2xl border-t">

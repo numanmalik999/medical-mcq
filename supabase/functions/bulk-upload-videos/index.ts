@@ -19,6 +19,7 @@ const corsHeaders = {
 interface IncomingVideo {
   parent_category: string;
   sub_category?: string;
+  sub_category_order?: number;
   video_title: string;
   order: number;
   video_id: string;
@@ -49,7 +50,6 @@ serve(async (req: Request) => {
     let errorCount = 0;
     const errors: string[] = [];
 
-    // Caches to prevent creating duplicates within the same run
     const groupCache = new Map<string, string>();
     const subgroupCache = new Map<string, string>();
 
@@ -58,13 +58,12 @@ serve(async (req: Request) => {
         const videoIdStr = String(video.video_id).trim();
         const videoTitle = video.video_title.trim();
 
-        // --- 1. Resolve Parent Group (Category) ---
+        // 1. Resolve Parent Group
         const parentName = video.parent_category.trim();
         const parentKey = parentName.toLowerCase();
         let groupId = groupCache.get(parentKey);
 
         if (!groupId) {
-          // Look for existing group by name (case-insensitive)
           const { data: groups } = await supabaseAdmin
             .from('video_groups')
             .select('id')
@@ -79,45 +78,49 @@ serve(async (req: Request) => {
               .insert({ name: parentName, order: 0 })
               .select('id')
               .single();
-            if (groupErr) throw new Error(`Failed to create group: ${groupErr.message}`);
+            if (groupErr) throw new Error(`Failed to create group: \${groupErr.message}`);
             groupId = newGroup.id;
           }
           groupCache.set(parentKey, groupId!);
         }
 
-        // --- 2. Resolve Sub-category (Subgroup) ---
+        // 2. Resolve Sub-category
         let subgroupId = null;
         if (video.sub_category && video.sub_category.trim()) {
           const subName = video.sub_category.trim();
-          const subKey = `${groupId}_${subName.toLowerCase()}`;
+          const subKey = `\${groupId}_\${subName.toLowerCase()}`;
+          const subOrder = parseInt(String(video.sub_category_order)) || 0;
+          
           subgroupId = subgroupCache.get(subKey);
 
           if (!subgroupId) {
-            // Look for existing subgroup within THIS parent group
-            const { data: subgroups } = await supabaseAdmin
+            const { data: existingSubs } = await supabaseAdmin
               .from('video_subgroups')
-              .select('id')
+              .select('id, order')
               .eq('group_id', groupId)
               .ilike('name', subName)
               .limit(1);
 
-            if (subgroups && subgroups.length > 0) {
-              subgroupId = subgroups[0].id;
+            if (existingSubs && existingSubs.length > 0) {
+              subgroupId = existingSubs[0].id;
+              // Update order if it's different to ensure consistency
+              if (existingSubs[0].order !== subOrder) {
+                await supabaseAdmin.from('video_subgroups').update({ order: subOrder }).eq('id', subgroupId);
+              }
             } else {
               const { data: newSub, error: subErr } = await supabaseAdmin
                 .from('video_subgroups')
-                .insert({ name: subName, group_id: groupId, order: 0 })
+                .insert({ name: subName, group_id: groupId, order: subOrder })
                 .select('id')
                 .single();
-              if (subErr) throw new Error(`Failed to create sub-category: ${subErr.message}`);
+              if (subErr) throw new Error(`Failed to create sub-category: \${subErr.message}`);
               subgroupId = newSub.id;
             }
             subgroupCache.set(subKey, subgroupId!);
           }
         }
 
-        // --- 3. Handle Video Insertion/Update ---
-        // Check for existing video by Vimeo ID
+        // 3. Handle Video
         const { data: existingVideos } = await supabaseAdmin
           .from('videos')
           .select('id')
@@ -148,27 +151,17 @@ serve(async (req: Request) => {
         }
 
         successCount++;
-
       } catch (e: any) {
         errorCount++;
-        errors.push(`Row failed ("${video.video_title}"): ${e.message}`);
+        errors.push(`Row failure ("\${video.video_title}"): \${e.message}`);
       }
     }
 
-    return new Response(JSON.stringify({
-      message: 'Bulk process finished.',
-      successCount,
-      errorCount,
-      errors: errors.length > 0 ? errors : undefined,
-    }), {
+    return new Response(JSON.stringify({ message: 'Bulk process finished.', successCount, errorCount, errors }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

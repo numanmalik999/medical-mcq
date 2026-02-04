@@ -8,7 +8,6 @@ import {
   Trash2, 
   Edit, 
   FolderTree, 
-  Video as VideoIcon,
   Plus,
   FolderPlus,
   MoreHorizontal,
@@ -37,6 +36,7 @@ import {
 import LoadingBar from '@/components/LoadingBar';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
 
 interface Video {
@@ -66,23 +66,24 @@ interface StructuredLibrary {
 const ManageVideosPage = () => {
   const { toast } = useToast();
   
-  // State for Video Library (Tab 1)
   const [library, setLibrary] = useState<StructuredLibrary[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
+  
+  // Video Dialog State
   const [isVideoDialogOpen, setIsVideoDialogOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
 
-  // State for Groups (Tab 2)
+  // Group Dialog State
   const [groups, setGroups] = useState<VideoGroup[]>([]);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<VideoGroup | null>(null);
 
-  // State for Subgroups (Tab 3)
+  // Subgroup Dialog State
   const [subgroups, setSubgroups] = useState<any[]>([]);
   const [isSubgroupDialogOpen, setIsSubgroupDialogOpen] = useState(false);
   const [selectedSubgroup, setSelectedSubgroup] = useState<any | null>(null);
 
-  // State for Bulk Upload (Tab 4)
+  // Bulk Upload State
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -99,11 +100,9 @@ const ManageVideosPage = () => {
       if (subRes.error) throw subRes.error;
       if (videoRes.error) throw videoRes.error;
 
-      // Update basic lists
       setGroups(groupsRes.data || []);
       setSubgroups(subRes.data || []);
 
-      // Build structured library
       const allVideos = videoRes.data || [];
       const allSubgroups = subRes.data || [];
       
@@ -177,10 +176,10 @@ const ManageVideosPage = () => {
         })).filter(v => v.parent_category && v.video_title && v.video_id);
 
         if (videosToUpload.length === 0) {
-          throw new Error("No valid data found in spreadsheet. Check column headers.");
+          throw new Error("No valid data found. Ensure column headers match: Parent Category, Sub-Category, Video Title, Display Number (Order), Vimeo ID");
         }
 
-        const { data: res, error } = await supabase.functions.invoke('bulk-upload-videos', {
+        const { data: _res, error } = await supabase.functions.invoke('bulk-upload-videos', {
           body: { videos: videosToUpload },
         });
 
@@ -188,7 +187,7 @@ const ManageVideosPage = () => {
 
         toast({ 
           title: "Upload Complete", 
-          description: `Successfully processed \${res.successCount} videos. \${res.errorCount} errors.` 
+          description: "Videos have been successfully imported into the curriculum." 
         });
         
         setSelectedFile(null);
@@ -435,7 +434,6 @@ const ManageVideosPage = () => {
           </Card>
         </TabsContent>
 
-        {/* Tab 4: Bulk Upload */}
         <TabsContent value="bulk">
           <Card className="max-w-2xl border-none shadow-xl">
             <CardHeader>
@@ -444,20 +442,20 @@ const ManageVideosPage = () => {
                 Spreadsheet Upload
               </CardTitle>
               <CardDescription>
-                Quickly populate your video curriculum using an Excel file.
+                Quickly populate your video library using an Excel file.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="bg-muted p-4 rounded-xl border space-y-3">
                  <h4 className="text-sm font-bold flex items-center gap-2">
-                   <Download className="h-4 w-4" /> Required Columns
+                   <Download className="h-4 w-4" /> Required Column Headers
                  </h4>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div className="bg-background p-2 border rounded font-mono">Parent Category</div>
-                    <div className="bg-background p-2 border rounded font-mono">Sub-Category</div>
-                    <div className="bg-background p-2 border rounded font-mono">Video Title</div>
-                    <div className="bg-background p-2 border rounded font-mono">Display Number (Order)</div>
-                    <div className="bg-background p-2 border rounded font-mono">Vimeo ID</div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] font-mono">
+                    <div className="bg-background p-2 border rounded">Parent Category</div>
+                    <div className="bg-background p-2 border rounded">Sub-Category</div>
+                    <div className="bg-background p-2 border rounded">Video Title</div>
+                    <div className="bg-background p-2 border rounded">Display Number (Order)</div>
+                    <div className="bg-background p-2 border rounded">Vimeo ID</div>
                  </div>
               </div>
 

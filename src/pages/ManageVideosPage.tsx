@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   Trash2, 
@@ -13,7 +13,11 @@ import {
   FolderPlus,
   MoreHorizontal,
   PlayCircle,
-  GripVertical
+  GripVertical,
+  UploadCloud,
+  FileSpreadsheet,
+  Download,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import EditVideoDialog from '@/components/EditVideoDialog';
@@ -32,6 +36,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import LoadingBar from '@/components/LoadingBar';
 import { MadeWithDyad } from '@/components/made-with-dyad';
+import { Input } from '@/components/ui/input';
+import * as XLSX from 'xlsx';
 
 interface Video {
   id: string;
@@ -75,6 +81,10 @@ const ManageVideosPage = () => {
   const [subgroups, setSubgroups] = useState<any[]>([]);
   const [isSubgroupDialogOpen, setIsSubgroupDialogOpen] = useState(false);
   const [selectedSubgroup, setSelectedSubgroup] = useState<any | null>(null);
+
+  // State for Bulk Upload (Tab 4)
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const fetchAllData = useCallback(async () => {
     setIsPageLoading(true);
@@ -138,6 +148,60 @@ const ManageVideosPage = () => {
     fetchAllData();
   }, [fetchAllData]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleBulkUpload = async () => {
+    if (!selectedFile) return;
+    setIsUploading(true);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        const videosToUpload = json.map(row => ({
+          parent_category: row['Parent Category'],
+          sub_category: row['Sub-Category'],
+          video_title: row['Video Title'],
+          order: parseInt(row['Display Number (Order)']) || 0,
+          video_id: String(row['Vimeo ID']),
+          platform: 'vimeo'
+        })).filter(v => v.parent_category && v.video_title && v.video_id);
+
+        if (videosToUpload.length === 0) {
+          throw new Error("No valid data found in spreadsheet. Check column headers.");
+        }
+
+        const { data: res, error } = await supabase.functions.invoke('bulk-upload-videos', {
+          body: { videos: videosToUpload },
+        });
+
+        if (error) throw error;
+
+        toast({ 
+          title: "Upload Complete", 
+          description: `Successfully processed \${res.successCount} videos. \${res.errorCount} errors.` 
+        });
+        
+        setSelectedFile(null);
+        fetchAllData();
+      } catch (err: any) {
+        toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
+      } finally {
+        setIsUploading(false);
+      }
+    };
+    reader.readAsBinaryString(selectedFile);
+  };
+
   const handleDeleteVideo = async (id: string) => {
     if (!window.confirm("Delete this video?")) return;
     const { error } = await supabase.from('videos').delete().eq('id', id);
@@ -164,8 +228,6 @@ const ManageVideosPage = () => {
       fetchAllData();
     }
   };
-
-  // --- Column Definitions for Management Tabs ---
 
   const groupColumns: ColumnDef<VideoGroup>[] = [
     { accessorKey: "order", header: "Order" },
@@ -264,17 +326,12 @@ const ManageVideosPage = () => {
           <TabsTrigger value="library" className="rounded-full px-6">Curriculum View</TabsTrigger>
           <TabsTrigger value="groups" className="rounded-full px-6">Groups</TabsTrigger>
           <TabsTrigger value="subgroups" className="rounded-full px-6">Sub-groups</TabsTrigger>
+          <TabsTrigger value="bulk" className="rounded-full px-6 flex items-center gap-2">
+            <UploadCloud className="h-4 w-4" /> Bulk Upload
+          </TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Structured Library (Curriculum View) */}
         <TabsContent value="library" className="space-y-6">
-          {library.length === 0 ? (
-            <Card className="border-dashed py-20 text-center">
-              <VideoIcon className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-bold">Your Library is Empty</h3>
-              <p className="text-muted-foreground">Start by creating groups and adding your first video lessons.</p>
-            </Card>
-          ) : (
             <Accordion type="multiple" defaultValue={[library[0]?.id]} className="space-y-6">
               {library.map((group) => (
                 <AccordionItem key={group.id} value={group.id} className="border rounded-2xl bg-card overflow-hidden shadow-sm border-border/60">
@@ -294,8 +351,6 @@ const ManageVideosPage = () => {
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="p-6 bg-muted/5 space-y-10">
-                    
-                    {/* Standalone Videos */}
                     {group.standaloneVideos.length > 0 && (
                       <section className="space-y-4">
                         <div className="flex items-center gap-2 px-1">
@@ -307,8 +362,6 @@ const ManageVideosPage = () => {
                         </div>
                       </section>
                     )}
-
-                    {/* Subgroups organized into distinct section cards */}
                     {group.subgroups.length > 0 && (
                       <section className="space-y-4">
                         <div className="flex items-center gap-2 px-1">
@@ -335,11 +388,6 @@ const ManageVideosPage = () => {
                               <AccordionContent className="px-5 pb-5 pt-2">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                                   {sg.videos.map(v => <VideoRow key={v.id} video={v} />)}
-                                  {sg.videos.length === 0 && (
-                                    <p className="col-span-full text-center py-8 text-xs text-muted-foreground italic border-2 border-dashed rounded-xl bg-muted/10">
-                                      This sub-group is currently empty.
-                                    </p>
-                                  )}
                                 </div>
                               </AccordionContent>
                             </AccordionItem>
@@ -347,21 +395,12 @@ const ManageVideosPage = () => {
                         </Accordion>
                       </section>
                     )}
-
-                    {group.standaloneVideos.length === 0 && group.subgroups.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-3xl opacity-40">
-                         <Plus className="h-10 w-10 mb-2" />
-                         <p className="text-sm font-bold">No content assigned to this group yet.</p>
-                      </div>
-                    )}
                   </AccordionContent>
                 </AccordionItem>
               ))}
             </Accordion>
-          )}
         </TabsContent>
 
-        {/* Tab 2: Manage Groups */}
         <TabsContent value="groups">
           <Card className="shadow-sm border-none bg-muted/20">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -379,7 +418,6 @@ const ManageVideosPage = () => {
           </Card>
         </TabsContent>
 
-        {/* Tab 3: Manage Subgroups */}
         <TabsContent value="subgroups">
           <Card className="shadow-sm border-none bg-muted/20">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -396,9 +434,63 @@ const ManageVideosPage = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Tab 4: Bulk Upload */}
+        <TabsContent value="bulk">
+          <Card className="max-w-2xl border-none shadow-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="h-6 w-6 text-primary" />
+                Spreadsheet Upload
+              </CardTitle>
+              <CardDescription>
+                Quickly populate your video curriculum using an Excel file.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="bg-muted p-4 rounded-xl border space-y-3">
+                 <h4 className="text-sm font-bold flex items-center gap-2">
+                   <Download className="h-4 w-4" /> Required Columns
+                 </h4>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div className="bg-background p-2 border rounded font-mono">Parent Category</div>
+                    <div className="bg-background p-2 border rounded font-mono">Sub-Category</div>
+                    <div className="bg-background p-2 border rounded font-mono">Video Title</div>
+                    <div className="bg-background p-2 border rounded font-mono">Display Number (Order)</div>
+                    <div className="bg-background p-2 border rounded font-mono">Vimeo ID</div>
+                 </div>
+              </div>
+
+              <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-10 bg-muted/30">
+                 <Input 
+                   type="file" 
+                   accept=".xlsx, .xls, .csv" 
+                   onChange={handleFileChange}
+                   className="hidden"
+                   id="bulk-video-upload"
+                 />
+                 <Label htmlFor="bulk-video-upload" className="cursor-pointer text-center space-y-2">
+                   <div className="bg-primary/5 p-4 rounded-full w-fit mx-auto">
+                     <UploadCloud className="h-10 w-10 text-primary" />
+                   </div>
+                   <p className="font-bold text-sm">{selectedFile ? selectedFile.name : "Select your Excel file"}</p>
+                   <p className="text-xs text-muted-foreground">Click to browse or drag and drop here.</p>
+                 </Label>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                onClick={handleBulkUpload} 
+                disabled={isUploading || !selectedFile} 
+                className="w-full h-11 text-lg font-bold"
+              >
+                {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...</> : "Start Bulk Import"}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
       </Tabs>
 
-      {/* Shared Dialogs */}
       <EditVideoDialog open={isVideoDialogOpen} onOpenChange={setIsVideoDialogOpen} video={selectedVideo} onSave={fetchAllData} />
       <EditVideoGroupDialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen} group={selectedGroup} onSave={fetchAllData} />
       <EditVideoSubgroupDialog open={isSubgroupDialogOpen} onOpenChange={setIsSubgroupDialogOpen} subgroup={selectedSubgroup} onSave={fetchAllData} />

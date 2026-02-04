@@ -15,8 +15,8 @@ import {
   GripVertical,
   UploadCloud,
   FileSpreadsheet,
-  Download,
-  Loader2
+  Loader2,
+  Table as TableIcon
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import EditVideoDialog from '@/components/EditVideoDialog';
@@ -176,7 +176,7 @@ const ManageVideosPage = () => {
         })).filter(v => v.parent_category && v.video_title && v.video_id);
 
         if (videosToUpload.length === 0) {
-          throw new Error("No valid data found. Ensure column headers match: Parent Category, Sub-Category, Video Title, Display Number (Order), Vimeo ID");
+          throw new Error("No valid data found. Ensure column headers match exactly: Parent Category, Sub-Category, Video Title, Display Number (Order), Vimeo ID");
         }
 
         const { data: _res, error } = await supabase.functions.invoke('bulk-upload-videos', {
@@ -435,54 +435,71 @@ const ManageVideosPage = () => {
         </TabsContent>
 
         <TabsContent value="bulk">
-          <Card className="max-w-2xl border-none shadow-xl">
+          <Card className="max-w-4xl border-none shadow-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileSpreadsheet className="h-6 w-6 text-primary" />
-                Spreadsheet Upload
+                Vimeo Bulk Import
               </CardTitle>
               <CardDescription>
-                Quickly populate your video library using an Excel file.
+                Import your entire curriculum in seconds using an Excel spreadsheet.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-muted p-4 rounded-xl border space-y-3">
-                 <h4 className="text-sm font-bold flex items-center gap-2">
-                   <Download className="h-4 w-4" /> Required Column Headers
-                 </h4>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] font-mono">
-                    <div className="bg-background p-2 border rounded">Parent Category</div>
-                    <div className="bg-background p-2 border rounded">Sub-Category</div>
-                    <div className="bg-background p-2 border rounded">Video Title</div>
-                    <div className="bg-background p-2 border rounded">Display Number (Order)</div>
-                    <div className="bg-background p-2 border rounded">Vimeo ID</div>
-                 </div>
+            <CardContent className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-muted/50 p-5 rounded-2xl border space-y-4">
+                  <h4 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                    <TableIcon className="h-4 w-4 text-primary" /> Required Column Headers
+                  </h4>
+                  <div className="space-y-2">
+                    {[
+                      { h: "Parent Category", d: "e.g., Cardiology, Surgery" },
+                      { h: "Sub-Category", d: "e.g., Heart Failure (Optional)" },
+                      { h: "Video Title", d: "e.g., Intro to CHF" },
+                      { h: "Display Number (Order)", d: "e.g., 1, 2, 3" },
+                      { h: "Vimeo ID", d: "e.g., 123456789" }
+                    ].map((col, i) => (
+                      <div key={i} className="flex items-center justify-between text-[11px] bg-background p-2 rounded-lg border">
+                        <code className="font-bold text-primary">{col.h}</code>
+                        <span className="text-muted-foreground italic">{col.d}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-6 bg-primary/5 hover:bg-primary/10 transition-colors">
+                  <Input 
+                    type="file" 
+                    accept=".xlsx, .xls, .csv" 
+                    onChange={handleFileChange}
+                    className="hidden"
+                    id="bulk-video-upload"
+                  />
+                  <Label htmlFor="bulk-video-upload" className="cursor-pointer text-center space-y-3 w-full">
+                    <div className="bg-background p-4 rounded-full w-fit mx-auto shadow-sm">
+                      <UploadCloud className="h-8 w-8 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-black text-sm uppercase tracking-tight">{selectedFile ? selectedFile.name : "Select Spreadsheet"}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Click to browse your device.</p>
+                    </div>
+                  </Label>
+                </div>
               </div>
 
-              <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-10 bg-muted/30">
-                 <Input 
-                   type="file" 
-                   accept=".xlsx, .xls, .csv" 
-                   onChange={handleFileChange}
-                   className="hidden"
-                   id="bulk-video-upload"
-                 />
-                 <Label htmlFor="bulk-video-upload" className="cursor-pointer text-center space-y-2">
-                   <div className="bg-primary/5 p-4 rounded-full w-fit mx-auto">
-                     <UploadCloud className="h-10 w-10 text-primary" />
-                   </div>
-                   <p className="font-bold text-sm">{selectedFile ? selectedFile.name : "Select your Excel file"}</p>
-                   <p className="text-xs text-muted-foreground">Click to browse or drag and drop here.</p>
-                 </Label>
+              <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl">
+                 <p className="text-[11px] text-orange-800 font-medium leading-relaxed">
+                   <strong>Note:</strong> The system automatically matches existing categories and sub-categories by name. If a video with the same Vimeo ID already exists, it will be updated with the new details from your file.
+                 </p>
               </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="bg-muted/30 p-6 rounded-b-2xl border-t">
               <Button 
                 onClick={handleBulkUpload} 
                 disabled={isUploading || !selectedFile} 
-                className="w-full h-11 text-lg font-bold"
+                className="w-full h-12 text-lg font-black uppercase tracking-widest shadow-lg"
               >
-                {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...</> : "Start Bulk Import"}
+                {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing File...</> : "Execute Bulk Import"}
               </Button>
             </CardFooter>
           </Card>

@@ -78,49 +78,71 @@ serve(async (req: Request) => {
               .insert({ name: parentName, order: 0 })
               .select('id')
               .single();
-            if (groupErr) throw new Error(`Failed to create group: \${groupErr.message}`);
+            if (groupErr) throw new Error(`Failed to create group: ${groupErr.message}`);
             groupId = newGroup.id;
           }
           groupCache.set(parentKey, groupId!);
         }
 
-        // 2. Resolve Sub-category
+        // 2. Resolve Sub-category (Topic)
         let subgroupId = null;
         if (video.sub_category && video.sub_category.trim()) {
           const subName = video.sub_category.trim();
-          const subKey = `\${groupId}_\${subName.toLowerCase()}`;
           const subOrder = parseInt(String(video.sub_category_order)) || 0;
           
-          subgroupId = subgroupCache.get(subKey);
+          // Generate a cache key that includes the parent group
+          const subKey = `${groupId}_${subName.toLowerCase()}`;
+          const subOrderKey = `${groupId}_order_${subOrder}`;
+          
+          subgroupId = subgroupCache.get(subKey) || subgroupCache.get(subOrderKey);
 
           if (!subgroupId) {
-            const { data: existingSubs } = await supabaseAdmin
+            // Priority 1: Match by EXACT name (case-insensitive) within this group
+            const { data: nameMatch } = await supabaseAdmin
               .from('video_subgroups')
-              .select('id, order')
+              .select('id')
               .eq('group_id', groupId)
               .ilike('name', subName)
               .limit(1);
 
-            if (existingSubs && existingSubs.length > 0) {
-              subgroupId = existingSubs[0].id;
-              // Update order if it's different to ensure consistency
-              if (existingSubs[0].order !== subOrder) {
-                await supabaseAdmin.from('video_subgroups').update({ order: subOrder }).eq('id', subgroupId);
+            if (nameMatch && nameMatch.length > 0) {
+              subgroupId = nameMatch[0].id;
+              // Update the order just in case it changed in the Excel
+              await supabaseAdmin.from('video_subgroups').update({ order: subOrder }).eq('id', subgroupId);
+            } else if (subOrder > 0) {
+              // Priority 2: Match by ORDER within this group (if name didn't match, maybe the user renamed it?)
+              const { data: orderMatch } = await supabaseAdmin
+                .from('video_subgroups')
+                .select('id')
+                .eq('group_id', groupId)
+                .eq('order', subOrder)
+                .limit(1);
+
+              if (orderMatch && orderMatch.length > 0) {
+                subgroupId = orderMatch[0].id;
+                // Update the name since the order matched but the name didn't
+                await supabaseAdmin.from('video_subgroups').update({ name: subName }).eq('id', subgroupId);
               }
-            } else {
+            }
+
+            // Priority 3: Create new if still no match
+            if (!subgroupId) {
               const { data: newSub, error: subErr } = await supabaseAdmin
                 .from('video_subgroups')
                 .insert({ name: subName, group_id: groupId, order: subOrder })
                 .select('id')
                 .single();
-              if (subErr) throw new Error(`Failed to create sub-category: \${subErr.message}`);
+              if (subErr) throw new Error(`Failed to create sub-category: ${subErr.message}`);
               subgroupId = newSub.id;
             }
+            
+            // Cache both by name and order to prevent duplicates later in this run
             subgroupCache.set(subKey, subgroupId!);
+            subgroupCache.set(subOrderKey, subgroupId!);
           }
         }
 
-        // 3. Handle Video
+        // 3. Handle Video Insertion/Update
         const { data: existingVideos } = await supabaseAdmin
           .from('videos')
           .select('id')
@@ -153,7 +175,7 @@ serve(async (req: Request) => {
         successCount++;
       } catch (e: any) {
         errorCount++;
-        errors.push(`Row failure ("\${video.video_title}"): \${e.message}`);
+        errors.push(`Row failure ("${video.video_title}"): ${e.message}`);
       }
     }
 

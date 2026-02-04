@@ -260,14 +260,14 @@ const ManageMcqsPage = () => {
 
   const handleBulkEnhance = async () => {
     const selectedIndices = Object.keys(rowSelection);
-    const selectedMcqIds = selectedIndices.map(index => filteredMcqs[parseInt(index)].id);
+    const selectedMcqIds = selectedIndices.map(_index => filteredMcqs[parseInt(_index)].id);
 
     if (selectedMcqIds.length === 0) {
       toast({ title: "No MCQs Selected", description: "Please select one or more MCQs to enhance.", variant: "destructive" });
       return;
     }
 
-    if (!window.confirm(`You are about to enhance ${selectedMcqIds.length} MCQs with AI. Continue?`)) {
+    if (!window.confirm(`You are about to enhance \${selectedMcqIds.length} MCQs with AI. Continue?`)) {
       return;
     }
 
@@ -282,18 +282,18 @@ const ManageMcqsPage = () => {
       if (data.errorCount > 0) {
         toast({
           title: "Partial Success",
-          description: `Enhanced ${data.successCount} MCQs. ${data.errorCount} failed. Check console for details.`,
+          description: `Enhanced \${data.successCount} MCQs. \${data.errorCount} failed. Check console for details.`,
           variant: "default",
         });
         console.error("Bulk Enhance Errors:", data.errors);
       } else {
-        toast({ title: "Success!", description: `Successfully enhanced ${data.successCount} MCQs.` });
+        toast({ title: "Success!", description: `Successfully enhanced \${data.successCount} MCQs.` });
       }
       setRowSelection({});
       refreshAllData();
     } catch (error: any) {
       console.error("Error bulk enhancing MCQs:", error);
-      toast({ title: "Error", description: `Failed to enhance MCQs: ${error.message || 'Unknown error'}`, variant: "destructive" });
+      toast({ title: "Error", description: `Failed to enhance MCQs: \${error.message || 'Unknown error'}`, variant: "destructive" });
     } finally {
       setIsEnhancing(false);
     }

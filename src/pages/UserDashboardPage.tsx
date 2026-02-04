@@ -11,7 +11,8 @@ import { Link } from 'react-router-dom';
 import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight } from 'lucide-react'; 
 import LoadingBar from '@/components/LoadingBar';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
-import { cn } from '@/lib/utils';
+import { differenceInDays, parseISO } from 'date-fns';
+import { cn } from "@/lib/utils";
 
 interface QuizPerformance {
   totalAttempts: number;
@@ -178,6 +179,10 @@ const UserDashboardPage = () => {
     return <LoadingBar />;
   }
 
+  const daysRemaining = user?.subscription_end_date 
+    ? differenceInDays(parseISO(user.subscription_end_date), new Date()) 
+    : null;
+
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -209,7 +214,6 @@ const UserDashboardPage = () => {
         </Card>
       )}
 
-      {/* Stats Grid - Optimized to 3 columns */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-primary text-primary-foreground">
           <CardHeader className="pb-2">
@@ -240,12 +244,19 @@ const UserDashboardPage = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
-                <Clock className="h-4 w-4" /> Trial Status
+                <Clock className="h-4 w-4" /> Account Status
             </CardDescription>
-            <CardTitle className="text-2xl font-bold">{user?.has_active_subscription ? 'Premium' : 'Free Trial'}</CardTitle>
+            <div className="flex items-baseline gap-2">
+              <CardTitle className="text-2xl font-bold">{user?.has_active_subscription ? 'Premium' : 'Free Trial'}</CardTitle>
+              {user?.has_active_subscription && daysRemaining !== null && (
+                <span className={cn("text-xs font-bold", daysRemaining <= 5 ? "text-red-500 animate-pulse" : "text-muted-foreground")}>
+                  ({daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left)
+                </span>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <Link to="/subscription" className="text-xs text-primary font-bold hover:underline">
+            <Link to="/user/subscriptions" className="text-xs text-primary font-bold hover:underline">
                 {user?.has_active_subscription ? 'Manage Subscription' : 'Upgrade for Full Access'}
             </Link>
           </CardContent>
@@ -253,7 +264,6 @@ const UserDashboardPage = () => {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-        {/* Performance Chart */}
         <Card className="md:col-span-4 shadow-sm">
           <CardHeader>
             <CardTitle>Performance by Specialty</CardTitle>
@@ -281,8 +291,8 @@ const UserDashboardPage = () => {
                     }}
                   />
                   <Bar dataKey="accuracy" radius={[0, 4, 4, 0]} barSize={25}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.accuracy > 70 ? '#16a34a' : entry.accuracy > 40 ? '#2563eb' : '#dc2626'} />
+                    {chartData.map((entry, _index) => (
+                      <Cell key={`cell-\${_index}`} fill={entry.accuracy > 70 ? '#16a34a' : entry.accuracy > 40 ? '#2563eb' : '#dc2626'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -297,7 +307,6 @@ const UserDashboardPage = () => {
           </CardContent>
         </Card>
 
-        {/* Improvement Areas */}
         <Card className="md:col-span-3 shadow-sm">
           <CardHeader>
             <CardTitle>Focus Areas</CardTitle>
@@ -336,7 +345,6 @@ const UserDashboardPage = () => {
       </div>
 
       <div className="grid gap-6">
-        {/* Recent Activity - Full Width */}
         <Card className="shadow-sm overflow-hidden">
           <CardHeader className="bg-muted/30 border-b">
             <CardTitle className="text-lg">Recent Quiz Activity</CardTitle>

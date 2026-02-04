@@ -24,7 +24,9 @@ serve(async (req: Request) => {
 
   // @ts-ignore
   const supabaseAdmin = createClient(
+    // @ts-ignore
     Deno.env.get('SUPABASE_URL') ?? '',
+    // @ts-ignore
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
@@ -42,21 +44,23 @@ serve(async (req: Request) => {
     let errorCount = 0;
     const errors: string[] = [];
 
-    // Cache for IDs to avoid redundant DB calls
+    // Local caches to avoid extra DB hits during this run
     const groupCache = new Map<string, string>();
     const subgroupCache = new Map<string, string>();
 
-    for (const video of videos) {
+    for (const video of (videos as IncomingVideo[])) {
       try {
-        // 1. Resolve Parent Category (Group)
+        // 1. Clean and Resolve Parent Group
         const parentName = video.parent_category.trim();
-        let groupId = groupCache.get(parentName);
+        const parentLower = parentName.toLowerCase();
+        let groupId = groupCache.get(parentLower);
 
         if (!groupId) {
+          // Check DB with ilike for safety
           const { data: existingGroup } = await supabaseAdmin
             .from('video_groups')
             .select('id')
-            .eq('name', parentName)
+            .ilike('name', parentName)
             .maybeSingle();
 
           if (existingGroup) {
@@ -70,14 +74,14 @@ serve(async (req: Request) => {
             if (groupErr) throw groupErr;
             groupId = newGroup.id;
           }
-          groupCache.set(parentName, groupId!);
+          groupCache.set(parentLower, groupId!);
         }
 
-        // 2. Resolve Sub-category (Subgroup) if provided
+        // 2. Clean and Resolve Subgroup
         let subgroupId = null;
         if (video.sub_category && video.sub_category.trim()) {
           const subName = video.sub_category.trim();
-          const cacheKey = `\${groupId}_\${subName}`;
+          const cacheKey = `${groupId}_${subName.toLowerCase()}`;
           subgroupId = subgroupCache.get(cacheKey);
 
           if (!subgroupId) {
@@ -85,7 +89,7 @@ serve(async (req: Request) => {
               .from('video_subgroups')
               .select('id')
               .eq('group_id', groupId)
-              .eq('name', subName)
+              .ilike('name', subName)
               .maybeSingle();
 
             if (existingSub) {
@@ -103,26 +107,26 @@ serve(async (req: Request) => {
           }
         }
 
-        // 3. Insert/Update Video
+        // 3. Upsert Video
         const videoData = {
-          title: video.video_title,
-          youtube_video_id: video.video_id,
-          platform: video.platform || 'vimeo', // Default to vimeo as requested
+          title: video.video_title.trim(),
+          youtube_video_id: String(video.video_id).trim(),
+          platform: 'vimeo',
           group_id: groupId,
           subgroup_id: subgroupId,
-          order: video.order || 0
+          order: parseInt(String(video.order)) || 0
         };
 
         const { error: videoErr } = await supabaseAdmin
           .from('videos')
-          .upsert(videoData, { onConflict: 'youtube_video_id' }); // Assuming unique IDs
+          .upsert(videoData, { onConflict: 'youtube_video_id' });
 
         if (videoErr) throw videoErr;
         successCount++;
 
       } catch (e: any) {
         errorCount++;
-        errors.push(`Failed to process "\${video.video_title}": \${e.message}`);
+        errors.push(`Failed to process "${video.video_title}": ${e.message}`);
       }
     }
 

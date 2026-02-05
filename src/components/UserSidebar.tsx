@@ -87,20 +87,22 @@ const UserSidebar = () => {
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-4 bg-sidebar flex flex-col">
           <h2 className="text-2xl font-bold text-sidebar-primary-foreground mb-6">User Panel</h2>
-          <nav className="flex flex-col gap-2 flex-grow">
-            {navItems.map((item) => (
-              <NavLink 
-                key={item.to} 
-                to={item.to} 
-                icon={item.icon} 
-                label={item.label} 
-                isMobile={true} 
-                onLinkClick={handleLinkClick} 
-                disabled={item.premium && !isSubscribed}
-                isPremium={item.premium}
-              />
-            ))}
-          </nav>
+          <div className="flex-1 overflow-y-auto pr-2 -mr-2">
+            <nav className="flex flex-col gap-2">
+              {navItems.map((item) => (
+                <NavLink 
+                  key={item.to} 
+                  to={item.to} 
+                  icon={item.icon} 
+                  label={item.label} 
+                  isMobile={true} 
+                  onLinkClick={handleLinkClick} 
+                  disabled={item.premium && !isSubscribed}
+                  isPremium={item.premium}
+                />
+              ))}
+            </nav>
+          </div>
           <div className="mt-auto pt-4 border-t border-sidebar-border">
             <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLogout}><LogOut className="h-4 w-4" /><span>Logout</span></Button>
           </div>

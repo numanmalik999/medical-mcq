@@ -10,7 +10,6 @@ import BackToTop from "./components/BackToTop";
 import { SessionContextProvider, useSession } from "./components/SessionContextProvider";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import AdSenseManager from "./components/AdSenseManager";
 import SchemaMarkup from "./components/SchemaMarkup";
 import LoadingBar from "./components/LoadingBar";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
@@ -93,7 +92,6 @@ const AppContent = () => {
     <>
       <ScrollToTop />
       <BackToTop />
-      <AdSenseManager />
       <SchemaMarkup />
       <Header />
       <div className="flex flex-col min-h-screen">

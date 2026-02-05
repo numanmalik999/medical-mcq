@@ -35,10 +35,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const isMounted = useRef(true);
   const maintenancePerformed = useRef<string | null>(null);
 
-  const fetchUserProfile = useCallback(async (supabaseUser: User): Promise<AuthUser> => {
-    if (!isMounted.current) {
-      return { ...supabaseUser } as AuthUser;
-    }
+  const hydrateProfile = useCallback(async (supabaseUser: User) => {
+    if (!isMounted.current) return;
 
     try {
       const [profileRes, subRes] = await Promise.all([
@@ -57,6 +55,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           .maybeSingle()
       ]);
 
+      if (!isMounted.current) return;
+
       const profileData = profileRes.data;
       const latestSub = subRes.data;
       
@@ -67,17 +67,16 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         const endDate = parseISO(latestSubEndDate);
         if (isPast(endDate)) {
           currentHasActiveSubscription = false;
-          
           if (maintenancePerformed.current !== supabaseUser.id) {
             maintenancePerformed.current = supabaseUser.id;
             supabase.functions.invoke('update-expired-subscription-status', {
               body: { user_id: supabaseUser.id, is_active: false },
-            }).catch(err => console.error("[Session] Background maintenance failed:", err));
+            }).catch(err => console.error("[Session] Maintenance failed:", err));
           }
         }
       }
     
-      return {
+      setUser({
         ...supabaseUser,
         is_admin: profileData?.is_admin || false,
         first_name: profileData?.first_name || null,
@@ -87,68 +86,55 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         has_active_subscription: currentHasActiveSubscription,
         trial_taken: profileData?.trial_taken || false,
         subscription_end_date: latestSubEndDate,
-      };
+      } as AuthUser);
     } catch (e: any) {
-      console.error("[Session] Hydration error:", e);
-      return { ...supabaseUser } as AuthUser;
+      console.error("[Session] Profile hydration failed:", e);
     }
   }, []);
-
-  const updateSessionAndUser = useCallback(async (currentSession: Session | null, event: string) => {
-    if (!isMounted.current) return;
-
-    if (!currentSession) {
-      setSession(null);
-      setUser(null);
-    } else {
-      const needsDbProfileFetch = !user || user.id !== currentSession.user.id || event === 'USER_UPDATED' || event === 'SIGNED_IN';
-      
-      if (needsDbProfileFetch) {
-        const hydratedUser = await fetchUserProfile(currentSession.user);
-        if (isMounted.current) {
-          setSession(currentSession);
-          setUser(hydratedUser);
-        }
-      } else {
-        setSession(currentSession);
-      }
-    }
-  }, [fetchUserProfile, user]);
 
   useEffect(() => {
     isMounted.current = true;
     
-    const initialize = async () => {
-      try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        if (initialSession) {
-          await updateSessionAndUser(initialSession, 'INITIAL_LOAD');
-        }
-      } catch (e) {
-        console.error("[Session] Initial check failed:", e);
-      } finally {
-        if (isMounted.current) setHasCheckedInitialSession(true);
-      }
-    };
-
-    initialize();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       if (!isMounted.current) return;
-      await updateSessionAndUser(currentSession, event);
+      setSession(initialSession);
+      if (initialSession) {
+        setUser(initialSession.user as AuthUser);
+        hydrateProfile(initialSession.user);
+      }
+      setHasCheckedInitialSession(true);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      if (!isMounted.current) return;
+      setSession(currentSession);
+      if (currentSession) {
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          hydrateProfile(currentSession.user);
+        } else {
+          setUser(currentSession.user as AuthUser);
+        }
+      } else {
+        setUser(null);
+      }
+      setHasCheckedInitialSession(true);
     });
 
     return () => {
       isMounted.current = false;
       subscription.unsubscribe();
     };
-  }, [updateSessionAndUser]);
+  }, [hydrateProfile]);
 
   useEffect(() => {
-    if (hasCheckedInitialSession && user && (location.pathname === '/login' || location.pathname === '/signup')) {
-      navigate(user.is_admin ? '/admin/dashboard' : '/user/dashboard', { replace: true });
+    if (hasCheckedInitialSession && session && (location.pathname === '/login' || location.pathname === '/signup')) {
+      const isAdmin = user?.is_admin || false;
+      const timer = setTimeout(() => {
+        navigate(isAdmin ? '/admin/dashboard' : '/user/dashboard', { replace: true });
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [user, hasCheckedInitialSession, navigate, location.pathname]);
+  }, [session, user?.is_admin, hasCheckedInitialSession, navigate, location.pathname]);
 
   return (
     <SessionContext.Provider value={{ session, user, hasCheckedInitialSession }}>

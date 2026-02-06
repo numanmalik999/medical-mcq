@@ -1,6 +1,6 @@
 "use client";
 
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { MadeWithDyad } from './made-with-dyad';
 import { MessageSquare, Mail, MapPin, Twitter, Facebook, Instagram, Linkedin, Globe, Youtube, ShieldCheck, Rss, Music2 } from 'lucide-react';
 import { useGlobalSettings, SocialLink } from '@/hooks/useGlobalSettings';
@@ -34,8 +34,13 @@ const getSocialIcon = (platform: string) => {
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const location = useLocation();
   const { footerLinks } = useNavigationData();
   const { settings } = useGlobalSettings();
+
+  // Hide footer on focused study pages
+  const isStudyMode = location.pathname.startsWith('/quiz') || location.pathname.includes('/take-test');
+  if (isStudyMode) return null;
 
   const quickLinks = footerLinks.filter(link => 
     !link.title.toLowerCase().includes('policy') && 

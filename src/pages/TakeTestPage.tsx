@@ -614,9 +614,9 @@ const TakeTestPage = () => {
         </div>
         
         <Card className="flex-1 border-none shadow-xl rounded-2xl overflow-hidden flex flex-col">
-          <CardHeader className="border-b py-4 px-6 flex flex-row justify-between items-center bg-muted/5">
+          <CardHeader className="border-b py-2 px-4 flex flex-row justify-between items-center bg-muted/5">
             <div>
-              <CardTitle className="text-lg font-bold tracking-tight">Question {currentQuestionIndex + 1} of {mcqs.length}</CardTitle>
+              <CardTitle className="text-base font-bold tracking-tight">Question {currentQuestionIndex + 1} of {mcqs.length}</CardTitle>
               <div className="flex items-center gap-2 mt-0.5">
                  <Badge variant="secondary" className="text-[8px] h-4 px-1.5 uppercase font-black leading-none">{currentMcq.difficulty || 'Mixed'}</Badge>
                  <span className="text-[10px] text-muted-foreground font-black flex items-center gap-1 uppercase"><TimerIcon className="h-3 w-3" /> {formatTime(timer)}</span>
@@ -628,17 +628,17 @@ const TakeTestPage = () => {
             </div>
           </CardHeader>
           
-          <CardContent className="p-6 flex-grow">
-             <div className="text-lg font-semibold leading-relaxed mb-6 text-foreground">
+          <CardContent className="p-4 flex-grow">
+             <div className="text-base font-semibold leading-relaxed mb-4 text-foreground">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{currentMcq.question_text}</ReactMarkdown>
              </div>
-             <RadioGroup onValueChange={handleOptionSelect} value={currentAns} className="space-y-2.5" disabled={isPaused}>
+             <RadioGroup onValueChange={handleOptionSelect} value={currentAns} className="space-y-1.5" disabled={isPaused}>
                 {['A','B','C','D'].map(k => (
                     <div 
                         key={k} 
                         onClick={() => !isPaused && handleOptionSelect(k)} 
                         className={cn(
-                            "flex items-center p-3.5 rounded-xl border transition-all cursor-pointer", 
+                            "flex items-center p-2.5 rounded-xl border transition-all cursor-pointer", 
                             currentAns === k ? "border-primary bg-primary/5 shadow-sm border-2" : "border-muted/50 hover:border-muted-foreground/30"
                         )}
                     >
@@ -652,11 +652,11 @@ const TakeTestPage = () => {
              </RadioGroup>
           </CardContent>
           
-          <CardFooter className="p-5 border-t bg-muted/5 flex justify-between">
-             <Button onClick={handlePrevious} variant="ghost" disabled={currentQuestionIndex === 0 || isPaused} className="rounded-lg h-10 px-4 text-xs font-bold uppercase tracking-tight">Back</Button>
+          <CardFooter className="p-3 border-t bg-muted/5 flex justify-between">
+             <Button onClick={handlePrevious} variant="ghost" disabled={currentQuestionIndex === 0 || isPaused} className="rounded-lg h-9 px-4 text-xs font-bold uppercase tracking-tight">Back</Button>
              <div className="flex gap-2">
-                <Button onClick={() => !isPaused && handleSkip()} variant="outline" className="rounded-lg h-10 px-4 gap-2 text-xs font-bold uppercase tracking-tight">Skip <SkipForward className="h-3 w-3" /></Button>
-                <Button onClick={handleNext} disabled={isPaused} className="rounded-lg h-10 px-8 font-black uppercase tracking-widest text-xs">
+                <Button onClick={() => !isPaused && handleSkip()} variant="outline" className="rounded-lg h-9 px-4 gap-2 text-xs font-bold uppercase tracking-tight">Skip <SkipForward className="h-3 w-3" /></Button>
+                <Button onClick={handleNext} disabled={isPaused} className="rounded-lg h-9 px-8 font-black uppercase tracking-widest text-xs">
                     {currentQuestionIndex === mcqs.length - 1 ? 'Finish Exam' : 'Next'}
                 </Button>
              </div>

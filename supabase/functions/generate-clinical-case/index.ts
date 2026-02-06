@@ -19,29 +19,29 @@ serve(async (req: Request) => {
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const prompt = `You are an expert medical examiner creating a clinical case study for 'Study Prometric'. 
+    const prompt = `You are an expert medical examiner for Gulf Prometric exams (DHA, SMLE, MOH). 
+    Generate a HARD/EXPERT level clinical case study. 
     
     Target Category: ${category_name}
     ${topic ? `Specific Topic: ${topic}` : ''}
 
     Task:
-    1. Create a detailed clinical vignette (Scenario). Include patient demographics, presenting symptoms, past medical history, physical examination findings, and initial lab results.
-    2. Generate 3 to 4 sequential multiple-choice questions based on this case.
-    3. Each question must follow the logic:
-       - Question 1: Usually about the most likely diagnosis or the next best step in management.
-       - Question 2: Usually about the definitive diagnostic test or underlying pathophysiology.
-       - Question 3: Usually about long-term management, complications, or prognosis.
+    1. Create a "Brief Presentation" (Initial 1-2 sentences of the patient's complaint).
+    2. Create a "Full Vignette" (The complete history, physical, and initial labs).
+    3. Generate 3 to 4 sequential HARD multiple-choice questions. 
+       - Focus on "Next Best Step", "Most Likely Diagnosis" (with complex distractors), and "Long Term Complications".
     
-    Return ONLY a valid JSON object with the following structure:
+    Return ONLY a valid JSON object:
     {
-      "case_title": "Title of the Case",
-      "vignette": "Full detailed clinical scenario text (use HTML <p> or <br/> for formatting)",
+      "case_title": "...",
+      "brief_presentation": "The initial chief complaint (1-2 sentences)",
+      "full_vignette": "The comprehensive clinical details (History, Exam, Labs) in Markdown",
       "questions": [
         {
           "question_text": "...",
           "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
           "correct_answer": "A/B/C/D",
-          "explanation": "Detailed clinical reasoning for the correct answer and why others are wrong."
+          "explanation": "Detailed clinical reasoning."
         }
       ]
     }`;

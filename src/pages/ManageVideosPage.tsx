@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   Trash2, 
@@ -12,7 +12,9 @@ import {
   PlayCircle,
   GripVertical,
   UploadCloud,
-  Loader2
+  FileSpreadsheet,
+  Loader2,
+  Search
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import EditVideoDialog from '@/components/EditVideoDialog';
@@ -51,9 +53,7 @@ const ManageVideosPage = () => {
   const [isVideoDialogOpen, setIsVideoDialogOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
   const [isSubgroupDialogOpen, setIsSubgroupDialogOpen] = useState(false);
-  const [selectedSubgroup, setSelectedSubgroup] = useState<any | null>(null);
 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
@@ -346,8 +346,8 @@ const ManageVideosPage = () => {
       </Tabs>
 
       <EditVideoDialog open={isVideoDialogOpen} onOpenChange={setIsVideoDialogOpen} video={selectedVideo} onSave={() => { setLoadedVideos({}); fetchMetadata(); }} />
-      <EditVideoGroupDialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen} group={selectedGroup} onSave={fetchMetadata} />
-      <EditVideoSubgroupDialog open={isSubgroupDialogOpen} onOpenChange={setIsSubgroupDialogOpen} subgroup={selectedSubgroup} onSave={fetchMetadata} />
+      <EditVideoGroupDialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen} group={null} onSave={fetchMetadata} />
+      <EditVideoSubgroupDialog open={isSubgroupDialogOpen} onOpenChange={setIsSubgroupDialogOpen} subgroup={null} onSave={fetchMetadata} />
       <MadeWithDyad />
     </div>
   );

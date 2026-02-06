@@ -4,7 +4,18 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Search, PlayCircle, Loader2, CheckCircle2, Circle, Layers, FolderTree, Info, AlertCircle } from 'lucide-react';
+import { 
+  Search, 
+  PlayCircle, 
+  Loader2, 
+  CheckCircle2, 
+  Circle, 
+  Layers, 
+  FolderTree, 
+  AlertCircle,
+  ChevronRight,
+  MonitorPlay
+} from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useSession } from '@/components/SessionContextProvider';
 import { Button } from '@/components/ui/button';
@@ -133,162 +144,245 @@ const UserVideosPage = () => {
 
   const VideoCard = ({ video }: { video: Video }) => {
     const isWatched = progressMap.get(video.id) || false;
+    
     return (
       <Card 
         className={cn(
-          "overflow-hidden cursor-pointer hover:shadow-lg transition-all border-2 relative group flex flex-col justify-center min-h-[140px]", 
-          isWatched ? "border-green-500/20 bg-green-50/5" : "border-transparent bg-muted/20 shadow-sm"
+          "group relative overflow-hidden cursor-pointer transition-all duration-300 border-2 hover:shadow-xl hover:-translate-y-1", 
+          isWatched ? "border-green-500/30 bg-green-50/10 shadow-inner" : "border-slate-200 bg-white"
         )}
         onClick={() => handleVideoClick(video)}
       >
-        <div className="p-6 text-center flex flex-col items-center justify-center gap-2">
-          <h4 className="text-sm font-extrabold leading-relaxed text-foreground px-4">
-            <span className="text-primary mr-1 opacity-40">{video.order}.</span> {video.title}
-          </h4>
-          <div className="absolute inset-0 bg-primary/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <PlayCircle className="h-10 w-10 text-primary/30" />
+        <div className="p-5 flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+                <div className={cn(
+                    "h-10 w-10 shrink-0 rounded-xl flex items-center justify-center font-black text-sm shadow-sm transition-colors",
+                    isWatched ? "bg-green-600 text-white" : "bg-primary text-primary-foreground"
+                )}>
+                    {video.order}
+                </div>
+                <h4 className="font-bold text-[15px] leading-snug text-slate-800 line-clamp-2">
+                    {video.title}
+                </h4>
+            </div>
+            
+            <div className="flex flex-col items-end gap-2">
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-full hover:bg-slate-100 shrink-0" 
+                    onClick={(e) => toggleWatched(video.id, e)}
+                    disabled={!user}
+                >
+                  {isWatched ? <CheckCircle2 className="h-6 w-6 text-green-600" /> : <Circle className="h-6 w-6 text-slate-300" />}
+                </Button>
+            </div>
           </div>
-          <div className="absolute top-2 right-2">
-            <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7 rounded-full hover:bg-background/80 shadow-sm" 
-                onClick={(e) => toggleWatched(video.id, e)}
-                disabled={!user}
-            >
-              {isWatched ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <Circle className="h-5 w-5 text-muted-foreground/40" />}
-            </Button>
+
+          <div className="flex items-center justify-between mt-2 pt-4 border-t border-slate-50">
+             <Badge variant="outline" className="text-[9px] uppercase font-black tracking-widest px-2 bg-slate-50 text-slate-500 border-slate-200">
+                {video.platform} lesson
+             </Badge>
+             <div className="flex items-center gap-1.5 text-primary group-hover:gap-2 transition-all">
+                <span className="text-[10px] font-black uppercase tracking-tighter">Watch Now</span>
+                <PlayCircle className="h-4 w-4" />
+             </div>
           </div>
         </div>
+
+        {isWatched && (
+            <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
+        )}
       </Card>
     );
   };
 
-  if (!hasCheckedInitialSession || isLoading) return <div className="flex justify-center py-20 pt-24"><Loader2 className="animate-spin" /></div>;
+  if (!hasCheckedInitialSession || isLoading) return <div className="flex justify-center py-20 pt-24"><Loader2 className="animate-spin text-primary" /></div>;
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <div>
-          <h1 className="text-4xl font-black tracking-tight text-foreground uppercase">Education Library</h1>
-          <p className="text-muted-foreground text-sm font-medium">Master medical concepts with our expert-led clinical series.</p>
-        </div>
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
-          <Input 
-            placeholder="Search thousands of lessons..." 
-            className="pl-12 rounded-2xl h-12 shadow-inner bg-muted/30 border-none text-lg" 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)} 
-          />
-          {isSearching && <Loader2 className="absolute right-4 top-3.5 h-5 w-5 animate-spin text-primary" />}
-        </div>
-      </div>
+    <div className="space-y-12 pb-20">
+      <section className="relative overflow-hidden bg-primary rounded-3xl p-8 md:p-12 text-primary-foreground shadow-2xl">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-8">
+          <div className="text-center lg:text-left space-y-3">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight uppercase italic leading-none">
+                Clinical Masterclass
+            </h1>
+            <p className="text-primary-foreground/70 font-medium max-w-md">
+                Master complex clinical concepts with our structured video roadmap, led by top-tier medical faculty.
+            </p>
+          </div>
 
-      {searchTerm.trim() ? (
-        <section className="animate-in fade-in slide-in-from-bottom-4 space-y-6">
-           <div className="flex items-center gap-2">
-             <Badge variant="secondary" className="px-3 py-1 text-xs font-black uppercase tracking-widest">Search Results</Badge>
-           </div>
-           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-             {searchResults.map(v => <VideoCard key={v.id} video={v} />)}
-             {searchResults.length === 0 && !isSearching && (
-               <Card className="col-span-full py-20 bg-muted/10 border-dashed border-2 text-center">
-                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-xl font-bold text-muted-foreground">No matches for "{searchTerm}"</p>
-               </Card>
-             )}
-           </div>
-        </section>
-      ) : (
-        <Accordion type="multiple" className="space-y-6">
-          {groups.map((group) => {
-            const groupSubgroups = subgroups.filter(sg => sg.group_id === group.id);
-            return (
-              <AccordionItem 
-                key={group.id} 
-                value={group.id} 
-                className="border rounded-3xl overflow-hidden shadow-md bg-card border-border/40"
-                onClick={() => loadVideosForId(group.id, 'group')}
-              >
-                <AccordionTrigger className="px-8 py-6 hover:bg-muted/30 hover:no-underline">
-                  <div className="flex items-center gap-5 text-left">
-                    <div className="p-3 bg-primary/5 rounded-2xl text-primary shadow-inner"><Layers className="h-8 w-8" /></div>
-                    <div>
-                      <h2 className="text-2xl font-black uppercase tracking-tight">{group.name}</h2>
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Core Modules Available</p>
+          <div className="relative w-full max-w-lg">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-6 w-6 text-primary" />
+            <Input 
+              placeholder="Search by topic, symptom, or diagnosis..." 
+              className="h-16 pl-14 pr-16 rounded-2xl bg-white text-slate-900 placeholder:text-slate-400 text-lg font-bold shadow-2xl border-none focus-visible:ring-offset-0 focus-visible:ring-4 focus-visible:ring-white/20" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+            />
+            {isSearching && (
+                <div className="absolute right-5 top-1/2 -translate-y-1/2">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div className="container max-w-7xl mx-auto px-0">
+        {searchTerm.trim() ? (
+          <section className="animate-in fade-in slide-in-from-bottom-4 space-y-8 px-4">
+             <div className="flex items-center gap-4">
+               <div className="p-2 bg-primary/10 rounded-xl text-primary"><MonitorPlay className="h-6 w-6" /></div>
+               <div>
+                  <h2 className="text-2xl font-black uppercase tracking-tight">Instant Search Results</h2>
+                  <p className="text-sm text-muted-foreground font-medium">Showing top matches for "{searchTerm}"</p>
+               </div>
+             </div>
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+               {searchResults.map(v => <VideoCard key={v.id} video={v} />)}
+               {searchResults.length === 0 && !isSearching && (
+                 <Card className="col-span-full py-24 bg-slate-50 border-2 border-dashed border-slate-200 text-center flex flex-col items-center gap-4 rounded-3xl">
+                    <div className="p-6 bg-white rounded-full shadow-sm"><AlertCircle className="h-12 w-12 text-slate-300" /></div>
+                    <div className="space-y-1">
+                        <p className="text-2xl font-black text-slate-400 uppercase tracking-tighter">No Lessons Found</p>
+                        <p className="text-slate-400 font-medium">Try adjusting your search terms or browse categories below.</p>
                     </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="p-8 bg-muted/5 border-t space-y-12">
-                  
-                  <div className="space-y-4">
-                    <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary/60 px-2 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-primary rounded-full" /> Foundation Lessons
-                    </h3>
-                    {loadingState[group.id] ? (
-                      <div className="flex justify-center py-10"><Loader2 className="animate-spin h-8 w-8 text-primary/20" /></div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {loadedVideos[group.id]?.map((v) => <VideoCard key={v.id} video={v} />)}
-                        {loadedVideos[group.id]?.length === 0 && <p className="text-sm text-muted-foreground italic px-2">No individual lessons here.</p>}
+                 </Card>
+               )}
+             </div>
+          </section>
+        ) : (
+          <Accordion type="multiple" className="space-y-8">
+            {groups.map((group) => {
+              const groupSubgroups = subgroups.filter(sg => sg.group_id === group.id);
+              return (
+                <AccordionItem 
+                  key={group.id} 
+                  value={group.id} 
+                  className="border-none bg-white rounded-3xl overflow-hidden shadow-xl border border-slate-100"
+                  onClick={() => loadVideosForId(group.id, 'group')}
+                >
+                  <AccordionTrigger className="px-8 py-8 hover:bg-slate-50/50 hover:no-underline border-b transition-all">
+                    <div className="flex items-center gap-6 text-left">
+                      <div className="p-4 bg-primary text-primary-foreground rounded-2xl shadow-lg ring-4 ring-primary/5">
+                        <Layers className="h-8 w-8" />
+                      </div>
+                      <div>
+                        <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">{group.name}</h2>
+                        <div className="flex items-center gap-3 mt-2">
+                             <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase tracking-widest px-3 py-1">
+                                Complete Syllabus
+                             </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="p-10 bg-slate-50/30 space-y-16">
+                    
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Foundation Curriculum</h3>
+                      </div>
+                      {loadingState[group.id] ? (
+                        <div className="flex justify-center py-16"><Loader2 className="animate-spin h-10 w-10 text-primary/20" /></div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                          {loadedVideos[group.id]?.map((v) => <VideoCard key={v.id} video={v} />)}
+                          {loadedVideos[group.id]?.length === 0 && (
+                            <div className="col-span-full py-8 text-center bg-white rounded-2xl border border-dashed border-slate-200">
+                                <p className="text-sm text-slate-400 font-medium">Core lessons are grouped by specialty below.</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {groupSubgroups.length > 0 && (
+                      <div className="space-y-8 pt-4">
+                        <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                            <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Specialty Sub-groups</h3>
+                        </div>
+                        <div className="grid grid-cols-1 gap-10">
+                          {groupSubgroups.map(sg => (
+                            <div key={sg.id} className="relative animate-in fade-in duration-700">
+                              <button 
+                                className="flex items-center gap-4 mb-6 group"
+                                onClick={() => loadVideosForId(sg.id, 'subgroup')}
+                              >
+                                <div className="p-2.5 bg-white rounded-xl shadow-md border group-hover:border-primary group-hover:scale-105 transition-all">
+                                    <FolderTree className="h-5 w-5 text-primary" />
+                                </div>
+                                <div className="text-left">
+                                    <span className="font-black text-xl uppercase tracking-tighter text-slate-800 flex items-center gap-2">
+                                        {sg.name} 
+                                        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
+                                    </span>
+                                    {sg.description && <p className="text-xs text-slate-400 font-medium mt-0.5">{sg.description}</p>}
+                                </div>
+                              </button>
+
+                              <div className="pl-2 border-l-2 border-slate-100 ml-5 pt-2">
+                                {loadingState[sg.id] ? (
+                                    <div className="flex justify-center py-12"><Loader2 className="animate-spin h-8 w-8 text-primary/20" /></div>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    {loadedVideos[sg.id]?.map((v) => <VideoCard key={v.id} video={v} />)}
+                                    {(!loadedVideos[sg.id] || loadedVideos[sg.id].length === 0) && (
+                                        <div 
+                                            className="col-span-full py-10 bg-white/50 rounded-2xl border border-dashed text-center cursor-pointer hover:bg-white transition-colors"
+                                            onClick={() => loadVideosForId(sg.id, 'subgroup')}
+                                        >
+                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Click to Expand Topics</p>
+                                        </div>
+                                    )}
+                                    </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
-                  </div>
-
-                  {groupSubgroups.length > 0 && (
-                    <div className="space-y-6">
-                      <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary/60 px-2 flex items-center gap-2">
-                        <div className="w-2 h-2 bg-primary rounded-full" /> Specialty Sub-groups
-                      </h3>
-                      <div className="grid grid-cols-1 gap-6">
-                        {groupSubgroups.map(sg => (
-                          <div key={sg.id} className="bg-background rounded-3xl border border-border/60 shadow-sm overflow-hidden transition-all hover:shadow-md">
-                            <button 
-                              className="w-full px-6 py-5 flex items-center justify-between group hover:bg-muted/20 transition-colors border-b"
-                              onClick={() => loadVideosForId(sg.id, 'subgroup')}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 bg-muted rounded-xl"><FolderTree className="h-5 w-5 text-primary/40" /></div>
-                                <span className="font-extrabold text-lg uppercase tracking-tight text-foreground/80">{sg.name}</span>
-                              </div>
-                              <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-                            </button>
-                            <div className="p-6">
-                              {loadingState[sg.id] ? (
-                                <div className="flex justify-center py-10"><Loader2 className="animate-spin h-6 w-6 text-primary/20" /></div>
-                              ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                  {loadedVideos[sg.id]?.map((v) => <VideoCard key={v.id} video={v} />)}
-                                  {loadedVideos[sg.id]?.length === 0 && <p className="text-xs text-muted-foreground italic text-center py-4 w-full col-span-full">Expand to load lessons for this topic.</p>}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
-      )}
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        )}
+      </div>
 
       <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none rounded-3xl shadow-2xl">
-          <DialogHeader className="p-6 bg-background border-b flex-row items-center justify-between space-y-0">
-             <DialogTitle className="flex-1 font-black text-2xl uppercase tracking-tighter">{selectedVideo?.title}</DialogTitle>
+        <DialogContent className="max-w-5xl p-0 overflow-hidden bg-black border-none rounded-[2rem] shadow-2xl">
+          <DialogHeader className="p-8 bg-white border-b flex-row items-center justify-between space-y-0">
+             <div className="flex items-center gap-4">
+                 <div className="h-12 w-12 bg-primary rounded-2xl flex items-center justify-center text-white font-black shadow-lg">
+                    {selectedVideo?.order}
+                 </div>
+                 <div>
+                    <DialogTitle className="font-black text-2xl uppercase tracking-tighter text-slate-900 leading-none">
+                        {selectedVideo?.title}
+                    </DialogTitle>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1.5">Masterclass Lesson</p>
+                 </div>
+             </div>
              <Button 
                variant={progressMap.get(selectedVideo?.id || '') ? "secondary" : "default"} 
-               size="sm" onClick={() => selectedVideo && toggleWatched(selectedVideo.id)}
-               className="ml-4 rounded-full px-8 font-black uppercase tracking-widest text-xs h-10"
+               size="lg" onClick={() => selectedVideo && toggleWatched(selectedVideo.id)}
+               className="ml-8 rounded-2xl px-10 font-black uppercase tracking-widest text-xs h-14 shadow-xl active:scale-95 transition-transform"
              >
-               {progressMap.get(selectedVideo?.id || '') ? "Completed" : "Mark Finished"}
+               {progressMap.get(selectedVideo?.id || '') ? (
+                   <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Lesson Finished</span>
+               ) : "Mark as Completed"}
              </Button>
           </DialogHeader>
-          <div className="aspect-video bg-zinc-900">
+          
+          <div className="aspect-video bg-zinc-900 shadow-2xl relative">
             {selectedVideo && (
               <iframe 
                 width="100%" height="100%" 
@@ -298,12 +392,17 @@ const UserVideosPage = () => {
               ></iframe>
             )}
           </div>
+          
           {selectedVideo?.description && (
-            <div className="p-10 bg-background border-t">
-               <h4 className="font-black text-xs uppercase tracking-[0.2em] text-primary/40 mb-4 flex items-center gap-2">
-                 <Info className="h-4 w-4" /> Lesson Briefing
+            <div className="p-12 bg-white border-t">
+               <h4 className="font-black text-xs uppercase tracking-[0.25em] text-primary/40 mb-6 flex items-center gap-2">
+                 <div className="h-1 w-8 bg-primary/20 rounded-full" /> Clinical Synopsis
                </h4>
-               <p className="text-lg font-medium text-foreground/80 leading-relaxed max-w-4xl">{selectedVideo.description}</p>
+               <div className="prose dark:prose-invert max-w-none">
+                <p className="text-xl font-medium text-slate-700 leading-relaxed italic border-l-4 border-primary/10 pl-6">
+                    {selectedVideo.description}
+                </p>
+               </div>
             </div>
           )}
         </DialogContent>
@@ -312,18 +411,13 @@ const UserVideosPage = () => {
       <SubscribePromptDialog 
         open={isUpgradeDialogOpen} 
         onOpenChange={setIsUpgradeDialogOpen} 
-        featureName="Video Education Series" 
-        description="Our clinical video library is a premium resource. Upgrade your plan to watch high-yield lessons and master complex medical concepts with our expert faculty."
+        featureName="Video Masterclass Series" 
+        description="Our high-yield clinical video library is reserved for premium subscribers. Upgrade your plan to master medical licensing concepts with our expert faculty."
       />
       
       <MadeWithDyad />
     </div>
   );
 };
-
-// Internal Helper for User Side
-const ChevronRight = ({ className }: { className?: string }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-);
 
 export default UserVideosPage;

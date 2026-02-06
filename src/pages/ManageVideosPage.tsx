@@ -1,40 +1,26 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   Trash2, 
   Edit, 
   FolderTree, 
   Plus,
-  FolderPlus,
-  MoreHorizontal,
   PlayCircle,
   GripVertical,
   UploadCloud,
-  FileSpreadsheet,
-  Loader2,
-  List as ListIcon,
-  Video as VideoIcon,
-  AlertCircle
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import EditVideoDialog from '@/components/EditVideoDialog';
-import EditVideoGroupDialog, { VideoGroup } from '@/components/EditVideoGroupDialog';
+import EditVideoGroupDialog from '@/components/EditVideoGroupDialog';
 import EditVideoSubgroupDialog from '@/components/EditVideoSubgroupDialog';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DataTable } from '@/components/data-table';
-import { ColumnDef } from '@tanstack/react-table';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
 import LoadingBar from '@/components/LoadingBar';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Input } from '@/components/ui/input';
@@ -50,36 +36,22 @@ interface Video {
   group_id: string | null;
   subgroup_id: string | null;
   order: number;
-  created_at: string;
-}
-
-interface StructuredLibrary {
-  id: string;
-  name: string;
-  standaloneVideos: Video[];
-  subgroups: {
-    id: string;
-    name: string;
-    description: string | null;
-    videos: Video[];
-  }[];
 }
 
 const ManageVideosPage = () => {
   const { toast } = useToast();
   
-  const [allVideos, setAllVideos] = useState<Video[]>([]);
-  const [library, setLibrary] = useState<StructuredLibrary[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
+  const [groups, setGroups] = useState<any[]>([]);
+  const [subgroups, setSubgroups] = useState<any[]>([]);
   
+  const [loadedVideos, setLoadedVideos] = useState<Record<string, Video[]>>({});
+  const [loadingState, setLoadingState] = useState<Record<string, boolean>>({});
+
   const [isVideoDialogOpen, setIsVideoDialogOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
-
-  const [groups, setGroups] = useState<VideoGroup[]>([]);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<VideoGroup | null>(null);
-
-  const [subgroups, setSubgroups] = useState<any[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
   const [isSubgroupDialogOpen, setIsSubgroupDialogOpen] = useState(false);
   const [selectedSubgroup, setSelectedSubgroup] = useState<any | null>(null);
 
@@ -87,10 +59,9 @@ const ManageVideosPage = () => {
   const [uploadProgress, setUploadProgress] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const fetchAllData = useCallback(async () => {
+  const fetchMetadata = useCallback(async () => {
     setIsPageLoading(true);
     try {
-      // 1. Fetch static categories and subcategories
       const [groupsRes, subRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
         supabase.from('video_subgroups').select('*').order('order')
@@ -99,102 +70,38 @@ const ManageVideosPage = () => {
       if (groupsRes.error) throw groupsRes.error;
       if (subRes.error) throw subRes.error;
 
-      const gData = groupsRes.data || [];
-      const sgData = subRes.data || [];
-
-      // 2. Fetch ALL videos using a loop to bypass the 1,000 limit
-      let vData: Video[] = [];
-      let hasMore = true;
-      let offset = 0;
-      const CHUNK_SIZE = 1000;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('videos')
-          .select('*')
-          .order('order', { ascending: true })
-          .range(offset, offset + CHUNK_SIZE - 1);
-
-        if (error) throw error;
-        if (data) {
-          vData = [...vData, ...(data as Video[])];
-          offset += CHUNK_SIZE;
-          hasMore = data.length === CHUNK_SIZE;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      setAllVideos(vData);
-      setGroups(gData);
-      setSubgroups(sgData);
-
-      // --- RESILIENT MAPPING ---
-      const sgMap = new Map(sgData.map(sg => [sg.id, { ...sg, videos: [] }]));
-      const gMap = new Map(gData.map(g => [g.id, { ...g, subgroups: [], standaloneVideos: [] }]));
-      const uncategorizedVideos: Video[] = [];
-
-      sgData.forEach(sg => {
-        const parentGroup = gMap.get(sg.group_id);
-        if (parentGroup) {
-          parentGroup.subgroups.push(sgMap.get(sg.id));
-        }
-      });
-
-      vData.forEach(video => {
-        let placed = false;
-        if (video.subgroup_id) {
-          const targetSg = sgMap.get(video.subgroup_id);
-          if (targetSg) {
-            targetSg.videos.push(video);
-            placed = true;
-          }
-        }
-        if (!placed && video.group_id) {
-          const targetG = gMap.get(video.group_id);
-          if (targetG) {
-            targetG.standaloneVideos.push(video);
-            placed = true;
-          }
-        }
-        if (!placed) {
-          uncategorizedVideos.push(video);
-        }
-      });
-
-      const structured: StructuredLibrary[] = Array.from(gMap.values()).map(g => ({
-        id: g.id,
-        name: g.name,
-        subgroups: g.subgroups.map((sg: any) => ({
-          id: sg.id,
-          name: sg.name,
-          description: sg.description,
-          videos: sg.videos
-        })),
-        standaloneVideos: g.standaloneVideos
-      }));
-
-      if (uncategorizedVideos.length > 0) {
-        structured.push({
-          id: 'uncategorized',
-          name: 'Uncategorized / Pending Sort',
-          subgroups: [],
-          standaloneVideos: uncategorizedVideos
-        });
-      }
-
-      setLibrary(structured);
+      setGroups(groupsRes.data || []);
+      setSubgroups(subRes.data || []);
     } catch (error: any) {
-      console.error("Error fetching library data:", error);
-      toast({ title: "Error", description: `Failed to load data: ${error.message}`, variant: "destructive" });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setIsPageLoading(false);
     }
   }, [toast]);
 
   useEffect(() => {
-    fetchAllData();
-  }, [fetchAllData]);
+    fetchMetadata();
+  }, [fetchMetadata]);
+
+  const fetchVideosForSection = async (id: string, type: 'group' | 'subgroup') => {
+    if (loadedVideos[id] || loadingState[id]) return;
+
+    setLoadingState(prev => ({ ...prev, [id]: true }));
+    try {
+      const query = supabase.from('videos').select('*').order('order', { ascending: true });
+      if (type === 'subgroup') query.eq('subgroup_id', id);
+      else query.eq('group_id', id).is('subgroup_id', null);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      setLoadedVideos(prev => ({ ...prev, [id]: data || [] }));
+    } catch (error: any) {
+      toast({ title: "Fetch Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setLoadingState(prev => ({ ...prev, [id]: false }));
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -202,19 +109,10 @@ const ManageVideosPage = () => {
     }
   };
 
-  const findVal = (row: any, keys: string[]) => {
-    const rowKeys = Object.keys(row);
-    for (const key of keys) {
-      const found = rowKeys.find(rk => rk.toLowerCase().trim() === key.toLowerCase().trim());
-      if (found) return row[found];
-    }
-    return undefined;
-  };
-
   const handleBulkUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
-    setUploadProgress("Reading spreadsheet...");
+    setUploadProgress("Analyzing Spreadsheet...");
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -225,6 +123,15 @@ const ManageVideosPage = () => {
         const worksheet = workbook.Sheets[sheetName];
         const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
+        const findVal = (row: any, keys: string[]) => {
+          const rowKeys = Object.keys(row);
+          for (const key of keys) {
+            const found = rowKeys.find(rk => rk.toLowerCase().trim() === key.toLowerCase().trim());
+            if (found) return row[found];
+          }
+          return undefined;
+        };
+
         const videosToUpload = json.map(row => ({
           parent_category: findVal(row, ['Parent Category', 'Category', 'Parent']),
           sub_category: findVal(row, ['Sub-Category', 'Topic', 'Subcategory']),
@@ -232,37 +139,30 @@ const ManageVideosPage = () => {
           video_title: findVal(row, ['Video Title', 'Title', 'Name']),
           order: parseInt(findVal(row, ['Display Number (Order)', 'Display Order', 'Order'])) || 0,
           video_id: String(findVal(row, ['Vimeo ID', 'Video ID', 'ID']) || '').trim(),
-          platform: 'vimeo'
         })).filter(v => v.parent_category && v.video_title && v.video_id);
 
-        if (videosToUpload.length === 0) {
-          throw new Error("No valid records found. Verify headers: 'Parent Category', 'Video Title', 'Vimeo ID'.");
-        }
+        if (videosToUpload.length === 0) throw new Error("No valid data found.");
 
-        const CHUNK_SIZE = 40;
-        let totalProcessed = 0;
+        const CHUNK_SIZE = 50;
+        let successCount = 0;
 
         for (let i = 0; i < videosToUpload.length; i += CHUNK_SIZE) {
           const chunk = videosToUpload.slice(i, i + CHUNK_SIZE);
-          const batchNum = Math.floor(i / CHUNK_SIZE) + 1;
-          const totalBatches = Math.ceil(videosToUpload.length / CHUNK_SIZE);
+          setUploadProgress(`Processing ${i + chunk.length} of ${videosToUpload.length}...`);
           
-          setUploadProgress(`Uploading batch ${batchNum} of ${totalBatches}...`);
-
           const { data: res, error } = await supabase.functions.invoke('bulk-upload-videos', {
             body: { videos: chunk },
           });
-
           if (error) throw error;
-          if (res) totalProcessed += (res.successCount || 0);
+          successCount += (res.successCount || 0);
         }
 
-        toast({ title: "Import Finished", description: `Processed ${totalProcessed} videos.` });
+        toast({ title: "Import Complete", description: `Successfully processed ${successCount} videos.` });
         setSelectedFile(null);
-        setUploadProgress("");
-        fetchAllData();
+        setLoadedVideos({}); // Clear cache
+        fetchMetadata();
       } catch (err: any) {
-        toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
+        toast({ title: "Upload Error", description: err.message, variant: "destructive" });
       } finally {
         setIsUploading(false);
       }
@@ -271,123 +171,36 @@ const ManageVideosPage = () => {
   };
 
   const handleDeleteVideo = async (id: string) => {
-    if (!window.confirm("Delete this video?")) return;
+    if (!window.confirm("Delete this video permanently?")) return;
     const { error } = await supabase.from('videos').delete().eq('id', id);
     if (!error) {
-      toast({ title: "Deleted", description: "Video removed." });
-      fetchAllData();
+      toast({ title: "Deleted" });
+      setLoadedVideos({});
+      fetchMetadata();
     }
   };
 
-  const videoListColumns: ColumnDef<Video>[] = useMemo(() => [
-    { accessorKey: "title", header: "Title", cell: ({ row }) => <span className="font-bold text-sm">{row.original.title}</span> },
-    { 
-        accessorKey: "platform", 
-        header: "Source", 
-        cell: ({ row }) => (
-            <Badge variant={row.original.platform === 'vimeo' ? 'default' : 'secondary'} className="uppercase text-[9px] font-black">
-                {row.original.platform}
-            </Badge>
-        ) 
-    },
-    { accessorKey: "youtube_video_id", header: "Vimeo ID", cell: ({ row }) => <code className="text-xs bg-muted p-1 rounded">{row.original.youtube_video_id}</code> },
-    { 
-      id: "placement", 
-      header: "Group", 
-      cell: ({ row }) => {
-        const group = groups.find(g => g.id === row.original.group_id);
-        return <Badge variant="outline">{group?.name || 'Uncategorized'}</Badge>;
-      } 
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => { setSelectedVideo(row.original); setIsVideoDialogOpen(true); }}>
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDeleteVideo(row.original.id)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      )
-    }
-  ], [groups]);
-
-  const groupColumns: ColumnDef<VideoGroup>[] = [
-    { accessorKey: "order", header: "Order" },
-    { accessorKey: "name", header: "Group Name" },
-    { accessorKey: "description", header: "Description", cell: ({ row }) => <span className="truncate max-w-xs block text-xs">{row.original.description || '-'}</span> },
-    {
-      id: "actions",
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => { setSelectedGroup(row.original); setIsGroupDialogOpen(true); }}>
-              <Edit className="h-4 w-4 mr-2" /> Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600" onClick={() => { if(window.confirm("Delete this group?")) supabase.from('video_groups').delete().eq('id', row.original.id).then(() => fetchAllData()) }}>
-              <Trash2 className="h-4 w-4 mr-2" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
-    }
-  ];
-
-  const subgroupColumns: ColumnDef<any>[] = [
-    { accessorKey: "order", header: "Order" },
-    { accessorKey: "name", header: "Sub-group" },
-    { 
-      id: "parent", 
-      header: "Parent Group", 
-      cell: ({ row }) => {
-        const group = groups.find(g => g.id === row.original.group_id);
-        return <Badge variant="outline">{group?.name || 'Unknown'}</Badge>;
-      }
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => { setSelectedSubgroup(row.original); setIsSubgroupDialogOpen(true); }}>
-              <Edit className="h-4 w-4 mr-2" /> Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600" onClick={() => { if(window.confirm("Delete this sub-group?")) supabase.from('video_subgroups').delete().eq('id', row.original.id).then(() => fetchAllData()) }}>
-              <Trash2 className="h-4 w-4 mr-2" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
-    }
-  ];
-
   const VideoRow = ({ video }: { video: Video }) => (
-    <div className="flex items-center justify-between p-2 pl-3 border rounded-lg bg-background/50 hover:bg-muted/50 transition-all group">
+    <div className="flex items-center justify-between p-3 border rounded-xl bg-background hover:bg-muted/50 transition-all group shadow-sm">
       <div className="flex items-center gap-3 overflow-hidden">
-        <PlayCircle className="h-4 w-4 text-primary/40 shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-[13px] truncate leading-none mb-1">
-            <span className="text-muted-foreground mr-1">#{video.order}</span> {video.title}
+        <div className="h-8 w-8 rounded-full bg-primary/5 flex items-center justify-center shrink-0">
+          <PlayCircle className="h-4 w-4 text-primary/40" />
+        </div>
+        <div className="min-w-0">
+          <p className="font-bold text-sm truncate leading-none mb-1">
+            <span className="text-primary/40 mr-1">#{video.order}</span> {video.title}
           </p>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-[8px] h-3 px-1 uppercase font-black">
-              {video.platform}
-            </Badge>
-            <span className="text-[9px] text-muted-foreground font-mono truncate">{video.youtube_video_id}</span>
-          </div>
+          <Badge variant="secondary" className="text-[8px] h-3 px-1 uppercase font-black tracking-tighter">
+            {video.platform} ID: {video.youtube_video_id}
+          </Badge>
         </div>
       </div>
-      
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setSelectedVideo(video); setIsVideoDialogOpen(true); }}>
-          <Edit className="h-3.5 w-3.5" />
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedVideo(video); setIsVideoDialogOpen(true); }}>
+          <Edit className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteVideo(video.id)}>
-          <Trash2 className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteVideo(video.id)}>
+          <Trash2 className="h-4 w-4" />
         </Button>
       </div>
     </div>
@@ -399,228 +212,142 @@ const ManageVideosPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Curriculum Manager</h1>
-          <p className="text-muted-foreground text-sm">You have <strong>{allVideos.length}</strong> lessons total.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Enterprise Video CMS</h1>
+          <p className="text-muted-foreground text-sm">Managing curriculum with on-demand loading for high performance.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => { setSelectedVideo(null); setIsVideoDialogOpen(true); }} className="rounded-full shadow-md">
-            <Plus className="h-4 w-4 mr-2" /> New Lesson
-          </Button>
-        </div>
+        <Button onClick={() => { setSelectedVideo(null); setIsVideoDialogOpen(true); }} className="rounded-full shadow-lg">
+          <Plus className="h-4 w-4 mr-2" /> Single Lesson
+        </Button>
       </div>
 
-      {allVideos.length === 0 && !isPageLoading && (
-        <Card className="bg-red-50 border-red-200">
-          <CardContent className="pt-6 flex items-center gap-3 text-red-700">
-            <AlertCircle className="h-5 w-5" />
-            <p className="font-medium">No videos found in the database. Please verify your imports or use the "All Lessons" tab to refresh.</p>
-          </CardContent>
-        </Card>
-      )}
-
-      <Tabs defaultValue="library" className="w-full">
+      <Tabs defaultValue="curriculum" className="w-full">
         <TabsList className="inline-flex h-11 items-center justify-center rounded-full bg-muted p-1 mb-8">
-          <TabsTrigger value="library" className="rounded-full px-6">Curriculum View</TabsTrigger>
-          <TabsTrigger value="all-lessons" className="rounded-full px-6 flex items-center gap-2">
-            <ListIcon className="h-4 w-4" /> All Lessons
-          </TabsTrigger>
-          <TabsTrigger value="groups" className="rounded-full px-6">Groups</TabsTrigger>
-          <TabsTrigger value="subgroups" className="rounded-full px-6">Sub-groups</TabsTrigger>
-          <TabsTrigger value="bulk" className="rounded-full px-6 flex items-center gap-2">
-            <UploadCloud className="h-4 w-4" /> Bulk Upload
-          </TabsTrigger>
+          <TabsTrigger value="curriculum" className="rounded-full px-8">Hierarchy View</TabsTrigger>
+          <TabsTrigger value="bulk" className="rounded-full px-8">Excel Import</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="library" className="space-y-6">
-            <Accordion type="multiple" defaultValue={library.map(l => l.id)} className="space-y-6">
-              {library.map((group) => (
-                <AccordionItem key={group.id} value={group.id} className="border rounded-2xl bg-card overflow-hidden shadow-sm border-border/60">
-                  <AccordionTrigger className="px-6 py-5 hover:bg-muted/30 hover:no-underline border-b bg-muted/10">
+        <TabsContent value="curriculum" className="space-y-6">
+          <Accordion type="multiple" className="space-y-6">
+            {groups.map((group) => {
+              const groupSubgroups = subgroups.filter(sg => sg.group_id === group.id);
+              
+              return (
+                <AccordionItem 
+                  key={group.id} 
+                  value={group.id} 
+                  className="border rounded-2xl bg-card overflow-hidden shadow-md border-border/60"
+                  onClick={() => fetchVideosForSection(group.id, 'group')}
+                >
+                  <AccordionTrigger className="px-6 py-6 hover:bg-muted/30 hover:no-underline bg-muted/10 border-b">
                     <div className="flex items-center gap-4 text-left">
-                      <div className="p-2 bg-primary/5 rounded-xl text-primary">
-                        <GripVertical className="h-5 w-5 opacity-40" />
+                      <div className="p-3 bg-primary/5 rounded-2xl text-primary shadow-inner">
+                        <GripVertical className="h-6 w-6 opacity-30" />
                       </div>
-                      <div className="space-y-0.5">
-                        <span className="font-extrabold text-xl tracking-tight">{group.name}</span>
-                        <div className="flex items-center gap-2">
-                           <Badge variant="outline" className="text-[10px] uppercase font-black bg-background">
-                            {group.standaloneVideos.length + group.subgroups.reduce((acc, sg) => acc + sg.videos.length, 0)} Items
-                           </Badge>
-                        </div>
+                      <div>
+                        <span className="font-black text-2xl tracking-tight text-foreground/90 uppercase">{group.name}</span>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Primary Category (Order: {group.order})</p>
                       </div>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="p-6 bg-muted/5 space-y-10">
-                    {group.standaloneVideos.length > 0 && (
-                      <section className="space-y-4">
-                        <div className="flex items-center gap-2 px-1">
-                           <Badge variant="secondary" className="h-1.5 w-1.5 rounded-full p-0" />
-                           <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-muted-foreground">Main Lessons</h3>
+                  <AccordionContent className="p-6 bg-muted/5 space-y-8">
+                    
+                    <div className="space-y-4">
+                      <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary/60 px-1">Ungrouped Lessons</h3>
+                      {loadingState[group.id] ? (
+                        <div className="flex items-center justify-center py-8"><Loader2 className="animate-spin h-6 w-6 text-primary" /></div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {loadedVideos[group.id]?.map(v => <VideoRow key={v.id} video={v} />)}
+                          {(!loadedVideos[group.id] || loadedVideos[group.id].length === 0) && !loadingState[group.id] && (
+                            <p className="text-xs text-muted-foreground italic col-span-2 text-center py-4">No standalone lessons in this category.</p>
+                          )}
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {group.standaloneVideos.map(v => <VideoRow key={v.id} video={v} />)}
-                        </div>
-                      </section>
-                    )}
-                    {group.subgroups.length > 0 && (
-                      <section className="space-y-4">
-                        <div className="flex items-center gap-2 px-1">
-                           <Badge variant="secondary" className="h-1.5 w-1.5 rounded-full p-0" />
-                           <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-muted-foreground">Topic Sub-groups</h3>
-                        </div>
-                        <Accordion type="multiple" className="space-y-4">
-                          {group.subgroups.map(sg => (
-                            <AccordionItem key={sg.id} value={sg.id} className="border rounded-xl bg-background shadow-sm border-border/40 overflow-hidden">
-                              <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/20">
-                                <div className="flex items-center gap-3 text-left">
-                                  <div className="p-1.5 bg-primary/5 rounded-lg">
-                                    <FolderTree className="h-4 w-4 text-primary/60" />
-                                  </div>
-                                  <div>
-                                    <span className="font-bold text-sm text-foreground">{sg.name}</span>
-                                    <p className="text-[10px] text-muted-foreground line-clamp-1">{sg.description || 'Section items'}</p>
-                                  </div>
-                                  <Badge variant="secondary" className="ml-2 text-[10px] font-bold rounded-full">
-                                    {sg.videos.length} videos
-                                  </Badge>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
+                      <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary/60 px-1">Curriculum Sub-groups</h3>
+                      <Accordion type="multiple" className="space-y-4">
+                        {groupSubgroups.map(sg => (
+                          <AccordionItem 
+                            key={sg.id} 
+                            value={sg.id} 
+                            className="border rounded-xl bg-background shadow-sm overflow-hidden"
+                            onClick={(e) => { e.stopPropagation(); fetchVideosForSection(sg.id, 'subgroup'); }}
+                          >
+                            <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/10">
+                              <div className="flex items-center gap-3 text-left">
+                                <div className="p-2 bg-muted rounded-lg"><FolderTree className="h-4 w-4 opacity-50" /></div>
+                                <div>
+                                  <span className="font-bold text-base text-foreground/80">{sg.name}</span>
+                                  <p className="text-[10px] text-muted-foreground">Order: {sg.order}</p>
                                 </div>
-                              </AccordionTrigger>
-                              <AccordionContent className="px-5 pb-5 pt-2">
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-5 pt-2 border-t bg-muted/5">
+                              {loadingState[sg.id] ? (
+                                <div className="flex items-center justify-center py-8"><Loader2 className="animate-spin h-5 w-5 text-primary" /></div>
+                              ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                                  {sg.videos.map(v => <VideoRow key={v.id} video={v} />)}
+                                  {loadedVideos[sg.id]?.map(v => <VideoRow key={v.id} video={v} />)}
+                                  {(!loadedVideos[sg.id] || loadedVideos[sg.id].length === 0) && (
+                                    <p className="text-xs text-muted-foreground italic col-span-2 text-center py-4">No lessons assigned to this sub-group.</p>
+                                  )}
                                 </div>
-                              </AccordionContent>
-                            </AccordionItem>
-                          ))}
-                        </Accordion>
-                      </section>
-                    )}
+                              )}
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
-              ))}
-            </Accordion>
-        </TabsContent>
-
-        <TabsContent value="all-lessons">
-          <Card className="shadow-sm border-none bg-muted/20">
-            <CardHeader>
-              <CardTitle>Complete Lesson List</CardTitle>
-              <CardDescription>Verify existence of all {allVideos.length} lessons in the database.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DataTable columns={videoListColumns} data={allVideos} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="groups">
-          <Card className="shadow-sm border-none bg-muted/20">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Category Management</CardTitle>
-                <CardDescription className="text-xs">Define top-level curriculum categories.</CardDescription>
-              </div>
-              <Button size="sm" variant="secondary" onClick={() => { setSelectedGroup(null); setIsGroupDialogOpen(true); }}>
-                <FolderPlus className="h-4 w-4 mr-2" /> New Category
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <DataTable columns={groupColumns} data={groups} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="subgroups">
-          <Card className="shadow-sm border-none bg-muted/20">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Nested Topic Management</CardTitle>
-                <CardDescription className="text-xs">Group specific lessons into topics within categories.</CardDescription>
-              </div>
-              <Button size="sm" variant="secondary" onClick={() => { setSelectedSubgroup(null); setIsSubgroupDialogOpen(true); }}>
-                <FolderPlus className="h-4 w-4 mr-2" /> New Topic
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <DataTable columns={subgroupColumns} data={subgroups} />
-            </CardContent>
-          </Card>
+              );
+            })}
+          </Accordion>
         </TabsContent>
 
         <TabsContent value="bulk">
-          <Card className="max-w-4xl border-none shadow-xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileSpreadsheet className="h-6 w-6 text-primary" />
-                Excel Curriculum Import
+          <Card className="max-w-4xl border-none shadow-xl mx-auto">
+            <CardHeader className="bg-primary text-primary-foreground py-10 text-center rounded-t-3xl">
+              <CardTitle className="text-3xl font-black uppercase tracking-tight flex justify-center items-center gap-3">
+                <UploadCloud className="h-8 w-8" /> Data Import
               </CardTitle>
-              <CardDescription>
-                Import categories, topics, and lessons in bulk.
-              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-muted/50 p-5 rounded-2xl border space-y-4">
-                  <h4 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                    <VideoIcon className="h-4 w-4 text-primary" /> Required Column Headers
-                  </h4>
-                  <div className="space-y-2">
-                    {[
-                      { h: "Parent Category", d: "e.g., Cardiology" },
-                      { h: "Sub-Category", d: "e.g., Heart Failure" },
-                      { h: "Sub-Category Order", d: "e.g., 1, 2, 3" },
-                      { h: "Video Title", d: "e.g., Intro to CHF" },
-                      { h: "Display Number (Order)", d: "e.g., 1, 2, 3" },
-                      { h: "Vimeo ID", d: "e.g., 123456789" }
-                    ].map((col, i) => (
-                      <div key={i} className="flex items-center justify-between text-[11px] bg-background p-2 rounded-lg border">
-                        <code className="font-bold text-primary">{col.h}</code>
-                        <span className="text-muted-foreground italic text-right">{col.d}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-6 bg-primary/5 hover:bg-primary/10 transition-colors">
+            <CardContent className="p-8 space-y-10">
+               <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-primary/20 rounded-3xl bg-primary/5 hover:bg-primary/10 transition-colors group cursor-pointer">
                   <Input 
                     type="file" 
                     accept=".xlsx, .xls, .csv" 
                     onChange={handleFileChange}
                     className="hidden"
-                    id="bulk-video-upload"
+                    id="excel-video-upload"
                   />
-                  <Label htmlFor="bulk-video-upload" className="cursor-pointer text-center space-y-3 w-full">
-                    <div className="bg-background p-4 rounded-full w-fit mx-auto shadow-sm">
-                      <UploadCloud className="h-8 w-8 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-black text-sm uppercase tracking-tight">{selectedFile ? selectedFile.name : "Select Spreadsheet"}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">Click to browse your device.</p>
-                    </div>
+                  <Label htmlFor="excel-video-upload" className="cursor-pointer text-center space-y-4">
+                      <div className="bg-background p-5 rounded-full w-fit mx-auto shadow-xl">
+                        <FileSpreadsheet className="h-10 w-10 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-black text-lg text-primary">{selectedFile ? selectedFile.name : "Choose Excel File"}</p>
+                        <p className="text-xs text-muted-foreground font-medium">Headers: Parent Category, Sub-Category, Video Title, Vimeo ID</p>
+                      </div>
                   </Label>
-                </div>
-              </div>
+               </div>
+               <Button 
+                 onClick={handleBulkUpload} 
+                 disabled={isUploading || !selectedFile} 
+                 className="w-full h-16 rounded-2xl text-xl font-black uppercase shadow-2xl"
+               >
+                 {isUploading ? <><Loader2 className="h-6 w-6 animate-spin mr-3" /> {uploadProgress}</> : "Execute Bulk Upload"}
+               </Button>
             </CardContent>
-            <CardFooter className="bg-muted/30 p-6 rounded-b-2xl border-t flex flex-col items-center gap-3">
-              <Button 
-                onClick={handleBulkUpload} 
-                disabled={isUploading || !selectedFile} 
-                className="w-full h-12 text-lg font-black uppercase tracking-widest shadow-lg"
-              >
-                {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing File...</> : "Execute Bulk Import"}
-              </Button>
-              {isUploading && (
-                <p className="text-sm font-bold text-primary animate-pulse">{uploadProgress}</p>
-              )}
-            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
 
-      <EditVideoDialog open={isVideoDialogOpen} onOpenChange={setIsVideoDialogOpen} video={selectedVideo} onSave={fetchAllData} />
-      <EditVideoGroupDialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen} group={selectedGroup} onSave={fetchAllData} />
-      <EditVideoSubgroupDialog open={isSubgroupDialogOpen} onOpenChange={setIsSubgroupDialogOpen} subgroup={selectedSubgroup} onSave={fetchAllData} />
-      
+      <EditVideoDialog open={isVideoDialogOpen} onOpenChange={setIsVideoDialogOpen} video={selectedVideo} onSave={() => { setLoadedVideos({}); fetchMetadata(); }} />
+      <EditVideoGroupDialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen} group={selectedGroup} onSave={fetchMetadata} />
+      <EditVideoSubgroupDialog open={isSubgroupDialogOpen} onOpenChange={setIsSubgroupDialogOpen} subgroup={selectedSubgroup} onSave={fetchMetadata} />
       <MadeWithDyad />
     </div>
   );

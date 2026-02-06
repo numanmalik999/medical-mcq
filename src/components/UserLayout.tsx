@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react';
 import UserSidebar from './UserSidebar';
 import { Outlet, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const UserLayout = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const isMobile = useIsMobile();
   const location = useLocation();
 
   const isStudyMode = location.pathname === '/quiz' || location.pathname === '/user/take-test';
@@ -23,7 +25,10 @@ const UserLayout = () => {
         isCollapsed={isCollapsed} 
         onToggleCollapse={() => setIsCollapsed(!isCollapsed)} 
       />
-      <div className="flex-1 min-w-0">
+      <div className={cn(
+        "flex-1 min-w-0 transition-all duration-300",
+        !isMobile && (isCollapsed ? "ml-14" : "ml-60")
+      )}>
         <div className={cn(
           "transition-all duration-300",
           isStudyMode ? "p-1 sm:p-3 lg:p-4" : "p-4 sm:p-6 lg:p-8"

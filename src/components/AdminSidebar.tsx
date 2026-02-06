@@ -129,7 +129,7 @@ const AdminSidebar = ({ isCollapsed, onToggleCollapse }: AdminSidebarProps) => {
 
   return (
     <aside className={cn(
-        "min-h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col transition-all duration-300",
+        "fixed left-0 top-16 bottom-0 z-40 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col transition-all duration-300",
         isCollapsed ? "w-16" : "w-64"
     )}>
       <div className={cn("p-4 flex items-center mb-4 transition-all duration-300", isCollapsed ? "justify-center" : "justify-between")}>

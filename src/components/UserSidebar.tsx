@@ -135,7 +135,7 @@ const UserSidebar = ({ isCollapsed, onToggleCollapse }: UserSidebarProps) => {
 
   return (
     <aside className={cn(
-        "min-h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col transition-all duration-300 relative",
+        "fixed left-0 top-16 bottom-0 z-40 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col transition-all duration-300",
         isCollapsed ? "w-14" : "w-60"
     )}>
       <div className={cn("p-3 flex items-center mb-2 transition-all duration-300", isCollapsed ? "justify-center" : "justify-between")}>
@@ -150,7 +150,7 @@ const UserSidebar = ({ isCollapsed, onToggleCollapse }: UserSidebarProps) => {
         </Button>
       </div>
       
-      <nav className="flex flex-col gap-0.5 flex-grow px-1.5">
+      <nav className="flex flex-col gap-0.5 flex-grow px-1.5 overflow-y-auto pr-1 scrollbar-hide">
         {navItems.map((item) => (
           <NavLink 
             key={item.to} 

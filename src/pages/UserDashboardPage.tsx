@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight } from 'lucide-react'; 
+import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight, Sparkles } from 'lucide-react'; 
 import LoadingBar from '@/components/LoadingBar';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { differenceInDays, parseISO } from 'date-fns';
@@ -183,18 +183,39 @@ const UserDashboardPage = () => {
     ? differenceInDays(parseISO(user.subscription_end_date), new Date()) 
     : null;
 
+  // Logic to detect if user is on a "Trial" based on their end date being within 3 days of joining
+  const isCurrentlyOnTrial = user?.has_active_subscription && daysRemaining !== null && daysRemaining <= 3;
+
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Student Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, {user?.email || 'Guest'}. Tracking your exam readiness.</p>
+          <p className="text-muted-foreground">Welcome back, {user?.first_name || user?.email || 'Guest'}. Tracking your exam readiness.</p>
         </div>
         <div className="flex gap-3">
            <Link to="/quiz"><Button className="rounded-full px-6">Start Practice</Button></Link>
            <Link to="/user/take-test"><Button variant="outline" className="rounded-full px-6">Take Mock Exam</Button></Link>
         </div>
       </div>
+
+      {isCurrentlyOnTrial && (
+        <Card className="border-primary bg-primary/5 border-l-4 shadow-md animate-in fade-in slide-in-from-top-4 duration-500">
+          <CardHeader className="py-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary text-primary-foreground rounded-2xl shadow-lg">
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <div>
+                <CardTitle className="text-xl font-black">Welcome to Premium Trial!</CardTitle>
+                <CardDescription className="text-foreground/80 font-medium">
+                  You have full access to all features for the next {daysRemaining} days. Explore the full question bank and AI cases!
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
 
       {isGuestMode && (
         <Card className="border-blue-500 bg-blue-50 dark:bg-blue-950/20 border-l-4">
@@ -206,7 +227,7 @@ const UserDashboardPage = () => {
               <div>
                 <CardTitle className="text-lg text-blue-700 dark:text-blue-300">Guest Mode - Limited Progress Tracking</CardTitle>
                 <CardDescription className="text-blue-600/80 dark:text-blue-400/80">
-                  <Link to="/subscription" className="font-bold underline">Subscribe</Link> to unlock detailed analytics and save your test history.
+                  <Link to="/signup" className="font-bold underline">Create an account</Link> to get a 3-day free trial and unlock detailed analytics.
                 </CardDescription>
               </div>
             </div>
@@ -244,12 +265,12 @@ const UserDashboardPage = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
-                <Clock className="h-4 w-4" /> Account Status
+                <Clock className="h-4 w-4" /> Access Level
             </CardDescription>
             <div className="flex items-baseline gap-2">
-              <CardTitle className="text-2xl font-bold">{user?.has_active_subscription ? 'Premium' : 'Free Trial'}</CardTitle>
+              <CardTitle className="text-2xl font-bold">{isCurrentlyOnTrial ? 'Free Trial' : (user?.has_active_subscription ? 'Premium' : 'Standard')}</CardTitle>
               {user?.has_active_subscription && daysRemaining !== null && (
-                <span className={cn("text-xs font-bold", daysRemaining <= 5 ? "text-red-500 animate-pulse" : "text-muted-foreground")}>
+                <span className={cn("text-xs font-bold", daysRemaining <= 1 ? "text-red-500 animate-pulse" : "text-muted-foreground")}>
                   ({daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left)
                 </span>
               )}
@@ -257,7 +278,7 @@ const UserDashboardPage = () => {
           </CardHeader>
           <CardContent>
             <Link to="/user/subscriptions" className="text-xs text-primary font-bold hover:underline">
-                {user?.has_active_subscription ? 'Manage Subscription' : 'Upgrade for Full Access'}
+                {user?.has_active_subscription ? 'Manage Access' : 'Upgrade for Full Access'}
             </Link>
           </CardContent>
         </Card>
@@ -280,7 +301,7 @@ const UserDashboardPage = () => {
                     content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                             return (
-                                <div className="bg-white p-3 border rounded-lg shadow-xl text-xs">
+                                <div className="bg-white p-3 border rounded-lg shadow-xl text-xs text-black">
                                     <p className="font-bold mb-1">{payload[0].payload.fullName}</p>
                                     <p className="text-blue-600">Accuracy: {payload[0].value}%</p>
                                     <p className="text-muted-foreground">Attempts: {payload[0].payload.attempts}</p>
@@ -292,7 +313,7 @@ const UserDashboardPage = () => {
                   />
                   <Bar dataKey="accuracy" radius={[0, 4, 4, 0]} barSize={25}>
                     {chartData.map((entry, _index) => (
-                      <Cell key={`cell-\${_index}`} fill={entry.accuracy > 70 ? '#16a34a' : entry.accuracy > 40 ? '#2563eb' : '#dc2626'} />
+                      <Cell key={`cell-${_index}`} fill={entry.accuracy > 70 ? '#16a34a' : entry.accuracy > 40 ? '#2563eb' : '#dc2626'} />
                     ))}
                   </Bar>
                 </BarChart>

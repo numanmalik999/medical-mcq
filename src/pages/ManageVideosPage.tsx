@@ -13,8 +13,7 @@ import {
   GripVertical,
   UploadCloud,
   FileSpreadsheet,
-  Loader2,
-  Search
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import EditVideoDialog from '@/components/EditVideoDialog';
@@ -62,10 +61,7 @@ const ManageVideosPage = () => {
   const [isSubgroupDialogOpen, setIsSubgroupDialogOpen] = useState(false);
 
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  const [searchTerm, setSearchTerm] = useState("");
 
   const fetchMetadata = useCallback(async () => {
     setIsPageLoading(true);
@@ -145,7 +141,6 @@ const ManageVideosPage = () => {
   const handleBulkUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
-    setUploadProgress("Analyzing Spreadsheet...");
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -181,8 +176,6 @@ const ManageVideosPage = () => {
 
         for (let i = 0; i < videosToUpload.length; i += CHUNK_SIZE) {
           const chunk = videosToUpload.slice(i, i + CHUNK_SIZE);
-          setUploadProgress(`Processing ${i + chunk.length} of ${videosToUpload.length}...`);
-          
           const { data: res, error } = await supabase.functions.invoke('bulk-upload-videos', {
             body: { videos: chunk },
           });
@@ -214,24 +207,24 @@ const ManageVideosPage = () => {
   };
 
   const VideoRow = ({ video }: { video: Video }) => (
-    <div className="flex items-center justify-between p-2.5 border rounded-lg bg-background hover:bg-muted/50 transition-all group shadow-sm">
+    <div className="flex items-center justify-between p-2 border rounded-lg bg-background hover:bg-muted/50 transition-all group shadow-sm">
       <div className="flex items-center gap-2 overflow-hidden">
         <div className="h-6 w-6 rounded-full bg-primary/5 flex items-center justify-center shrink-0">
           <PlayCircle className="h-3 w-3 text-primary/40" />
         </div>
         <div className="min-w-0">
-          <p className="font-bold text-xs truncate leading-none mb-1">
+          <p className="font-bold text-[11px] truncate leading-none mb-1">
             <span className="text-primary/40 mr-1">#{video.order}</span> {video.title}
           </p>
           <p className="text-[8px] text-muted-foreground uppercase font-black">ID: {video.youtube_video_id}</p>
         </div>
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setSelectedVideo(video); setIsVideoDialogOpen(true); }}>
-          <Edit className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setSelectedVideo(video); setIsVideoDialogOpen(true); }}>
+          <Edit className="h-3 w-3" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteVideo(video.id)}>
-          <Trash2 className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDeleteVideo(video.id)}>
+          <Trash2 className="h-3 w-3" />
         </Button>
       </div>
     </div>
@@ -336,12 +329,10 @@ const ManageVideosPage = () => {
         <TabsContent value="bulk">
           <Card className="max-w-4xl border-none shadow-lg mx-auto">
             <CardHeader className="bg-primary text-primary-foreground py-6 text-center rounded-t-2xl">
-              <CardTitle className="text-xl font-black uppercase tracking-tight flex justify-center items-center gap-3">
-                <UploadCloud className="h-8 w-8" /> Data Import
-              </CardTitle>
+              <CardTitle className="text-xl font-black uppercase tracking-tight">Bulk Importer</CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-               <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-primary/20 rounded-2xl bg-primary/5 hover:bg-primary/10 transition-colors group cursor-pointer">
+               <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-primary/20 rounded-2xl bg-primary/5">
                   <Input 
                     type="file" 
                     accept=".xlsx, .xls, .csv" 
@@ -350,21 +341,19 @@ const ManageVideosPage = () => {
                     id="excel-video-upload"
                   />
                   <Label htmlFor="excel-video-upload" className="cursor-pointer text-center space-y-3">
-                      <div className="bg-background p-5 rounded-full w-fit mx-auto shadow-xl">
-                        <FileSpreadsheet className="h-10 w-10 text-primary" />
-                      </div>
+                      <FileSpreadsheet className="h-8 w-8 text-primary mx-auto" />
                       <div>
                         <p className="font-black text-sm text-primary">{selectedFile ? selectedFile.name : "Choose Excel File"}</p>
-                        <p className="text-[10px] text-muted-foreground font-medium">Headers: Parent Category, Sub-Category, Video Title, Vimeo ID</p>
+                        <p className="text-[10px] text-muted-foreground font-medium">Headers: Category, Topic, Video Title, Vimeo ID</p>
                       </div>
                   </Label>
                </div>
                <Button 
                  onClick={handleBulkUpload} 
                  disabled={isUploading || !selectedFile} 
-                 className="w-full h-12 rounded-xl text-md font-black uppercase shadow-2xl"
+                 className="w-full h-12 rounded-xl text-md font-black uppercase"
                >
-                 {isUploading ? <><Loader2 className="h-4 w-4 animate-spin mr-3" /> {uploadProgress}</> : "Execute Bulk Upload"}
+                 {isUploading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing...</> : "Upload Library"}
                </Button>
             </CardContent>
           </Card>

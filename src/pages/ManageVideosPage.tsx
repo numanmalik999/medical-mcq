@@ -17,7 +17,8 @@ import {
   FileSpreadsheet,
   Loader2,
   List as ListIcon,
-  Video as VideoIcon
+  Video as VideoIcon,
+  AlertCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import EditVideoDialog from '@/components/EditVideoDialog';
@@ -89,6 +90,7 @@ const ManageVideosPage = () => {
   const fetchAllData = useCallback(async () => {
     setIsPageLoading(true);
     try {
+      // Use simple selects to ensure stability, matching the user-side logic
       const [groupsRes, subRes, videoRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
         supabase.from('video_subgroups').select('*').order('order'),
@@ -107,7 +109,6 @@ const ManageVideosPage = () => {
       setGroups(groupsData);
       setSubgroups(subgroupsData);
 
-      // Create a set of valid group IDs for faster lookup
       const validGroupIds = new Set(groupsData.map(g => g.id));
       const validSubgroupIds = new Set(subgroupsData.map(sg => sg.id));
 
@@ -129,7 +130,7 @@ const ManageVideosPage = () => {
         };
       });
 
-      // Catch videos that have no group_id OR have a group_id that doesn't exist anymore
+      // Find videos that aren't mapped to any existing group
       const uncategorized = videosData.filter(v => !v.group_id || !validGroupIds.has(v.group_id));
       
       if (uncategorized.length > 0) {
@@ -144,7 +145,7 @@ const ManageVideosPage = () => {
       setLibrary(structured);
     } catch (error: any) {
       console.error("Error fetching library data:", error);
-      toast({ title: "Error", description: "Failed to load library data.", variant: "destructive" });
+      toast({ title: "Error", description: `Failed to load data: ${error.message}`, variant: "destructive" });
     } finally {
       setIsPageLoading(false);
     }
@@ -248,7 +249,7 @@ const ManageVideosPage = () => {
             </Badge>
         ) 
     },
-    { accessorKey: "youtube_video_id", header: "Video ID", cell: ({ row }) => <code className="text-xs bg-muted p-1 rounded">{row.original.youtube_video_id}</code> },
+    { accessorKey: "youtube_video_id", header: "Vimeo ID", cell: ({ row }) => <code className="text-xs bg-muted p-1 rounded">{row.original.youtube_video_id}</code> },
     { 
       id: "placement", 
       header: "Group", 
@@ -366,6 +367,15 @@ const ManageVideosPage = () => {
           </Button>
         </div>
       </div>
+
+      {allVideos.length === 0 && !isPageLoading && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="pt-6 flex items-center gap-3 text-red-700">
+            <AlertCircle className="h-5 w-5" />
+            <p className="font-medium">No videos found in the database. Please verify your imports or use the "All Lessons" tab to refresh.</p>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="library" className="w-full">
         <TabsList className="inline-flex h-11 items-center justify-center rounded-full bg-muted p-1 mb-8">

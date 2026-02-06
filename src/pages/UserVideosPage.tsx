@@ -388,40 +388,41 @@ const UserVideosPage = () => {
       </div>
 
       <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none rounded-xl shadow-2xl">
+        <DialogContent className="max-w-4xl w-[98vw] sm:w-full p-0 overflow-hidden bg-black border-none rounded-xl shadow-2xl">
           <DialogHeader className="p-3 bg-white border-b flex-row items-center justify-between space-y-0">
-             <div className="flex items-center gap-2">
-                 <div className="h-6 w-6 bg-primary rounded flex items-center justify-center text-white font-black text-[10px]">
+             <div className="flex items-center gap-2 overflow-hidden">
+                 <div className="h-6 w-6 bg-primary rounded flex items-center justify-center text-white font-black text-[10px] shrink-0">
                     {selectedVideo?.order}
                  </div>
-                 <DialogTitle className="font-black text-sm uppercase tracking-tight text-slate-900 leading-none">
+                 <DialogTitle className="font-black text-[11px] sm:text-sm uppercase tracking-tight text-slate-900 leading-none truncate">
                     {selectedVideo?.title}
                  </DialogTitle>
              </div>
              <Button 
                variant={progressMap.get(selectedVideo?.id || '') ? "secondary" : "default"} 
                size="sm" onClick={() => selectedVideo && toggleWatched(selectedVideo.id)}
-               className="rounded-lg px-4 font-black uppercase text-[9px] h-8 shadow-sm"
+               className="rounded-lg px-2 sm:px-4 font-black uppercase text-[8px] sm:text-[9px] h-7 sm:h-8 shadow-sm shrink-0"
              >
                {progressMap.get(selectedVideo?.id || '') ? "Completed" : "Complete Lesson"}
              </Button>
           </DialogHeader>
           
-          <div className="aspect-video bg-zinc-900 relative">
+          <div className="relative w-full overflow-hidden bg-zinc-900" style={{ paddingTop: '56.25%' }}>
             {selectedVideo && (
               <iframe 
-                width="100%" height="100%" 
-                src={`https://player.vimeo.com/video/\${selectedVideo.youtube_video_id}?autoplay=1`}
-                frameBorder="0" allowFullScreen
-                className="w-full h-full"
+                src={`https://player.vimeo.com/video/\${selectedVideo.youtube_video_id}?autoplay=1&badge=0&autopause=0`}
+                frameBorder="0" 
+                allow="autoplay; fullscreen; picture-in-picture" 
+                allowFullScreen
+                className="absolute top-0 left-0 w-full h-full"
               ></iframe>
             )}
           </div>
           
           {selectedVideo?.description && (
-            <div className="p-4 bg-white border-t">
+            <div className="p-3 sm:p-4 bg-white border-t">
                <div className="prose dark:prose-invert max-w-none">
-                <p className="text-[12px] font-medium text-slate-700 leading-relaxed italic border-l-2 border-primary/20 pl-3">
+                <p className="text-[10px] sm:text-[12px] font-medium text-slate-700 leading-relaxed italic border-l-2 border-primary/20 pl-3">
                     {selectedVideo.description}
                 </p>
                </div>

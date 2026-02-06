@@ -105,7 +105,6 @@ const UserSubscriptionsPage = () => {
 
     if (status === 'success') {
       toast({ title: "Payment Successful!", description: "Your subscription is being activated. Please wait a moment for the page to update.", variant: "default" });
-      // Re-fetch data to update the UI after a short delay to allow the webhook to process
       setTimeout(() => {
         fetchSubscriptionData();
       }, 3000); 
@@ -113,7 +112,6 @@ const UserSubscriptionsPage = () => {
       toast({ title: "Payment Cancelled", description: "You cancelled the checkout process.", variant: "default" });
     }
 
-    // Clear search params after displaying toast
     if (status) {
       navigate('/user/subscriptions', { replace: true });
     }
@@ -188,6 +186,7 @@ const UserSubscriptionsPage = () => {
           {subscriptionTiers.map((tier) => {
             const isCurrentPlan = userActiveSubscription?.subscription_tier_id === tier.id && hasActiveSubscriptionFromSession;
             const isStripePlanAvailable = !!tier.stripe_price_id;
+            const isFreeTier = tier.price === 0 || tier.name.toLowerCase().includes('trial');
 
             return (
               <Card key={tier.id} className="flex flex-col">
@@ -197,7 +196,7 @@ const UserSubscriptionsPage = () => {
                 </CardHeader>
                 <CardContent className="flex-grow space-y-4">
                   <p className="text-4xl font-bold">
-                    {tier.currency} {tier.price.toFixed(2)}
+                    {tier.price === 0 ? "Free" : `${tier.currency} ${tier.price.toFixed(2)}`}
                     <span className="text-lg font-normal text-muted-foreground"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
                   </p>
                   {tier.features && tier.features.length > 0 && (
@@ -211,6 +210,10 @@ const UserSubscriptionsPage = () => {
                 <CardFooter>
                   {isCurrentPlan ? (
                     <Button className="w-full" disabled>Current Plan</Button>
+                  ) : isFreeTier ? (
+                    <Button className="w-full" variant="secondary" disabled>
+                      Included / Used
+                    </Button>
                   ) : isStripePlanAvailable ? (
                     <Link to={`/user/payment/${tier.id}?priceId=${tier.stripe_price_id}`} className="w-full">
                       <Button className="w-full">

@@ -17,7 +17,7 @@ interface SubscriptionTier {
   duration_in_months: number;
   description: string | null;
   features: string[] | null;
-  stripe_price_id: string | null; // Updated field
+  stripe_price_id: string | null;
 }
 
 const SubscriptionPage = () => {
@@ -35,14 +35,12 @@ const SubscriptionPage = () => {
     }
   }, [hasCheckedInitialSession]);
 
-  // Handle Stripe redirect status messages
   useEffect(() => {
     const status = searchParams.get('status');
     const subId = searchParams.get('subId');
 
     if (status === 'success') {
       toast({ title: "Subscription Activated!", description: `Your subscription (ID: ${subId}) is now active.`, variant: "default" });
-      // Redirect to user dashboard after successful payment
       navigate('/user/dashboard', { replace: true });
     } else if (status === 'cancelled') {
       toast({ title: "Subscription Cancelled", description: "You cancelled the checkout process.", variant: "default" });
@@ -50,7 +48,6 @@ const SubscriptionPage = () => {
       toast({ title: "Payment Failed", description: "There was an issue processing your payment. Please try again.", variant: "destructive" });
     }
 
-    // Clear search params after displaying toast
     if (status) {
       setSearchParams({}, { replace: true });
     }
@@ -61,7 +58,7 @@ const SubscriptionPage = () => {
     setIsFetchingData(true);
     const { data: tiersData, error: tiersError } = await supabase
       .from('subscription_tiers')
-      .select('*, stripe_price_id') // Select new Stripe field
+      .select('*, stripe_price_id')
       .order('price', { ascending: true });
 
     if (tiersError) {
@@ -101,6 +98,7 @@ const SubscriptionPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {subscriptionTiers.map((tier) => {
             const isStripePlanAvailable = !!tier.stripe_price_id;
+            const isFreeTier = tier.price === 0 || tier.name.toLowerCase().includes('trial');
             const isPreselected = preselectedTierId === tier.id;
 
             return (
@@ -111,7 +109,7 @@ const SubscriptionPage = () => {
                 </CardHeader>
                 <CardContent className="flex-grow space-y-4">
                   <p className="text-4xl font-bold">
-                    {tier.currency} {tier.price.toFixed(2)}
+                    {tier.price === 0 ? "Free" : `${tier.currency} ${tier.price.toFixed(2)}`}
                     <span className="text-lg font-normal text-muted-foreground"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
                   </p>
                   {tier.features && tier.features.length > 0 && (
@@ -123,8 +121,12 @@ const SubscriptionPage = () => {
                   )}
                 </CardContent>
                 <CardFooter>
-                  {user ? ( // User is logged in
-                    isStripePlanAvailable ? (
+                  {user ? (
+                    isFreeTier ? (
+                      <Button className="w-full" variant="secondary" disabled>
+                        Included with Signup
+                      </Button>
+                    ) : isStripePlanAvailable ? (
                       <Link to={`/user/payment/${tier.id}?priceId=${tier.stripe_price_id!}`} className="w-full">
                         <Button className="w-full">
                           Subscribe
@@ -135,9 +137,9 @@ const SubscriptionPage = () => {
                         Payment Not Configured
                       </Button>
                     )
-                  ) : ( // User is not logged in
+                  ) : (
                     <Link to={`/signup?tierId=${tier.id}`} className="w-full">
-                      <Button className="w-full">Sign Up to Subscribe</Button>
+                      <Button className="w-full">{isFreeTier ? "Start Free Trial" : "Sign Up to Subscribe"}</Button>
                     </Link>
                   )}
                 </CardFooter>

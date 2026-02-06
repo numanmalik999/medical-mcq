@@ -2,18 +2,19 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Search, PlayCircle, Lock, Loader2, CheckCircle2, Circle, Layers, FolderTree } from 'lucide-react';
+import { Search, PlayCircle, Loader2, CheckCircle2, Circle, Layers, FolderTree } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useSession } from '@/components/SessionContextProvider';
-import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import SubscribePromptDialog from '@/components/SubscribePromptDialog';
+import { differenceInDays, parseISO } from 'date-fns';
 
 interface Video {
   id: string;
@@ -49,19 +50,15 @@ const UserVideosPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
 
   const fetchLibrary = useCallback(async () => {
-    if (!user?.has_active_subscription) {
-      setIsLoading(false);
-      return;
-    }
-
     try {
       const [groupsRes, subRes, videoRes, progRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
         supabase.from('video_subgroups').select('*').order('order'),
         supabase.from('videos').select('*').order('order', { ascending: true }),
-        supabase.from('user_video_progress').select('video_id, is_watched').eq('user_id', user.id)
+        user ? supabase.from('user_video_progress').select('video_id, is_watched').eq('user_id', user.id) : Promise.resolve({ data: [] })
       ]);
 
       const newProgressMap = new Map();
@@ -105,6 +102,7 @@ const UserVideosPage = () => {
 
   const toggleWatched = async (videoId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (!user) return;
     const newStatus = !(progressMap.get(videoId) || false);
     try {
       await supabase.from('user_video_progress').upsert({ user_id: user?.id, video_id: videoId, is_watched: newStatus }, { onConflict: 'user_id,video_id' });
@@ -115,15 +113,26 @@ const UserVideosPage = () => {
     }
   };
 
+  const handleVideoClick = (video: Video) => {
+    // BLOCK TRIAL USERS FROM WATCHING
+    const isPaid = user?.has_active_subscription && user?.subscription_end_date && differenceInDays(parseISO(user.subscription_end_date), new Date()) > 3;
+    
+    if (!isPaid) {
+      setIsUpgradeDialogOpen(true);
+      return;
+    }
+    setSelectedVideo(video);
+  };
+
   const getEmbedUrl = (video: Video) => {
-    const id = video.youtube_video_id;
+    const vidId = video.youtube_video_id;
     switch (video.platform) {
       case 'vimeo':
-        return `https://player.vimeo.com/video/${id}?autoplay=1`;
+        return `https://player.vimeo.com/video/${vidId}?autoplay=1`;
       case 'dailymotion':
-        return `https://www.dailymotion.com/embed/video/${id}?autoplay=1`;
+        return `https://www.dailymotion.com/embed/video/${vidId}?autoplay=1`;
       default:
-        return `https://www.youtube.com/embed/${id}?autoplay=1`;
+        return `https://www.youtube.com/embed/${vidId}?autoplay=1`;
     }
   };
 
@@ -136,7 +145,7 @@ const UserVideosPage = () => {
           "overflow-hidden cursor-pointer hover:shadow-lg transition-all border-2 relative group flex flex-col justify-center min-h-[140px]", 
           isWatched ? "border-green-500/20 bg-green-50/5" : "border-transparent bg-muted/20"
         )}
-        onClick={() => setSelectedVideo(video)}
+        onClick={() => handleVideoClick(video)}
       >
         <div className="p-6 text-center flex flex-col items-center justify-center gap-2">
           <div className="absolute top-2 left-2">
@@ -159,6 +168,7 @@ const UserVideosPage = () => {
                 size="icon" 
                 className="h-7 w-7 rounded-full hover:bg-background/80 shadow-sm" 
                 onClick={(e) => toggleWatched(video.id, e)}
+                disabled={!user}
             >
               {isWatched ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <Circle className="h-5 w-5 text-muted-foreground/40" />}
             </Button>
@@ -168,28 +178,7 @@ const UserVideosPage = () => {
     );
   };
 
-  if (!hasCheckedInitialSession || isLoading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>;
-
-  if (!user?.has_active_subscription) {
-    return (
-      <div className="max-w-2xl mx-auto py-12 px-4 text-center">
-        <Card className="border-primary/20 shadow-xl py-8">
-          <CardHeader>
-            <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4"><Lock className="h-10 w-10 text-primary" /></div>
-            <CardTitle className="text-3xl">Premium Video Access</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">Unlock high-yield tutorials organized by medical specialty and topic.</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-              <Link to="/user/subscriptions"><Button size="lg" className="w-full">Explore Plans</Button></Link>
-              <Link to="/user/dashboard"><Button variant="outline" size="lg" className="w-full">Back</Button></Link>
-            </div>
-          </CardContent>
-        </Card>
-        <MadeWithDyad />
-      </div>
-    );
-  }
+  if (!hasCheckedInitialSession || isLoading) return <div className="flex justify-center py-20 pt-24"><Loader2 className="animate-spin" /></div>;
 
   const filteredLibrary = library.map(group => {
     const matchingStandalone = group.standaloneVideos.filter(v => v.title.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -227,7 +216,6 @@ const UserVideosPage = () => {
             </AccordionTrigger>
             <AccordionContent className="p-6 bg-muted/5 border-t space-y-8">
               
-              {/* Standalone Intro Videos */}
               {group.standaloneVideos.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="text-xs font-black uppercase tracking-widest text-primary/60 px-2">Core Foundation Lessons</h3>
@@ -237,7 +225,6 @@ const UserVideosPage = () => {
                 </div>
               )}
 
-              {/* Nested Subgroups */}
               {group.subgroups.length > 0 && (
                 <div className="space-y-4">
                   <Accordion type="multiple" className="space-y-4">
@@ -294,6 +281,14 @@ const UserVideosPage = () => {
           )}
         </DialogContent>
       </Dialog>
+      
+      <SubscribePromptDialog 
+        open={isUpgradeDialogOpen} 
+        onOpenChange={setIsUpgradeDialogOpen} 
+        featureName="Video Education Series" 
+        description="Our clinical video library is a premium resource. Upgrade your plan to watch high-yield lessons and master complex medical concepts with our expert faculty."
+      />
+      
       <MadeWithDyad />
     </div>
   );

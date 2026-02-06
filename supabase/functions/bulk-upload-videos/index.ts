@@ -42,6 +42,7 @@ serve(async (req: Request) => {
       });
     }
 
+    // 1. Fetch current structure to avoid redundant lookups
     const { data: allGroups } = await supabaseAdmin.from('video_groups').select('id, name');
     const { data: allSubgroups } = await supabaseAdmin.from('video_subgroups').select('id, name, group_id');
 
@@ -57,6 +58,7 @@ serve(async (req: Request) => {
         const videoIdStr = String(video.video_id).trim();
         const platform = 'vimeo';
 
+        // --- Handle Parent Category (Group) ---
         const parentName = video.parent_category.trim();
         let groupId = groupMap.get(parentName.toLowerCase());
 
@@ -72,6 +74,7 @@ serve(async (req: Request) => {
           groupMap.set(parentName.toLowerCase(), groupId);
         }
 
+        // --- Handle Sub-Category (Subgroup) ---
         let subgroupId = null;
         if (video.sub_category?.trim()) {
           const subName = video.sub_category.trim();
@@ -95,6 +98,7 @@ serve(async (req: Request) => {
           }
         }
 
+        // --- Upsert/Insert Video ---
         const { error: vErr } = await supabaseAdmin
           .from('videos')
           .upsert({
@@ -127,9 +131,9 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
-    console.error(`[bulk-upload-videos] Critical Function Error:`, (error as Error).message);
-    return new Response(JSON.stringify({ error: (error as Error).message }), { 
+  } catch (error: any) {
+    console.error(`[bulk-upload-videos] Critical Function Error:`, error.message);
+    return new Response(JSON.stringify({ error: error.message }), { 
       status: 500, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });

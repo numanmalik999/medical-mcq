@@ -214,6 +214,9 @@ const ManageVideosPage = () => {
           if (res) {
             totalProcessed += (res.successCount || 0);
             totalErrors += (res.errorCount || 0);
+            if (res.errors && res.errors.length > 0) {
+                console.warn("Processing warnings:", res.errors);
+            }
           }
         }
 

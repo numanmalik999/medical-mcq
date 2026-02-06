@@ -1,28 +1,24 @@
 "use client";
 
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { MadeWithDyad } from './made-with-dyad';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { MessageSquare, Mail, MapPin, Twitter, Facebook, Instagram, Linkedin, Globe, Youtube, ShieldCheck, Rss, Music2 } from 'lucide-react';
 import { useGlobalSettings, SocialLink } from '@/hooks/useGlobalSettings';
-
-interface StaticPageLink {
-  slug: string;
-  title: string;
-}
+import { useNavigationData } from '@/hooks/useNavigationData';
 
 const getRouteFromSlug = (slug: string): string => {
-  if (slug.includes('privacy')) return '/privacy';
-  if (slug.includes('terms')) return '/terms';
-  if (slug.includes('refund')) return '/refund';
-  if (slug.includes('about')) return '/about';
-  if (slug.includes('contact')) return '/contact';
-  if (slug.includes('faq')) return '/faq';
-  if (slug.includes('road-to-gulf')) return '/road-to-gulf';
-  if (slug.includes('editorial-guidelines')) return '/editorial-guidelines';
-  if (slug.includes('team')) return '/team';
-  return `/${slug}`;
+  const map: Record<string, string> = {
+    'privacy': '/privacy',
+    'terms': '/terms',
+    'refund': '/refund',
+    'about': '/about',
+    'contact': '/contact',
+    'faq': '/faq',
+    'road-to-gulf': '/road-to-gulf',
+    'editorial-guidelines': '/editorial-guidelines',
+    'team': '/team'
+  };
+  return map[slug] || `/${slug}`;
 };
 
 const getSocialIcon = (platform: string) => {
@@ -38,24 +34,8 @@ const getSocialIcon = (platform: string) => {
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
-  const [footerLinks, setFooterLinks] = useState<StaticPageLink[]>([]);
-  const location = useLocation();
+  const { footerLinks } = useNavigationData();
   const { settings } = useGlobalSettings();
-
-  useEffect(() => {
-    const fetchFooterLinks = async () => {
-      const { data, error } = await supabase
-        .from('static_pages')
-        .select('slug, title, location')
-        .contains('location', ['footer'])
-        .order('title', { ascending: true });
-
-      if (!error) {
-        setFooterLinks(data || []);
-      }
-    };
-    fetchFooterLinks();
-  }, [location.pathname]);
 
   const quickLinks = footerLinks.filter(link => 
     !link.title.toLowerCase().includes('policy') && 
@@ -76,7 +56,6 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 text-center md:text-left">
           
-          {/* Brand & Mission */}
           <div className="space-y-4">
             <h4 className="text-xl font-bold tracking-tight">Study Prometric MCQs</h4>
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -94,7 +73,6 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Contact Details (EEAT) */}
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Contact & Support</h4>
             <div className="space-y-3 text-sm text-muted-foreground">
@@ -113,14 +91,12 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Navigation Links */}
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Quick Access</h4>
-            <nav className="flex flex-col space-y-2 text-sm" aria-label="Footer Quick Links">
+            <nav className="flex flex-col space-y-2 text-sm">
               <Link to="/" className="text-muted-foreground hover:text-primary transition-colors">Home</Link>
               <Link to="/blog" className="text-muted-foreground hover:text-primary transition-colors">Exam Insights Blog</Link>
               <Link to="/sitemap" className="text-muted-foreground hover:text-primary transition-colors">Site Map</Link>
-              <a href={rssUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">RSS Content Feed</a>
               {quickLinks.map((link) => (
                 <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-primary transition-colors">
                   {link.title}
@@ -129,10 +105,9 @@ const Footer = () => {
             </nav>
           </div>
 
-          {/* Legal & Trust */}
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Legal & Compliance</h4>
-            <nav className="flex flex-col space-y-2 text-sm" aria-label="Footer Legal Links">
+            <nav className="flex flex-col space-y-2 text-sm">
               {legalLinks.map((link) => (
                 <Link key={link.slug} to={getRouteFromSlug(link.slug)} className="text-muted-foreground hover:text-primary transition-colors">
                   {link.title}
@@ -146,13 +121,8 @@ const Footer = () => {
           </div>
         </div>
 
-        {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-border flex flex-col items-center gap-4 text-sm text-muted-foreground">
-          <p className="font-medium">
-            &copy; {currentYear} Study Prometric MCQs. All rights reserved. 
-            <span className="hidden sm:inline mx-2">|</span> 
-            <span className="block sm:inline">Certified Medical Education Provider</span>
-          </p>
+          <p className="font-medium">&copy; {currentYear} Study Prometric MCQs. All rights reserved.</p>
           <MadeWithDyad />
         </div>
       </div>

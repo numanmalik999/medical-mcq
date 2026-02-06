@@ -18,14 +18,15 @@ export const useBookmark = (mcqId: string | null) => {
     }
     setIsLoading(true);
     try {
+      // Using maybeSingle() prevents 406 errors when no bookmark is found
       const { data, error } = await supabase
         .from('user_bookmarked_mcqs')
         .select('id')
         .eq('user_id', user.id)
         .eq('mcq_id', mcqId)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+      if (error) {
         throw error;
       }
       setIsBookmarked(!!data);

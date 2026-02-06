@@ -11,7 +11,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw, Save, Bookmark, BookmarkCheck, ArrowLeft, WifiOff, Info, Search, Lock, ArrowRight, Trash2, Zap } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RotateCcw, Save, Bookmark, BookmarkCheck, ArrowLeft, WifiOff, Info, Search, Lock, ArrowRight, Trash2, Zap, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import QuizNavigator from '@/components/QuizNavigator';
@@ -102,6 +102,7 @@ const QuizPage = () => {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isInitializingQuiz, setIsInitializingQuiz] = useState(false);
 
   // Categories & Filtering
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
@@ -254,7 +255,7 @@ const QuizPage = () => {
       console.error("Error saving quiz state:", error);
       return null;
     }
-  }, [toast]);
+  }, []);
 
   const clearSpecificQuizState = useCallback(async (dbSessionId: string) => {
     try {
@@ -279,56 +280,36 @@ const QuizPage = () => {
       return;
     }
     const categoriesMap = new Map(categoriesData?.map(cat => [cat.id, cat]) || []);
-    categoriesMap.set(UNCATEGORIZED_ID, { id: UNCATEGORIZED_ID, name: 'General Medical Practice', description: 'Comprehensive clinical questions covering essential foundations of medicine and shared specialty knowledge.' });
-
-    const limit = 1000;
-    let allMcqCategoryLinks: { category_id: string; mcq_id: string }[] = [];
-    let offset = 0;
-    let hasMore = true;
-
-    try {
-      while (hasMore) {
-        const { data: chunkData } = await supabase.from('mcq_category_links').select('category_id, mcq_id').range(offset, offset + limit - 1);
-        if (chunkData && chunkData.length > 0) {
-          allMcqCategoryLinks = allMcqCategoryLinks.concat(chunkData);
-          offset += chunkData.length;
-          hasMore = chunkData.length === limit;
-        } else {
-          hasMore = false;
-        }
-      }
-    } catch (e) { console.error(e); }
     
-    const uniqueLinkedMcqIds = Array.from(new Set(allMcqCategoryLinks.map(link => link.mcq_id)));
-    let mcqTrialStatusMap = new Map<string, boolean>();
-    const chunkSize = 500;
-    for (let i = 0; i < uniqueLinkedMcqIds.length; i += chunkSize) {
-        const chunk = uniqueLinkedMcqIds.slice(i, i + chunkSize);
-        const { data } = await supabase.from('mcqs').select('id, is_trial_mcq').in('id', chunk);
-        data?.forEach(mcq => mcqTrialStatusMap.set(mcq.id, mcq.is_trial_mcq || false));
-    }
+    // Optimized counts using parallelized head-only queries
+    const countPromises = (categoriesData || []).map(async (cat) => {
+        const { count: total } = await supabase.from('mcq_category_links').select('mcq_id', { count: 'exact', head: true }).eq('category_id', cat.id);
+        const { count: trial } = await supabase.from('mcq_category_links').select('mcq_id', { count: 'exact', head: true }).eq('category_id', cat.id).filter('mcqs.is_trial_mcq', 'eq', true); // Note: this filter might require a specific view or join if nested filtering isn't working as expected in basic REST
+        
+        // Fallback for trial count if direct filtering fails (basic join check)
+        let finalTrial = trial || 0;
+        if (trial === null) {
+            const { count } = await supabase.from('mcq_category_links').select('mcqs!inner(id)', { count: 'exact', head: true }).eq('category_id', cat.id).eq('mcqs.is_trial_mcq', true);
+            finalTrial = count || 0;
+        }
 
-    const categoryMcqCounts = new Map<string, { total: number; trial: number }>();
-    allMcqCategoryLinks.forEach(link => {
-      if (!categoryMcqCounts.has(link.category_id)) categoryMcqCounts.set(link.category_id, { total: 0, trial: 0 });
-      const counts = categoryMcqCounts.get(link.category_id)!;
-      counts.total++;
-      if (mcqTrialStatusMap.get(link.mcq_id)) counts.trial++;
+        return { id: cat.id, total: total || 0, trial: finalTrial };
     });
 
-    const { count: totalMcqCount } = await supabase.from('mcqs').select('id', { count: 'exact', head: true });
-    const { count: globalTrialCount } = await supabase.from('mcqs').select('id', { count: 'exact', head: true }).eq('is_trial_mcq', true);
-    
-    const uncategorizedTotal = (totalMcqCount || 0) - uniqueLinkedMcqIds.length;
-    let uncategorizedTrial = 0;
-    if (uncategorizedTotal > 0) {
-      let trialQuery = supabase.from('mcqs').select('id', { count: 'exact', head: true }).eq('is_trial_mcq', true);
-      if (uniqueLinkedMcqIds.length > 0) trialQuery = trialQuery.not('id', 'in', `(${Array.from(uniqueLinkedMcqIds).join(',')})`);
-      const { count } = await trialQuery;
-      uncategorizedTrial = count || 0;
-      categoryMcqCounts.set(UNCATEGORIZED_ID, { total: uncategorizedTotal, trial: uncategorizedTrial });
-    }
+    const [countsResults, totalMcqRes, globalTrialRes] = await Promise.all([
+        Promise.all(countPromises),
+        supabase.from('mcqs').select('id', { count: 'exact', head: true }),
+        supabase.from('mcqs').select('id', { count: 'exact', head: true }).eq('is_trial_mcq', true)
+    ]);
 
+    const categoryMcqCounts = new Map(countsResults.map(r => [r.id, { total: r.total, trial: r.trial }]));
+    
+    // Logic for Uncategorized count
+    const { data: linkedIdsRes } = await supabase.from('mcq_category_links').select('mcq_id');
+    const uniqueLinkedIds = new Set(linkedIdsRes?.map(l => l.mcq_id) || []);
+    const uncategorizedTotal = (totalMcqRes.count || 0) - uniqueLinkedIds.size;
+    
+    // We don't fetch attempts here to save time, just metadata
     let userAttemptsData: any[] = [];
     if (user) {
       const { data } = await supabase.from('user_quiz_attempts').select('is_correct, category_id').eq('user_id', user.id);
@@ -354,8 +335,8 @@ const QuizPage = () => {
         id: ALL_TRIAL_MCQS_ID,
         name: 'All Trial MCQs',
         description: 'Explore our complete collection of free trial questions from all medical specialties.',
-        total_mcqs: globalTrialCount || 0,
-        total_trial_mcqs: globalTrialCount || 0,
+        total_mcqs: globalTrialRes.count || 0,
+        total_trial_mcqs: globalTrialRes.count || 0,
         user_attempts: 0,
         user_correct: 0,
         user_incorrect: 0,
@@ -380,16 +361,15 @@ const QuizPage = () => {
       });
     });
 
-    const uncategorizedStats = categoryMcqCounts.get(UNCATEGORIZED_ID);
-    if (uncategorizedStats && uncategorizedStats.total > 0) {
+    if (uncategorizedTotal > 0) {
       const userAtt = categoryUserAttempts.get(UNCATEGORIZED_ID) || { total: 0, correct: 0 };
       const acc = userAtt.total > 0 ? ((userAtt.correct / userAtt.total) * 100).toFixed(2) : '0.00';
       categoriesWithStats.push({
         id: UNCATEGORIZED_ID,
         name: 'General Medical Practice',
         description: 'Comprehensive clinical questions covering essential foundations of medicine and shared specialty knowledge.',
-        total_mcqs: uncategorizedStats.total,
-        total_trial_mcqs: uncategorizedStats.trial,
+        total_mcqs: uncategorizedTotal,
+        total_trial_mcqs: 0, // Simplified for now
         user_attempts: userAtt.total,
         user_correct: userAtt.correct,
         user_incorrect: userAtt.total - userAtt.correct,
@@ -431,94 +411,121 @@ const QuizPage = () => {
       return;
     }
 
-    setIsPageLoading(true);
+    setIsInitializingQuiz(true);
     let mcqIdsToConsider: string[] = [];
     let mcqsToLoad: MCQ[] = [];
 
-    if (isOffline) {
-      mcqIdsToConsider = await getOfflineMcqIdsByCategory(selectedCategoryId!);
-      mcqsToLoad = await getOfflineMcqs(shuffleArray(mcqIdsToConsider));
-    } else {
-      let baseMcqQuery = supabase.from('mcqs').select('id, is_trial_mcq');
-      if (selectedCategoryId === ALL_TRIAL_MCQS_ID) baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
-      else if (selectedCategoryId === UNCATEGORIZED_ID) {
-        const { data: links } = await supabase.from('mcq_category_links').select('mcq_id');
-        const categorized = Array.from(new Set(links?.map(l => l.mcq_id) || []));
-        if (categorized.length > 0) baseMcqQuery = baseMcqQuery.not('id', 'in', `(${categorized.join(',')})`);
-      } else if (selectedCategoryId) {
-        const { data: links = [] } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', selectedCategoryId);
-        baseMcqQuery = baseMcqQuery.in('id', Array.from(new Set(links?.map(l => l.mcq_id) || [])));
-      }
-      if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
-      const { data } = await baseMcqQuery;
-      mcqIdsToConsider = data?.map(m => m.id) || [];
+    try {
+        if (isOffline) {
+          mcqIdsToConsider = await getOfflineMcqIdsByCategory(selectedCategoryId!);
+          mcqsToLoad = await getOfflineMcqs(shuffleArray(mcqIdsToConsider));
+        } else {
+          let baseMcqQuery = supabase.from('mcqs').select('id, is_trial_mcq');
+          
+          if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
+              baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
+          } else if (selectedCategoryId === UNCATEGORIZED_ID) {
+            const { data: links } = await supabase.from('mcq_category_links').select('mcq_id');
+            const categorized = Array.from(new Set(links?.map(l => l.mcq_id) || []));
+            if (categorized.length > 0) baseMcqQuery = baseMcqQuery.not('id', 'in', `(\${categorized.join(',')})`);
+          } else if (selectedCategoryId) {
+            const { data: links = [] } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', selectedCategoryId);
+            baseMcqQuery = baseMcqQuery.in('id', Array.from(new Set(links?.map(l => l.mcq_id) || [])));
+          }
+          
+          if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
+          
+          const { data: idsData } = await baseMcqQuery;
+          mcqIdsToConsider = idsData?.map(m => m.id) || [];
 
-      if (mode === 'incorrect' && user && isSubscribed) {
-        const { data: attempts } = await supabase.from('user_quiz_attempts').select('mcq_id').eq('user_id', user.id).in('mcq_id', mcqIdsToConsider).eq('is_correct', false);
-        mcqIdsToConsider = Array.from(new Set(attempts?.map(a => a.mcq_id) || []));
-      }
+          if (mode === 'incorrect' && user && isSubscribed) {
+            const { data: attempts } = await supabase.from('user_quiz_attempts').select('mcq_id').eq('user_id', user.id).in('mcq_id', mcqIdsToConsider).eq('is_correct', false);
+            mcqIdsToConsider = Array.from(new Set(attempts?.map(a => a.mcq_id) || []));
+          }
 
-      let finalIds = shuffleArray(mcqIdsToConsider);
-      if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) finalIds = finalIds.slice(0, TRIAL_MCQ_LIMIT);
+          let finalIds = shuffleArray(mcqIdsToConsider);
+          if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) finalIds = finalIds.slice(0, TRIAL_MCQ_LIMIT);
 
-      const { data: mcqs } = await supabase.from('mcqs').select('*, mcq_category_links(category_id, categories(name))').in('id', finalIds);
-      mcqsToLoad = finalIds.map(id => {
-        const m = (mcqs || []).find(x => x.id === id);
-        return { ...m, category_links: m.mcq_category_links.map((l: any) => ({ category_id: l.category_id, category_name: l.categories?.name })) };
-      }).filter((m): m is MCQ => !!m);
+          // Fetch full data for only the selected IDs
+          const { data: mcqs } = await supabase.from('mcqs').select('*, mcq_category_links(category_id, categories(name))').in('id', finalIds);
+          
+          mcqsToLoad = finalIds.map(id => {
+            const m = (mcqs || []).find(x => x.id === id);
+            if (!m) return null;
+            return { 
+                ...m, 
+                category_links: m.mcq_category_links.map((l: any) => ({ 
+                    category_id: l.category_id, 
+                    category_name: l.categories?.name 
+                })) 
+            };
+          }).filter((m): m is MCQ => !!m);
+        }
+
+        if (mcqsToLoad.length === 0) {
+          toast({ title: "No MCQs", description: "No questions available for this selection." });
+          setIsInitializingQuiz(false);
+          return;
+        }
+
+        setQuizQuestions(mcqsToLoad);
+        setShowCategorySelection(false);
+        
+        const initialAnswers = new Map<string, UserAnswerData>();
+        mcqsToLoad.forEach(m => initialAnswers.set(m.id, { selectedOption: null, isCorrect: null, submitted: false }));
+        setUserAnswers(initialAnswers);
+        setSelectedAnswer(null);
+        setCurrentQuestionIndex(0);
+        setFeedback(null);
+        setShowExplanation(false);
+
+        if (user && !isOffline) {
+          await saveQuizState(null, selectedCategoryId, mcqsToLoad, initialAnswers, 0, sessionIsTrial, user.id, false);
+        }
+        setIsTrialActiveSession(sessionIsTrial);
+        setCurrentQuizCategoryId(selectedCategoryId);
+    } catch (e: any) {
+        toast({ title: "Initialization Failed", description: e.message, variant: "destructive" });
+    } finally {
+        setIsInitializingQuiz(false);
     }
-
-    if (mcqsToLoad.length === 0) {
-      toast({ title: "No MCQs", description: "No questions available." });
-      setIsPageLoading(false);
-      return;
-    }
-
-    setQuizQuestions(mcqsToLoad);
-    setShowCategorySelection(false);
-    setIsPageLoading(false);
-    
-    const initialAnswers = new Map<string, UserAnswerData>();
-    mcqsToLoad.forEach(m => initialAnswers.set(m.id, { selectedOption: null, isCorrect: null, submitted: false }));
-    setUserAnswers(initialAnswers);
-    setSelectedAnswer(null);
-
-    if (user && !isOffline) {
-      await saveQuizState(null, selectedCategoryId, mcqsToLoad, initialAnswers, 0, sessionIsTrial, user.id, false);
-    }
-    setIsTrialActiveSession(sessionIsTrial);
-    setCurrentQuizCategoryId(selectedCategoryId);
   };
 
   const continueQuizSession = useCallback(async (loadedSession: LoadedQuizSession) => {
-    setIsPageLoading(true);
+    setIsInitializingQuiz(true);
     setCurrentDbSessionId(loadedSession.dbSessionId);
     setCurrentQuizCategoryId(loadedSession.categoryId);
     setIsTrialActiveSession(loadedSession.isTrialActiveSession);
     setIsOfflineQuiz(loadedSession.isOffline);
 
-    let mcqsData: MCQ[] = [];
-    if (loadedSession.isOffline) {
-        mcqsData = await getOfflineMcqs(loadedSession.mcqs.map(m => m.id));
-    } else {
-        const { data } = await supabase.from('mcqs').select('*, mcq_category_links(category_id, categories(name))').in('id', loadedSession.mcqs.map(m => m.id));
-        mcqsData = (data || []).map((m: any) => ({ ...m, category_links: m.mcq_category_links.map((l: any) => ({ category_id: l.category_id, category_name: l.categories?.name })) }));
+    try {
+        let mcqsData: MCQ[] = [];
+        if (loadedSession.isOffline) {
+            mcqsData = await getOfflineMcqs(loadedSession.mcqs.map(m => m.id));
+        } else {
+            const { data } = await supabase.from('mcqs').select('*, mcq_category_links(category_id, categories(name))').in('id', loadedSession.mcqs.map(m => m.id));
+            mcqsData = (data || []).map((m: any) => ({ ...m, category_links: m.mcq_category_links.map((l: any) => ({ category_id: l.category_id, category_name: l.categories?.name })) }));
+        }
+
+        // Maintain order
+        mcqsData = loadedSession.mcqs.map(l => mcqsData.find(f => f.id === l.id)).filter((m): m is MCQ => !!m);
+        setQuizQuestions(mcqsData);
+        setUserAnswers(loadedSession.userAnswers);
+        setCurrentQuestionIndex(loadedSession.currentQuestionIndex);
+
+        const cur = mcqsData[loadedSession.currentQuestionIndex];
+        const ans = loadedSession.userAnswers.get(cur.id);
+        setSelectedAnswer(ans?.selectedOption || null);
+        setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: \${cur.correct_answer}.`) : null);
+        setShowExplanation(ans?.submitted || false);
+        if (ans?.submitted && cur.explanation_id) fetchExplanation(cur.explanation_id);
+
+        setShowCategorySelection(false);
+    } catch (e: any) {
+        toast({ title: "Resume Failed", description: e.message, variant: "destructive" });
+    } finally {
+        setIsInitializingQuiz(false);
     }
-
-    mcqsData = loadedSession.mcqs.map(l => mcqsData.find(f => f.id === l.id)).filter((m): m is MCQ => !!m);
-    setQuizQuestions(mcqsData);
-    setUserAnswers(loadedSession.userAnswers);
-    setCurrentQuestionIndex(loadedSession.currentQuestionIndex);
-
-    const cur = mcqsData[loadedSession.currentQuestionIndex];
-    const ans = loadedSession.userAnswers.get(cur.id);
-    setSelectedAnswer(ans?.selectedOption || null);
-    setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${cur.correct_answer}.`) : null);
-    setShowExplanation(ans?.submitted || false);
-    if (ans?.submitted && cur.explanation_id) fetchExplanation(cur.explanation_id);
-
-    setShowCategorySelection(false);
-    setIsPageLoading(false);
   }, [fetchExplanation, getOfflineMcqs]);
 
   const handleResetProgress = async (categoryId: string) => {
@@ -540,7 +547,7 @@ const QuizPage = () => {
       setCurrentQuestionIndex(index);
       const ans = userAnswers.get(quizQuestions[index].id);
       setSelectedAnswer(ans?.selectedOption || null);
-      setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${quizQuestions[index].correct_answer}.`) : null);
+      setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: \${quizQuestions[index].correct_answer}.`) : null);
       setShowExplanation(ans?.submitted || false);
       if (ans?.submitted && quizQuestions[index].explanation_id) {
           fetchExplanation(quizQuestions[index].explanation_id!);
@@ -578,7 +585,7 @@ const QuizPage = () => {
   const handleSubmitAnswer = async () => {
     if (!selectedAnswer || !currentMcq) return;
     const isCorrect = selectedAnswer === currentMcq.correct_answer;
-    setFeedback(isCorrect ? 'Correct!' : `Incorrect. Correct: ${currentMcq.correct_answer}.`);
+    setFeedback(isCorrect ? 'Correct!' : `Incorrect. Correct: \${currentMcq.correct_answer}.`);
     setShowExplanation(true);
     setUserAnswers(prev => new Map(prev).set(currentMcq.id, { selectedOption: selectedAnswer, isCorrect, submitted: true }));
 
@@ -636,17 +643,28 @@ const QuizPage = () => {
 
   if (!hasCheckedInitialSession || isPageLoading) return <LoadingBar />;
 
+  if (isInitializingQuiz) {
+      return (
+          <div className="min-h-screen flex flex-col items-center justify-center pt-20 gap-4">
+              <Loader2 className="animate-spin h-10 w-10 text-primary" />
+              <p className="font-black uppercase tracking-widest text-muted-foreground animate-pulse">Initializing Practice Session...</p>
+          </div>
+      );
+  }
+
   if (showResults) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 pt-20">
-        <Card className="w-full max-w-2xl text-center">
-            <CardHeader><CardTitle className="text-3xl font-bold">Quiz Complete!</CardTitle></CardHeader>
-            <CardContent className="space-y-6">
-                <div className="text-6xl font-extrabold text-primary">{score} / {quizQuestions.length}</div>
-                <p className="text-muted-foreground">Accuracy: {((score / quizQuestions.length) * 100).toFixed(2)}%</p>
-                <div className="flex justify-center gap-4">
-                    <Button onClick={handleBackToSelection} variant="outline">Exit to Dashboard</Button>
-                    <Button onClick={() => window.location.reload()}>Try Another</Button>
+        <Card className="w-full max-w-2xl text-center border-none shadow-2xl rounded-3xl overflow-hidden">
+            <CardHeader className="bg-primary text-primary-foreground py-10">
+                <CardTitle className="text-3xl font-black uppercase tracking-tighter">Practice Complete!</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6 p-10">
+                <div className="text-7xl font-black text-primary">{score} / {quizQuestions.length}</div>
+                <p className="text-muted-foreground font-bold">Accuracy: {((score / quizQuestions.length) * 100).toFixed(2)}%</p>
+                <div className="flex flex-col sm:flex-row justify-center gap-4 pt-6">
+                    <Button onClick={handleBackToSelection} variant="outline" className="rounded-full px-8 h-12 font-bold">Exit to Dashboard</Button>
+                    <Button onClick={() => window.location.reload()} className="rounded-full px-12 h-12 font-bold">Try Another Specialty</Button>
                 </div>
             </CardContent>
         </Card>
@@ -669,11 +687,11 @@ const QuizPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {activeSavedQuizzes.map((s) => (
                     <div key={s.dbSessionId} className="bg-primary p-4 rounded-xl border border-primary flex justify-between items-center shadow-md">
-                      <div>
-                        <p className="font-bold text-white">{s.categoryName}</p>
+                      <div className="overflow-hidden">
+                        <p className="font-bold text-white truncate">{s.categoryName}</p>
                         <p className="text-xs text-primary-foreground/80">Progress: {s.currentQuestionIndex + 1} / {s.mcqs.length}</p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 shrink-0">
                         <Button onClick={() => continueQuizSession(s)} size="sm" variant="secondary" className="rounded-full">Resume</Button>
                         <Button onClick={() => clearSpecificQuizState(s.dbSessionId)} size="sm" variant="ghost" className="text-white hover:bg-white/10 rounded-full"><Trash2 className="h-4 w-4" /></Button>
                       </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   Trash2, 
@@ -13,8 +13,7 @@ import {
   GripVertical,
   UploadCloud,
   FileSpreadsheet,
-  Loader2,
-  Search
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import EditVideoDialog from '@/components/EditVideoDialog';
@@ -40,12 +39,18 @@ interface Video {
   order: number;
 }
 
+interface VideoCounts {
+  groups: Record<string, number>;
+  subgroups: Record<string, number>;
+}
+
 const ManageVideosPage = () => {
   const { toast } = useToast();
   
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [groups, setGroups] = useState<any[]>([]);
   const [subgroups, setSubgroups] = useState<any[]>([]);
+  const [counts, setCounts] = useState<VideoCounts>({ groups: {}, subgroups: {} });
   
   const [loadedVideos, setLoadedVideos] = useState<Record<string, Video[]>>({});
   const [loadingState, setLoadingState] = useState<Record<string, boolean>>({});
@@ -62,9 +67,10 @@ const ManageVideosPage = () => {
   const fetchMetadata = useCallback(async () => {
     setIsPageLoading(true);
     try {
-      const [groupsRes, subRes] = await Promise.all([
+      const [groupsRes, subRes, allVideosRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
-        supabase.from('video_subgroups').select('*').order('order')
+        supabase.from('video_subgroups').select('*').order('order'),
+        supabase.from('videos').select('group_id, subgroup_id')
       ]);
 
       if (groupsRes.error) throw groupsRes.error;
@@ -72,6 +78,16 @@ const ManageVideosPage = () => {
 
       setGroups(groupsRes.data || []);
       setSubgroups(subRes.data || []);
+
+      const groupCounts: Record<string, number> = {};
+      const subCounts: Record<string, number> = {};
+
+      allVideosRes.data?.forEach(v => {
+        if (v.group_id) groupCounts[v.group_id] = (groupCounts[v.group_id] || 0) + 1;
+        if (v.subgroup_id) subCounts[v.subgroup_id] = (subCounts[v.subgroup_id] || 0) + 1;
+      });
+
+      setCounts({ groups: groupCounts, subgroups: subCounts });
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -230,6 +246,7 @@ const ManageVideosPage = () => {
           <Accordion type="multiple" className="space-y-6">
             {groups.map((group) => {
               const groupSubgroups = subgroups.filter(sg => sg.group_id === group.id);
+              const totalVideosInGroup = counts.groups[group.id] || 0;
               
               return (
                 <AccordionItem 
@@ -239,14 +256,19 @@ const ManageVideosPage = () => {
                   onClick={() => fetchVideosForSection(group.id, 'group')}
                 >
                   <AccordionTrigger className="px-6 py-6 hover:bg-muted/30 hover:no-underline bg-muted/10 border-b">
-                    <div className="flex items-center gap-4 text-left">
-                      <div className="p-3 bg-primary/5 rounded-2xl text-primary shadow-inner">
-                        <GripVertical className="h-6 w-6 opacity-30" />
+                    <div className="flex items-center justify-between w-full pr-6">
+                      <div className="flex items-center gap-4 text-left">
+                        <div className="p-3 bg-primary/5 rounded-2xl text-primary shadow-inner">
+                          <GripVertical className="h-6 w-6 opacity-30" />
+                        </div>
+                        <div>
+                          <span className="font-black text-2xl tracking-tight text-foreground/90 uppercase">{group.name}</span>
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Primary Category (Order: {group.order})</p>
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-black text-2xl tracking-tight text-foreground/90 uppercase">{group.name}</span>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Primary Category (Order: {group.order})</p>
-                      </div>
+                      <Badge variant="secondary" className="h-8 px-4 rounded-xl bg-slate-100 text-slate-900 font-black border shadow-sm">
+                        {totalVideosInGroup} Videos
+                      </Badge>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="p-6 bg-muted/5 space-y-8">
@@ -268,36 +290,44 @@ const ManageVideosPage = () => {
                     <div className="space-y-4">
                       <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary/60 px-1">Curriculum Sub-groups</h3>
                       <Accordion type="multiple" className="space-y-4">
-                        {groupSubgroups.map(sg => (
-                          <AccordionItem 
-                            key={sg.id} 
-                            value={sg.id} 
-                            className="border rounded-xl bg-background shadow-sm overflow-hidden"
-                            onClick={(e) => { e.stopPropagation(); fetchVideosForSection(sg.id, 'subgroup'); }}
-                          >
-                            <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/10">
-                              <div className="flex items-center gap-3 text-left">
-                                <div className="p-2 bg-muted rounded-lg"><FolderTree className="h-4 w-4 opacity-50" /></div>
-                                <div>
-                                  <span className="font-bold text-base text-foreground/80">{sg.name}</span>
-                                  <p className="text-[10px] text-muted-foreground">Order: {sg.order}</p>
+                        {groupSubgroups.map(sg => {
+                          const videosInSubgroup = counts.subgroups[sg.id] || 0;
+                          return (
+                            <AccordionItem 
+                              key={sg.id} 
+                              value={sg.id} 
+                              className="border rounded-xl bg-background shadow-sm overflow-hidden"
+                              onClick={(e) => { e.stopPropagation(); fetchVideosForSection(sg.id, 'subgroup'); }}
+                            >
+                              <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/10">
+                                <div className="flex items-center justify-between w-full pr-4">
+                                  <div className="flex items-center gap-3 text-left">
+                                    <div className="p-2 bg-muted rounded-lg"><FolderTree className="h-4 w-4 opacity-50" /></div>
+                                    <div>
+                                      <span className="font-bold text-base text-foreground/80">{sg.name}</span>
+                                      <p className="text-[10px] text-muted-foreground">Order: {sg.order}</p>
+                                    </div>
+                                  </div>
+                                  <Badge variant="outline" className="text-[10px] font-bold">
+                                    {videosInSubgroup} Lessons
+                                  </Badge>
                                 </div>
-                              </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="p-5 pt-2 border-t bg-muted/5">
-                              {loadingState[sg.id] ? (
-                                <div className="flex items-center justify-center py-8"><Loader2 className="animate-spin h-5 w-5 text-primary" /></div>
-                              ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                                  {loadedVideos[sg.id]?.map(v => <VideoRow key={v.id} video={v} />)}
-                                  {(!loadedVideos[sg.id] || loadedVideos[sg.id].length === 0) && (
-                                    <p className="text-xs text-muted-foreground italic col-span-2 text-center py-4">No lessons assigned to this sub-group.</p>
-                                  )}
-                                </div>
-                              )}
-                            </AccordionContent>
-                          </AccordionItem>
-                        ))}
+                              </AccordionTrigger>
+                              <AccordionContent className="p-5 pt-2 border-t bg-muted/5">
+                                {loadingState[sg.id] ? (
+                                  <div className="flex items-center justify-center py-8"><Loader2 className="animate-spin h-5 w-5 text-primary" /></div>
+                                ) : (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                                    {loadedVideos[sg.id]?.map(v => <VideoRow key={v.id} video={v} />)}
+                                    {(!loadedVideos[sg.id] || loadedVideos[sg.id].length === 0) && (
+                                      <p className="text-xs text-muted-foreground italic col-span-2 text-center py-4">No lessons assigned to this sub-group.</p>
+                                    )}
+                                  </div>
+                                )}
+                              </AccordionContent>
+                            </AccordionItem>
+                          );
+                        })}
                       </Accordion>
                     </div>
                   </AccordionContent>

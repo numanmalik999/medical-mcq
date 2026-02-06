@@ -38,6 +38,11 @@ interface Video {
   order: number;
 }
 
+interface VideoCounts {
+  groups: Record<string, number>;
+  subgroups: Record<string, number>;
+}
+
 const UserVideosPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
@@ -45,6 +50,7 @@ const UserVideosPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [groups, setGroups] = useState<any[]>([]);
   const [subgroups, setSubgroups] = useState<any[]>([]);
+  const [counts, setCounts] = useState<VideoCounts>({ groups: {}, subgroups: {} });
   
   const [loadedVideos, setLoadedVideos] = useState<Record<string, Video[]>>({});
   const [loadingState, setLoadingState] = useState<Record<string, boolean>>({});
@@ -57,12 +63,14 @@ const UserVideosPage = () => {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
 
+  // 1. Fetch Hierarchy Metadata and calculate counts
   const fetchMetadata = useCallback(async () => {
     try {
-      const [groupsRes, subRes, progRes] = await Promise.all([
+      const [groupsRes, subRes, progRes, allVideosRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
         supabase.from('video_subgroups').select('*').order('order'),
-        user ? supabase.from('user_video_progress').select('video_id, is_watched').eq('user_id', user.id) : Promise.resolve({ data: [] })
+        user ? supabase.from('user_video_progress').select('video_id, is_watched').eq('user_id', user.id) : Promise.resolve({ data: [] }),
+        supabase.from('videos').select('group_id, subgroup_id') // Fetch mapping only for counts
       ]);
 
       const newProgressMap = new Map();
@@ -70,6 +78,22 @@ const UserVideosPage = () => {
       setProgressMap(newProgressMap);
       setGroups(groupsRes.data || []);
       setSubgroups(subRes.data || []);
+
+      // Calculate video distribution
+      const groupCounts: Record<string, number> = {};
+      const subCounts: Record<string, number> = {};
+
+      allVideosRes.data?.forEach(v => {
+        if (v.group_id) {
+          groupCounts[v.group_id] = (groupCounts[v.group_id] || 0) + 1;
+        }
+        if (v.subgroup_id) {
+          subCounts[v.subgroup_id] = (subCounts[v.subgroup_id] || 0) + 1;
+        }
+      });
+
+      setCounts({ groups: groupCounts, subgroups: subCounts });
+
     } catch (error: any) {
       toast({ title: "Error", description: "Failed to load library structure.", variant: "destructive" });
     } finally {
@@ -259,6 +283,8 @@ const UserVideosPage = () => {
           <Accordion type="multiple" className="space-y-8">
             {groups.map((group) => {
               const groupSubgroups = subgroups.filter(sg => sg.group_id === group.id);
+              const totalVideosInGroup = counts.groups[group.id] || 0;
+
               return (
                 <AccordionItem 
                   key={group.id} 
@@ -267,18 +293,23 @@ const UserVideosPage = () => {
                   onClick={() => loadVideosForId(group.id, 'group')}
                 >
                   <AccordionTrigger className="px-8 py-8 hover:bg-slate-50/50 hover:no-underline border-b transition-all">
-                    <div className="flex items-center gap-6 text-left">
-                      <div className="p-4 bg-primary text-primary-foreground rounded-2xl shadow-lg ring-4 ring-primary/5">
-                        <Layers className="h-8 w-8" />
-                      </div>
-                      <div>
-                        <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">{group.name}</h2>
-                        <div className="flex items-center gap-3 mt-2">
-                             <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase tracking-widest px-3 py-1">
-                                Complete Syllabus
-                             </Badge>
+                    <div className="flex items-center justify-between w-full pr-4">
+                      <div className="flex items-center gap-6 text-left">
+                        <div className="p-4 bg-primary text-primary-foreground rounded-2xl shadow-lg ring-4 ring-primary/5">
+                          <Layers className="h-8 w-8" />
+                        </div>
+                        <div>
+                          <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">{group.name}</h2>
+                          <div className="flex items-center gap-3 mt-2">
+                               <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase tracking-widest px-3 py-1">
+                                  Complete Syllabus
+                               </Badge>
+                          </div>
                         </div>
                       </div>
+                      <Badge className="h-10 px-4 rounded-xl bg-slate-900 text-white font-black text-base shadow-lg">
+                        {totalVideosInGroup} Videos
+                      </Badge>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="p-10 bg-slate-50/30 space-y-16">
@@ -309,43 +340,51 @@ const UserVideosPage = () => {
                             <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Specialty Sub-groups</h3>
                         </div>
                         <div className="grid grid-cols-1 gap-10">
-                          {groupSubgroups.map(sg => (
-                            <div key={sg.id} className="relative animate-in fade-in duration-700">
-                              <button 
-                                className="flex items-center gap-4 mb-6 group"
-                                onClick={() => loadVideosForId(sg.id, 'subgroup')}
-                              >
-                                <div className="p-2.5 bg-white rounded-xl shadow-md border group-hover:border-primary group-hover:scale-105 transition-all">
-                                    <FolderTree className="h-5 w-5 text-primary" />
-                                </div>
-                                <div className="text-left">
-                                    <span className="font-black text-xl uppercase tracking-tighter text-slate-800 flex items-center gap-2">
-                                        {sg.name} 
-                                        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
-                                    </span>
-                                    {sg.description && <p className="text-xs text-slate-400 font-medium mt-0.5">{sg.description}</p>}
-                                </div>
-                              </button>
+                          {groupSubgroups.map(sg => {
+                            const videosInSubgroup = counts.subgroups[sg.id] || 0;
+                            return (
+                              <div key={sg.id} className="relative animate-in fade-in duration-700">
+                                <button 
+                                  className="flex items-center justify-between w-full mb-6 group bg-white p-4 rounded-2xl border shadow-sm hover:shadow-md transition-all"
+                                  onClick={() => loadVideosForId(sg.id, 'subgroup')}
+                                >
+                                  <div className="flex items-center gap-4">
+                                      <div className="p-2.5 bg-primary/5 rounded-xl border group-hover:border-primary group-hover:scale-105 transition-all">
+                                          <FolderTree className="h-5 w-5 text-primary" />
+                                      </div>
+                                      <div className="text-left">
+                                          <span className="font-black text-xl uppercase tracking-tighter text-slate-800 flex items-center gap-2">
+                                              {sg.name} 
+                                              <ChevronRight className="h-4 w-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
+                                          </span>
+                                          {sg.description && <p className="text-xs text-slate-400 font-medium mt-0.5">{sg.description}</p>}
+                                      </div>
+                                  </div>
+                                  <Badge variant="outline" className="h-8 px-3 rounded-lg border-2 border-primary/20 text-primary font-black text-xs uppercase tracking-wider">
+                                     {videosInSubgroup} Lessons
+                                  </Badge>
+                                </button>
 
-                              <div className="pl-2 border-l-2 border-slate-100 ml-5 pt-2">
-                                {loadingState[sg.id] ? (
-                                    <div className="flex justify-center py-12"><Loader2 className="animate-spin h-8 w-8 text-primary/20" /></div>
-                                ) : (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {loadedVideos[sg.id]?.map((v) => <VideoCard key={v.id} video={v} />)}
-                                    {(!loadedVideos[sg.id] || loadedVideos[sg.id].length === 0) && (
-                                        <div 
-                                            className="col-span-full py-10 bg-white/50 rounded-2xl border border-dashed text-center cursor-pointer hover:bg-white transition-colors"
-                                            onClick={() => loadVideosForId(sg.id, 'subgroup')}
-                                        >
-                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Click to Expand Topics</p>
-                                        </div>
-                                    )}
-                                    </div>
-                                )}
+                                <div className="pl-2 border-l-2 border-slate-100 ml-5 pt-2">
+                                  {loadingState[sg.id] ? (
+                                      <div className="flex justify-center py-12"><Loader2 className="animate-spin h-8 w-8 text-primary/20" /></div>
+                                  ) : (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                      {loadedVideos[sg.id]?.map((v) => <VideoCard key={v.id} video={v} />)}
+                                      {(!loadedVideos[sg.id] || loadedVideos[sg.id].length === 0) && (
+                                          <div 
+                                              className="col-span-full py-10 bg-white/50 rounded-2xl border border-dashed text-center cursor-pointer hover:bg-white transition-colors"
+                                              onClick={() => loadVideosForId(sg.id, 'subgroup')}
+                                          >
+                                              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Click to Expand Topics</p>
+                                          </div>
+                                      )}
+                                      </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}

@@ -410,7 +410,7 @@ const UserVideosPage = () => {
           <div className="relative w-full overflow-hidden bg-zinc-900" style={{ paddingTop: '56.25%' }}>
             {selectedVideo && (
               <iframe 
-                src={`https://player.vimeo.com/video/\${selectedVideo.youtube_video_id}?autoplay=1&badge=0&autopause=0`}
+                src={`https://player.vimeo.com/video/${selectedVideo.youtube_video_id}?autoplay=1&badge=0&autopause=0`}
                 frameBorder="0" 
                 allow="autoplay; fullscreen; picture-in-picture" 
                 allowFullScreen

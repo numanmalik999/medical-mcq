@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   Trash2, 
@@ -13,8 +13,7 @@ import {
   GripVertical,
   UploadCloud,
   FileSpreadsheet,
-  Loader2,
-  Search
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import EditVideoDialog from '@/components/EditVideoDialog';
@@ -27,6 +26,8 @@ import LoadingBar from '@/components/LoadingBar';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DataTable } from '@/components/data-table';
+import { ColumnDef } from '@tanstack/react-table';
 import * as XLSX from 'xlsx';
 
 interface Video {
@@ -58,45 +59,27 @@ const ManageVideosPage = () => {
 
   const [isVideoDialogOpen, setIsVideoDialogOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<any>(null);
+  
   const [isSubgroupDialogOpen, setIsSubgroupDialogOpen] = useState(false);
+  const [selectedSubgroup, setSelectedSubgroup] = useState<any>(null);
 
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<Video[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-
-  // Accurate metadata fetch using recursive loop to bypass 1000 limit
   const fetchMetadata = useCallback(async () => {
     setIsPageLoading(true);
     try {
-      const [groupsRes, subRes] = await Promise.all([
+      const [groupsRes, subRes, allVideosRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
-        supabase.from('video_subgroups').select('*').order('order')
+        supabase.from('video_subgroups').select('*').order('order'),
+        supabase.from('videos').select('group_id, subgroup_id')
       ]);
 
-      let allMappings: { group_id: string | null; subgroup_id: string | null }[] = [];
-      let hasMore = true;
-      let offset = 0;
-      const CHUNK_SIZE = 1000;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('videos')
-          .select('group_id, subgroup_id')
-          .range(offset, offset + CHUNK_SIZE - 1);
-        
-        if (error) throw error;
-        if (data && data.length > 0) {
-          allMappings = [...allMappings, ...data];
-          offset += CHUNK_SIZE;
-          hasMore = data.length === CHUNK_SIZE;
-        } else {
-          hasMore = false;
-        }
-      }
+      if (groupsRes.error) throw groupsRes.error;
+      if (subRes.error) throw subRes.error;
 
       setGroups(groupsRes.data || []);
       setSubgroups(subRes.data || []);
@@ -104,7 +87,7 @@ const ManageVideosPage = () => {
       const groupCounts: Record<string, number> = {};
       const subCounts: Record<string, number> = {};
 
-      allMappings.forEach(v => {
+      allVideosRes.data?.forEach(v => {
         if (v.group_id) groupCounts[v.group_id] = (groupCounts[v.group_id] || 0) + 1;
         if (v.subgroup_id) subCounts[v.subgroup_id] = (subCounts[v.subgroup_id] || 0) + 1;
       });
@@ -155,33 +138,6 @@ const ManageVideosPage = () => {
     }
   };
 
-  useEffect(() => {
-    if (!searchTerm.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    const delayDebounceFn = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const { data, error } = await supabase
-          .from('videos')
-          .select('*')
-          .ilike('title', `%${searchTerm}%`)
-          .limit(50);
-        
-        if (error) throw error;
-        setSearchResults(data || []);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 500);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
@@ -201,25 +157,17 @@ const ManageVideosPage = () => {
         const worksheet = workbook.Sheets[sheetName];
         const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-        const findVal = (row: any, keys: string[]) => {
-          const rowKeys = Object.keys(row);
-          for (const key of keys) {
-            const found = rowKeys.find(rk => rk.toLowerCase().trim() === key.toLowerCase().trim());
-            if (found) return row[found];
-          }
-          return undefined;
-        };
-
+        // Header Mapping for your specific requirement
         const videosToUpload = json.map(row => ({
-          parent_category: findVal(row, ['Parent Category', 'Category', 'Parent']),
-          sub_category: findVal(row, ['Sub-Category', 'Topic', 'Subcategory']),
-          sub_category_order: parseInt(findVal(row, ['Sub-Category Order', 'Sub Order'])) || 0,
-          video_title: findVal(row, ['Video Title', 'Title', 'Name']),
-          order: parseInt(findVal(row, ['Display Number (Order)', 'Display Order', 'Order'])) || 0,
-          video_id: String(findVal(row, ['Vimeo ID', 'Video ID', 'ID']) || '').trim(),
+          parent_category: row['Parent Category'],
+          sub_category: row['Sub-Category'],
+          sub_category_order: parseInt(row['Sub-Category Order']) || 0,
+          video_title: row['Video Title'],
+          order: parseInt(row['Display Number (Order)']) || 0,
+          video_id: String(row['Vimeo ID'] || '').trim(),
         })).filter(v => v.parent_category && v.video_title && v.video_id);
 
-        if (videosToUpload.length === 0) throw new Error("No valid data found.");
+        if (videosToUpload.length === 0) throw new Error("No valid data found matching required headers.");
 
         const CHUNK_SIZE = 50;
         let successCount = 0;
@@ -233,9 +181,9 @@ const ManageVideosPage = () => {
           successCount += (res.successCount || 0);
         }
 
-        toast({ title: "Import Complete", description: `Successfully processed ${successCount} videos.` });
+        toast({ title: "Import Complete", description: `Processed ${successCount} videos.` });
         setSelectedFile(null);
-        setLoadedVideos({}); // Clear cache
+        setLoadedVideos({}); 
         fetchMetadata();
       } catch (err: any) {
         toast({ title: "Upload Error", description: err.message, variant: "destructive" });
@@ -254,6 +202,18 @@ const ManageVideosPage = () => {
       setLoadedVideos({});
       fetchMetadata();
     }
+  };
+
+  const handleDeleteGroup = async (id: string) => {
+    if (!window.confirm("Delete this group? Videos will be uncategorized.")) return;
+    const { error } = await supabase.from('video_groups').delete().eq('id', id);
+    if (!error) fetchMetadata();
+  };
+
+  const handleDeleteSubgroup = async (id: string) => {
+    if (!window.confirm("Delete this sub-group? Videos will move to parent group.")) return;
+    const { error } = await supabase.from('video_subgroups').delete().eq('id', id);
+    if (!error) fetchMetadata();
   };
 
   const VideoRow = ({ video }: { video: Video }) => (
@@ -280,6 +240,33 @@ const ManageVideosPage = () => {
     </div>
   );
 
+  const groupColumns: ColumnDef<any>[] = [
+    { accessorKey: 'order', header: 'Order' },
+    { accessorKey: 'name', header: 'Group Name' },
+    { id: 'actions', cell: ({ row }) => (
+      <div className="flex gap-1 justify-end">
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setSelectedGroup(row.original); setIsGroupDialogOpen(true); }}><Edit className="h-3 w-3"/></Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteGroup(row.original.id)}><Trash2 className="h-3 w-3"/></Button>
+      </div>
+    )}
+  ];
+
+  const subgroupColumns: ColumnDef<any>[] = [
+    { accessorKey: 'order', header: 'Order' },
+    { accessorKey: 'name', header: 'Sub-group Name' },
+    { 
+        accessorKey: 'group_id', 
+        header: 'Parent',
+        cell: ({ row }) => groups.find(g => g.id === row.original.group_id)?.name || 'Unknown'
+    },
+    { id: 'actions', cell: ({ row }) => (
+      <div className="flex gap-1 justify-end">
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setSelectedSubgroup(row.original); setIsSubgroupDialogOpen(true); }}><Edit className="h-3 w-3"/></Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteSubgroup(row.original.id)}><Trash2 className="h-3 w-3"/></Button>
+      </div>
+    )}
+  ];
+
   if (isPageLoading) return <LoadingBar />;
 
   return (
@@ -294,7 +281,8 @@ const ManageVideosPage = () => {
       <Tabs defaultValue="curriculum" className="w-full">
         <TabsList className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 mb-4">
           <TabsTrigger value="curriculum" className="rounded-md px-4 text-xs">Hierarchy</TabsTrigger>
-          <TabsTrigger value="search" className="rounded-md px-4 text-xs">Search</TabsTrigger>
+          <TabsTrigger value="groups" className="rounded-md px-4 text-xs">Main Groups</TabsTrigger>
+          <TabsTrigger value="subgroups" className="rounded-md px-4 text-xs">Sub-groups</TabsTrigger>
           <TabsTrigger value="bulk" className="rounded-md px-4 text-xs">Import</TabsTrigger>
         </TabsList>
 
@@ -377,23 +365,32 @@ const ManageVideosPage = () => {
           </Accordion>
         </TabsContent>
 
-        <TabsContent value="search" className="space-y-4">
-          <Card className="border-none shadow-sm">
-            <CardContent className="p-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Fast search..." 
-                  className="pl-10 h-10 text-sm rounded-xl"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
-              </div>
+        <TabsContent value="groups">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+               <div>
+                 <CardTitle className="text-sm font-black uppercase">Main Groups</CardTitle>
+                 <CardDescription className="text-[10px]">Manage top-level curriculum categories.</CardDescription>
+               </div>
+               <Button size="sm" onClick={() => { setSelectedGroup(null); setIsGroupDialogOpen(true); }}><Plus className="h-3 w-3 mr-2"/> Add Group</Button>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <DataTable columns={groupColumns} data={groups} pageSize={20} />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {searchResults.map(v => <VideoRow key={v.id} video={v} />)}
-              </div>
+        <TabsContent value="subgroups">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+               <div>
+                 <CardTitle className="text-sm font-black uppercase">Sub-groups (Topics)</CardTitle>
+                 <CardDescription className="text-[10px]">Manage nested chapters under main groups.</CardDescription>
+               </div>
+               <Button size="sm" onClick={() => { setSelectedSubgroup(null); setIsSubgroupDialogOpen(true); }}><Plus className="h-3 w-3 mr-2"/> Add Sub-group</Button>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <DataTable columns={subgroupColumns} data={subgroups} pageSize={20} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -418,7 +415,7 @@ const ManageVideosPage = () => {
                       <FileSpreadsheet className="h-8 w-8 text-primary mx-auto" />
                       <div>
                         <p className="font-black text-xs text-primary">{selectedFile ? selectedFile.name : "Select Excel"}</p>
-                        <p className="text-[9px] text-muted-foreground">Category | Topic | Video Title | Vimeo ID</p>
+                        <p className="text-[9px] text-muted-foreground">Required Headers: Parent Category | Sub-Category | Sub-Category Order | Video Title | Display Number (Order) | Vimeo ID</p>
                       </div>
                   </Label>
                </div>
@@ -435,8 +432,8 @@ const ManageVideosPage = () => {
       </Tabs>
 
       <EditVideoDialog open={isVideoDialogOpen} onOpenChange={setIsVideoDialogOpen} video={selectedVideo} onSave={() => { setLoadedVideos({}); fetchMetadata(); }} />
-      <EditVideoGroupDialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen} group={null} onSave={fetchMetadata} />
-      <EditVideoSubgroupDialog open={isSubgroupDialogOpen} onOpenChange={setIsSubgroupDialogOpen} subgroup={null} onSave={fetchMetadata} />
+      <EditVideoGroupDialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen} group={selectedGroup} onSave={fetchMetadata} />
+      <EditVideoSubgroupDialog open={isSubgroupDialogOpen} onOpenChange={setIsSubgroupDialogOpen} subgroup={selectedSubgroup} onSave={fetchMetadata} />
       <MadeWithDyad />
     </div>
   );

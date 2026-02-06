@@ -166,7 +166,7 @@ const ManageVideosPage = () => {
   const handleBulkUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
-    setUploadProgress("Reading and parsing spreadsheet...");
+    setUploadProgress("Reading spreadsheet...");
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -176,8 +176,6 @@ const ManageVideosPage = () => {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const json: any[] = XLSX.utils.sheet_to_json(worksheet);
-
-        console.log("Parsed Excel Raw JSON:", json[0]); // Debugging
 
         const videosToUpload = json.map(row => ({
           parent_category: findVal(row, ['Parent Category', 'Category', 'Parent']),
@@ -189,46 +187,46 @@ const ManageVideosPage = () => {
           platform: 'vimeo'
         })).filter(v => v.parent_category && v.video_title && v.video_id && v.video_id !== 'undefined' && v.video_id !== '');
 
-        console.log("Processed videos for upload:", videosToUpload.length);
-
         if (videosToUpload.length === 0) {
-          throw new Error("No valid data found. Check your column names: 'Parent Category', 'Video Title', and 'Vimeo ID' are required.");
+          throw new Error("No valid records found. Verify headers: 'Parent Category', 'Video Title', 'Vimeo ID'.");
         }
 
-        const CHUNK_SIZE = 50;
+        const CHUNK_SIZE = 40;
         let totalProcessed = 0;
         let totalErrors = 0;
 
         for (let i = 0; i < videosToUpload.length; i += CHUNK_SIZE) {
           const chunk = videosToUpload.slice(i, i + CHUNK_SIZE);
-          const currentBatch = Math.floor(i / CHUNK_SIZE) + 1;
+          const batchNum = Math.floor(i / CHUNK_SIZE) + 1;
           const totalBatches = Math.ceil(videosToUpload.length / CHUNK_SIZE);
           
-          setUploadProgress(`Processing batch ${currentBatch} of ${totalBatches}... (${i}/${videosToUpload.length})`);
+          setUploadProgress(`Uploading batch ${batchNum} of ${totalBatches}...`);
 
           const { data: res, error } = await supabase.functions.invoke('bulk-upload-videos', {
             body: { videos: chunk },
           });
 
           if (error) {
-            console.error("Batch invoke error:", error);
-            throw error;
+            console.error("Function Invoke Error:", error);
+            throw new Error(error.message || "The server encountered an error during processing.");
           }
           
-          totalProcessed += (res.successCount || 0);
-          totalErrors += (res.errorCount || 0);
+          if (res) {
+            totalProcessed += (res.successCount || 0);
+            totalErrors += (res.errorCount || 0);
+          }
         }
 
         toast({ 
-          title: "Upload Complete", 
-          description: `Successfully imported ${totalProcessed} videos. Failed: ${totalErrors}.` 
+          title: "Import Finished", 
+          description: `Imported ${totalProcessed} videos successfully. Errors: ${totalErrors}.` 
         });
         
         setSelectedFile(null);
         setUploadProgress("");
         fetchAllData();
       } catch (err: any) {
-        console.error("Bulk upload handler error:", err);
+        console.error("Bulk upload logic error:", err);
         toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
       } finally {
         setIsUploading(false);

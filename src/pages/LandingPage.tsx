@@ -296,33 +296,33 @@ const LandingPage = () => {
               {settings.pricingCta.subtitle}
             </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
               {subscriptionTiers.map((tier) => (
                 <Card key={tier.id} className="flex flex-col text-left shadow-2xl transition-all border-slate-800 bg-slate-950 scale-100 hover:scale-[1.02]">
                   <CardHeader className="pb-6">
-                    <CardTitle className="text-3xl text-white">{tier.name}</CardTitle>
-                    <CardDescription className="text-slate-400 text-lg">{tier.description}</CardDescription>
+                    <CardTitle className="text-2xl text-white">{tier.name}</CardTitle>
+                    <CardDescription className="text-slate-400 text-sm line-clamp-2">{tier.description}</CardDescription>
                   </CardHeader>
                   <CardContent className="flex-grow space-y-6 border-b border-slate-800 pb-8">
                     <div className="flex items-baseline">
-                      <span className="text-5xl font-extrabold text-white">{tier.currency} {tier.price.toFixed(2)}</span>
-                      <span className="text-lg text-slate-400 ml-2"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
+                      <span className="text-3xl font-extrabold text-white">{tier.currency} {tier.price.toFixed(2)}</span>
+                      <span className="text-sm text-slate-400 ml-2"> / {tier.duration_in_months} mo</span>
                     </div>
                     {tier.features && tier.features.length > 0 && (
-                      <ul className="space-y-4">
-                        {tier.features.map((feature, index) => (
-                          <li key={index} className="flex items-start gap-3 text-slate-300">
-                            <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                      <ul className="space-y-3">
+                        {tier.features.slice(0, 5).map((feature, index) => (
+                          <li key={index} className="flex items-start gap-2 text-slate-300 text-xs">
+                            <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
                             <span>{feature}</span>
                           </li>
                         ))}
                       </ul>
                     )}
                   </CardContent>
-                  <CardFooter className="pt-8">
+                  <CardFooter className="pt-6">
                     <Link to={user ? `/user/payment/\${tier.id}?priceId=\${tier.stripe_price_id}` : `/signup?tierId=\${tier.id}`} className="w-full">
-                      <Button className="w-full h-12 text-lg bg-white text-slate-900 hover:bg-slate-200 font-bold" disabled={!tier.stripe_price_id && !!user}>
-                        {user ? 'Subscribe Now' : 'Sign Up & Subscribe'}
+                      <Button className="w-full h-10 text-sm bg-white text-slate-900 hover:bg-slate-200 font-bold" disabled={!tier.stripe_price_id && !!user}>
+                        {user ? 'Subscribe' : 'Sign Up'}
                       </Button>
                     </Link>
                   </CardFooter>

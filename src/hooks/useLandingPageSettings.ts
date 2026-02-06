@@ -56,9 +56,10 @@ export const useLandingPageSettings = () => {
     features: defaultFeatures,
     pricingCta: defaultPricingCta,
   });
-  const [isLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
+    setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('global_settings')
@@ -101,6 +102,8 @@ export const useLandingPageSettings = () => {
 
     } catch (error: any) {
       console.error("Error fetching landing page settings:", error);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 

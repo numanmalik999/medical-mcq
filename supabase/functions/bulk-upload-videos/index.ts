@@ -43,11 +43,10 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'Invalid input.' }), { status: 400, headers: corsHeaders });
     }
 
-    // 1. Warm up the cache - Load all existing groups and subgroups
+    // 1. Load all existing structural data once to avoid per-row queries
     const { data: allGroups } = await supabaseAdmin.from('video_groups').select('id, name');
     const { data: allSubgroups } = await supabaseAdmin.from('video_subgroups').select('id, name, group_id, order');
 
-    // Added explicit :any to resolve "implicitly has an any type" errors
     const groupMap = new Map(allGroups?.map((g: any) => [g.name.toLowerCase(), g.id]) || []);
     const subgroupMap = new Map(allSubgroups?.map((sg: any) => [`${sg.group_id}_${sg.name.toLowerCase()}`, sg.id]) || []);
 
@@ -84,7 +83,11 @@ serve(async (req: Request) => {
           if (!subgroupId) {
             const { data: newSub, error: sErr } = await supabaseAdmin
               .from('video_subgroups')
-              .insert({ name: subName, group_id: groupId, order: parseInt(String(video.sub_category_order)) || 0 })
+              .insert({ 
+                name: subName, 
+                group_id: groupId, 
+                order: parseInt(String(video.sub_category_order)) || 0 
+              })
               .select('id').single();
             if (sErr) throw sErr;
             subgroupId = newSub.id;
@@ -92,7 +95,7 @@ serve(async (req: Request) => {
           }
         }
 
-        // Upsert Video
+        // Upsert Video based on video_id
         const { error: vErr } = await supabaseAdmin
           .from('videos')
           .upsert({
@@ -118,6 +121,9 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: error.message }), { 
+      status: 500, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
   }
 });

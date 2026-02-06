@@ -18,7 +18,7 @@ const formSchema = z.object({
   title: z.string().min(1, "Title is required."),
   description: z.string().optional().or(z.literal('')),
   youtube_video_id: z.string().min(1, "Video ID is required."),
-  platform: z.enum(['vimeo']), // Restricted to vimeo only
+  platform: z.enum(['youtube', 'vimeo', 'dailymotion']),
   group_id: z.string().optional().or(z.literal('none')),
   subgroup_id: z.string().optional().or(z.literal('none')),
   order: z.preprocess((val) => parseInt(String(val), 10), z.number().min(0)),
@@ -43,7 +43,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
       title: "", 
       description: "", 
       youtube_video_id: "", 
-      platform: 'vimeo',
+      platform: 'youtube',
       group_id: 'none',
       subgroup_id: 'none',
       order: 0
@@ -77,18 +77,20 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
   }, [selectedGroupId]);
 
   useEffect(() => {
-    if (video && open) {
-      form.reset({
-        title: video.title,
-        description: video.description || "",
-        youtube_video_id: video.youtube_video_id,
-        platform: 'vimeo',
-        group_id: video.group_id || 'none',
-        subgroup_id: video.subgroup_id || 'none',
-        order: video.order || 0
-      });
-    } else if (!open) {
-      form.reset({ title: "", description: "", youtube_video_id: "", platform: 'vimeo', group_id: 'none', subgroup_id: 'none', order: 0 });
+    if (open) {
+      if (video) {
+        form.reset({
+          title: video.title,
+          description: video.description || "",
+          youtube_video_id: video.youtube_video_id,
+          platform: (video.platform as any) || 'youtube',
+          group_id: video.group_id || 'none',
+          subgroup_id: video.subgroup_id || 'none',
+          order: video.order || 0
+        });
+      } else {
+        form.reset({ title: "", description: "", youtube_video_id: "", platform: 'youtube', group_id: 'none', subgroup_id: 'none', order: 0 });
+      }
     }
   }, [video, open, form]);
 
@@ -99,10 +101,11 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
         title: values.title,
         description: values.description || null,
         youtube_video_id: values.youtube_video_id,
-        platform: 'vimeo',
+        platform: values.platform,
         group_id: values.group_id === 'none' ? null : values.group_id,
         subgroup_id: values.subgroup_id === 'none' ? null : values.subgroup_id,
-        order: values.order
+        order: values.order,
+        updated_at: new Date().toISOString()
       };
 
       const { error } = video?.id 
@@ -126,7 +129,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
         <DialogHeader>
           <DialogTitle>{video ? 'Edit Lesson' : 'Add New Lesson'}</DialogTitle>
           <DialogDescription>
-            Configure metadata for this Vimeo lesson.
+            Configure the details and placement for this medical lesson.
           </DialogDescription>
         </DialogHeader>
 
@@ -161,7 +164,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
 
                 <FormField control={form.control} name="subgroup_id" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Sub-group (Optional)</FormLabel>
+                    <FormLabel>Sub-group (Topic)</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || 'none'} disabled={!selectedGroupId || selectedGroupId === 'none'}>
                       <FormControl><SelectTrigger><SelectValue placeholder="No Sub-group" /></SelectTrigger></FormControl>
                       <SelectContent>
@@ -174,14 +177,23 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormItem>
-                  <FormLabel>Platform</FormLabel>
-                  <Input value="Vimeo" disabled />
-                </FormItem>
+                <FormField control={form.control} name="platform" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Platform</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="youtube">YouTube</SelectItem>
+                        <SelectItem value="vimeo">Vimeo</SelectItem>
+                        <SelectItem value="dailymotion">Dailymotion</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
 
                 <FormField control={form.control} name="youtube_video_id" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Vimeo ID</FormLabel>
+                    <FormLabel>Video / ID</FormLabel>
                     <FormControl><Input placeholder="e.g. 123456789" {...field} /></FormControl>
                   </FormItem>
                 )} />
@@ -197,7 +209,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
 
               <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Summary</FormLabel>
+                  <FormLabel>Summary (Optional)</FormLabel>
                   <FormControl><Textarea placeholder="Quick lesson takeaway..." rows={3} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

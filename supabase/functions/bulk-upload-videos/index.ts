@@ -23,7 +23,7 @@ interface IncomingVideo {
   video_title: string;
   order: number;
   video_id: string;
-  platform?: 'vimeo';
+  platform?: string;
 }
 
 serve(async (req: Request) => {
@@ -40,142 +40,84 @@ serve(async (req: Request) => {
     const { videos } = await req.json();
 
     if (!Array.isArray(videos)) {
-      return new Response(JSON.stringify({ error: 'Invalid input: Expected an array of videos.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(JSON.stringify({ error: 'Invalid input.' }), { status: 400, headers: corsHeaders });
     }
+
+    // 1. Warm up the cache - Load all existing groups and subgroups
+    const { data: allGroups } = await supabaseAdmin.from('video_groups').select('id, name');
+    const { data: allSubgroups } = await supabaseAdmin.from('video_subgroups').select('id, name, group_id, order');
+
+    // Added explicit :any to resolve "implicitly has an any type" errors
+    const groupMap = new Map(allGroups?.map((g: any) => [g.name.toLowerCase(), g.id]) || []);
+    const subgroupMap = new Map(allSubgroups?.map((sg: any) => [`${sg.group_id}_${sg.name.toLowerCase()}`, sg.id]) || []);
 
     let successCount = 0;
     let errorCount = 0;
     const errors: string[] = [];
 
-    const groupCache = new Map<string, string>();
-    const subgroupCache = new Map<string, string>();
-
     for (const video of (videos as IncomingVideo[])) {
       try {
         const videoIdStr = String(video.video_id).trim();
-        const videoTitle = video.video_title.trim();
+        const platform = (video.platform || 'vimeo').toLowerCase();
 
-        // 1. Resolve Parent Group
+        // Resolve or Create Parent Group
         const parentName = video.parent_category.trim();
-        const parentKey = parentName.toLowerCase();
-        let groupId = groupCache.get(parentKey);
+        let groupId = groupMap.get(parentName.toLowerCase());
 
         if (!groupId) {
-          const { data: groups } = await supabaseAdmin
+          const { data: newGroup, error: gErr } = await supabaseAdmin
             .from('video_groups')
-            .select('id')
-            .ilike('name', parentName)
-            .limit(1);
-
-          if (groups && groups.length > 0) {
-            groupId = groups[0].id;
-          } else {
-            const { data: newGroup, error: groupErr } = await supabaseAdmin
-              .from('video_groups')
-              .insert({ name: parentName, order: 0 })
-              .select('id')
-              .single();
-            if (groupErr) throw new Error(`Failed to create group: ${groupErr.message}`);
-            groupId = newGroup.id;
-          }
-          groupCache.set(parentKey, groupId!);
+            .insert({ name: parentName, order: 0 })
+            .select('id').single();
+          if (gErr) throw gErr;
+          groupId = newGroup.id;
+          groupMap.set(parentName.toLowerCase(), groupId);
         }
 
-        // 2. Resolve Sub-category (Topic)
+        // Resolve or Create Sub-category
         let subgroupId = null;
-        if (video.sub_category && video.sub_category.trim()) {
+        if (video.sub_category?.trim()) {
           const subName = video.sub_category.trim();
-          const subOrder = parseInt(String(video.sub_category_order)) || 0;
-          
           const subKey = `${groupId}_${subName.toLowerCase()}`;
-          const subOrderKey = `${groupId}_order_${subOrder}`;
-          
-          subgroupId = subgroupCache.get(subKey) || subgroupCache.get(subOrderKey);
+          subgroupId = subgroupMap.get(subKey);
 
           if (!subgroupId) {
-            const { data: nameMatch } = await supabaseAdmin
+            const { data: newSub, error: sErr } = await supabaseAdmin
               .from('video_subgroups')
-              .select('id')
-              .eq('group_id', groupId)
-              .ilike('name', subName)
-              .limit(1);
-
-            if (nameMatch && nameMatch.length > 0) {
-              subgroupId = nameMatch[0].id;
-            } else if (subOrder > 0) {
-              const { data: orderMatch } = await supabaseAdmin
-                .from('video_subgroups')
-                .select('id')
-                .eq('group_id', groupId)
-                .eq('order', subOrder)
-                .limit(1);
-
-              if (orderMatch && orderMatch.length > 0) {
-                subgroupId = orderMatch[0].id;
-                await supabaseAdmin.from('video_subgroups').update({ name: subName }).eq('id', subgroupId);
-              }
-            }
-
-            if (!subgroupId) {
-              const { data: newSub, error: subErr } = await supabaseAdmin
-                .from('video_subgroups')
-                .insert({ name: subName, group_id: groupId, order: subOrder })
-                .select('id')
-                .single();
-              if (subErr) throw new Error(`Failed to create sub-category: ${subErr.message}`);
-              subgroupId = newSub.id;
-            }
-            
-            subgroupCache.set(subKey, subgroupId!);
-            subgroupCache.set(subOrderKey, subgroupId!);
+              .insert({ name: subName, group_id: groupId, order: parseInt(String(video.sub_category_order)) || 0 })
+              .select('id').single();
+            if (sErr) throw sErr;
+            subgroupId = newSub.id;
+            subgroupMap.set(subKey, subgroupId);
           }
         }
 
-        // 3. Handle Video Insertion/Update
-        const { data: existingVideos } = await supabaseAdmin
+        // Upsert Video
+        const { error: vErr } = await supabaseAdmin
           .from('videos')
-          .select('id')
-          .eq('youtube_video_id', videoIdStr)
-          .limit(1);
+          .upsert({
+            title: video.video_title.trim(),
+            youtube_video_id: videoIdStr,
+            platform: platform,
+            group_id: groupId,
+            subgroup_id: subgroupId,
+            order: parseInt(String(video.order)) || 0,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'youtube_video_id' });
 
-        const videoPayload = {
-          title: videoTitle,
-          youtube_video_id: videoIdStr,
-          platform: 'vimeo',
-          group_id: groupId,
-          subgroup_id: subgroupId,
-          order: parseInt(String(video.order)) || 0,
-          updated_at: new Date().toISOString()
-        };
-
-        if (existingVideos && existingVideos.length > 0) {
-          const { error: updateErr } = await supabaseAdmin
-            .from('videos')
-            .update(videoPayload)
-            .eq('id', existingVideos[0].id);
-          if (updateErr) throw updateErr;
-        } else {
-          const { error: insertErr } = await supabaseAdmin
-            .from('videos')
-            .insert(videoPayload);
-          if (insertErr) throw insertErr;
-        }
-
+        if (vErr) throw vErr;
         successCount++;
       } catch (e: any) {
         errorCount++;
-        errors.push(`Row failure ("${video.video_title}"): ${e.message}`);
+        errors.push(`Failed "${video.video_title}": ${e.message}`);
       }
     }
 
-    return new Response(JSON.stringify({ message: 'Batch complete.', successCount, errorCount, errors }), {
+    return new Response(JSON.stringify({ successCount, errorCount, errors }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
   }
 });

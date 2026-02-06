@@ -61,14 +61,36 @@ const UserVideosPage = () => {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
 
+  // Fetch Hierarchy Metadata and bypass 1000 limit for counts
   const fetchMetadata = useCallback(async () => {
     try {
-      const [groupsRes, subRes, progRes, allVideosRes] = await Promise.all([
+      const [groupsRes, subRes, progRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
         supabase.from('video_subgroups').select('*').order('order'),
         user ? supabase.from('user_video_progress').select('video_id, is_watched').eq('user_id', user.id) : Promise.resolve({ data: [] }),
-        supabase.from('videos').select('group_id, subgroup_id')
       ]);
+
+      // Loop to fetch ALL video group mappings for accurate counts
+      let allMappings: { group_id: string | null; subgroup_id: string | null }[] = [];
+      let hasMore = true;
+      let offset = 0;
+      const CHUNK_SIZE = 1000;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('videos')
+          .select('group_id, subgroup_id')
+          .range(offset, offset + CHUNK_SIZE - 1);
+        
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allMappings = [...allMappings, ...data];
+          offset += CHUNK_SIZE;
+          hasMore = data.length === CHUNK_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
 
       const newProgressMap = new Map();
       progRes.data?.forEach(p => newProgressMap.set(p.video_id, p.is_watched));
@@ -79,7 +101,7 @@ const UserVideosPage = () => {
       const groupCounts: Record<string, number> = {};
       const subCounts: Record<string, number> = {};
 
-      allVideosRes.data?.forEach(v => {
+      allMappings.forEach(v => {
         if (v.group_id) groupCounts[v.group_id] = (groupCounts[v.group_id] || 0) + 1;
         if (v.subgroup_id) subCounts[v.subgroup_id] = (subCounts[v.subgroup_id] || 0) + 1;
       });
@@ -125,7 +147,6 @@ const UserVideosPage = () => {
       setLoadedVideos(prev => ({ ...prev, [id]: allData }));
     } catch (e: any) {
       console.error(e);
-      toast({ title: "Sync Error", description: "Failed to load complete video list." });
     } finally {
       setLoadingState(prev => ({ ...prev, [id]: false }));
     }
@@ -157,7 +178,7 @@ const UserVideosPage = () => {
           if (data && data.length > 0) {
             allResults = [...allResults, ...(data as Video[])];
             offset += CHUNK_SIZE;
-            hasMore = data.length === CHUNK_SIZE;
+            hasMore = data.length === CHUNK_SIZE && allResults.length < 5000;
           } else {
             hasMore = false;
           }
@@ -232,17 +253,17 @@ const UserVideosPage = () => {
   if (!hasCheckedInitialSession || isLoading) return <div className="flex justify-center py-20 pt-24"><Loader2 className="animate-spin text-primary" /></div>;
 
   return (
-    <div className="space-y-4 pb-12">
-      <section className="relative overflow-hidden bg-primary rounded-xl p-4 md:p-6 text-primary-foreground shadow-md">
-        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-4">
+    <div className="space-y-3 pb-12">
+      <section className="relative overflow-hidden bg-primary rounded-xl p-3 md:p-5 text-primary-foreground shadow-sm">
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-3">
           <div className="text-center lg:text-left">
-            <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase italic leading-none">Education Library</h1>
+            <h1 className="text-lg md:text-xl font-black tracking-tight uppercase italic leading-none">Library</h1>
           </div>
-          <div className="relative w-full max-w-md">
+          <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
             <Input 
-              placeholder="Search library..." 
-              className="h-10 pl-10 rounded-lg bg-white text-slate-900 font-bold border-none shadow-lg text-sm" 
+              placeholder="Search database..." 
+              className="h-9 pl-10 rounded-lg bg-white text-slate-900 font-bold border-none shadow-md text-xs" 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 
             />
@@ -253,23 +274,23 @@ const UserVideosPage = () => {
 
       <div className="container max-w-7xl mx-auto px-0">
         {searchTerm.trim() ? (
-          <section className="animate-in fade-in space-y-3 px-2">
+          <section className="animate-in fade-in space-y-2 px-1">
              <div className="flex items-center gap-2">
                 <MonitorPlay className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-black uppercase">Search Results</h2>
+                <h2 className="text-xs font-black uppercase">Results</h2>
              </div>
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                {searchResults.map(v => <VideoCard key={v.id} video={v} />)}
                {searchResults.length === 0 && !isSearching && (
-                 <Card className="col-span-full py-8 text-center rounded-xl">
-                    <AlertCircle className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                    <p className="text-slate-400 font-bold uppercase text-[10px]">No matches found</p>
+                 <Card className="col-span-full py-6 text-center rounded-xl">
+                    <AlertCircle className="h-6 w-6 text-slate-300 mx-auto mb-1" />
+                    <p className="text-slate-400 font-bold uppercase text-[9px]">No results</p>
                  </Card>
                )}
              </div>
           </section>
         ) : (
-          <Accordion type="multiple" className="space-y-2">
+          <Accordion type="multiple" className="space-y-1.5">
             {groups.map((group) => {
               const groupSubgroups = subgroups.filter(sg => sg.group_id === group.id);
               const totalVideosInGroup = counts.groups[group.id] || 0;
@@ -278,26 +299,26 @@ const UserVideosPage = () => {
                 <AccordionItem 
                   key={group.id} 
                   value={group.id} 
-                  className="border-none bg-white rounded-xl overflow-hidden shadow-sm border border-slate-100"
+                  className="border-none bg-white rounded-lg overflow-hidden shadow-sm border"
                   onClick={() => loadVideosForId(group.id, 'group')}
                 >
-                  <AccordionTrigger className="px-4 py-3 hover:bg-slate-50/50 hover:no-underline border-b transition-all">
+                  <AccordionTrigger className="px-4 py-2.5 hover:bg-slate-50/50 hover:no-underline border-b transition-all">
                     <div className="flex items-center justify-between w-full pr-2">
                       <div className="flex items-center gap-3 text-left">
-                        <div className="p-2 bg-primary text-primary-foreground rounded-lg shadow-sm">
+                        <div className="p-1.5 bg-primary text-primary-foreground rounded-lg">
                           <Layers className="h-4 w-4" />
                         </div>
-                        <h2 className="text-md font-black uppercase tracking-tight text-slate-900 leading-none">{group.name}</h2>
+                        <h2 className="text-sm font-black uppercase text-slate-900 leading-none">{group.name}</h2>
                       </div>
-                      <Badge className="h-6 px-2 rounded-md bg-slate-900 text-white font-black text-[10px]">
+                      <Badge className="h-6 px-2 rounded bg-slate-900 text-white font-black text-[10px]">
                         {totalVideosInGroup}
                       </Badge>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="p-2 bg-slate-50/20 space-y-4">
+                  <AccordionContent className="p-1.5 bg-slate-50/10 space-y-3">
                     
                     {loadingState[group.id] ? (
-                      <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary/20" /></div>
+                      <div className="flex justify-center py-4"><Loader2 className="animate-spin h-5 w-5 text-primary/20" /></div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                         {loadedVideos[group.id]?.map((v) => <VideoCard key={v.id} video={v} />)}
@@ -305,32 +326,32 @@ const UserVideosPage = () => {
                     )}
 
                     {groupSubgroups.length > 0 && (
-                      <Accordion type="multiple" className="space-y-2">
+                      <Accordion type="multiple" className="space-y-1.5">
                         {groupSubgroups.map(sg => {
                           const videosInSubgroup = counts.subgroups[sg.id] || 0;
                           return (
                             <AccordionItem 
                               key={sg.id} 
                               value={sg.id} 
-                              className="border rounded-lg bg-white overflow-hidden shadow-sm"
+                              className="border rounded-md bg-white overflow-hidden"
                               onClick={(e) => { e.stopPropagation(); loadVideosForId(sg.id, 'subgroup'); }}
                             >
-                              <AccordionTrigger className="px-3 py-2 hover:bg-slate-50 hover:no-underline transition-all">
-                                <div className="flex items-center justify-between w-full pr-2">
+                              <AccordionTrigger className="px-3 py-1.5 hover:bg-slate-50 hover:no-underline transition-all">
+                                <div className="flex items-center justify-between w-full pr-1">
                                   <div className="flex items-center gap-2">
-                                      <FolderTree className="h-3.5 w-3.5 text-primary opacity-40" />
-                                      <span className="font-bold text-[12px] uppercase text-slate-800">
+                                      <FolderTree className="h-3 w-3 text-primary opacity-40" />
+                                      <span className="font-bold text-[11px] uppercase text-slate-800">
                                           {sg.name} 
                                       </span>
                                   </div>
-                                  <Badge variant="outline" className="h-5 px-1.5 rounded text-[9px] font-black text-primary border-primary/20">
+                                  <Badge variant="outline" className="h-4 px-1.5 rounded text-[8px] font-black text-primary border-primary/20">
                                      {videosInSubgroup}
                                   </Badge>
                                 </div>
                               </AccordionTrigger>
-                              <AccordionContent className="p-2 bg-slate-50/10">
+                              <AccordionContent className="p-1.5 bg-slate-50/5">
                                 {loadingState[sg.id] ? (
-                                    <div className="flex justify-center py-4"><Loader2 className="animate-spin h-5 w-5 text-primary/20" /></div>
+                                    <div className="flex justify-center py-3"><Loader2 className="animate-spin h-4 w-4 text-primary/20" /></div>
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                                       {loadedVideos[sg.id]?.map((v) => <VideoCard key={v.id} video={v} />)}

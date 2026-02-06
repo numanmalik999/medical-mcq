@@ -143,7 +143,7 @@ const AppContent = () => {
                   <Route path="subscription" element={<SubscriptionPage />} />
                   <Route path="reviews" element={<ReviewsPage />} />
                   
-                  {/* Dashboard-only pages */}
+                  {/* Dashboard and other standard pages */}
                   <Route path="user">
                     <Route index element={<UserDashboardPage />} />
                     <Route path="dashboard" element={<UserDashboardPage />} />
@@ -156,12 +156,12 @@ const AppContent = () => {
                     <Route path="courses/:courseId" element={<UserCourseDetailsPage />} />
                     <Route path="videos" element={<UserVideosPage />} />
                     <Route path="case-studies" element={<CaseStudiesPage />} />
+                    <Route path="take-test" element={<TakeTestPage />} />
                   </Route>
                 </Route>
                 
-                {/* Full-width special pages */}
+                {/* Pages that might need strictly full width or custom handling outside standard user padding */}
                 <Route path="user">
-                   <Route path="take-test" element={<TakeTestPage />} /> 
                    <Route path="payment/:tierId" element={<PaymentPage />} />
                 </Route>
               </Route>

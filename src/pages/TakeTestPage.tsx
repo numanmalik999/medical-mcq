@@ -122,11 +122,10 @@ const TakeTestPage = () => {
   const currentMcq = mcqs[currentQuestionIndex];
   const { isBookmarked, toggleBookmark } = useBookmark(currentMcq?.id || null);
 
+  // --- Scroll to top on question change ---
   useEffect(() => {
-    if (!showConfiguration && !showInstructions) {
-      window.scrollTo(0, 0);
-    }
-  }, [currentQuestionIndex, showConfiguration, showInstructions]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentQuestionIndex, showConfiguration, showInstructions, showResults]);
 
   const fetchExplanation = useCallback(async (explanationId: string): Promise<MCQExplanation | null> => {
     if (explanations.has(explanationId)) {
@@ -298,7 +297,6 @@ const TakeTestPage = () => {
   };
 
   const startTestPreparation = async () => {
-    // BLOCK TRIAL USERS FROM STARTING THE ENGINE
     if (!user?.has_active_subscription || (user?.subscription_end_date && differenceInDays(parseISO(user.subscription_end_date), new Date()) <= 3)) {
       setIsUpgradeDialogOpen(true);
       return;
@@ -317,7 +315,7 @@ const TakeTestPage = () => {
       const { data: all } = await supabase.from('mcqs').select('id');
       mcqIdsToFilter = (all?.map(mcq => mcq.id) || []).filter(id => !categorized.includes(id));
     } else if (regularCategoryIds.length > 0) {
-      const { data: links } = await supabase.from('mcq_category_links').select('mcq_id').in('category_id', regularCategoryIds);
+      const { data: links = [] } = await supabase.from('mcq_category_links').select('mcq_id').in('category_id', regularCategoryIds);
       mcqIdsToFilter = Array.from(new Set(links?.map(link => link.mcq_id) || []));
     } else {
       const { data: all } = await supabase.from('mcqs').select('id');
@@ -365,7 +363,6 @@ const TakeTestPage = () => {
   };
 
   const continueTestSession = useCallback(async (loadedSession: LoadedTestSession) => {
-    // BLOCK TRIAL USERS FROM CONTINUING ENGINE
     if (!user?.has_active_subscription || (user?.subscription_end_date && differenceInDays(parseISO(user.subscription_end_date), new Date()) <= 3)) {
       setIsUpgradeDialogOpen(true);
       return;
@@ -420,7 +417,6 @@ const TakeTestPage = () => {
     newAnswers.set(currentId, { selectedOption: value, isCorrect: null, submitted: false });
     setUserAnswers(newAnswers);
     
-    // Remove from skipped set if they answer it
     if (skippedMcqIds.has(currentId)) {
       const newSkipped = new Set(skippedMcqIds);
       newSkipped.delete(currentId);
@@ -439,12 +435,12 @@ const TakeTestPage = () => {
     handleNext();
   };
 
-  if (!hasCheckedInitialSession || isPageLoading) return <div className="min-h-screen flex items-center justify-center pt-20"><Loader2 className="animate-spin" /></div>;
+  if (!hasCheckedInitialSession || isPageLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
   if (showConfiguration) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-20">
-        <Card className="w-full max-w-2xl border-none shadow-xl rounded-3xl overflow-hidden">
+      <div className="space-y-8 pb-20">
+        <Card className="w-full border-none shadow-xl rounded-3xl overflow-hidden">
           <CardHeader className="bg-primary text-primary-foreground py-8 text-center">
             <CardTitle className="text-3xl font-black uppercase tracking-tight">Simulated Mock Exam</CardTitle>
             <CardDescription className="text-primary-foreground/80 font-medium">Design your practice session to mirror the real Prometric experience.</CardDescription>
@@ -471,7 +467,7 @@ const TakeTestPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-3">
                     <Label className="text-sm font-black uppercase tracking-[0.15em] text-muted-foreground px-1">Specialties</Label>
-                    <div className="grid grid-cols-1 gap-2 max-h-[250px] overflow-y-auto p-4 bg-muted/30 rounded-2xl border scrollbar-hide">
+                    <div className="grid grid-cols-1 gap-2 max-h-[350px] overflow-y-auto p-4 bg-muted/30 rounded-2xl border scrollbar-hide">
                         {allCategories.map((c) => (
                             <div key={c.id} className="flex items-center space-x-3 p-2 hover:bg-background rounded-lg transition-colors">
                                 <Checkbox id={`cat-${c.id}`} checked={selectedCategoryIds.includes(c.id)} onCheckedChange={() => handleCategoryToggle(c.id)} />
@@ -522,8 +518,8 @@ const TakeTestPage = () => {
 
   if (showInstructions) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 pt-20">
-        <Card className="w-full max-w-2xl border-none shadow-2xl rounded-3xl overflow-hidden">
+      <div className="max-w-3xl mx-auto py-8">
+        <Card className="border-none shadow-2xl rounded-3xl overflow-hidden">
           <CardHeader className="bg-primary text-primary-foreground py-8">
             <CardTitle className="text-3xl text-center font-black uppercase italic">Final Instructions</CardTitle>
           </CardHeader>
@@ -553,8 +549,8 @@ const TakeTestPage = () => {
 
   if (showResults) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 pt-24">
-        <div className="flex flex-col lg:flex-row w-full max-w-6xl gap-6">
+      <div className="space-y-6">
+        <div className="flex flex-col lg:flex-row w-full gap-6">
           <QuizNavigator mcqs={mcqs} userAnswers={userAnswers} currentQuestionIndex={currentQuestionIndex} goToQuestion={(i) => setCurrentQuestionIndex(i)} showResults={true} score={score} />
           <Card className="flex-1 border-none shadow-2xl rounded-3xl overflow-hidden">
             <CardHeader className="bg-primary text-primary-foreground text-center py-10">
@@ -613,8 +609,8 @@ const TakeTestPage = () => {
   const currentAns = userAnswers.get(currentMcq.id)?.selectedOption || "";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 pt-20">
-      <div className="flex flex-col lg:flex-row w-full max-w-6xl gap-6">
+    <div className="space-y-6">
+      <div className="flex flex-col lg:flex-row w-full gap-6">
         <QuizNavigator mcqs={mcqs} userAnswers={userAnswers} currentQuestionIndex={currentQuestionIndex} goToQuestion={(i) => setCurrentQuestionIndex(i)} showResults={false} score={0} skippedMcqIds={skippedMcqIds} />
         <Card className="flex-1 border-none shadow-2xl rounded-3xl overflow-hidden">
           <CardHeader className="border-b py-6 px-8 flex flex-row justify-between items-center bg-muted/10">

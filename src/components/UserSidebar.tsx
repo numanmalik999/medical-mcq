@@ -70,7 +70,6 @@ const UserSidebar = () => {
     { to: "/user/take-test", icon: <ClipboardCheck className="h-4 w-4" />, label: "Take A Test", premium: true },
     { to: "/user/case-studies", icon: <Stethoscope className="h-4 w-4" />, label: "Case Studies", premium: true },
     { to: "/user/videos", icon: <Youtube className="h-4 w-4" />, label: "Videos", premium: true },
-    { to: "/user/courses", icon: <BookOpenText className="h-4 w-4" />, label: "Courses", premium: true },
     { to: "/user/subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "My Subscriptions", premium: false },
     { to: "/user/submit-mcq", icon: <FilePlus className="h-4 w-4" />, label: "Submit MCQ", premium: false },
     { to: "/user/bookmarked-mcqs", icon: <Bookmark className="h-4 w-4" />, label: "Bookmarked MCQs", premium: false },

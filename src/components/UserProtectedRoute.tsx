@@ -11,7 +11,11 @@ const guestAllowedUserRoutes = [
   '/user/take-test',
   '/user/videos',
   '/user/case-studies',
-  '/user/courses'
+  '/user/courses',
+  '/quiz', // Moved here for unified layout
+  '/quiz-of-the-day', // Moved here for unified layout
+  '/subscription', // Moved here for unified layout
+  '/reviews' // Moved here for unified layout
 ];
 
 const UserProtectedRoute = () => {

@@ -98,22 +98,20 @@ const AppContent = () => {
         <main id="main-content" className="flex-grow">
           <Suspense fallback={<LoadingBar />}>
             <Routes>
+              {/* Public Outside Landing/Info Pages */}
               <Route path="/" element={<LandingPage />} />
               <Route path="/redirect" element={<DashboardRedirect />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<SignUp />} />
-              <Route path="/quiz" element={<QuizPage />} />
-              <Route path="/subscription" element={<SubscriptionPage />} />
-              <Route path="/quiz-of-the-day" element={<QuestionOfTheDayPage />} />
-              <Route path="/reset-password" element={<PasswordResetPage />} />
-              <Route path="/reviews" element={<ReviewsPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/faq" element={<FaqPage />} />
               <Route path="/about" element={<AboutUsPage />} />
               <Route path="/sitemap" element={<SitemapPage />} />
               <Route path="/blog" element={<BlogListPage />} />
               <Route path="/blog/:slug" element={<BlogDetailsPage />} />
+              <Route path="/reset-password" element={<PasswordResetPage />} />
 
+              {/* Admin Protected Routes */}
               <Route path="/admin" element={<AdminProtectedRoute />}>
                 <Route element={<AdminLayout />}>
                   <Route index element={<AdminDashboardPage />} />
@@ -137,21 +135,34 @@ const AppContent = () => {
                 </Route>
               </Route>
 
-              <Route path="/user" element={<UserProtectedRoute />}>
-                <Route path="take-test" element={<TakeTestPage />} /> 
-                <Route path="payment/:tierId" element={<PaymentPage />} />
+              {/* User / App Experience (Wrapped in Collapsible Layout) */}
+              <Route path="/" element={<UserProtectedRoute />}>
                 <Route element={<UserLayout />}>
-                  <Route index element={<UserDashboardPage />} />
-                  <Route path="dashboard" element={<UserDashboardPage />} />
-                  <Route path="profile" element={<UserProfilePage />} />
-                  <Route path="subscriptions" element={<UserSubscriptionsPage />} />
-                  <Route path="submit-mcq" element={<SubmitMcqPage />} />
-                  <Route path="bookmarked-mcqs" element={<BookmarkedMcqsPage />} />
-                  <Route path="suggestions" element={<UserSuggestionsPage />} />
-                  <Route path="courses" element={<UserCoursesPage />} />
-                  <Route path="courses/:courseId" element={<UserCourseDetailsPage />} />
-                  <Route path="videos" element={<UserVideosPage />} />
-                  <Route path="case-studies" element={<CaseStudiesPage />} />
+                  <Route path="quiz" element={<QuizPage />} />
+                  <Route path="quiz-of-the-day" element={<QuestionOfTheDayPage />} />
+                  <Route path="subscription" element={<SubscriptionPage />} />
+                  <Route path="reviews" element={<ReviewsPage />} />
+                  
+                  {/* Dashboard-only pages */}
+                  <Route path="user">
+                    <Route index element={<UserDashboardPage />} />
+                    <Route path="dashboard" element={<UserDashboardPage />} />
+                    <Route path="profile" element={<UserProfilePage />} />
+                    <Route path="subscriptions" element={<UserSubscriptionsPage />} />
+                    <Route path="submit-mcq" element={<SubmitMcqPage />} />
+                    <Route path="bookmarked-mcqs" element={<BookmarkedMcqsPage />} />
+                    <Route path="suggestions" element={<UserSuggestionsPage />} />
+                    <Route path="courses" element={<UserCoursesPage />} />
+                    <Route path="courses/:courseId" element={<UserCourseDetailsPage />} />
+                    <Route path="videos" element={<UserVideosPage />} />
+                    <Route path="case-studies" element={<CaseStudiesPage />} />
+                  </Route>
+                </Route>
+                
+                {/* Full-width special pages */}
+                <Route path="user">
+                   <Route path="take-test" element={<TakeTestPage />} /> 
+                   <Route path="payment/:tierId" element={<PaymentPage />} />
                 </Route>
               </Route>
 

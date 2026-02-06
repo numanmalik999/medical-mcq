@@ -72,26 +72,37 @@ const ManageVideosPage = () => {
   const fetchMetadata = useCallback(async () => {
     setIsPageLoading(true);
     try {
-      const [groupsRes, subRes, allVideosRes] = await Promise.all([
+      const [groupsRes, subRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
-        supabase.from('video_subgroups').select('*').order('order'),
-        supabase.from('videos').select('group_id, subgroup_id')
+        supabase.from('video_subgroups').select('*').order('order')
       ]);
 
-      if (groupsRes.error) throw groupsRes.error;
-      if (subRes.error) throw subRes.error;
+      const fetchedGroups = groupsRes.data || [];
+      const fetchedSubgroups = subRes.data || [];
 
-      setGroups(groupsRes.data || []);
-      setSubgroups(subRes.data || []);
+      // Parallelized head-count queries for accurate results without row limits
+      const groupCountPromises = fetchedGroups.map(g => 
+        supabase.from('videos').select('id', { count: 'exact', head: true }).eq('group_id', g.id)
+      );
+      const subCountPromises = fetchedSubgroups.map(sg => 
+        supabase.from('videos').select('id', { count: 'exact', head: true }).eq('subgroup_id', sg.id)
+      );
+
+      const groupCountResults = await Promise.all(groupCountPromises);
+      const subCountResults = await Promise.all(subCountPromises);
 
       const groupCounts: Record<string, number> = {};
       const subCounts: Record<string, number> = {};
 
-      allVideosRes.data?.forEach(v => {
-        if (v.group_id) groupCounts[v.group_id] = (groupCounts[v.group_id] || 0) + 1;
-        if (v.subgroup_id) subCounts[v.subgroup_id] = (subCounts[v.subgroup_id] || 0) + 1;
+      fetchedGroups.forEach((g, i) => {
+        groupCounts[g.id] = groupCountResults[i].count || 0;
+      });
+      fetchedSubgroups.forEach((sg, i) => {
+        subCounts[sg.id] = subCountResults[i].count || 0;
       });
 
+      setGroups(fetchedGroups);
+      setSubgroups(fetchedSubgroups);
       setCounts({ groups: groupCounts, subgroups: subCounts });
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -157,7 +168,6 @@ const ManageVideosPage = () => {
         const worksheet = workbook.Sheets[sheetName];
         const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-        // Header Mapping for your specific requirement
         const videosToUpload = json.map(row => ({
           parent_category: row['Parent Category'],
           sub_category: row['Sub-Category'],
@@ -415,7 +425,7 @@ const ManageVideosPage = () => {
                       <FileSpreadsheet className="h-8 w-8 text-primary mx-auto" />
                       <div>
                         <p className="font-black text-xs text-primary">{selectedFile ? selectedFile.name : "Select Excel"}</p>
-                        <p className="text-[9px] text-muted-foreground">Required Headers: Parent Category | Sub-Category | Sub-Category Order | Video Title | Display Number (Order) | Vimeo ID</p>
+                        <p className="text-[10px] text-muted-foreground">Required Headers: Parent Category | Sub-Category | Sub-Category Order | Video Title | Display Number (Order) | Vimeo ID</p>
                       </div>
                   </Label>
                </div>

@@ -61,7 +61,7 @@ const UserVideosPage = () => {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
 
-  // Fetch Hierarchy Metadata and bypass 1000 limit for counts
+  // Optimized parallel counting logic
   const fetchMetadata = useCallback(async () => {
     try {
       const [groupsRes, subRes, progRes] = await Promise.all([
@@ -70,42 +70,36 @@ const UserVideosPage = () => {
         user ? supabase.from('user_video_progress').select('video_id, is_watched').eq('user_id', user.id) : Promise.resolve({ data: [] }),
       ]);
 
-      // Loop to fetch ALL video group mappings for accurate counts
-      let allMappings: { group_id: string | null; subgroup_id: string | null }[] = [];
-      let hasMore = true;
-      let offset = 0;
-      const CHUNK_SIZE = 1000;
+      const fetchedGroups = groupsRes.data || [];
+      const fetchedSubgroups = subRes.data || [];
 
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('videos')
-          .select('group_id, subgroup_id')
-          .range(offset, offset + CHUNK_SIZE - 1);
-        
-        if (error) throw error;
-        if (data && data.length > 0) {
-          allMappings = [...allMappings, ...data];
-          offset += CHUNK_SIZE;
-          hasMore = data.length === CHUNK_SIZE;
-        } else {
-          hasMore = false;
-        }
-      }
+      // Parallelized head-count queries for performance
+      const groupCountPromises = fetchedGroups.map(g => 
+        supabase.from('videos').select('id', { count: 'exact', head: true }).eq('group_id', g.id)
+      );
+      const subCountPromises = fetchedSubgroups.map(sg => 
+        supabase.from('videos').select('id', { count: 'exact', head: true }).eq('subgroup_id', sg.id)
+      );
 
-      const newProgressMap = new Map();
-      progRes.data?.forEach(p => newProgressMap.set(p.video_id, p.is_watched));
-      setProgressMap(newProgressMap);
-      setGroups(groupsRes.data || []);
-      setSubgroups(subRes.data || []);
+      const groupCountResults = await Promise.all(groupCountPromises);
+      const subCountResults = await Promise.all(subCountPromises);
 
       const groupCounts: Record<string, number> = {};
       const subCounts: Record<string, number> = {};
 
-      allMappings.forEach(v => {
-        if (v.group_id) groupCounts[v.group_id] = (groupCounts[v.group_id] || 0) + 1;
-        if (v.subgroup_id) subCounts[v.subgroup_id] = (subCounts[v.subgroup_id] || 0) + 1;
+      fetchedGroups.forEach((g, i) => {
+        groupCounts[g.id] = groupCountResults[i].count || 0;
+      });
+      fetchedSubgroups.forEach((sg, i) => {
+        subCounts[sg.id] = subCountResults[i].count || 0;
       });
 
+      const newProgressMap = new Map();
+      progRes.data?.forEach(p => newProgressMap.set(p.video_id, p.is_watched));
+      
+      setProgressMap(newProgressMap);
+      setGroups(fetchedGroups);
+      setSubgroups(fetchedSubgroups);
       setCounts({ groups: groupCounts, subgroups: subCounts });
     } catch (error: any) {
       toast({ title: "Error", description: "Failed to load library structure.", variant: "destructive" });

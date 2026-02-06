@@ -91,7 +91,7 @@ const ManageVideosPage = () => {
     try {
       const [groupsRes, subRes, videoRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
-        supabase.from('video_subgroups').select('*, video_groups(name)').order('order'),
+        supabase.from('video_subgroups').select('*').order('order'),
         supabase.from('videos').select('*').order('created_at', { ascending: false })
       ]);
 
@@ -100,14 +100,19 @@ const ManageVideosPage = () => {
       if (videoRes.error) throw videoRes.error;
 
       const videosData = videoRes.data || [];
-      setAllVideos(videosData);
-      setGroups(groupsRes.data || []);
-      setSubgroups(subRes.data || []);
+      const groupsData = groupsRes.data || [];
+      const subgroupsData = subRes.data || [];
 
-      const allSubgroups = subRes.data || [];
-      
-      const structured: StructuredLibrary[] = (groupsRes.data || []).map(g => {
-        const groupSubgroups = allSubgroups
+      setAllVideos(videosData);
+      setGroups(groupsData);
+      setSubgroups(subgroupsData);
+
+      // Create a set of valid group IDs for faster lookup
+      const validGroupIds = new Set(groupsData.map(g => g.id));
+      const validSubgroupIds = new Set(subgroupsData.map(sg => sg.id));
+
+      const structured: StructuredLibrary[] = groupsData.map(g => {
+        const groupSubgroups = subgroupsData
           .filter(sg => sg.group_id === g.id)
           .map(sg => ({
             id: sg.id,
@@ -120,15 +125,17 @@ const ManageVideosPage = () => {
           id: g.id,
           name: g.name,
           subgroups: groupSubgroups,
-          standaloneVideos: videosData.filter(v => v.group_id === g.id && !v.subgroup_id)
+          standaloneVideos: videosData.filter(v => v.group_id === g.id && (!v.subgroup_id || !validSubgroupIds.has(v.subgroup_id)))
         };
       });
 
-      const uncategorized = videosData.filter(v => !v.group_id);
+      // Catch videos that have no group_id OR have a group_id that doesn't exist anymore
+      const uncategorized = videosData.filter(v => !v.group_id || !validGroupIds.has(v.group_id));
+      
       if (uncategorized.length > 0) {
         structured.push({
           id: 'uncategorized',
-          name: 'Uncategorized / General',
+          name: 'Uncategorized / Pending Sort',
           subgroups: [],
           standaloneVideos: uncategorized
         });
@@ -241,7 +248,7 @@ const ManageVideosPage = () => {
             </Badge>
         ) 
     },
-    { accessorKey: "youtube_video_id", header: "ID", cell: ({ row }) => <code className="text-xs bg-muted p-1 rounded">{row.original.youtube_video_id}</code> },
+    { accessorKey: "youtube_video_id", header: "Video ID", cell: ({ row }) => <code className="text-xs bg-muted p-1 rounded">{row.original.youtube_video_id}</code> },
     { 
       id: "placement", 
       header: "Group", 
@@ -293,7 +300,10 @@ const ManageVideosPage = () => {
     { 
       id: "parent", 
       header: "Parent Group", 
-      cell: ({ row }) => <Badge variant="outline">{row.original.video_groups?.name || 'Error'}</Badge> 
+      cell: ({ row }) => {
+        const group = groups.find(g => g.id === row.original.group_id);
+        return <Badge variant="outline">{group?.name || 'Unknown'}</Badge>;
+      }
     },
     {
       id: "actions",
@@ -371,7 +381,7 @@ const ManageVideosPage = () => {
         </TabsList>
 
         <TabsContent value="library" className="space-y-6">
-            <Accordion type="multiple" defaultValue={[library[0]?.id]} className="space-y-6">
+            <Accordion type="multiple" defaultValue={library.map(l => l.id)} className="space-y-6">
               {library.map((group) => (
                 <AccordionItem key={group.id} value={group.id} className="border rounded-2xl bg-card overflow-hidden shadow-sm border-border/60">
                   <AccordionTrigger className="px-6 py-5 hover:bg-muted/30 hover:no-underline border-b bg-muted/10">
@@ -383,7 +393,7 @@ const ManageVideosPage = () => {
                         <span className="font-extrabold text-xl tracking-tight">{group.name}</span>
                         <div className="flex items-center gap-2">
                            <Badge variant="outline" className="text-[10px] uppercase font-black bg-background">
-                            {group.standaloneVideos.length + group.subgroups.reduce((acc, sg) => acc + sg.videos.length, 0)} Items Total
+                            {group.standaloneVideos.length + group.subgroups.reduce((acc, sg) => acc + sg.videos.length, 0)} Items
                            </Badge>
                         </div>
                       </div>
@@ -394,7 +404,7 @@ const ManageVideosPage = () => {
                       <section className="space-y-4">
                         <div className="flex items-center gap-2 px-1">
                            <Badge variant="secondary" className="h-1.5 w-1.5 rounded-full p-0" />
-                           <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-muted-foreground">Foundation Lessons</h3>
+                           <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-muted-foreground">Main Lessons</h3>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {group.standaloneVideos.map(v => <VideoRow key={v.id} video={v} />)}

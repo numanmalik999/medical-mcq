@@ -85,6 +85,7 @@ const ManageVideosPage = () => {
 
   // Bulk Upload State
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const fetchAllData = useCallback(async () => {
@@ -156,6 +157,7 @@ const ManageVideosPage = () => {
   const handleBulkUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
+    setUploadProgress("Reading file...");
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -180,18 +182,35 @@ const ManageVideosPage = () => {
           throw new Error("No valid data found. Ensure column headers match exactly.");
         }
 
-        const { data: _res, error } = await supabase.functions.invoke('bulk-upload-videos', {
-          body: { videos: videosToUpload },
-        });
+        // CHUNKING LOGIC
+        const CHUNK_SIZE = 50;
+        let totalProcessed = 0;
+        let totalErrors = 0;
 
-        if (error) throw error;
+        for (let i = 0; i < videosToUpload.length; i += CHUNK_SIZE) {
+          const chunk = videosToUpload.slice(i, i + CHUNK_SIZE);
+          const currentBatch = Math.floor(i / CHUNK_SIZE) + 1;
+          const totalBatches = Math.ceil(videosToUpload.length / CHUNK_SIZE);
+          
+          setUploadProgress(`Processing batch ${currentBatch} of ${totalBatches}... (${i}/${videosToUpload.length})`);
+
+          const { data: res, error } = await supabase.functions.invoke('bulk-upload-videos', {
+            body: { videos: chunk },
+          });
+
+          if (error) throw error;
+          
+          totalProcessed += (res.successCount || 0);
+          totalErrors += (res.errorCount || 0);
+        }
 
         toast({ 
           title: "Upload Complete", 
-          description: "Videos have been successfully imported into the curriculum." 
+          description: `Successfully imported ${totalProcessed} videos. Failed: ${totalErrors}.` 
         });
         
         setSelectedFile(null);
+        setUploadProgress("");
         fetchAllData();
       } catch (err: any) {
         toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
@@ -471,7 +490,7 @@ const ManageVideosPage = () => {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="bg-muted/30 p-6 rounded-b-2xl border-t">
+            <CardFooter className="bg-muted/30 p-6 rounded-b-2xl border-t flex flex-col items-center gap-3">
               <Button 
                 onClick={handleBulkUpload} 
                 disabled={isUploading || !selectedFile} 
@@ -479,6 +498,9 @@ const ManageVideosPage = () => {
               >
                 {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing File...</> : "Execute Bulk Import"}
               </Button>
+              {isUploading && (
+                <p className="text-sm font-bold text-primary animate-pulse">{uploadProgress}</p>
+              )}
             </CardFooter>
           </Card>
         </TabsContent>

@@ -90,14 +90,12 @@ serve(async (req: Request) => {
           const subName = video.sub_category.trim();
           const subOrder = parseInt(String(video.sub_category_order)) || 0;
           
-          // Generate a cache key that includes the parent group
           const subKey = `${groupId}_${subName.toLowerCase()}`;
           const subOrderKey = `${groupId}_order_${subOrder}`;
           
           subgroupId = subgroupCache.get(subKey) || subgroupCache.get(subOrderKey);
 
           if (!subgroupId) {
-            // Priority 1: Match by EXACT name (case-insensitive) within this group
             const { data: nameMatch } = await supabaseAdmin
               .from('video_subgroups')
               .select('id')
@@ -107,10 +105,7 @@ serve(async (req: Request) => {
 
             if (nameMatch && nameMatch.length > 0) {
               subgroupId = nameMatch[0].id;
-              // Update the order just in case it changed in the Excel
-              await supabaseAdmin.from('video_subgroups').update({ order: subOrder }).eq('id', subgroupId);
             } else if (subOrder > 0) {
-              // Priority 2: Match by ORDER within this group (if name didn't match, maybe the user renamed it?)
               const { data: orderMatch } = await supabaseAdmin
                 .from('video_subgroups')
                 .select('id')
@@ -120,12 +115,10 @@ serve(async (req: Request) => {
 
               if (orderMatch && orderMatch.length > 0) {
                 subgroupId = orderMatch[0].id;
-                // Update the name since the order matched but the name didn't
                 await supabaseAdmin.from('video_subgroups').update({ name: subName }).eq('id', subgroupId);
               }
             }
 
-            // Priority 3: Create new if still no match
             if (!subgroupId) {
               const { data: newSub, error: subErr } = await supabaseAdmin
                 .from('video_subgroups')
@@ -136,7 +129,6 @@ serve(async (req: Request) => {
               subgroupId = newSub.id;
             }
             
-            // Cache both by name and order to prevent duplicates later in this run
             subgroupCache.set(subKey, subgroupId!);
             subgroupCache.set(subOrderKey, subgroupId!);
           }
@@ -179,7 +171,7 @@ serve(async (req: Request) => {
       }
     }
 
-    return new Response(JSON.stringify({ message: 'Bulk process finished.', successCount, errorCount, errors }), {
+    return new Response(JSON.stringify({ message: 'Batch complete.', successCount, errorCount, errors }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -197,50 +197,59 @@ const UserVideosPage = () => {
       </div>
 
       <Accordion type="multiple" defaultValue={library.map(g => g.id)} className="space-y-6">
-        {filteredLibrary.map((group) => (
-          <AccordionItem key={group.id} value={group.id} className="border rounded-2xl overflow-hidden shadow-sm bg-card">
-            <AccordionTrigger className="px-6 py-5 hover:bg-muted/30 hover:no-underline">
-              <div className="flex items-center gap-4 text-left">
-                <div className="p-2 bg-primary/5 rounded-lg text-primary"><Layers className="h-6 w-6" /></div>
-                <h2 className="text-xl font-bold">{group.name}</h2>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="p-6 bg-muted/5 border-t space-y-8">
-              
-              {group.standaloneVideos.length > 0 && (
-                <div className="space-y-4">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-primary/60 px-2">Core Foundation Lessons</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {group.standaloneVideos.map((v) => <VideoCard key={v.id} video={v} />)}
+        {filteredLibrary.map((group) => {
+          const totalVideosInGroup = group.standaloneVideos.length + group.subgroups.reduce((acc, sg) => acc + sg.videos.length, 0);
+          
+          return (
+            <AccordionItem key={group.id} value={group.id} className="border rounded-2xl overflow-hidden shadow-sm bg-card">
+              <AccordionTrigger className="px-6 py-5 hover:bg-muted/30 hover:no-underline">
+                <div className="flex items-center justify-between w-full pr-4">
+                  <div className="flex items-center gap-4 text-left">
+                    <div className="p-2 bg-primary/5 rounded-lg text-primary"><Layers className="h-6 w-6" /></div>
+                    <h2 className="text-xl font-bold">{group.name}</h2>
                   </div>
+                  <Badge variant="secondary" className="font-black text-xs px-3 h-6 rounded-full bg-primary/10 text-primary border-none">
+                    {totalVideosInGroup} lessons
+                  </Badge>
                 </div>
-              )}
+              </AccordionTrigger>
+              <AccordionContent className="p-6 bg-muted/5 border-t space-y-8">
+                
+                {group.standaloneVideos.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-primary/60 px-2">Core Foundation Lessons</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {group.standaloneVideos.map((v) => <VideoCard key={v.id} video={v} />)}
+                    </div>
+                  </div>
+                )}
 
-              {group.subgroups.length > 0 && (
-                <div className="space-y-4">
-                  <Accordion type="multiple" className="space-y-4">
-                    {group.subgroups.map(sg => (
-                      <AccordionItem key={sg.id} value={sg.id} className="border rounded-xl bg-background shadow-sm">
-                        <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/20">
-                          <div className="flex items-center gap-2 text-left">
-                            <FolderTree className="h-4 w-4 text-primary/60" />
-                            <span className="font-bold text-sm uppercase tracking-tight">{sg.name}</span>
-                            <Badge variant="outline" className="ml-2 text-[10px] font-bold">{sg.videos.length} lessons</Badge>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="p-4 bg-muted/5 border-t">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {sg.videos.map((v) => <VideoCard key={v.id} video={v} />)}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
-                </div>
-              )}
-            </AccordionContent>
-          </AccordionItem>
-        ))}
+                {group.subgroups.length > 0 && (
+                  <div className="space-y-4">
+                    <Accordion type="multiple" className="space-y-4">
+                      {group.subgroups.map(sg => (
+                        <AccordionItem key={sg.id} value={sg.id} className="border rounded-xl bg-background shadow-sm">
+                          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/20">
+                            <div className="flex items-center gap-2 text-left">
+                              <FolderTree className="h-4 w-4 text-primary/60" />
+                              <span className="font-bold text-sm uppercase tracking-tight">{sg.name}</span>
+                              <Badge variant="outline" className="ml-2 text-[10px] font-bold">{sg.videos.length} lessons</Badge>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="p-4 bg-muted/5 border-t">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                              {sg.videos.map((v) => <VideoCard key={v.id} video={v} />)}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </div>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
       </Accordion>
 
       <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>

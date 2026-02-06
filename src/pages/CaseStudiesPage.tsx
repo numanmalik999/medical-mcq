@@ -251,7 +251,7 @@ const CaseStudiesPage = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 px-4 pb-20">
+    <div className={cn("mx-auto space-y-6 px-4 pb-20 transition-all duration-500", currentCase ? "max-w-[1600px]" : "max-w-6xl")}>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h1 className="text-3xl font-black tracking-tighter uppercase italic">Diagnostic Simulation</h1>
@@ -331,7 +331,7 @@ const CaseStudiesPage = () => {
               </CardContent>
               {viewMode === 'investigation' && (
                 <CardFooter className="p-6 border-t bg-muted/10">
-                    <Button onClick={() => setViewMode('assessment')} className="w-full h-12 rounded-xl font-bold uppercase tracking-tight">
+                    <Button onClick={() => setViewMode('assessment')} className="w-full h-12 rounded-xl font-bold uppercase tracking-tight text-white bg-primary hover:bg-primary/90">
                         End Investigation <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                 </CardFooter>
@@ -447,9 +447,9 @@ const CaseStudiesPage = () => {
                            <History className="h-4 w-4" /> Review Lab Notes
                         </Button>
                         {!isSubmitted ? (
-                            <Button onClick={handleSubmitAnswer} disabled={!selectedAnswer} className="rounded-full px-10 h-12 font-black uppercase">Confirm Diagnosis</Button>
+                            <Button onClick={handleSubmitAnswer} disabled={!selectedAnswer} className="rounded-full px-10 h-12 font-black uppercase text-white bg-primary hover:bg-primary/90">Confirm Diagnosis</Button>
                         ) : (
-                            <Button onClick={handleNext} className="rounded-full px-10 h-12 font-black uppercase">
+                            <Button onClick={handleNext} className="rounded-full px-10 h-12 font-black uppercase text-white bg-primary hover:bg-primary/90">
                                 {currentQuestionIndex < currentCase.questions.length - 1 ? "Next Stage" : "Case Summary"} 
                                 <ArrowRight className="ml-2 h-4 w-4" />
                             </Button>

@@ -5,7 +5,23 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { MenuIcon, LayoutDashboard, User, BookOpenText, LogOut, ClipboardCheck, CreditCard, FilePlus, Bookmark, Lightbulb, Youtube, Stethoscope, Lock } from 'lucide-react';
+import { 
+    MenuIcon, 
+    LayoutDashboard, 
+    User, 
+    BookOpenText, 
+    LogOut, 
+    ClipboardCheck, 
+    CreditCard, 
+    FilePlus, 
+    Bookmark, 
+    Lightbulb, 
+    Youtube, 
+    Stethoscope, 
+    Lock,
+    ChevronLeft,
+    ChevronRight
+} from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './SessionContextProvider';
@@ -18,33 +34,40 @@ interface NavLinkProps {
   onLinkClick?: () => void;
   isPremium?: boolean;
   isSubscribed?: boolean;
+  isCollapsed?: boolean;
 }
 
-const NavLink = ({ to, icon, label, isMobile, onLinkClick, isPremium, isSubscribed }: NavLinkProps) => {
+const NavLink = ({ to, icon, label, isMobile, onLinkClick, isPremium, isSubscribed, isCollapsed }: NavLinkProps) => {
   const location = useLocation();
   const isActive = location.pathname === to;
 
   return (
-    <Link to={to} onClick={onLinkClick}>
+    <Link to={to} onClick={onLinkClick} title={isCollapsed ? label : undefined}>
       <Button
         variant="ghost"
         className={cn(
-          "w-full justify-start gap-2",
+          "w-full gap-2 transition-all duration-200",
+          isCollapsed ? "justify-center px-0" : "justify-start px-4",
           isActive
             ? "bg-accent text-accent-foreground"
             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           isMobile && "text-base py-3"
         )}
       >
-        {icon}
-        <span className="flex-grow text-left">{label}</span>
-        {isPremium && !isSubscribed && <Lock className="h-3 w-3 ml-auto text-muted-foreground opacity-50" />}
+        <div className="shrink-0">{icon}</div>
+        {!isCollapsed && <span className="flex-grow text-left truncate">{label}</span>}
+        {!isCollapsed && isPremium && !isSubscribed && <Lock className="h-3 w-3 ml-auto text-muted-foreground opacity-50" />}
       </Button>
     </Link>
   );
 };
 
-const UserSidebar = () => {
+interface UserSidebarProps {
+    isCollapsed?: boolean;
+    onToggleCollapse?: () => void;
+}
+
+const UserSidebar = ({ isCollapsed, onToggleCollapse }: UserSidebarProps) => {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
   const { user } = useSession();
@@ -111,9 +134,23 @@ const UserSidebar = () => {
   }
 
   return (
-    <aside className="w-64 min-h-screen bg-sidebar text-sidebar-foreground p-4 border-r border-sidebar-border flex flex-col">
-      <h2 className="text-2xl font-bold text-sidebar-primary-foreground mb-6">User Panel</h2>
-      <nav className="flex flex-col gap-2 flex-grow">
+    <aside className={cn(
+        "min-h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col transition-all duration-300 relative",
+        isCollapsed ? "w-16" : "w-64"
+    )}>
+      <div className={cn("p-4 flex items-center mb-4 transition-all duration-300", isCollapsed ? "justify-center" : "justify-between")}>
+        {!isCollapsed && <h2 className="text-xl font-bold text-sidebar-primary-foreground truncate px-2">User Panel</h2>}
+        <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onToggleCollapse} 
+            className={cn("h-8 w-8 rounded-full bg-muted/50 hover:bg-muted transition-all", isCollapsed && "mt-2")}
+        >
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </Button>
+      </div>
+      
+      <nav className="flex flex-col gap-1 flex-grow px-2">
         {navItems.map((item) => (
           <NavLink 
             key={item.to} 
@@ -122,11 +159,21 @@ const UserSidebar = () => {
             label={item.label} 
             isPremium={item.premium}
             isSubscribed={isSubscribed}
+            isCollapsed={isCollapsed}
           />
         ))}
       </nav>
-      <div className="mt-auto pt-4 border-t border-sidebar-border">
-        <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLogout}><LogOut className="h-4 w-4" /><span>Logout</span></Button>
+
+      <div className="mt-auto p-2 border-t border-sidebar-border">
+        <Button 
+            variant="ghost" 
+            className={cn("w-full transition-all duration-200", isCollapsed ? "justify-center px-0" : "justify-start gap-2 px-4")} 
+            onClick={handleLogout}
+            title={isCollapsed ? "Logout" : undefined}
+        >
+          <LogOut className="h-4 w-4" />
+          {!isCollapsed && <span>Logout</span>}
+        </Button>
       </div>
     </aside>
   );

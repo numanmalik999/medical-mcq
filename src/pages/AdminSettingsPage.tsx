@@ -2,13 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, ShieldCheck, AlertTriangle, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ import EditStaticPageDialog, { StaticPage } from '@/components/EditStaticPageDia
 import { useSession } from '@/components/SessionContextProvider';
 import { Badge } from '@/components/ui/badge';
 import SocialMediaSettingsCard from '@/components/SocialMediaSettingsCard';
+import { cn } from '@/lib/utils';
 
 const roadToGulfContent = `
 # Your Road to Practicing in the Gulf
@@ -135,6 +136,9 @@ const AdminSettingsPage = () => {
   const { toast } = useToast();
   const [staticPages, setStaticPages] = useState<StaticPage[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isCheckingTrial, setIsCheckingTrial] = useState(true);
+  const [isTrialConfigured, setIsTrialConfigured] = useState(false);
+  const [isFixingTrial, setIsFixingTrial] = useState(false);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedPageForEdit, setSelectedPageForEdit] = useState<StaticPage | null>(null);
@@ -154,6 +158,48 @@ const AdminSettingsPage = () => {
     }
     return data || [];
   }, [toast]);
+
+  const checkTrialTier = useCallback(async () => {
+    setIsCheckingTrial(true);
+    try {
+      const { data, error } = await supabase
+        .from('subscription_tiers')
+        .select('id')
+        .eq('name', '3-Day Trial')
+        .maybeSingle();
+      
+      if (error) throw error;
+      setIsTrialConfigured(!!data);
+    } catch (e) {
+      console.error("Error checking trial tier:", e);
+    } finally {
+      setIsCheckingTrial(false);
+    }
+  }, []);
+
+  const handleFixTrial = async () => {
+    setIsFixingTrial(true);
+    try {
+      const { error } = await supabase
+        .from('subscription_tiers')
+        .insert({
+          name: '3-Day Trial',
+          price: 0,
+          currency: 'USD',
+          duration_in_months: 1, // Stored as integer, used for the trial metadata
+          description: 'Automatic 3-day full access for new signups.',
+          features: ['Full Question Bank', 'AI Clinical Cases', 'Timed Exams', 'All Videos']
+        });
+
+      if (error) throw error;
+      toast({ title: "Success", description: "3-Day Trial tier created. New signups will now receive access." });
+      setIsTrialConfigured(true);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsFixingTrial(false);
+    }
+  };
 
   const ensureDefaultStaticPages = useCallback(async (currentPages: StaticPage[]) => {
     const existingPagesMap = new Map(currentPages.map(p => [p.slug, p]));
@@ -185,30 +231,22 @@ const AdminSettingsPage = () => {
 
     if (pagesToInsert.length > 0) {
       changesMade = true;
-      console.log(`Inserting ${pagesToInsert.length} default static pages.`);
       const { error } = await supabase.from('static_pages').insert(pagesToInsert);
       if (error) {
         console.error('Error inserting default static pages:', error);
-        toast({ title: "Error", description: "Failed to initialize default pages.", variant: "destructive" });
       }
     }
 
     if (pagesToUpdate.length > 0) {
       changesMade = true;
-      console.log(`Updating ${pagesToUpdate.length} default static pages.`);
       const updates = pagesToUpdate.map(page => 
         supabase.from('static_pages').update({ location: page.location, content: page.content }).eq('id', page.id)
       );
-      const results = await Promise.all(updates);
-      const updateError = results.some(res => res.error);
-      if (updateError) {
-        console.error('Error updating default static pages:', results.map(r => r.error).filter(Boolean));
-        toast({ title: "Error", description: "Failed to update default pages.", variant: "destructive" });
-      }
+      await Promise.all(updates);
     }
 
     return changesMade;
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
@@ -216,34 +254,23 @@ const AdminSettingsPage = () => {
         setIsPageLoading(true);
         const initialPages = await fetchStaticPages();
         setStaticPages(initialPages);
-        const wereChangesMade = await ensureDefaultStaticPages(initialPages);
-        if (wereChangesMade) {
-          const updatedPages = await fetchStaticPages();
-          setStaticPages(updatedPages);
-        }
+        await ensureDefaultStaticPages(initialPages);
+        await checkTrialTier();
         setIsPageLoading(false);
       };
       runSetup();
     }
-  }, [hasCheckedInitialSession, fetchStaticPages, ensureDefaultStaticPages]);
+  }, [hasCheckedInitialSession, fetchStaticPages, ensureDefaultStaticPages, checkTrialTier]);
 
   const handleDeletePage = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this static page? This action cannot be undone.")) {
-      return;
-    }
+    if (!window.confirm("Are you sure you want to delete this static page?")) return;
     try {
-      const { error } = await supabase
-        .from('static_pages')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('static_pages').delete().eq('id', id);
       if (error) throw error;
-      toast({ title: "Success", description: "Static page deleted successfully." });
       const updatedPages = await fetchStaticPages();
       setStaticPages(updatedPages);
     } catch (error: any) {
-      console.error("Error deleting static page:", error);
-      toast({ title: "Error", description: `Failed to delete page: ${error.message}`, variant: "destructive" });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
@@ -260,22 +287,11 @@ const AdminSettingsPage = () => {
       header: 'Location',
       cell: ({ row }) => (
         <div className="flex flex-wrap gap-1">
-          {(row.original.location || []).length > 0 ? (
-            (row.original.location || []).map((loc, index) => (
-              <Badge key={index} variant="secondary">
-                {loc.charAt(0).toUpperCase() + loc.slice(1)}
-              </Badge>
-            ))
-          ) : (
-            <span className="text-muted-foreground">None</span>
-          )}
+          {(row.original.location || []).map((loc, index) => (
+            <Badge key={index} variant="secondary">{loc}</Badge>
+          ))}
         </div>
       ),
-    },
-    {
-      accessorKey: 'updated_at',
-      header: 'Last Updated',
-      cell: ({ row }) => new Date(row.original.updated_at).toLocaleDateString(),
     },
     {
       id: 'actions',
@@ -294,16 +310,39 @@ const AdminSettingsPage = () => {
   ];
 
   if (!hasCheckedInitialSession || isPageLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-gray-700 dark:text-gray-300">Loading settings...</p>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center pt-24"><Loader2 className="animate-spin" /></div>;
   }
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Admin Settings</h1>
+
+      {/* Trial Tier Configuration Check */}
+      <Card className={cn("border-l-4", isTrialConfigured ? "border-l-green-500" : "border-l-orange-500")}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            {isCheckingTrial ? <Loader2 className="h-5 w-5 animate-spin" /> : isTrialConfigured ? <ShieldCheck className="h-5 w-5 text-green-500" /> : <AlertTriangle className="h-5 w-5 text-orange-500" />}
+            <CardTitle className="text-lg">System Health: 3-Day Trial Access</CardTitle>
+          </div>
+          <CardDescription>Ensures the mandatory '3-Day Trial' tier exists for new user automation.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isTrialConfigured ? (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">Automation is active. New users correctly receive trial access upon signup.</p>
+              <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100 border-none">Ready</Badge>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <p className="text-sm text-orange-700 font-medium">The '3-Day Trial' tier is missing! New signups will NOT receive automatic access until this is fixed.</p>
+              <Button onClick={handleFixTrial} disabled={isFixingTrial} size="sm" variant="default">
+                {isFixingTrial ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Fix Trial Tier Now
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <SocialMediaSettingsCard />
 

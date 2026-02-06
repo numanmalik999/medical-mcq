@@ -677,24 +677,24 @@ const QuizPage = () => {
     return (
       <div className="bg-background p-2">
         <Card className="w-full max-w-7xl mx-auto shadow-xl border-none">
-          <CardHeader className="text-center pb-8 border-b">
+          <CardHeader className="text-center pb-4 border-b">
             <CardTitle className="text-4xl font-extrabold text-foreground">Select a Practice Specialty</CardTitle>
             <CardDescription className="text-lg mt-2">Access high-yield MCQs mapped to current Gulf licensing blueprints.</CardDescription>
           </CardHeader>
-          <CardContent className="pt-8 space-y-8">
+          <CardContent className="pt-6 space-y-6">
             {activeSavedQuizzes.length > 0 && !isGuest && (
-              <div className="p-6 rounded-2xl border border-border">
-                <h3 className="text-xl font-bold flex items-center gap-2 mb-4 text-foreground"><RotateCcw className="h-5 w-5 text-primary" /> Continue Recent Practice</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-2xl border border-border">
+                <h3 className="text-lg font-bold flex items-center gap-2 mb-3 text-foreground"><RotateCcw className="h-4 w-4 text-primary" /> Continue Recent Practice</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {activeSavedQuizzes.map((s) => (
-                    <div key={s.dbSessionId} className="bg-primary p-4 rounded-xl border border-primary flex justify-between items-center shadow-md">
+                    <div key={s.dbSessionId} className="bg-primary p-3 rounded-xl border border-primary flex justify-between items-center shadow-md">
                       <div className="overflow-hidden">
-                        <p className="font-bold text-white truncate">{s.categoryName}</p>
-                        <p className="text-xs text-primary-foreground/80">Progress: {s.currentQuestionIndex + 1} / {s.mcqs.length}</p>
+                        <p className="font-bold text-white truncate text-sm">{s.categoryName}</p>
+                        <p className="text-[10px] text-primary-foreground/80">Progress: {s.currentQuestionIndex + 1} / {s.mcqs.length}</p>
                       </div>
                       <div className="flex gap-2 shrink-0">
-                        <Button onClick={() => continueQuizSession(s)} size="sm" variant="secondary" className="rounded-full">Resume</Button>
-                        <Button onClick={() => clearSpecificQuizState(s.dbSessionId)} size="sm" variant="ghost" className="text-white hover:bg-white/10 rounded-full"><Trash2 className="h-4 w-4" /></Button>
+                        <Button onClick={() => continueQuizSession(s)} size="sm" variant="secondary" className="rounded-full h-8 text-xs">Resume</Button>
+                        <Button onClick={() => clearSpecificQuizState(s.dbSessionId)} size="sm" variant="ghost" className="text-white hover:bg-white/10 rounded-full h-8 w-8"><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </div>
                   ))}
@@ -703,42 +703,42 @@ const QuizPage = () => {
             )}
 
             <div className="relative">
-               <Input placeholder="Search for a medical specialty..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-14 pl-12 rounded-2xl shadow-sm text-lg" />
-               <Search className="absolute left-4 top-4 text-muted-foreground" />
+               <Input placeholder="Search for a medical specialty..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-12 pl-12 rounded-2xl shadow-sm text-base" />
+               <Search className="absolute left-4 top-3 text-muted-foreground" />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredCategories.map((cat) => (
                 <Card key={cat.id} className={cn("flex flex-col hover:shadow-lg transition-all border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden", cat.is_trial_virtual && "border-primary/30 ring-1 ring-primary/20 bg-primary/5")}>
-                  <CardHeader className="pb-4">
-                    <div className="flex justify-between items-start mb-2">
-                        <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
-                            {cat.is_trial_virtual && <Zap className="h-5 w-5 text-primary fill-primary" />}
+                  <CardHeader className="pb-2 space-y-1">
+                    <div className="flex justify-between items-start">
+                        <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                            {cat.is_trial_virtual && <Zap className="h-4 w-4 text-primary fill-primary" />}
                             {cat.name}
                         </CardTitle>
-                        <Badge variant={cat.is_trial_virtual ? "default" : "outline"} className="font-bold">{cat.total_mcqs} MCQs</Badge>
+                        <Badge variant={cat.is_trial_virtual ? "default" : "outline"} className="font-bold text-[10px] h-5">{cat.total_mcqs} MCQs</Badge>
                     </div>
-                    <CardDescription className="text-sm line-clamp-3 min-h-[4.5rem] text-foreground/80 leading-relaxed italic">
+                    <CardDescription className="text-xs line-clamp-2 min-h-[2.5rem] text-foreground/80 leading-relaxed italic">
                         {cat.description || `High-yield questions and detailed explanations focusing on ${cat.name} to help you master this specialty.`}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="flex-grow pt-6 space-y-3">
-                    <div className="grid grid-cols-2 gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  <CardContent className="flex-grow pt-2 space-y-2">
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                         <span>Accuracy: <span className="text-foreground font-bold">{cat.user_accuracy}</span></span>
                         <span>Attempts: <span className="text-foreground font-bold">{cat.user_attempts}</span></span>
                     </div>
                     {!user?.has_active_subscription && !cat.is_trial_virtual && cat.total_trial_mcqs < cat.total_mcqs && (
-                        <div className="flex items-center gap-1.5 text-xs text-orange-600 font-bold bg-orange-50 dark:bg-orange-950/20 p-2 rounded-lg">
+                        <div className="flex items-center gap-1 text-[10px] text-orange-600 font-bold bg-orange-50 dark:bg-orange-950/20 p-1.5 rounded-lg">
                             <Lock className="h-3 w-3" />
-                            <span>{cat.total_mcqs - cat.total_trial_mcqs} premium questions locked</span>
+                            <span>{cat.total_mcqs - cat.total_trial_mcqs} locked</span>
                         </div>
                     )}
                   </CardContent>
-                  <CardFooter className="flex flex-col gap-2 p-4 pt-0">
-                    <Button onClick={() => startQuizSession(cat.id, 'random', false)} className="w-full rounded-xl font-bold">Practice Now</Button>
+                  <CardFooter className="flex flex-col gap-2 p-3 pt-0">
+                    <Button onClick={() => startQuizSession(cat.id, 'random', false)} className="w-full rounded-xl font-bold h-9 text-sm">Practice Now</Button>
                     <div className="grid grid-cols-2 gap-2 w-full">
-                         <Button variant="outline" size="sm" className="rounded-xl text-[10px]" disabled={cat.user_incorrect === 0 || cat.is_trial_virtual} onClick={() => startQuizSession(cat.id, 'incorrect', false)}>Review Mistakes ({cat.user_incorrect})</Button>
-                         <Button variant="ghost" size="sm" className="rounded-xl text-[10px] text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleResetProgress(cat.id)}>Reset Statistics</Button>
+                         <Button variant="outline" size="sm" className="rounded-xl text-[9px] h-7" disabled={cat.user_incorrect === 0 || cat.is_trial_virtual} onClick={() => startQuizSession(cat.id, 'incorrect', false)}>Mistakes ({cat.user_incorrect})</Button>
+                         <Button variant="ghost" size="sm" className="rounded-xl text-[9px] h-7 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleResetProgress(cat.id)}>Reset Stats</Button>
                     </div>
                   </CardFooter>
                 </Card>
@@ -756,50 +756,50 @@ const QuizPage = () => {
   const isSub = ansData?.submitted;
 
   return (
-    <div className="flex flex-col items-center justify-center p-2">
-      <div className="w-full max-w-5xl mb-3">
-        <Card className="p-3 flex flex-col sm:flex-row justify-between items-center gap-3 bg-primary border-none shadow-md">
-          <p className="font-bold text-white text-sm flex items-center gap-2">
+    <div className="flex flex-col items-center justify-center p-1">
+      <div className="w-full max-w-7xl mb-1.5">
+        <Card className="p-2 flex flex-col sm:flex-row justify-between items-center gap-2 bg-primary border-none shadow-md">
+          <p className="font-bold text-white text-xs flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4" /> Live Session Accuracy: {currentCorrectnessPercentage}
           </p>
           <div className="flex gap-2">
-             <Button variant="outline" size="sm" className="h-8 text-black border-white hover:bg-white/10 text-xs" onClick={handleSaveProgress} disabled={isOfflineQuiz}><Save className="h-3 w-3 mr-2" /> Save</Button>
-             <Button variant="ghost" size="sm" className="h-8 text-white hover:bg-white/10 text-xs" onClick={handleBackToSelection}><ArrowLeft className="h-3 w-3 mr-2" /> Exit</Button>
+             <Button variant="outline" size="sm" className="h-7 text-black border-white hover:bg-white/10 text-[10px]" onClick={handleSaveProgress} disabled={isOfflineQuiz}><Save className="h-3 w-3 mr-1.5" /> Save</Button>
+             <Button variant="ghost" size="sm" className="h-7 text-white hover:bg-white/10 text-[10px]" onClick={handleBackToSelection}><ArrowLeft className="h-3 w-3 mr-1.5" /> Exit</Button>
           </div>
         </Card>
       </div>
-      <div className="flex flex-col md:flex-row w-full max-w-5xl gap-4">
+      <div className="flex flex-col md:flex-row w-full max-w-7xl gap-3">
         <Card className="flex-1 border-none shadow-lg rounded-2xl overflow-hidden">
-          <CardHeader className="border-b flex flex-row items-center justify-between py-4 px-5">
-            <div className="space-y-1">
-              <CardTitle className="text-xl font-bold">Question {currentQuestionIndex + 1} of {quizQuestions.length}</CardTitle>
-              {isOfflineQuiz && <Badge variant="destructive" className="flex items-center gap-1 h-5 text-[10px]"><WifiOff className="h-3 w-3" /> Offline</Badge>}
+          <CardHeader className="border-b flex flex-row items-center justify-between py-2.5 px-4">
+            <div className="space-y-0.5">
+              <CardTitle className="text-lg font-bold">Question {currentQuestionIndex + 1} of {quizQuestions.length}</CardTitle>
+              {isOfflineQuiz && <Badge variant="destructive" className="flex items-center gap-1 h-4 text-[9px]"><WifiOff className="h-2.5 w-2.5" /> Offline</Badge>}
             </div>
             {!isGuest && !isOfflineQuiz && (
-              <Button variant="ghost" size="icon" onClick={toggleBookmark} disabled={isBookmarkLoading} className="h-9 w-9">
-                {isBookmarked ? <BookmarkCheck className="h-5 w-5 text-primary fill-current" /> : <Bookmark className="h-5 w-5 text-muted-foreground" />}
+              <Button variant="ghost" size="icon" onClick={toggleBookmark} disabled={isBookmarkLoading} className="h-8 w-8">
+                {isBookmarked ? <BookmarkCheck className="h-4 w-4 text-primary fill-current" /> : <Bookmark className="h-4 w-4 text-muted-foreground" />}
               </Button>
             )}
           </CardHeader>
-          <CardContent className="pt-6 px-5">
-            <div className="prose dark:prose-invert max-w-none text-lg font-medium leading-relaxed mb-6 text-foreground">
+          <CardContent className="pt-4 px-4">
+            <div className="prose dark:prose-invert max-w-none text-base font-medium leading-snug mb-4 text-foreground">
                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{currentMcq.question_text}</ReactMarkdown>
             </div>
-            <RadioGroup onValueChange={handleOptionSelect} value={selectedAnswer || ""} className="space-y-3" disabled={isSub}>
+            <RadioGroup onValueChange={handleOptionSelect} value={selectedAnswer || ""} className="space-y-1.5" disabled={isSub}>
               {['A', 'B', 'C', 'D'].map((k) => {
                 const optKey = `option_${k.toLowerCase()}` as keyof MCQ;
                 const text = currentMcq[optKey] as string;
                 const isCorrectOpt = currentMcq.correct_answer === k;
                 const isSel = selectedAnswer === k;
                 return (
-                  <div key={k} className={cn("flex items-center space-x-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer", 
+                  <div key={k} className={cn("flex items-center space-x-3 p-2.5 rounded-xl border-2 transition-all cursor-pointer", 
                     isSub && isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
                     isSub && isSel && !isCorrectOpt && "border-red-600 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
                     isSub && !isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
                     !isSub && isSel && "border-primary bg-primary/5 dark:bg-primary/10"
                   )} onClick={() => !isSub && handleOptionSelect(k)}>
                     <RadioGroupItem value={k} id={`opt-${k}`} />
-                    <Label htmlFor={`opt-${k}`} className="cursor-pointer text-base font-semibold flex-grow leading-tight">
+                    <Label htmlFor={`opt-${k}`} className="cursor-pointer text-sm font-semibold flex-grow leading-tight">
                       <span className="opacity-50 mr-2">{k}.</span> {text}
                     </Label>
                   </div>
@@ -808,33 +808,33 @@ const QuizPage = () => {
             </RadioGroup>
 
             {feedback && (
-              <div className={cn("mt-6 p-4 rounded-xl flex items-center gap-3 font-bold text-base border animate-in fade-in zoom-in-95", 
+              <div className={cn("mt-4 p-3 rounded-xl flex items-center gap-2 font-bold text-sm border animate-in fade-in zoom-in-95", 
                 feedback.startsWith('Correct') 
                     ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-700 dark:text-green-200" 
                     : "bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-700 dark:text-red-200")}>
-                {feedback.startsWith('Correct') ? <CheckCircle2 className="h-6 w-6" /> : <AlertCircle className="h-6 w-6" />}
+                {feedback.startsWith('Correct') ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
                 {feedback}
               </div>
             )}
 
             {showExplanation && (
-              <div className="mt-6 p-6 bg-background rounded-2xl border-2 border-dashed border-border animate-in slide-in-from-bottom-4 duration-500">
-                <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-foreground"><Info className="h-4 w-4 text-primary" /> Clinical AI Explanation</h3>
-                <div className="prose dark:prose-invert max-w-none text-foreground/90 text-sm leading-relaxed">
+              <div className="mt-4 p-4 bg-background rounded-2xl border-2 border-dashed border-border animate-in slide-in-from-bottom-4 duration-500">
+                <h3 className="text-base font-bold mb-2 flex items-center gap-2 text-foreground"><Info className="h-4 w-4 text-primary" /> Clinical AI Explanation</h3>
+                <div className="prose dark:prose-invert max-w-none text-foreground/90 text-[13px] leading-relaxed">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{explanations.get(currentMcq.id || '')?.explanation_text || "Analyzing clinical scenario..."}</ReactMarkdown>
                 </div>
                 {!isOfflineQuiz && (
-                  <Button variant="link" className="mt-4 p-0 text-muted-foreground hover:text-primary transition-colors text-xs" onClick={() => setIsFeedbackDialogOpen(true)}>Report a clinical error or add note</Button>
+                  <Button variant="link" className="mt-3 p-0 text-muted-foreground hover:text-primary transition-colors text-[10px]" onClick={() => setIsFeedbackDialogOpen(true)}>Report error or add note</Button>
                 )}
               </div>
             )}
           </CardContent>
-          <CardFooter className="border-t py-4 px-5 flex justify-between">
-              <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} variant="outline" className="rounded-full h-10 px-5 text-sm">Previous</Button>
+          <CardFooter className="border-t py-3 px-4 flex justify-between">
+              <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} variant="outline" className="rounded-full h-8 px-4 text-xs">Previous</Button>
               {!isSub ? (
-                <Button onClick={handleSubmitAnswer} disabled={!isSelected} className="px-8 rounded-full font-bold h-10 text-sm">Check Answer</Button>
+                <Button onClick={handleSubmitAnswer} disabled={!isSelected} className="px-6 rounded-full font-bold h-8 text-xs">Check Answer</Button>
               ) : (
-                <Button onClick={handleNextQuestion} className="px-8 rounded-full font-bold h-10 text-sm">Next <ArrowRight className="ml-2 h-4 w-4" /></Button>
+                <Button onClick={handleNextQuestion} className="px-6 rounded-full font-bold h-8 text-xs">Next <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>
               )}
           </CardFooter>
         </Card>
@@ -844,11 +844,11 @@ const QuizPage = () => {
 
       <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
         <DialogContent className="rounded-2xl"><DialogHeader><DialogTitle>Clinical Feedback</DialogTitle></DialogHeader>
-          <div className="space-y-4 pt-2">
-            <p className="text-sm text-muted-foreground">Your notes help our review board maintain the highest standard of accuracy.</p>
-            <Textarea placeholder="e.g. Current ESC guidelines suggest..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} rows={6} className="rounded-xl" />
+          <div className="space-y-3 pt-1">
+            <p className="text-xs text-muted-foreground">Your notes help our review board maintain accuracy.</p>
+            <Textarea placeholder="e.g. ESC guidelines suggest..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} rows={5} className="rounded-xl text-sm" />
           </div>
-          <DialogFooter><Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()} className="w-full rounded-xl h-12 font-bold">Submit to Clinical Board</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()} className="w-full rounded-xl h-10 font-bold text-sm">Submit to Clinical Board</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

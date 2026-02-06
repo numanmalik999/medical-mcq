@@ -439,37 +439,39 @@ const TakeTestPage = () => {
 
   if (showConfiguration) {
     return (
-      <div className="space-y-4 pb-20 max-w-5xl mx-auto">
+      <div className="space-y-4 pb-20 max-w-7xl mx-auto">
         <Card className="w-full border-none shadow-lg rounded-2xl overflow-hidden">
-          <CardHeader className="bg-primary text-primary-foreground py-6 text-center">
+          <CardHeader className="bg-primary text-primary-foreground py-4 text-center">
             <CardTitle className="text-2xl font-black uppercase tracking-tight">Mock Exam</CardTitle>
             <CardDescription className="text-primary-foreground/80 font-medium">Design your practice session.</CardDescription>
           </CardHeader>
-          <CardContent className="p-6 space-y-6">
+          <CardContent className="p-4 space-y-4">
             {activeSavedTests.length > 0 && (
-              <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
-                <h3 className="font-bold text-sm flex items-center gap-2 uppercase tracking-wider"><Play className="h-4 w-4 text-primary" /> Pending Sessions</h3>
+              <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-2">
+                <h3 className="font-bold text-xs flex items-center gap-2 uppercase tracking-wider"><Play className="h-3 w-3 text-primary" /> Pending Sessions</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {activeSavedTests.map((s) => (
-                  <div key={s.dbSessionId} className="flex items-center justify-between p-3 rounded-lg bg-background shadow-sm border text-sm">
+                  <div key={s.dbSessionId} className="flex items-center justify-between p-2 rounded-lg bg-background shadow-sm border text-xs">
                     <div className="overflow-hidden">
                       <p className="font-bold truncate">{s.categoryNames.join(', ')}</p>
-                      <p className="text-[10px] text-muted-foreground font-medium uppercase mt-0.5">Q: {s.currentQuestionIndex + 1}/{s.mcqs.length} • {formatTime(s.remainingTimeSeconds)} left</p>
+                      <p className="text-[9px] text-muted-foreground font-medium uppercase mt-0.5">Q: {s.currentQuestionIndex + 1}/{s.mcqs.length} • {formatTime(s.remainingTimeSeconds)} left</p>
                     </div>
                     <div className="flex gap-1 shrink-0 ml-2">
-                      <Button onClick={() => continueTestSession(s)} size="sm" className="rounded-lg h-8">Resume</Button>
-                      <Button onClick={() => clearSpecificTestState(s.dbSessionId)} variant="ghost" size="icon" className="text-red-500 h-8 w-8"><Trash2 className="h-4 w-4" /></Button>
+                      <Button onClick={() => continueTestSession(s)} size="sm" className="rounded-lg h-7 text-[10px]">Resume</Button>
+                      <Button onClick={() => clearSpecificTestState(s.dbSessionId)} variant="ghost" size="icon" className="text-red-500 h-7 w-7"><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   </div>
                 ))}
+                </div>
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Specialties</Label>
-                    <div className="grid grid-cols-1 gap-1 max-h-[250px] overflow-y-auto p-3 bg-muted/20 rounded-xl border scrollbar-hide">
+                    <div className="grid grid-cols-1 gap-0.5 max-h-[200px] overflow-y-auto p-2 bg-muted/20 rounded-xl border scrollbar-hide">
                         {allCategories.map((c) => (
-                            <div key={c.id} className="flex items-center space-x-2 p-1.5 hover:bg-background rounded-md transition-colors">
+                            <div key={c.id} className="flex items-center space-x-2 p-1 hover:bg-background rounded-md transition-colors">
                                 <Checkbox id={`cat-${c.id}`} checked={selectedCategoryIds.includes(c.id)} onCheckedChange={() => handleCategoryToggle(c.id)} />
                                 <Label htmlFor={`cat-${c.id}`} className="text-xs font-bold cursor-pointer line-clamp-1">{c.name}</Label>
                             </div>
@@ -477,29 +479,29 @@ const TakeTestPage = () => {
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    <div className="space-y-1.5">
+                <div className="space-y-3">
+                    <div className="space-y-1">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Difficulty</Label>
                         <Select onValueChange={(v) => setSelectedDifficulty(v === "all" ? null : v)} value={selectedDifficulty || "all"}>
-                            <SelectTrigger className="h-10 rounded-xl bg-muted/30 border-none font-bold text-xs"><SelectValue placeholder="Mixed Difficulty" /></SelectTrigger>
+                            <SelectTrigger className="h-9 rounded-xl bg-muted/30 border-none font-bold text-xs"><SelectValue placeholder="Mixed Difficulty" /></SelectTrigger>
                             <SelectContent><SelectItem value="all">Mixed (Random)</SelectItem><SelectItem value="Easy">Easy Level</SelectItem><SelectItem value="Medium">Medium Level</SelectItem><SelectItem value="Hard">Expert Level</SelectItem></SelectContent>
                         </Select>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Questions ({numMcqsToSelect})</Label>
-                        <Input type="number" value={numMcqsToSelect} onChange={(e) => setNumMcqsToSelect(parseInt(e.target.value) || 0)} className="h-10 rounded-xl bg-muted/30 border-none font-bold text-xs" />
+                        <Input type="number" value={numMcqsToSelect} onChange={(e) => setNumMcqsToSelect(parseInt(e.target.value) || 0)} className="h-9 rounded-xl bg-muted/30 border-none font-bold text-xs" />
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Time (Minutes)</Label>
-                        <Input type="number" value={testDurationMinutes} onChange={(e) => setTestDurationMinutes(parseInt(e.target.value) || 0)} className="h-10 rounded-xl bg-muted/30 border-none font-bold text-xs" />
+                        <Input type="number" value={testDurationMinutes} onChange={(e) => setTestDurationMinutes(parseInt(e.target.value) || 0)} className="h-9 rounded-xl bg-muted/30 border-none font-bold text-xs" />
                     </div>
                 </div>
             </div>
           </CardContent>
-          <CardFooter className="p-6 pt-0">
-            <Button onClick={startTestPreparation} className="w-full h-12 rounded-xl text-md font-black uppercase tracking-widest shadow-lg">
+          <CardFooter className="p-4 pt-0">
+            <Button onClick={startTestPreparation} className="w-full h-11 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg">
                Start Simulation
             </Button>
           </CardFooter>
@@ -518,29 +520,29 @@ const TakeTestPage = () => {
 
   if (showInstructions) {
     return (
-      <div className="max-w-2xl mx-auto py-8">
+      <div className="max-w-2xl mx-auto py-4">
         <Card className="border-none shadow-xl rounded-2xl overflow-hidden">
-          <CardHeader className="bg-primary text-primary-foreground py-6">
-            <CardTitle className="text-2xl text-center font-black uppercase italic">Instructions</CardTitle>
+          <CardHeader className="bg-primary text-primary-foreground py-4">
+            <CardTitle className="text-xl text-center font-black uppercase italic">Instructions</CardTitle>
           </CardHeader>
-          <CardContent className="p-8 space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-muted/50 rounded-xl text-center"><p className="text-[10px] text-muted-foreground uppercase font-black">Length</p><p className="text-xl font-black">{mcqs.length} MCQs</p></div>
-                <div className="p-3 bg-muted/50 rounded-xl text-center"><p className="text-[10px] text-muted-foreground uppercase font-black">Timer</p><p className="text-xl font-black">{testDurationMinutes} Min</p></div>
+          <CardContent className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+                <div className="p-2 bg-muted/50 rounded-xl text-center"><p className="text-[9px] text-muted-foreground uppercase font-black">Length</p><p className="text-lg font-black">{mcqs.length} MCQs</p></div>
+                <div className="p-2 bg-muted/50 rounded-xl text-center"><p className="text-[9px] text-muted-foreground uppercase font-black">Timer</p><p className="text-lg font-black">{testDurationMinutes} Min</p></div>
             </div>
-            <ul className="space-y-3">
+            <ul className="space-y-2">
               {[
                   "No negative marking.",
                   "Timer runs continuously.",
                   "Results revealed only after submission.",
                   "Auto-submit when time expires."
               ].map((text, i) => (
-                  <li key={i} className="flex gap-3 items-start"><CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" /><p className="font-bold text-sm">{text}</p></li>
+                  <li key={i} className="flex gap-2 items-start"><CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" /><p className="font-bold text-sm">{text}</p></li>
               ))}
             </ul>
           </CardContent>
-          <CardFooter className="p-8 pt-0">
-             <Button onClick={() => setShowInstructions(false)} className="w-full h-12 rounded-xl font-black uppercase tracking-widest">Begin Now</Button>
+          <CardFooter className="p-6 pt-0">
+             <Button onClick={() => setShowInstructions(false)} className="w-full h-11 rounded-xl font-black uppercase tracking-widest text-sm">Begin Now</Button>
           </CardFooter>
         </Card>
       </div>
@@ -549,43 +551,43 @@ const TakeTestPage = () => {
 
   if (showResults) {
     return (
-      <div className="space-y-4 max-w-7xl mx-auto">
-        <div className="flex flex-col lg:flex-row w-full gap-4">
+      <div className="space-y-3 max-w-7xl mx-auto">
+        <div className="flex flex-col lg:flex-row w-full gap-3">
           <QuizNavigator mcqs={mcqs} userAnswers={userAnswers} currentQuestionIndex={currentQuestionIndex} goToQuestion={(i) => setCurrentQuestionIndex(i)} showResults={true} score={score} />
           <Card className="flex-1 border-none shadow-xl rounded-2xl overflow-hidden">
-            <CardHeader className="bg-primary text-primary-foreground text-center py-8">
-              <CardTitle className="text-3xl font-black uppercase tracking-tighter">Results</CardTitle>
-              <div className="mt-2 flex justify-center items-baseline gap-1">
-                <span className="text-6xl font-black">{score}</span>
-                <span className="text-xl text-primary-foreground/40">/ {mcqs.length}</span>
+            <CardHeader className="bg-primary text-primary-foreground text-center py-6">
+              <CardTitle className="text-2xl font-black uppercase tracking-tighter">Results</CardTitle>
+              <div className="mt-1 flex justify-center items-baseline gap-1">
+                <span className="text-5xl font-black">{score}</span>
+                <span className="text-lg text-primary-foreground/40">/ {mcqs.length}</span>
               </div>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-3 scrollbar-thin">
+            <CardContent className="p-4">
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin">
                 {mcqs.map((mcq, index) => {
                   const ans = userAnswers.get(mcq.id);
                   const exp = explanations.get(mcq.id);
                   return (
-                    <div key={mcq.id} className="border rounded-xl p-4 bg-muted/10 space-y-3">
-                      <h4 className="font-bold text-md">Q{index + 1}. {mcq.question_text}</h4>
-                      <div className="grid grid-cols-1 gap-1.5">
+                    <div key={mcq.id} className="border rounded-xl p-3 bg-muted/10 space-y-2">
+                      <h4 className="font-bold text-sm">Q{index + 1}. {mcq.question_text}</h4>
+                      <div className="grid grid-cols-1 gap-1">
                         {['A','B','C','D'].map(k => {
                             const isCorr = mcq.correct_answer === k;
                             const isUser = ans?.selectedOption === k;
                             return (
-                                <div key={k} className={cn("p-3 rounded-lg border font-bold text-xs transition-all", 
+                                <div key={k} className={cn("p-2.5 rounded-lg border font-bold text-[11px] transition-all", 
                                     isCorr && "bg-green-50 border-green-500 text-green-700",
                                     !isCorr && isUser && "bg-red-50 border-red-500 text-red-700",
                                     !isCorr && !isUser && "opacity-50"
                                 )}>
-                                    <span className="mr-2 opacity-50">{k}.</span> {mcq[`option_${k.toLowerCase()}` as keyof MCQ] as string}
+                                    <span className="mr-1.5 opacity-50">{k}.</span> {mcq[`option_${k.toLowerCase()}` as keyof MCQ] as string}
                                 </div>
                             );
                         })}
                       </div>
                       {exp && (
-                          <div className="mt-3 p-4 bg-white rounded-xl border border-dashed border-primary/20 prose prose-sm max-w-none">
-                              <h5 className="font-black uppercase text-[10px] tracking-widest text-primary mb-2">Insight</h5>
+                          <div className="mt-2 p-3 bg-white rounded-xl border border-dashed border-primary/20 prose prose-sm max-w-none text-xs">
+                              <h5 className="font-black uppercase text-[9px] tracking-widest text-primary mb-1">Insight</h5>
                               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{exp.explanation_text}</ReactMarkdown>
                           </div>
                       )}
@@ -594,9 +596,9 @@ const TakeTestPage = () => {
                 })}
               </div>
             </CardContent>
-            <CardFooter className="p-6 pt-0 border-t flex justify-center gap-3">
-               <Button onClick={handleBackToConfiguration} variant="outline" className="rounded-full px-6 h-10 text-xs uppercase font-bold">New Config</Button>
-               <Button onClick={() => navigate('/user/dashboard')} className="rounded-full px-6 h-10 text-xs uppercase font-bold">Dashboard</Button>
+            <CardFooter className="p-4 pt-0 border-t flex justify-center gap-2">
+               <Button onClick={handleBackToConfiguration} variant="outline" className="rounded-full px-5 h-9 text-[11px] uppercase font-bold">New Config</Button>
+               <Button onClick={() => navigate('/user/dashboard')} className="rounded-full px-5 h-9 text-[11px] uppercase font-bold">Dashboard</Button>
             </CardFooter>
           </Card>
         </div>
@@ -607,8 +609,8 @@ const TakeTestPage = () => {
   const currentAns = userAnswers.get(currentMcq.id)?.selectedOption || "";
 
   return (
-    <div className="space-y-3 max-w-7xl mx-auto">
-      <div className="flex flex-col lg:flex-row w-full gap-4">
+    <div className="space-y-1.5 max-w-7xl mx-auto">
+      <div className="flex flex-col lg:flex-row w-full gap-3">
         <div className="lg:w-64">
            <QuizNavigator mcqs={mcqs} userAnswers={userAnswers} currentQuestionIndex={currentQuestionIndex} goToQuestion={(i) => setCurrentQuestionIndex(i)} showResults={false} score={0} skippedMcqIds={skippedMcqIds} />
         </div>
@@ -616,35 +618,35 @@ const TakeTestPage = () => {
         <Card className="flex-1 border-none shadow-xl rounded-2xl overflow-hidden flex flex-col">
           <CardHeader className="border-b py-2 px-4 flex flex-row justify-between items-center bg-muted/5">
             <div>
-              <CardTitle className="text-base font-bold tracking-tight">Question {currentQuestionIndex + 1} of {mcqs.length}</CardTitle>
+              <CardTitle className="text-sm font-bold tracking-tight">Question {currentQuestionIndex + 1} of {mcqs.length}</CardTitle>
               <div className="flex items-center gap-2 mt-0.5">
-                 <Badge variant="secondary" className="text-[8px] h-4 px-1.5 uppercase font-black leading-none">{currentMcq.difficulty || 'Mixed'}</Badge>
-                 <span className="text-[10px] text-muted-foreground font-black flex items-center gap-1 uppercase"><TimerIcon className="h-3 w-3" /> {formatTime(timer)}</span>
+                 <Badge variant="secondary" className="text-[8px] h-3.5 px-1 uppercase font-black leading-none">{currentMcq.difficulty || 'Mixed'}</Badge>
+                 <span className="text-[9px] text-muted-foreground font-black flex items-center gap-1 uppercase"><TimerIcon className="h-2.5 w-2.5" /> {formatTime(timer)}</span>
               </div>
             </div>
             <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" onClick={togglePause} className="rounded-full h-8 w-8">{isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}</Button>
-                <Button variant="ghost" size="icon" onClick={toggleBookmark} className="rounded-full h-8 w-8">{isBookmarked ? <BookmarkCheck className="h-4 w-4 text-primary fill-current" /> : <Bookmark className="h-4 w-4" />}</Button>
+                <Button variant="ghost" size="icon" onClick={togglePause} className="rounded-full h-7 w-7">{isPaused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}</Button>
+                <Button variant="ghost" size="icon" onClick={toggleBookmark} className="rounded-full h-7 w-7">{isBookmarked ? <BookmarkCheck className="h-3 w-3 text-primary fill-current" /> : <Bookmark className="h-3 w-3" />}</Button>
             </div>
           </CardHeader>
           
-          <CardContent className="p-4 flex-grow">
-             <div className="text-base font-semibold leading-relaxed mb-4 text-foreground">
+          <CardContent className="p-3.5 flex-grow">
+             <div className="text-base font-semibold leading-snug mb-3 text-foreground">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{currentMcq.question_text}</ReactMarkdown>
              </div>
-             <RadioGroup onValueChange={handleOptionSelect} value={currentAns} className="space-y-1.5" disabled={isPaused}>
+             <RadioGroup onValueChange={handleOptionSelect} value={currentAns} className="space-y-1" disabled={isPaused}>
                 {['A','B','C','D'].map(k => (
                     <div 
                         key={k} 
                         onClick={() => !isPaused && handleOptionSelect(k)} 
                         className={cn(
-                            "flex items-center p-2.5 rounded-xl border transition-all cursor-pointer", 
+                            "flex items-center p-2 rounded-xl border transition-all cursor-pointer", 
                             currentAns === k ? "border-primary bg-primary/5 shadow-sm border-2" : "border-muted/50 hover:border-muted-foreground/30"
                         )}
                     >
                         <RadioGroupItem value={k} id={`q-${k}`} className="sr-only" />
-                        <Label htmlFor={`q-${k}`} className="flex-grow text-sm font-bold cursor-pointer leading-tight">
-                            <span className="opacity-30 mr-3 font-black text-xs">{k}</span> 
+                        <Label htmlFor={`q-${k}`} className="flex-grow text-[13px] font-bold cursor-pointer leading-tight">
+                            <span className="opacity-30 mr-2.5 font-black text-[11px]">{k}</span> 
                             {currentMcq[`option_${k.toLowerCase()}` as keyof MCQ] as string}
                         </Label>
                     </div>
@@ -652,11 +654,11 @@ const TakeTestPage = () => {
              </RadioGroup>
           </CardContent>
           
-          <CardFooter className="p-3 border-t bg-muted/5 flex justify-between">
-             <Button onClick={handlePrevious} variant="ghost" disabled={currentQuestionIndex === 0 || isPaused} className="rounded-lg h-9 px-4 text-xs font-bold uppercase tracking-tight">Back</Button>
-             <div className="flex gap-2">
-                <Button onClick={() => !isPaused && handleSkip()} variant="outline" className="rounded-lg h-9 px-4 gap-2 text-xs font-bold uppercase tracking-tight">Skip <SkipForward className="h-3 w-3" /></Button>
-                <Button onClick={handleNext} disabled={isPaused} className="rounded-lg h-9 px-8 font-black uppercase tracking-widest text-xs">
+          <CardFooter className="p-2.5 border-t bg-muted/5 flex justify-between">
+             <Button onClick={handlePrevious} variant="ghost" disabled={currentQuestionIndex === 0 || isPaused} className="rounded-lg h-8 px-3 text-[10px] font-bold uppercase tracking-tight">Back</Button>
+             <div className="flex gap-1.5">
+                <Button onClick={() => !isPaused && handleSkip()} variant="outline" className="rounded-lg h-8 px-3 gap-1.5 text-[10px] font-bold uppercase tracking-tight">Skip <SkipForward className="h-2.5 w-2.5" /></Button>
+                <Button onClick={handleNext} disabled={isPaused} className="rounded-lg h-8 px-6 font-black uppercase tracking-widest text-[10px]">
                     {currentQuestionIndex === mcqs.length - 1 ? 'Finish Exam' : 'Next'}
                 </Button>
              </div>

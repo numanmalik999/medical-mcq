@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Loader2, Wand2, BookOpen, CheckCircle2, AlertCircle, ArrowRight, RotateCcw, Trophy, Share2, Lock } from 'lucide-react';
+import { Loader2, Wand2, BookOpen, CheckCircle2, AlertCircle, ArrowRight, RotateCcw, Trophy, Share2 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,8 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import { useSession } from '@/components/SessionContextProvider';
-import { Link } from 'react-router-dom';
+import { differenceInDays, parseISO } from 'date-fns';
+import SubscribePromptDialog from '@/components/SubscribePromptDialog';
 
 interface CaseQuestion {
   question_text: string;
@@ -47,54 +48,34 @@ const CaseStudiesPage = () => {
   const [answers, setAnswers] = useState<Map<number, { selected: string, isCorrect: boolean }>>(new Map());
   const [showSummary, setShowSummary] = useState(false);
   const [isContributing, setIsContributing] = useState(false);
+  
+  const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (user?.has_active_subscription) {
-      const fetchCategories = async () => {
-        const { data } = await supabase.from('categories').select('id, name').order('name');
-        if (data) setCategories(data);
-      };
-      fetchCategories();
-    }
-  }, [user]);
+    const fetchCategories = async () => {
+      const { data } = await supabase.from('categories').select('id, name').order('name');
+      if (data) setCategories(data);
+    };
+    fetchCategories();
+  }, []);
 
   if (!hasCheckedInitialSession) {
     return <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>;
   }
 
-  if (!user?.has_active_subscription) {
-    return (
-      <div className="max-w-2xl mx-auto py-12 px-4 text-center">
-        <Card className="border-primary/20 shadow-xl py-8">
-          <CardHeader>
-            <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
-              <Lock className="h-10 w-10 text-primary" />
-            </div>
-            <CardTitle className="text-3xl">Premium Feature</CardTitle>
-            <CardDescription className="text-lg">
-              AI Clinical Cases are exclusively available to our subscribed members.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              Unlock unique clinical vignettes and interactive scenarios generated specifically for your target specialty.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-              <Link to="/user/subscriptions">
-                <Button size="lg" className="w-full">View Subscription Plans</Button>
-              </Link>
-              <Link to="/user/dashboard">
-                <Button variant="outline" size="lg" className="w-full">Back to Dashboard</Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-        <MadeWithDyad />
-      </div>
-    );
-  }
-
   const handleGenerate = async () => {
+    // CHECK FOR SUBSCRIPTION
+    const daysRemaining = user?.subscription_end_date 
+      ? differenceInDays(parseISO(user.subscription_end_date), new Date()) 
+      : null;
+    
+    const isPaid = user?.has_active_subscription && daysRemaining !== null && daysRemaining > 3;
+
+    if (!isPaid) {
+      setIsUpgradeDialogOpen(true);
+      return;
+    }
+
     const category = categories.find(c => c.id === selectedCategoryId);
     if (!category && !customTopic) {
       toast({ title: "Input Required", description: "Please select a category or enter a topic.", variant: "destructive" });
@@ -362,6 +343,14 @@ const CaseStudiesPage = () => {
           </div>
         </div>
       )}
+
+      <SubscribePromptDialog 
+        open={isUpgradeDialogOpen} 
+        onOpenChange={setIsUpgradeDialogOpen} 
+        featureName="AI Clinical Case Scenarios" 
+        description="Interactive clinical cases are a premium AI-driven feature. Upgrade your plan to generate complex diagnostic scenarios and test your clinical logic."
+      />
+
       <MadeWithDyad />
     </div>
   );

@@ -16,16 +16,16 @@ interface NavLinkProps {
   label: string;
   isMobile?: boolean;
   onLinkClick?: () => void;
-  disabled?: boolean;
   isPremium?: boolean;
+  isSubscribed?: boolean;
 }
 
-const NavLink = ({ to, icon, label, isMobile, onLinkClick, disabled, isPremium }: NavLinkProps) => {
+const NavLink = ({ to, icon, label, isMobile, onLinkClick, isPremium, isSubscribed }: NavLinkProps) => {
   const location = useLocation();
   const isActive = location.pathname === to;
 
   return (
-    <Link to={disabled ? "#" : to} onClick={disabled ? (e) => e.preventDefault() : onLinkClick} className={cn(disabled && "cursor-not-allowed opacity-60")}>
+    <Link to={to} onClick={onLinkClick}>
       <Button
         variant="ghost"
         className={cn(
@@ -35,11 +35,10 @@ const NavLink = ({ to, icon, label, isMobile, onLinkClick, disabled, isPremium }
             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           isMobile && "text-base py-3"
         )}
-        disabled={disabled}
       >
         {icon}
         <span className="flex-grow text-left">{label}</span>
-        {isPremium && disabled && <Lock className="h-3 w-3 ml-auto text-muted-foreground" />}
+        {isPremium && !isSubscribed && <Lock className="h-3 w-3 ml-auto text-muted-foreground opacity-50" />}
       </Button>
     </Link>
   );
@@ -71,6 +70,7 @@ const UserSidebar = () => {
     { to: "/user/take-test", icon: <ClipboardCheck className="h-4 w-4" />, label: "Take A Test", premium: true },
     { to: "/user/case-studies", icon: <Stethoscope className="h-4 w-4" />, label: "Case Studies", premium: true },
     { to: "/user/videos", icon: <Youtube className="h-4 w-4" />, label: "Videos", premium: true },
+    { to: "/user/courses", icon: <BookOpenText className="h-4 w-4" />, label: "Courses", premium: true },
     { to: "/user/subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "My Subscriptions", premium: false },
     { to: "/user/submit-mcq", icon: <FilePlus className="h-4 w-4" />, label: "Submit MCQ", premium: false },
     { to: "/user/bookmarked-mcqs", icon: <Bookmark className="h-4 w-4" />, label: "Bookmarked MCQs", premium: false },
@@ -97,8 +97,8 @@ const UserSidebar = () => {
                   label={item.label} 
                   isMobile={true} 
                   onLinkClick={handleLinkClick} 
-                  disabled={item.premium && !isSubscribed}
                   isPremium={item.premium}
+                  isSubscribed={isSubscribed}
                 />
               ))}
             </nav>
@@ -121,8 +121,8 @@ const UserSidebar = () => {
             to={item.to} 
             icon={item.icon} 
             label={item.label} 
-            disabled={item.premium && !isSubscribed}
             isPremium={item.premium}
+            isSubscribed={isSubscribed}
           />
         ))}
       </nav>

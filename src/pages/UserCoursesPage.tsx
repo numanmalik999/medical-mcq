@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
-import { Link } from 'react-router-dom';
-import { BookOpenText, Lock, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { BookOpenText, Loader2 } from 'lucide-react';
+import SubscribePromptDialog from '@/components/SubscribePromptDialog';
+import { differenceInDays, parseISO } from 'date-fns';
 
 interface Course {
   id: string;
@@ -23,16 +25,14 @@ interface Course {
 const UserCoursesPage = () => {
   const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (user?.has_active_subscription) {
-      fetchCourses();
-    } else if (hasCheckedInitialSession) {
-      setIsPageLoading(false);
-    }
-  }, [user, hasCheckedInitialSession]);
+    fetchCourses();
+  }, []);
 
   const fetchCourses = async () => {
     setIsPageLoading(true);
@@ -51,40 +51,22 @@ const UserCoursesPage = () => {
     setIsPageLoading(false);
   };
 
+  const handleCourseClick = (courseId: string) => {
+    const daysRemaining = user?.subscription_end_date 
+      ? differenceInDays(parseISO(user.subscription_end_date), new Date()) 
+      : null;
+    
+    const isPaid = user?.has_active_subscription && daysRemaining !== null && daysRemaining > 3;
+
+    if (!isPaid) {
+      setIsUpgradeDialogOpen(true);
+      return;
+    }
+    navigate(`/user/courses/${courseId}`);
+  };
+
   if (!hasCheckedInitialSession || isPageLoading) {
     return <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>;
-  }
-
-  if (!user?.has_active_subscription) {
-    return (
-      <div className="max-w-2xl mx-auto py-12 px-4 text-center">
-        <Card className="border-primary/20 shadow-xl py-8">
-          <CardHeader>
-            <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
-              <Lock className="h-10 w-10 text-primary" />
-            </div>
-            <CardTitle className="text-3xl">Premium Content</CardTitle>
-            <CardDescription className="text-lg">
-              Our structured medical courses are available exclusively to subscribed members.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              Unlock comprehensive learning paths, detailed topic breakdowns, and expert-curated medical content.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-              <Link to="/user/subscriptions">
-                <Button size="lg" className="w-full">View Subscription Plans</Button>
-              </Link>
-              <Link to="/user/dashboard">
-                <Button variant="outline" size="lg" className="w-full">Back to Dashboard</Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-        <MadeWithDyad />
-      </div>
-    );
   }
 
   return (
@@ -123,17 +105,21 @@ const UserCoursesPage = () => {
                 </CardDescription>
               </CardContent>
               <CardFooter className="p-4 pt-0">
-                <Link to={`/user/courses/${course.id}`} className="w-full">
-                  <Button className="w-full">
-                    <BookOpenText className="mr-2 h-4 w-4" /> View Course
-                  </Button>
-                </Link>
+                <Button className="w-full" onClick={() => handleCourseClick(course.id)}>
+                  <BookOpenText className="mr-2 h-4 w-4" /> View Course
+                </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
       )}
 
+      <SubscribePromptDialog 
+        open={isUpgradeDialogOpen} 
+        onOpenChange={setIsUpgradeDialogOpen} 
+        featureName="Structured Courses" 
+        description="Detailed course modules are a premium feature. Upgrade your plan to follow guided learning paths and access in-depth curriculum content."
+      />
       <MadeWithDyad />
     </div>
   );

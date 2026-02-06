@@ -125,15 +125,8 @@ const UserVideosPage = () => {
   };
 
   const getEmbedUrl = (video: Video) => {
-    const vidId = video.youtube_video_id;
-    switch (video.platform) {
-      case 'vimeo':
-        return `https://player.vimeo.com/video/${vidId}?autoplay=1`;
-      case 'dailymotion':
-        return `https://www.dailymotion.com/embed/video/${vidId}?autoplay=1`;
-      default:
-        return `https://www.youtube.com/embed/${vidId}?autoplay=1`;
-    }
+    // Exclusively use Vimeo embed
+    return `https://player.vimeo.com/video/${video.youtube_video_id}?autoplay=1&badge=0&autopause=0&player_id=0&app_id=58479`;
   };
 
   const VideoCard = ({ video }: { video: Video }) => {
@@ -148,12 +141,6 @@ const UserVideosPage = () => {
         onClick={() => handleVideoClick(video)}
       >
         <div className="p-6 text-center flex flex-col items-center justify-center gap-2">
-          <div className="absolute top-2 left-2">
-            <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[9px] uppercase font-black tracking-widest">
-              {video.platform}
-            </Badge>
-          </div>
-
           <h4 className="text-sm font-extrabold leading-relaxed text-foreground px-4">
             <span className="text-primary mr-1 opacity-40">{video.order}.</span> {video.title}
           </h4>
@@ -193,7 +180,7 @@ const UserVideosPage = () => {
   return (
     <div className="space-y-10">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Resource Library</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Vimeo Study Library</h1>
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 

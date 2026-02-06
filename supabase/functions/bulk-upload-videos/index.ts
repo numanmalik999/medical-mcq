@@ -57,7 +57,8 @@ serve(async (req: Request) => {
     for (const video of (videos as IncomingVideo[])) {
       try {
         const videoIdStr = String(video.video_id).trim();
-        const platform = (video.platform || 'vimeo').toLowerCase();
+        // Force platform to Vimeo
+        const platform = 'vimeo';
 
         // Resolve or Create Parent Group
         const parentName = video.parent_category.trim();

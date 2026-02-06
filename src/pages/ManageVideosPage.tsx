@@ -90,31 +90,50 @@ const ManageVideosPage = () => {
   const fetchAllData = useCallback(async () => {
     setIsPageLoading(true);
     try {
-      const [groupsRes, subRes, videoRes] = await Promise.all([
+      // 1. Fetch static categories and subcategories
+      const [groupsRes, subRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
-        supabase.from('video_subgroups').select('*').order('order'),
-        supabase.from('videos').select('*').order('order', { ascending: true })
+        supabase.from('video_subgroups').select('*').order('order')
       ]);
 
       if (groupsRes.error) throw groupsRes.error;
       if (subRes.error) throw subRes.error;
-      if (videoRes.error) throw videoRes.error;
 
-      const vData = videoRes.data || [];
       const gData = groupsRes.data || [];
       const sgData = subRes.data || [];
+
+      // 2. Fetch ALL videos using a loop to bypass the 1,000 limit
+      let vData: Video[] = [];
+      let hasMore = true;
+      let offset = 0;
+      const CHUNK_SIZE = 1000;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('videos')
+          .select('*')
+          .order('order', { ascending: true })
+          .range(offset, offset + CHUNK_SIZE - 1);
+
+        if (error) throw error;
+        if (data) {
+          vData = [...vData, ...(data as Video[])];
+          offset += CHUNK_SIZE;
+          hasMore = data.length === CHUNK_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
 
       setAllVideos(vData);
       setGroups(gData);
       setSubgroups(sgData);
 
       // --- RESILIENT MAPPING ---
-      // 1. Create maps for quick lookup
       const sgMap = new Map(sgData.map(sg => [sg.id, { ...sg, videos: [] }]));
       const gMap = new Map(gData.map(g => [g.id, { ...g, subgroups: [], standaloneVideos: [] }]));
       const uncategorizedVideos: Video[] = [];
 
-      // 2. Track which groups subgroups belong to
       sgData.forEach(sg => {
         const parentGroup = gMap.get(sg.group_id);
         if (parentGroup) {
@@ -122,11 +141,8 @@ const ManageVideosPage = () => {
         }
       });
 
-      // 3. Place every video into its proper slot
       vData.forEach(video => {
         let placed = false;
-
-        // Try placing in subgroup first
         if (video.subgroup_id) {
           const targetSg = sgMap.get(video.subgroup_id);
           if (targetSg) {
@@ -134,8 +150,6 @@ const ManageVideosPage = () => {
             placed = true;
           }
         }
-
-        // If not placed in subgroup, try placing in group
         if (!placed && video.group_id) {
           const targetG = gMap.get(video.group_id);
           if (targetG) {
@@ -143,8 +157,6 @@ const ManageVideosPage = () => {
             placed = true;
           }
         }
-
-        // Final fallback: Uncategorized
         if (!placed) {
           uncategorizedVideos.push(video);
         }

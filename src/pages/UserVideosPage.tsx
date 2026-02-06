@@ -54,18 +54,41 @@ const UserVideosPage = () => {
 
   const fetchLibrary = useCallback(async () => {
     try {
-      const [groupsRes, subRes, videoRes, progRes] = await Promise.all([
+      // 1. Fetch categories and subcategories
+      const [groupsRes, subRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
-        supabase.from('video_subgroups').select('*').order('order'),
-        supabase.from('videos').select('*').order('order', { ascending: true }),
-        user ? supabase.from('user_video_progress').select('video_id, is_watched').eq('user_id', user.id) : Promise.resolve({ data: [] })
+        supabase.from('video_subgroups').select('*').order('order')
       ]);
 
+      // 2. Fetch progress (likely < 1000 so simple fetch is fine, but resilient mapping handles it)
+      const progRes = user ? await supabase.from('user_video_progress').select('video_id, is_watched').eq('user_id', user.id) : { data: [] };
       const newProgressMap = new Map();
       progRes.data?.forEach(p => newProgressMap.set(p.video_id, p.is_watched));
       setProgressMap(newProgressMap);
 
-      const vData = videoRes.data || [];
+      // 3. Fetch ALL videos using a loop to bypass the 1,000 limit
+      let vData: Video[] = [];
+      let hasMore = true;
+      let offset = 0;
+      const CHUNK_SIZE = 1000;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('videos')
+          .select('*')
+          .order('order', { ascending: true })
+          .range(offset, offset + CHUNK_SIZE - 1);
+
+        if (error) throw error;
+        if (data) {
+          vData = [...vData, ...(data as Video[])];
+          offset += CHUNK_SIZE;
+          hasMore = data.length === CHUNK_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
+
       const sgData = subRes.data || [];
       const gData = groupsRes.data || [];
       
@@ -74,13 +97,11 @@ const UserVideosPage = () => {
       const gMap = new Map(gData.map(g => [g.id, { ...g, subgroups: [], standaloneVideos: [] }]));
       const uncategorizedVideos: Video[] = [];
 
-      // Link subgroups to their groups
       sgData.forEach(sg => {
         const parent = gMap.get(sg.group_id);
         if (parent) parent.subgroups.push(sgMap.get(sg.id));
       });
 
-      // Place every single video
       vData.forEach(video => {
         let placed = false;
         if (video.subgroup_id) {

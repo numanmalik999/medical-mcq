@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import Logo from './Logo';
-import { Search } from 'lucide-react';
+import { Search, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useNavigationData } from '@/hooks/useNavigationData';
+import { supabase } from '@/integrations/supabase/client';
 
 const Header = () => {
   const { user, hasCheckedInitialSession } = useSession();
@@ -22,6 +23,11 @@ const Header = () => {
       navigate(`/quiz?search=${encodeURIComponent(searchQuery.trim())}`);
       setSearchQuery('');
     }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
   };
 
   const homeDestination = user 
@@ -92,8 +98,9 @@ const Header = () => {
             </>
           )}
           {user && (
-            <Link to={homeDestination}>
-              <Button 
+            <div className="flex items-center gap-2">
+              <Link to={homeDestination}>
+                <Button 
                   variant="outline" 
                   size="sm" 
                   className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-full font-bold uppercase"
@@ -101,6 +108,25 @@ const Header = () => {
                   Dashboard
                 </Button>
               </Link>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleLogout}
+                className="text-primary-foreground hover:bg-white/10 rounded-full font-bold uppercase hidden sm:flex items-center gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </Button>
+              {/* Mobile Logout (Icon only) */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleLogout}
+                className="text-primary-foreground hover:bg-white/10 rounded-full sm:hidden"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           )}
         </div>
       </div>

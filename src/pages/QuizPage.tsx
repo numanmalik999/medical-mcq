@@ -757,7 +757,7 @@ const QuizPage = () => {
 
   return (
     <div className="flex flex-col items-center justify-center p-2">
-      <div className="w-full max-w-7xl mb-3">
+      <div className="w-full max-w-5xl mb-3">
         <Card className="p-3 flex flex-col sm:flex-row justify-between items-center gap-3 bg-primary border-none shadow-md">
           <p className="font-bold text-white text-sm flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4" /> Live Session Accuracy: {currentCorrectnessPercentage}
@@ -768,7 +768,7 @@ const QuizPage = () => {
           </div>
         </Card>
       </div>
-      <div className="flex flex-col md:flex-row w-full max-w-7xl gap-4">
+      <div className="flex flex-col md:flex-row w-full max-w-5xl gap-4">
         <Card className="flex-1 border-none shadow-lg rounded-2xl overflow-hidden">
           <CardHeader className="border-b flex flex-row items-center justify-between py-4 px-5">
             <div className="space-y-1">

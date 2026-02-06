@@ -168,7 +168,7 @@ const UserVideosPage = () => {
           const { data, error } = await supabase
             .from('videos')
             .select('*, video_groups(name), video_subgroups(name)')
-            .ilike('title', `%${searchTerm}%`)
+            .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
             .order('title', { ascending: true })
             .range(offset, offset + CHUNK_SIZE - 1);
           
@@ -278,7 +278,7 @@ const UserVideosPage = () => {
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
             <Input 
-              placeholder="Search database..." 
+              placeholder="Search videos..." 
               className="h-9 pl-10 rounded-lg bg-white text-slate-900 font-bold border-none shadow-md text-xs" 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 

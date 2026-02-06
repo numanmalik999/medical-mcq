@@ -57,7 +57,7 @@ const Footer = () => {
   const rssUrl = "https://uvhlyitcrogvssmcqtni.supabase.co/functions/v1/rss-feed";
 
   return (
-    <footer className="bg-card text-card-foreground py-12 border-t border-border mt-12">
+    <footer className="bg-card text-card-foreground py-10 border-t border-border mt-auto">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 text-center md:text-left">
           
@@ -126,7 +126,7 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-border flex flex-col items-center gap-4 text-sm text-muted-foreground">
+        <div className="mt-10 pt-8 border-t border-border flex flex-col items-center gap-4 text-sm text-muted-foreground">
           <p className="font-medium">&copy; {currentYear} Study Prometric MCQs. All rights reserved.</p>
           <MadeWithDyad />
         </div>

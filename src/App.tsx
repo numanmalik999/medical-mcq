@@ -9,7 +9,6 @@ import ScrollToTop from "./components/ScrollToTop";
 import BackToTop from "./components/BackToTop";
 import { SessionContextProvider, useSession } from "./components/SessionContextProvider";
 import Header from "./components/Header";
-import Footer from "./components/Footer";
 import SchemaMarkup from "./components/SchemaMarkup";
 import LoadingBar from "./components/LoadingBar";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
@@ -65,6 +64,7 @@ const BlogDetailsPage = lazy(() => import("./pages/BlogDetailsPage"));
 // Components & Layouts
 const AdminLayout = lazy(() => import("./components/AdminLayout"));
 const UserLayout = lazy(() => import("./components/UserLayout"));
+const PublicLayout = lazy(() => import("./components/PublicLayout"));
 const AdminProtectedRoute = lazy(() => import("./components/AdminProtectedRoute"));
 const UserProtectedRoute = lazy(() => import("./components/UserProtectedRoute"));
 const AiChatbot = lazy(() => import("./components/AiChatbot"));
@@ -94,85 +94,83 @@ const AppContent = () => {
       <BackToTop />
       <SchemaMarkup />
       <Header />
-      <div className="flex flex-col min-h-screen">
-        <main id="main-content" className="flex-grow">
-          <Suspense fallback={<LoadingBar />}>
-            <Routes>
-              {/* Public Outside Landing/Info Pages */}
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/redirect" element={<DashboardRedirect />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<SignUp />} />
-              <Route path="/contact" element={<ContactPage />} />
-              <Route path="/faq" element={<FaqPage />} />
-              <Route path="/about" element={<AboutUsPage />} />
-              <Route path="/sitemap" element={<SitemapPage />} />
-              <Route path="/blog" element={<BlogListPage />} />
-              <Route path="/blog/:slug" element={<BlogDetailsPage />} />
-              <Route path="/reset-password" element={<PasswordResetPage />} />
+      <Suspense fallback={<LoadingBar />}>
+        <Routes>
+          {/* Public Outside Landing/Info Pages */}
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/faq" element={<FaqPage />} />
+            <Route path="/about" element={<AboutUsPage />} />
+            <Route path="/sitemap" element={<SitemapPage />} />
+            <Route path="/blog" element={<BlogListPage />} />
+            <Route path="/blog/:slug" element={<BlogDetailsPage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/reset-password" element={<PasswordResetPage />} />
+            <Route path="/:slug" element={<GenericStaticPage />} />
+          </Route>
 
-              {/* Admin Protected Routes */}
-              <Route path="/admin" element={<AdminProtectedRoute />}>
-                <Route element={<AdminLayout />}>
-                  <Route index element={<AdminDashboardPage />} />
-                  <Route path="dashboard" element={<AdminDashboardPage />} />
-                  <Route path="manage-landing-page" element={<ManageLandingPage />} />
-                  <Route path="add-mcq" element={<AddMcqPage />} />
-                  <Route path="bulk-upload-mcqs" element={<BulkUploadMcqsPage />} />
-                  <Route path="manage-mcqs" element={<ManageMcqsPage />} />
-                  <Route path="manage-daily-mcqs" element={<ManageDailyMcqsPage />} />
-                  <Route path="manage-submitted-mcqs" element={<ManageSubmittedMcqsPage />} />
-                  <Route path="manage-categories" element={<ManageCategoriesPage />} />
-                  <Route path="manage-courses" element={<ManageCoursesPage />} />
-                  <Route path="manage-courses/:courseId/topics" element={<ManageCourseTopicsPage />} />
-                  <Route path="manage-videos" element={<ManageVideosPage />} />
-                  <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
-                  <Route path="manage-users" element={<ManageUsersPage />} />
-                  <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />
-                  <Route path="manage-suggestions" element={<ManageSuggestionsPage />} />
-                  <Route path="seo" element={<ManageSeoPage />} />
-                  <Route path="settings" element={<AdminSettingsPage />} />
-                </Route>
+          <Route path="/redirect" element={<DashboardRedirect />} />
+
+          {/* Admin Protected Routes */}
+          <Route path="/admin" element={<AdminProtectedRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route index element={<AdminDashboardPage />} />
+              <Route path="dashboard" element={<AdminDashboardPage />} />
+              <Route path="manage-landing-page" element={<ManageLandingPage />} />
+              <Route path="add-mcq" element={<AddMcqPage />} />
+              <Route path="bulk-upload-mcqs" element={<BulkUploadMcqsPage />} />
+              <Route path="manage-mcqs" element={<ManageMcqsPage />} />
+              <Route path="manage-daily-mcqs" element={<ManageDailyMcqsPage />} />
+              <Route path="manage-submitted-mcqs" element={<ManageSubmittedMcqsPage />} />
+              <Route path="manage-categories" element={<ManageCategoriesPage />} />
+              <Route path="manage-courses" element={<ManageCoursesPage />} />
+              <Route path="manage-courses/:courseId/topics" element={<ManageCourseTopicsPage />} />
+              <Route path="manage-videos" element={<ManageVideosPage />} />
+              <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
+              <Route path="manage-users" element={<ManageUsersPage />} />
+              <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />
+              <Route path="manage-suggestions" element={<ManageSuggestionsPage />} />
+              <Route path="seo" element={<ManageSeoPage />} />
+              <Route path="settings" element={<AdminSettingsPage />} />
+            </Route>
+          </Route>
+
+          {/* User / App Experience (Wrapped in Collapsible Layout) */}
+          <Route path="/" element={<UserProtectedRoute />}>
+            <Route element={<UserLayout />}>
+              <Route path="quiz" element={<QuizPage />} />
+              <Route path="quiz-of-the-day" element={<QuestionOfTheDayPage />} />
+              <Route path="subscription" element={<SubscriptionPage />} />
+              <Route path="reviews" element={<ReviewsPage />} />
+              
+              {/* Dashboard and other standard pages */}
+              <Route path="user">
+                <Route index element={<UserDashboardPage />} />
+                <Route path="dashboard" element={<UserDashboardPage />} />
+                <Route path="profile" element={<UserProfilePage />} />
+                <Route path="subscriptions" element={<UserSubscriptionsPage />} />
+                <Route path="submit-mcq" element={<SubmitMcqPage />} />
+                <Route path="bookmarked-mcqs" element={<BookmarkedMcqsPage />} />
+                <Route path="suggestions" element={<UserSuggestionsPage />} />
+                <Route path="courses" element={<UserCoursesPage />} />
+                <Route path="courses/:courseId" element={<UserCourseDetailsPage />} />
+                <Route path="videos" element={<UserVideosPage />} />
+                <Route path="case-studies" element={<CaseStudiesPage />} />
+                <Route path="take-test" element={<TakeTestPage />} />
               </Route>
+            </Route>
+            
+            {/* Pages that might need strictly full width or custom handling outside standard user padding */}
+            <Route path="user">
+               <Route path="payment/:tierId" element={<PaymentPage />} />
+            </Route>
+          </Route>
 
-              {/* User / App Experience (Wrapped in Collapsible Layout) */}
-              <Route path="/" element={<UserProtectedRoute />}>
-                <Route element={<UserLayout />}>
-                  <Route path="quiz" element={<QuizPage />} />
-                  <Route path="quiz-of-the-day" element={<QuestionOfTheDayPage />} />
-                  <Route path="subscription" element={<SubscriptionPage />} />
-                  <Route path="reviews" element={<ReviewsPage />} />
-                  
-                  {/* Dashboard and other standard pages */}
-                  <Route path="user">
-                    <Route index element={<UserDashboardPage />} />
-                    <Route path="dashboard" element={<UserDashboardPage />} />
-                    <Route path="profile" element={<UserProfilePage />} />
-                    <Route path="subscriptions" element={<UserSubscriptionsPage />} />
-                    <Route path="submit-mcq" element={<SubmitMcqPage />} />
-                    <Route path="bookmarked-mcqs" element={<BookmarkedMcqsPage />} />
-                    <Route path="suggestions" element={<UserSuggestionsPage />} />
-                    <Route path="courses" element={<UserCoursesPage />} />
-                    <Route path="courses/:courseId" element={<UserCourseDetailsPage />} />
-                    <Route path="videos" element={<UserVideosPage />} />
-                    <Route path="case-studies" element={<CaseStudiesPage />} />
-                    <Route path="take-test" element={<TakeTestPage />} />
-                  </Route>
-                </Route>
-                
-                {/* Pages that might need strictly full width or custom handling outside standard user padding */}
-                <Route path="user">
-                   <Route path="payment/:tierId" element={<PaymentPage />} />
-                </Route>
-              </Route>
-
-              <Route path="/:slug" element={<GenericStaticPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </main>
-        <Footer />
-      </div>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
       <Suspense fallback={null}>
         <AiChatbot />
       </Suspense>

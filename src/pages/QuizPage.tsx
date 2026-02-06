@@ -281,19 +281,21 @@ const QuizPage = () => {
     }
     const categoriesMap = new Map(categoriesData?.map(cat => [cat.id, cat]) || []);
     
-    // Optimized counts using parallelized head-only queries
+    // Optimized counts using parallelized head-only queries with inner join hints
     const countPromises = (categoriesData || []).map(async (cat) => {
-        const { count: total } = await supabase.from('mcq_category_links').select('mcq_id', { count: 'exact', head: true }).eq('category_id', cat.id);
-        const { count: trial } = await supabase.from('mcq_category_links').select('mcq_id', { count: 'exact', head: true }).eq('category_id', cat.id).filter('mcqs.is_trial_mcq', 'eq', true); // Note: this filter might require a specific view or join if nested filtering isn't working as expected in basic REST
-        
-        // Fallback for trial count if direct filtering fails (basic join check)
-        let finalTrial = trial || 0;
-        if (trial === null) {
-            const { count } = await supabase.from('mcq_category_links').select('mcqs!inner(id)', { count: 'exact', head: true }).eq('category_id', cat.id).eq('mcqs.is_trial_mcq', true);
-            finalTrial = count || 0;
-        }
+        const { count: total } = await supabase
+            .from('mcq_category_links')
+            .select('mcq_id', { count: 'exact', head: true })
+            .eq('category_id', cat.id);
+            
+        // Use inner join hint to filter counts by related table mcqs
+        const { count: trial } = await supabase
+            .from('mcq_category_links')
+            .select('mcqs!inner(id)', { count: 'exact', head: true })
+            .eq('category_id', cat.id)
+            .eq('mcqs.is_trial_mcq', true);
 
-        return { id: cat.id, total: total || 0, trial: finalTrial };
+        return { id: cat.id, total: total || 0, trial: trial || 0 };
     });
 
     const [countsResults, totalMcqRes, globalTrialRes] = await Promise.all([
@@ -309,7 +311,6 @@ const QuizPage = () => {
     const uniqueLinkedIds = new Set(linkedIdsRes?.map(l => l.mcq_id) || []);
     const uncategorizedTotal = (totalMcqRes.count || 0) - uniqueLinkedIds.size;
     
-    // We don't fetch attempts here to save time, just metadata
     let userAttemptsData: any[] = [];
     if (user) {
       const { data } = await supabase.from('user_quiz_attempts').select('is_correct, category_id').eq('user_id', user.id);
@@ -369,7 +370,7 @@ const QuizPage = () => {
         name: 'General Medical Practice',
         description: 'Comprehensive clinical questions covering essential foundations of medicine and shared specialty knowledge.',
         total_mcqs: uncategorizedTotal,
-        total_trial_mcqs: 0, // Simplified for now
+        total_trial_mcqs: 0,
         user_attempts: userAtt.total,
         user_correct: userAtt.correct,
         user_incorrect: userAtt.total - userAtt.correct,

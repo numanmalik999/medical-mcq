@@ -46,16 +46,16 @@ const NavLink = ({ to, icon, label, isMobile, onLinkClick, isPremium, isSubscrib
       <Button
         variant="ghost"
         className={cn(
-          "w-full gap-2 transition-all duration-200",
-          isCollapsed ? "justify-center px-0" : "justify-start px-4",
+          "w-full gap-2 transition-all duration-200 h-9",
+          isCollapsed ? "justify-center px-0" : "justify-start px-3",
           isActive
             ? "bg-accent text-accent-foreground"
             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-          isMobile && "text-base py-3"
+          isMobile && "text-base py-3 h-12"
         )}
       >
         <div className="shrink-0">{icon}</div>
-        {!isCollapsed && <span className="flex-grow text-left truncate">{label}</span>}
+        {!isCollapsed && <span className="flex-grow text-left truncate text-sm font-medium">{label}</span>}
         {!isCollapsed && isPremium && !isSubscribed && <Lock className="h-3 w-3 ml-auto text-muted-foreground opacity-50" />}
       </Button>
     </Link>
@@ -108,9 +108,9 @@ const UserSidebar = ({ isCollapsed, onToggleCollapse }: UserSidebarProps) => {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-4 bg-sidebar flex flex-col">
-          <h2 className="text-2xl font-bold text-sidebar-primary-foreground mb-6">User Panel</h2>
-          <div className="flex-1 overflow-y-auto pr-2 -mr-2">
-            <nav className="flex flex-col gap-2">
+          <h2 className="text-xl font-bold text-sidebar-primary-foreground mb-4">User Panel</h2>
+          <div className="flex-1 overflow-y-auto">
+            <nav className="flex flex-col gap-1">
               {navItems.map((item) => (
                 <NavLink 
                   key={item.to} 
@@ -126,7 +126,7 @@ const UserSidebar = ({ isCollapsed, onToggleCollapse }: UserSidebarProps) => {
             </nav>
           </div>
           <div className="mt-auto pt-4 border-t border-sidebar-border">
-            <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLogout}><LogOut className="h-4 w-4" /><span>Logout</span></Button>
+            <Button variant="ghost" className="w-full justify-start gap-2 h-10" onClick={handleLogout}><LogOut className="h-4 w-4" /><span>Logout</span></Button>
           </div>
         </SheetContent>
       </Sheet>
@@ -136,21 +136,21 @@ const UserSidebar = ({ isCollapsed, onToggleCollapse }: UserSidebarProps) => {
   return (
     <aside className={cn(
         "min-h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col transition-all duration-300 relative",
-        isCollapsed ? "w-16" : "w-64"
+        isCollapsed ? "w-14" : "w-60"
     )}>
-      <div className={cn("p-4 flex items-center mb-4 transition-all duration-300", isCollapsed ? "justify-center" : "justify-between")}>
-        {!isCollapsed && <h2 className="text-xl font-bold text-sidebar-primary-foreground truncate px-2">User Panel</h2>}
+      <div className={cn("p-3 flex items-center mb-2 transition-all duration-300", isCollapsed ? "justify-center" : "justify-between")}>
+        {!isCollapsed && <h2 className="text-lg font-bold text-sidebar-primary-foreground truncate px-1">User Panel</h2>}
         <Button 
             variant="ghost" 
             size="icon" 
             onClick={onToggleCollapse} 
-            className={cn("h-8 w-8 rounded-full bg-muted/50 hover:bg-muted transition-all", isCollapsed && "mt-2")}
+            className={cn("h-7 w-7 rounded-full bg-muted/50 hover:bg-muted transition-all")}
         >
-          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          {isCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
         </Button>
       </div>
       
-      <nav className="flex flex-col gap-1 flex-grow px-2">
+      <nav className="flex flex-col gap-0.5 flex-grow px-1.5">
         {navItems.map((item) => (
           <NavLink 
             key={item.to} 
@@ -164,15 +164,15 @@ const UserSidebar = ({ isCollapsed, onToggleCollapse }: UserSidebarProps) => {
         ))}
       </nav>
 
-      <div className="mt-auto p-2 border-t border-sidebar-border">
+      <div className="mt-auto p-1.5 border-t border-sidebar-border">
         <Button 
             variant="ghost" 
-            className={cn("w-full transition-all duration-200", isCollapsed ? "justify-center px-0" : "justify-start gap-2 px-4")} 
+            className={cn("w-full transition-all duration-200 h-9", isCollapsed ? "justify-center px-0" : "justify-start gap-2 px-3")} 
             onClick={handleLogout}
             title={isCollapsed ? "Logout" : undefined}
         >
           <LogOut className="h-4 w-4" />
-          {!isCollapsed && <span>Logout</span>}
+          {!isCollapsed && <span className="text-sm font-medium">Logout</span>}
         </Button>
       </div>
     </aside>

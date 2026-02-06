@@ -549,7 +549,7 @@ const TakeTestPage = () => {
 
   if (showResults) {
     return (
-      <div className="space-y-4 max-w-6xl mx-auto">
+      <div className="space-y-4 max-w-7xl mx-auto">
         <div className="flex flex-col lg:flex-row w-full gap-4">
           <QuizNavigator mcqs={mcqs} userAnswers={userAnswers} currentQuestionIndex={currentQuestionIndex} goToQuestion={(i) => setCurrentQuestionIndex(i)} showResults={true} score={score} />
           <Card className="flex-1 border-none shadow-xl rounded-2xl overflow-hidden">
@@ -607,7 +607,7 @@ const TakeTestPage = () => {
   const currentAns = userAnswers.get(currentMcq.id)?.selectedOption || "";
 
   return (
-    <div className="space-y-4 max-w-6xl mx-auto">
+    <div className="space-y-3 max-w-7xl mx-auto">
       <div className="flex flex-col lg:flex-row w-full gap-4">
         <div className="lg:w-64">
            <QuizNavigator mcqs={mcqs} userAnswers={userAnswers} currentQuestionIndex={currentQuestionIndex} goToQuestion={(i) => setCurrentQuestionIndex(i)} showResults={false} score={0} skippedMcqIds={skippedMcqIds} />

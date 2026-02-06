@@ -646,7 +646,7 @@ const QuizPage = () => {
 
   if (isInitializingQuiz) {
       return (
-          <div className="min-h-screen flex flex-col items-center justify-center pt-20 gap-4">
+          <div className="flex flex-col items-center justify-center pt-20 gap-4">
               <Loader2 className="animate-spin h-10 w-10 text-primary" />
               <p className="font-black uppercase tracking-widest text-muted-foreground animate-pulse">Initializing Practice Session...</p>
           </div>
@@ -655,7 +655,7 @@ const QuizPage = () => {
 
   if (showResults) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 pt-20">
+      <div className="flex flex-col items-center justify-center p-2 pt-4">
         <Card className="w-full max-w-2xl text-center border-none shadow-2xl rounded-3xl overflow-hidden">
             <CardHeader className="bg-primary text-primary-foreground py-10">
                 <CardTitle className="text-3xl font-black uppercase tracking-tighter">Practice Complete!</CardTitle>
@@ -675,8 +675,8 @@ const QuizPage = () => {
 
   if (showCategorySelection) {
     return (
-      <div className="min-h-screen bg-background p-4 pt-16">
-        <Card className="w-full max-w-6xl mx-auto shadow-xl border-none">
+      <div className="bg-background p-2">
+        <Card className="w-full max-w-7xl mx-auto shadow-xl border-none">
           <CardHeader className="text-center pb-8 border-b">
             <CardTitle className="text-4xl font-extrabold text-foreground">Select a Practice Specialty</CardTitle>
             <CardDescription className="text-lg mt-2">Access high-yield MCQs mapped to current Gulf licensing blueprints.</CardDescription>
@@ -756,50 +756,50 @@ const QuizPage = () => {
   const isSub = ansData?.submitted;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
-      <div className="w-full max-w-6xl mb-4">
-        <Card className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-primary border-none shadow-md">
-          <p className="font-bold text-white flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5" /> Live Session Accuracy: {currentCorrectnessPercentage}
+    <div className="flex flex-col items-center justify-center p-2">
+      <div className="w-full max-w-7xl mb-3">
+        <Card className="p-3 flex flex-col sm:flex-row justify-between items-center gap-3 bg-primary border-none shadow-md">
+          <p className="font-bold text-white text-sm flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" /> Live Session Accuracy: {currentCorrectnessPercentage}
           </p>
           <div className="flex gap-2">
-             <Button variant="outline" size="sm" className="text-black border-white hover:bg-white/10" onClick={handleSaveProgress} disabled={isOfflineQuiz}><Save className="h-4 w-4 mr-2" /> Save Progress</Button>
-             <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={handleBackToSelection}><ArrowLeft className="h-4 w-4 mr-2" /> Exit Quiz</Button>
+             <Button variant="outline" size="sm" className="h-8 text-black border-white hover:bg-white/10 text-xs" onClick={handleSaveProgress} disabled={isOfflineQuiz}><Save className="h-3 w-3 mr-2" /> Save</Button>
+             <Button variant="ghost" size="sm" className="h-8 text-white hover:bg-white/10 text-xs" onClick={handleBackToSelection}><ArrowLeft className="h-3 w-3 mr-2" /> Exit</Button>
           </div>
         </Card>
       </div>
-      <div className="flex flex-col md:flex-row w-full max-w-6xl gap-6">
+      <div className="flex flex-col md:flex-row w-full max-w-7xl gap-4">
         <Card className="flex-1 border-none shadow-lg rounded-2xl overflow-hidden">
-          <CardHeader className="border-b flex flex-row items-center justify-between py-6">
+          <CardHeader className="border-b flex flex-row items-center justify-between py-4 px-5">
             <div className="space-y-1">
-              <CardTitle className="text-2xl font-bold">Question {currentQuestionIndex + 1} of {quizQuestions.length}</CardTitle>
-              {isOfflineQuiz && <Badge variant="destructive" className="flex items-center gap-1"><WifiOff className="h-3 w-3" /> Offline Practice</Badge>}
+              <CardTitle className="text-xl font-bold">Question {currentQuestionIndex + 1} of {quizQuestions.length}</CardTitle>
+              {isOfflineQuiz && <Badge variant="destructive" className="flex items-center gap-1 h-5 text-[10px]"><WifiOff className="h-3 w-3" /> Offline</Badge>}
             </div>
             {!isGuest && !isOfflineQuiz && (
-              <Button variant="ghost" size="icon" onClick={toggleBookmark} disabled={isBookmarkLoading}>
-                {isBookmarked ? <BookmarkCheck className="h-6 w-6 text-primary fill-current" /> : <Bookmark className="h-6 w-6 text-muted-foreground" />}
+              <Button variant="ghost" size="icon" onClick={toggleBookmark} disabled={isBookmarkLoading} className="h-9 w-9">
+                {isBookmarked ? <BookmarkCheck className="h-5 w-5 text-primary fill-current" /> : <Bookmark className="h-5 w-5 text-muted-foreground" />}
               </Button>
             )}
           </CardHeader>
-          <CardContent className="pt-8">
-            <div className="prose dark:prose-invert max-w-none text-xl font-medium leading-relaxed mb-8 text-foreground">
+          <CardContent className="pt-6 px-5">
+            <div className="prose dark:prose-invert max-w-none text-lg font-medium leading-relaxed mb-6 text-foreground">
                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{currentMcq.question_text}</ReactMarkdown>
             </div>
-            <RadioGroup onValueChange={handleOptionSelect} value={selectedAnswer || ""} className="space-y-4" disabled={isSub}>
+            <RadioGroup onValueChange={handleOptionSelect} value={selectedAnswer || ""} className="space-y-3" disabled={isSub}>
               {['A', 'B', 'C', 'D'].map((k) => {
                 const optKey = `option_${k.toLowerCase()}` as keyof MCQ;
                 const text = currentMcq[optKey] as string;
                 const isCorrectOpt = currentMcq.correct_answer === k;
                 const isSel = selectedAnswer === k;
                 return (
-                  <div key={k} className={cn("flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer", 
+                  <div key={k} className={cn("flex items-center space-x-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer", 
                     isSub && isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
                     isSub && isSel && !isCorrectOpt && "border-red-600 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
                     isSub && !isSel && isCorrectOpt && "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
                     !isSub && isSel && "border-primary bg-primary/5 dark:bg-primary/10"
                   )} onClick={() => !isSub && handleOptionSelect(k)}>
                     <RadioGroupItem value={k} id={`opt-${k}`} />
-                    <Label htmlFor={`opt-${k}`} className="cursor-pointer text-lg font-semibold flex-grow">
+                    <Label htmlFor={`opt-${k}`} className="cursor-pointer text-base font-semibold flex-grow leading-tight">
                       <span className="opacity-50 mr-2">{k}.</span> {text}
                     </Label>
                   </div>
@@ -808,33 +808,33 @@ const QuizPage = () => {
             </RadioGroup>
 
             {feedback && (
-              <div className={cn("mt-8 p-6 rounded-2xl flex items-center gap-4 font-bold text-lg border animate-in fade-in zoom-in-95", 
+              <div className={cn("mt-6 p-4 rounded-xl flex items-center gap-3 font-bold text-base border animate-in fade-in zoom-in-95", 
                 feedback.startsWith('Correct') 
                     ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-700 dark:text-green-200" 
                     : "bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-700 dark:text-red-200")}>
-                {feedback.startsWith('Correct') ? <CheckCircle2 className="h-8 w-8" /> : <AlertCircle className="h-8 w-8" />}
+                {feedback.startsWith('Correct') ? <CheckCircle2 className="h-6 w-6" /> : <AlertCircle className="h-6 w-6" />}
                 {feedback}
               </div>
             )}
 
             {showExplanation && (
-              <div className="mt-8 p-8 bg-background rounded-2xl border-2 border-dashed border-border animate-in slide-in-from-bottom-4 duration-500">
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground"><Info className="h-5 w-5 text-primary" /> Clinical AI Explanation</h3>
-                <div className="prose dark:prose-invert max-w-none text-foreground/90 leading-relaxed">
+              <div className="mt-6 p-6 bg-background rounded-2xl border-2 border-dashed border-border animate-in slide-in-from-bottom-4 duration-500">
+                <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-foreground"><Info className="h-4 w-4 text-primary" /> Clinical AI Explanation</h3>
+                <div className="prose dark:prose-invert max-w-none text-foreground/90 text-sm leading-relaxed">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{explanations.get(currentMcq.id || '')?.explanation_text || "Analyzing clinical scenario..."}</ReactMarkdown>
                 </div>
                 {!isOfflineQuiz && (
-                  <Button variant="link" className="mt-6 p-0 text-muted-foreground hover:text-primary transition-colors" onClick={() => setIsFeedbackDialogOpen(true)}>Report a clinical error or add note</Button>
+                  <Button variant="link" className="mt-4 p-0 text-muted-foreground hover:text-primary transition-colors text-xs" onClick={() => setIsFeedbackDialogOpen(true)}>Report a clinical error or add note</Button>
                 )}
               </div>
             )}
           </CardContent>
-          <CardFooter className="border-t py-6 px-8 flex justify-between">
-              <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} variant="outline" className="rounded-full h-12 px-6">Previous</Button>
+          <CardFooter className="border-t py-4 px-5 flex justify-between">
+              <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} variant="outline" className="rounded-full h-10 px-5 text-sm">Previous</Button>
               {!isSub ? (
-                <Button onClick={handleSubmitAnswer} disabled={!isSelected} className="px-10 rounded-full font-bold h-12">Check Answer</Button>
+                <Button onClick={handleSubmitAnswer} disabled={!isSelected} className="px-8 rounded-full font-bold h-10 text-sm">Check Answer</Button>
               ) : (
-                <Button onClick={handleNextQuestion} className="px-10 rounded-full font-bold h-12">Next Question <ArrowRight className="ml-2 h-4 w-4" /></Button>
+                <Button onClick={handleNextQuestion} className="px-8 rounded-full font-bold h-10 text-sm">Next <ArrowRight className="ml-2 h-4 w-4" /></Button>
               )}
           </CardFooter>
         </Card>

@@ -69,6 +69,11 @@ const CaseStudiesPage = () => {
   // Limit State
   const [dailyCount, setDailyCount] = useState(0);
 
+  // --- Auto-scroll page to top on major changes ---
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentCase, viewMode, showSummary]);
+
   useEffect(() => {
     const fetchData = async () => {
       const { data: cats } = await supabase.from('categories').select('id, name').order('name');
@@ -90,9 +95,17 @@ const CaseStudiesPage = () => {
     fetchData();
   }, [user]);
 
+  // --- Auto-scroll chat window to bottom ---
   useEffect(() => {
     if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' });
+        // Find the scrollable viewport inside the ScrollArea component
+        const scrollContainer = chatScrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (scrollContainer) {
+            scrollContainer.scrollTo({
+                top: scrollContainer.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
     }
   }, [chatMessages, isChatLoading]);
 

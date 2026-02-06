@@ -6,14 +6,12 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { 
   Search, 
-  PlayCircle, 
   Loader2, 
   CheckCircle2, 
   Circle, 
   Layers, 
   FolderTree, 
   AlertCircle,
-  ChevronRight,
   MonitorPlay
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -70,7 +68,7 @@ const UserVideosPage = () => {
         supabase.from('video_groups').select('*').order('order'),
         supabase.from('video_subgroups').select('*').order('order'),
         user ? supabase.from('user_video_progress').select('video_id, is_watched').eq('user_id', user.id) : Promise.resolve({ data: [] }),
-        supabase.from('videos').select('group_id, subgroup_id') // Fetch mapping only for counts
+        supabase.from('videos').select('group_id, subgroup_id')
       ]);
 
       const newProgressMap = new Map();
@@ -79,21 +77,15 @@ const UserVideosPage = () => {
       setGroups(groupsRes.data || []);
       setSubgroups(subRes.data || []);
 
-      // Calculate video distribution
       const groupCounts: Record<string, number> = {};
       const subCounts: Record<string, number> = {};
 
       allVideosRes.data?.forEach(v => {
-        if (v.group_id) {
-          groupCounts[v.group_id] = (groupCounts[v.group_id] || 0) + 1;
-        }
-        if (v.subgroup_id) {
-          subCounts[v.subgroup_id] = (subCounts[v.subgroup_id] || 0) + 1;
-        }
+        if (v.group_id) groupCounts[v.group_id] = (groupCounts[v.group_id] || 0) + 1;
+        if (v.subgroup_id) subCounts[v.subgroup_id] = (subCounts[v.subgroup_id] || 0) + 1;
       });
 
       setCounts({ groups: groupCounts, subgroups: subCounts });
-
     } catch (error: any) {
       toast({ title: "Error", description: "Failed to load library structure.", variant: "destructive" });
     } finally {
@@ -109,16 +101,32 @@ const UserVideosPage = () => {
     if (loadedVideos[id] || loadingState[id]) return;
 
     setLoadingState(prev => ({ ...prev, [id]: true }));
-    try {
-      const query = supabase.from('videos').select('*').order('order', { ascending: true });
-      if (type === 'subgroup') query.eq('subgroup_id', id);
-      else query.eq('group_id', id).is('subgroup_id', null);
+    let allData: Video[] = [];
+    let hasMore = true;
+    let offset = 0;
+    const CHUNK_SIZE = 1000;
 
-      const { data, error } = await query;
-      if (error) throw error;
-      setLoadedVideos(prev => ({ ...prev, [id]: data || [] }));
+    try {
+      while (hasMore) {
+        let query = supabase.from('videos').select('*').order('order', { ascending: true }).range(offset, offset + CHUNK_SIZE - 1);
+        if (type === 'subgroup') query = query.eq('subgroup_id', id);
+        else query = query.eq('group_id', id).is('subgroup_id', null);
+
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          allData = [...allData, ...(data as Video[])];
+          offset += CHUNK_SIZE;
+          hasMore = data.length === CHUNK_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
+      setLoadedVideos(prev => ({ ...prev, [id]: allData }));
     } catch (e: any) {
       console.error(e);
+      toast({ title: "Sync Error", description: "Failed to load complete video list." });
     } finally {
       setLoadingState(prev => ({ ...prev, [id]: false }));
     }
@@ -132,9 +140,35 @@ const UserVideosPage = () => {
 
     const timer = setTimeout(async () => {
       setIsSearching(true);
-      const { data } = await supabase.from('videos').select('*').ilike('title', `%${searchTerm}%`).limit(30);
-      setSearchResults(data || []);
-      setIsSearching(false);
+      let allResults: Video[] = [];
+      let hasMore = true;
+      let offset = 0;
+      const CHUNK_SIZE = 1000;
+
+      try {
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('videos')
+            .select('*')
+            .ilike('title', `%${searchTerm}%`)
+            .order('title', { ascending: true })
+            .range(offset, offset + CHUNK_SIZE - 1);
+          
+          if (error) throw error;
+          if (data && data.length > 0) {
+            allResults = [...allResults, ...(data as Video[])];
+            offset += CHUNK_SIZE;
+            hasMore = data.length === CHUNK_SIZE && allResults.length < 5000;
+          } else {
+            hasMore = false;
+          }
+        }
+        setSearchResults(allResults);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsSearching(false);
+      }
     }, 500);
 
     return () => clearTimeout(timer);
@@ -147,7 +181,6 @@ const UserVideosPage = () => {
     try {
       await supabase.from('user_video_progress').upsert({ user_id: user.id, video_id: videoId, is_watched: newStatus }, { onConflict: 'user_id,video_id' });
       setProgressMap(prev => new Map(prev).set(videoId, newStatus));
-      toast({ title: newStatus ? "Lesson Completed!" : "Progress updated" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -162,62 +195,37 @@ const UserVideosPage = () => {
     setSelectedVideo(video);
   };
 
-  const getEmbedUrl = (video: Video) => {
-    return `https://player.vimeo.com/video/${video.youtube_video_id}?autoplay=1&badge=0&autopause=0&player_id=0&app_id=58479`;
-  };
-
   const VideoCard = ({ video }: { video: Video }) => {
     const isWatched = progressMap.get(video.id) || false;
     
     return (
       <Card 
         className={cn(
-          "group relative overflow-hidden cursor-pointer transition-all duration-300 border-2 hover:shadow-xl hover:-translate-y-1", 
-          isWatched ? "border-green-500/30 bg-green-50/10 shadow-inner" : "border-slate-200 bg-white"
+          "group relative overflow-hidden cursor-pointer transition-all border-2 flex flex-col justify-between", 
+          isWatched ? "border-green-500/20 bg-green-50/5" : "border-slate-100 bg-white"
         )}
         onClick={() => handleVideoClick(video)}
       >
-        <div className="p-5 flex flex-col gap-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-                <div className={cn(
-                    "h-10 w-10 shrink-0 rounded-xl flex items-center justify-center font-black text-sm shadow-sm transition-colors",
-                    isWatched ? "bg-green-600 text-white" : "bg-primary text-primary-foreground"
-                )}>
-                    {video.order}
-                </div>
-                <h4 className="font-bold text-[15px] leading-snug text-slate-800 line-clamp-2">
-                    {video.title}
-                </h4>
+        <div className="p-3 flex items-center gap-3">
+            <div className={cn(
+                "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center font-black text-xs transition-colors",
+                isWatched ? "bg-green-600 text-white" : "bg-primary text-primary-foreground"
+            )}>
+                {video.order}
             </div>
-            
-            <div className="flex flex-col items-end gap-2">
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 rounded-full hover:bg-slate-100 shrink-0" 
-                    onClick={(e) => toggleWatched(video.id, e)}
-                    disabled={!user}
-                >
-                  {isWatched ? <CheckCircle2 className="h-6 w-6 text-green-600" /> : <Circle className="h-6 w-6 text-slate-300" />}
-                </Button>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between mt-2 pt-4 border-t border-slate-50">
-             <Badge variant="outline" className="text-[9px] uppercase font-black tracking-widest px-2 bg-slate-50 text-slate-500 border-slate-200">
-                {video.platform} lesson
-             </Badge>
-             <div className="flex items-center gap-1.5 text-primary group-hover:gap-2 transition-all">
-                <span className="text-[10px] font-black uppercase tracking-tighter">Watch Now</span>
-                <PlayCircle className="h-4 w-4" />
-             </div>
-          </div>
+            <h4 className="font-bold text-[13px] leading-tight text-slate-800 line-clamp-2 flex-grow">
+                {video.title}
+            </h4>
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6 rounded-full shrink-0" 
+                onClick={(e) => toggleWatched(video.id, e)}
+                disabled={!user}
+            >
+              {isWatched ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-slate-300" />}
+            </Button>
         </div>
-
-        {isWatched && (
-            <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
-        )}
       </Card>
     );
   };
@@ -225,62 +233,44 @@ const UserVideosPage = () => {
   if (!hasCheckedInitialSession || isLoading) return <div className="flex justify-center py-20 pt-24"><Loader2 className="animate-spin text-primary" /></div>;
 
   return (
-    <div className="space-y-12 pb-20">
-      <section className="relative overflow-hidden bg-primary rounded-3xl p-8 md:p-12 text-primary-foreground shadow-2xl">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-8">
-          <div className="text-center lg:text-left space-y-3">
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight uppercase italic leading-none">
-                Clinical Masterclass
-            </h1>
-            <p className="text-primary-foreground/70 font-medium max-w-md">
-                Master complex clinical concepts with our structured video roadmap, led by top-tier medical faculty.
-            </p>
+    <div className="space-y-6 pb-12">
+      <section className="relative overflow-hidden bg-primary rounded-2xl p-6 md:p-8 text-primary-foreground shadow-lg">
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-6">
+          <div className="text-center lg:text-left">
+            <h1 className="text-2xl md:text-4xl font-black tracking-tight uppercase italic leading-none">Education Library</h1>
           </div>
-
-          <div className="relative w-full max-w-lg">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-6 w-6 text-primary" />
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary" />
             <Input 
-              placeholder="Search by topic, symptom, or diagnosis..." 
-              className="h-16 pl-14 pr-16 rounded-2xl bg-white text-slate-900 placeholder:text-slate-400 text-lg font-bold shadow-2xl border-none focus-visible:ring-offset-0 focus-visible:ring-4 focus-visible:ring-white/20" 
+              placeholder="Quick search..." 
+              className="h-12 pl-12 rounded-xl bg-white text-slate-900 font-bold border-none shadow-xl" 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 
             />
-            {isSearching && (
-                <div className="absolute right-5 top-1/2 -translate-y-1/2">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-            )}
+            {isSearching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-primary" />}
           </div>
         </div>
       </section>
 
       <div className="container max-w-7xl mx-auto px-0">
         {searchTerm.trim() ? (
-          <section className="animate-in fade-in slide-in-from-bottom-4 space-y-8 px-4">
-             <div className="flex items-center gap-4">
-               <div className="p-2 bg-primary/10 rounded-xl text-primary"><MonitorPlay className="h-6 w-6" /></div>
-               <div>
-                  <h2 className="text-2xl font-black uppercase tracking-tight">Instant Search Results</h2>
-                  <p className="text-sm text-muted-foreground font-medium">Showing top matches for "{searchTerm}"</p>
-               </div>
+          <section className="animate-in fade-in space-y-4 px-2">
+             <div className="flex items-center gap-2">
+                <MonitorPlay className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-black uppercase">Search Results</h2>
              </div>
-             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                {searchResults.map(v => <VideoCard key={v.id} video={v} />)}
                {searchResults.length === 0 && !isSearching && (
-                 <Card className="col-span-full py-24 bg-slate-50 border-2 border-dashed border-slate-200 text-center flex flex-col items-center gap-4 rounded-3xl">
-                    <div className="p-6 bg-white rounded-full shadow-sm"><AlertCircle className="h-12 w-12 text-slate-300" /></div>
-                    <div className="space-y-1">
-                        <p className="text-2xl font-black text-slate-400 uppercase tracking-tighter">No Lessons Found</p>
-                        <p className="text-slate-400 font-medium">Try adjusting your search terms or browse categories below.</p>
-                    </div>
+                 <Card className="col-span-full py-12 text-center rounded-2xl">
+                    <AlertCircle className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                    <p className="text-slate-400 font-bold uppercase text-xs">No matches found</p>
                  </Card>
                )}
              </div>
           </section>
         ) : (
-          <Accordion type="multiple" className="space-y-8">
+          <Accordion type="multiple" className="space-y-4">
             {groups.map((group) => {
               const groupSubgroups = subgroups.filter(sg => sg.group_id === group.id);
               const totalVideosInGroup = counts.groups[group.id] || 0;
@@ -289,103 +279,67 @@ const UserVideosPage = () => {
                 <AccordionItem 
                   key={group.id} 
                   value={group.id} 
-                  className="border-none bg-white rounded-3xl overflow-hidden shadow-xl border border-slate-100"
+                  className="border-none bg-white rounded-2xl overflow-hidden shadow-md"
                   onClick={() => loadVideosForId(group.id, 'group')}
                 >
-                  <AccordionTrigger className="px-8 py-8 hover:bg-slate-50/50 hover:no-underline border-b transition-all">
-                    <div className="flex items-center justify-between w-full pr-4">
-                      <div className="flex items-center gap-6 text-left">
-                        <div className="p-4 bg-primary text-primary-foreground rounded-2xl shadow-lg ring-4 ring-primary/5">
-                          <Layers className="h-8 w-8" />
+                  <AccordionTrigger className="px-6 py-5 hover:bg-slate-50/50 hover:no-underline border-b transition-all">
+                    <div className="flex items-center justify-between w-full pr-2">
+                      <div className="flex items-center gap-4 text-left">
+                        <div className="p-2.5 bg-primary text-primary-foreground rounded-xl shadow-md">
+                          <Layers className="h-6 w-6" />
                         </div>
                         <div>
-                          <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">{group.name}</h2>
-                          <div className="flex items-center gap-3 mt-2">
-                               <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase tracking-widest px-3 py-1">
-                                  Complete Syllabus
-                               </Badge>
-                          </div>
+                          <h2 className="text-xl font-black uppercase tracking-tighter text-slate-900 leading-none">{group.name}</h2>
                         </div>
                       </div>
-                      <Badge className="h-10 px-4 rounded-xl bg-slate-900 text-white font-black text-base shadow-lg">
-                        {totalVideosInGroup} Videos
+                      <Badge className="h-8 px-3 rounded-lg bg-slate-900 text-white font-black text-xs">
+                        {totalVideosInGroup}
                       </Badge>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="p-10 bg-slate-50/30 space-y-16">
+                  <AccordionContent className="p-4 bg-slate-50/20 space-y-8">
                     
-                    <div className="space-y-6">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Foundation Curriculum</h3>
+                    {loadingState[group.id] ? (
+                      <div className="flex justify-center py-8"><Loader2 className="animate-spin h-8 w-8 text-primary/20" /></div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {loadedVideos[group.id]?.map((v) => <VideoCard key={v.id} video={v} />)}
                       </div>
-                      {loadingState[group.id] ? (
-                        <div className="flex justify-center py-16"><Loader2 className="animate-spin h-10 w-10 text-primary/20" /></div>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                          {loadedVideos[group.id]?.map((v) => <VideoCard key={v.id} video={v} />)}
-                          {loadedVideos[group.id]?.length === 0 && (
-                            <div className="col-span-full py-8 text-center bg-white rounded-2xl border border-dashed border-slate-200">
-                                <p className="text-sm text-slate-400 font-medium">Core lessons are grouped by specialty below.</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    )}
 
                     {groupSubgroups.length > 0 && (
-                      <div className="space-y-8 pt-4">
-                        <div className="flex items-center gap-2">
-                            <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                            <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Specialty Sub-groups</h3>
-                        </div>
-                        <div className="grid grid-cols-1 gap-10">
-                          {groupSubgroups.map(sg => {
-                            const videosInSubgroup = counts.subgroups[sg.id] || 0;
-                            return (
-                              <div key={sg.id} className="relative animate-in fade-in duration-700">
-                                <button 
-                                  className="flex items-center justify-between w-full mb-6 group bg-white p-4 rounded-2xl border shadow-sm hover:shadow-md transition-all"
-                                  onClick={() => loadVideosForId(sg.id, 'subgroup')}
-                                >
-                                  <div className="flex items-center gap-4">
-                                      <div className="p-2.5 bg-primary/5 rounded-xl border group-hover:border-primary group-hover:scale-105 transition-all">
-                                          <FolderTree className="h-5 w-5 text-primary" />
-                                      </div>
-                                      <div className="text-left">
-                                          <span className="font-black text-xl uppercase tracking-tighter text-slate-800 flex items-center gap-2">
-                                              {sg.name} 
-                                              <ChevronRight className="h-4 w-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
-                                          </span>
-                                          {sg.description && <p className="text-xs text-slate-400 font-medium mt-0.5">{sg.description}</p>}
-                                      </div>
-                                  </div>
-                                  <Badge variant="outline" className="h-8 px-3 rounded-lg border-2 border-primary/20 text-primary font-black text-xs uppercase tracking-wider">
-                                     {videosInSubgroup} Lessons
-                                  </Badge>
-                                </button>
-
-                                <div className="pl-2 border-l-2 border-slate-100 ml-5 pt-2">
-                                  {loadingState[sg.id] ? (
-                                      <div className="flex justify-center py-12"><Loader2 className="animate-spin h-8 w-8 text-primary/20" /></div>
-                                  ) : (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                      {loadedVideos[sg.id]?.map((v) => <VideoCard key={v.id} video={v} />)}
-                                      {(!loadedVideos[sg.id] || loadedVideos[sg.id].length === 0) && (
-                                          <div 
-                                              className="col-span-full py-10 bg-white/50 rounded-2xl border border-dashed text-center cursor-pointer hover:bg-white transition-colors"
-                                              onClick={() => loadVideosForId(sg.id, 'subgroup')}
-                                          >
-                                              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Click to Expand Topics</p>
-                                          </div>
-                                      )}
-                                      </div>
-                                  )}
+                      <div className="space-y-4 pt-2">
+                        {groupSubgroups.map(sg => {
+                          const videosInSubgroup = counts.subgroups[sg.id] || 0;
+                          return (
+                            <div key={sg.id} className="relative">
+                              <button 
+                                className="flex items-center justify-between w-full mb-3 group bg-white p-3 rounded-xl border shadow-sm hover:shadow-md transition-all"
+                                onClick={() => loadVideosForId(sg.id, 'subgroup')}
+                              >
+                                <div className="flex items-center gap-3">
+                                    <FolderTree className="h-4 w-4 text-primary opacity-40" />
+                                    <span className="font-black text-sm uppercase text-slate-800">
+                                        {sg.name} 
+                                    </span>
                                 </div>
+                                <Badge variant="outline" className="h-6 px-2 rounded font-black text-[10px] uppercase">
+                                   {videosInSubgroup}
+                                </Badge>
+                              </button>
+
+                              <div className="pl-4 border-l-2 border-slate-100 ml-3">
+                                {loadingState[sg.id] ? (
+                                    <div className="flex justify-center py-6"><Loader2 className="animate-spin h-6 w-6 text-primary/20" /></div>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                      {loadedVideos[sg.id]?.map((v) => <VideoCard key={v.id} video={v} />)}
+                                    </div>
+                                )}
                               </div>
-                            );
-                          })}
-                        </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </AccordionContent>
@@ -397,35 +351,30 @@ const UserVideosPage = () => {
       </div>
 
       <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
-        <DialogContent className="max-w-5xl p-0 overflow-hidden bg-black border-none rounded-[2rem] shadow-2xl">
-          <DialogHeader className="p-8 bg-white border-b flex-row items-center justify-between space-y-0">
-             <div className="flex items-center gap-4">
-                 <div className="h-12 w-12 bg-primary rounded-2xl flex items-center justify-center text-white font-black shadow-lg">
+        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none rounded-2xl shadow-2xl">
+          <DialogHeader className="p-4 bg-white border-b flex-row items-center justify-between space-y-0">
+             <div className="flex items-center gap-3">
+                 <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center text-white font-black text-xs">
                     {selectedVideo?.order}
                  </div>
-                 <div>
-                    <DialogTitle className="font-black text-2xl uppercase tracking-tighter text-slate-900 leading-none">
-                        {selectedVideo?.title}
-                    </DialogTitle>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1.5">Masterclass Lesson</p>
-                 </div>
+                 <DialogTitle className="font-black text-lg uppercase tracking-tight text-slate-900 leading-none">
+                    {selectedVideo?.title}
+                 </DialogTitle>
              </div>
              <Button 
                variant={progressMap.get(selectedVideo?.id || '') ? "secondary" : "default"} 
-               size="lg" onClick={() => selectedVideo && toggleWatched(selectedVideo.id)}
-               className="ml-8 rounded-2xl px-10 font-black uppercase tracking-widest text-xs h-14 shadow-xl active:scale-95 transition-transform"
+               size="sm" onClick={() => selectedVideo && toggleWatched(selectedVideo.id)}
+               className="rounded-xl px-6 font-black uppercase text-[10px] h-10 shadow-md"
              >
-               {progressMap.get(selectedVideo?.id || '') ? (
-                   <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Lesson Finished</span>
-               ) : "Mark as Completed"}
+               {progressMap.get(selectedVideo?.id || '') ? "Completed" : "Complete Lesson"}
              </Button>
           </DialogHeader>
           
-          <div className="aspect-video bg-zinc-900 shadow-2xl relative">
+          <div className="aspect-video bg-zinc-900 relative">
             {selectedVideo && (
               <iframe 
                 width="100%" height="100%" 
-                src={getEmbedUrl(selectedVideo)}
+                src={`https://player.vimeo.com/video/\${selectedVideo.youtube_video_id}?autoplay=1`}
                 frameBorder="0" allowFullScreen
                 className="w-full h-full"
               ></iframe>
@@ -433,12 +382,9 @@ const UserVideosPage = () => {
           </div>
           
           {selectedVideo?.description && (
-            <div className="p-12 bg-white border-t">
-               <h4 className="font-black text-xs uppercase tracking-[0.25em] text-primary/40 mb-6 flex items-center gap-2">
-                 <div className="h-1 w-8 bg-primary/20 rounded-full" /> Clinical Synopsis
-               </h4>
+            <div className="p-6 bg-white border-t">
                <div className="prose dark:prose-invert max-w-none">
-                <p className="text-xl font-medium text-slate-700 leading-relaxed italic border-l-4 border-primary/10 pl-6">
+                <p className="text-sm font-medium text-slate-700 leading-relaxed italic border-l-2 border-primary/20 pl-4">
                     {selectedVideo.description}
                 </p>
                </div>
@@ -450,13 +396,18 @@ const UserVideosPage = () => {
       <SubscribePromptDialog 
         open={isUpgradeDialogOpen} 
         onOpenChange={setIsUpgradeDialogOpen} 
-        featureName="Video Masterclass Series" 
-        description="Our high-yield clinical video library is reserved for premium subscribers. Upgrade your plan to master medical licensing concepts with our expert faculty."
+        featureName="Video Masterclass" 
+        description="This lesson requires a premium subscription. Upgrade your plan to master medical concepts with our expert faculty."
       />
       
       <MadeWithDyad />
     </div>
   );
 };
+
+// Internal Helper for User Side
+const ChevronRight = ({ className }: { className?: string }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+);
 
 export default UserVideosPage;

@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight, Sparkles } from 'lucide-react'; 
+import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight, Sparkles, PlayCircle, MonitorPlay } from 'lucide-react'; 
 import LoadingBar from '@/components/LoadingBar';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { differenceInDays, parseISO } from 'date-fns';
@@ -27,6 +27,13 @@ interface RecentAttempt {
   selected_option: string;
   is_correct: boolean;
   attempt_timestamp: string;
+}
+
+interface RecentVideo {
+  id: string;
+  title: string;
+  group_name: string;
+  last_watched_at: string;
 }
 
 interface Category {
@@ -49,6 +56,8 @@ const UserDashboardPage = () => {
 
   const [quizPerformance, setQuizPerformance] = useState<QuizPerformance | null>(null);
   const [recentAttempts, setRecentAttempts] = useState<RecentAttempt[]>([]);
+  const [videoProgress, setVideoProgress] = useState({ watched: 0, total: 0, percentage: 0 });
+  const [recentVideos, setRecentVideos] = useState<RecentVideo[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [areasForImprovement, setAreasForImprovement] = useState<PerformanceSummary[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
@@ -59,9 +68,12 @@ const UserDashboardPage = () => {
     if (hasCheckedInitialSession) {
       const fetchData = async () => {
         setIsPageLoading(true);
-        await fetchAllCategories(); 
-        await fetchQuizPerformance();
-        await fetchRecentAttempts();
+        await Promise.all([
+          fetchAllCategories(),
+          fetchQuizPerformance(),
+          fetchRecentAttempts(),
+          fetchVideoStats()
+        ]);
         setIsPageLoading(false);
       };
       fetchData();
@@ -71,6 +83,53 @@ const UserDashboardPage = () => {
   const fetchAllCategories = async () => {
     const { data: categoriesData } = await supabase.from('categories').select('*');
     setAllCategories(categoriesData || []);
+  };
+
+  const fetchVideoStats = async () => {
+    if (!user) return;
+
+    try {
+      // Fetch total video count
+      const { count: totalVideos } = await supabase
+        .from('videos')
+        .select('*', { count: 'exact', head: true });
+
+      // Fetch watched count
+      const { data: progressData } = await supabase
+        .from('user_video_progress')
+        .select(`
+          video_id,
+          last_watched_at,
+          videos (
+            title,
+            video_groups (name)
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('is_watched', true)
+        .order('last_watched_at', { ascending: false });
+
+      const watchedCount = progressData?.length || 0;
+      const total = totalVideos || 0;
+      
+      setVideoProgress({
+        watched: watchedCount,
+        total: total,
+        percentage: total > 0 ? (watchedCount / total) * 100 : 0
+      });
+
+      if (progressData) {
+        const formattedVideos: RecentVideo[] = progressData.slice(0, 3).map((p: any) => ({
+          id: p.video_id,
+          title: p.videos?.title || 'Unknown Lesson',
+          group_name: p.videos?.video_groups?.name || 'General',
+          last_watched_at: p.last_watched_at
+        }));
+        setRecentVideos(formattedVideos);
+      }
+    } catch (e) {
+      console.error("Error fetching video stats:", e);
+    }
   };
 
   const fetchQuizPerformance = async () => {
@@ -183,7 +242,6 @@ const UserDashboardPage = () => {
     ? differenceInDays(parseISO(user.subscription_end_date), new Date()) 
     : null;
 
-  // Logic to detect if user is on a "Trial" based on their end date being within 3 days of joining
   const isCurrentlyOnTrial = user?.has_active_subscription && daysRemaining !== null && daysRemaining <= 3;
 
   return (
@@ -235,13 +293,13 @@ const UserDashboardPage = () => {
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-primary text-primary-foreground">
           <CardHeader className="pb-2">
-            <CardDescription className="text-primary-foreground/70 flex items-center gap-2">
-                <Target className="h-4 w-4" /> Overall Accuracy
+            <CardDescription className="text-primary-foreground/70 flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
+                <Target className="h-4 w-4" /> Quiz Accuracy
             </CardDescription>
-            <CardTitle className="text-3xl font-bold">{quizPerformance?.accuracy.toFixed(1) || '0.0'}%</CardTitle>
+            <CardTitle className="text-3xl font-black">{quizPerformance?.accuracy.toFixed(1) || '0.0'}%</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-2 w-full bg-white/20 rounded-full mt-2">
@@ -250,35 +308,49 @@ const UserDashboardPage = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-none shadow-sm">
           <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" /> Total Practice
+            <CardDescription className="flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
+                <MonitorPlay className="h-4 w-4 text-primary" /> Video Progress
             </CardDescription>
-            <CardTitle className="text-3xl font-bold">{quizPerformance?.totalAttempts || 0}</CardTitle>
+            <CardTitle className="text-3xl font-black">{videoProgress.watched} <span className="text-sm text-muted-foreground font-medium">/ {videoProgress.total}</span></CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">MCQs attempted across all specialties</p>
+            <div className="h-2 w-full bg-muted rounded-full mt-2">
+                <div className="h-full bg-primary rounded-full" style={{ width: `${videoProgress.percentage}%` }}></div>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-                <Clock className="h-4 w-4" /> Access Level
+            <CardDescription className="flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
+                <TrendingUp className="h-4 w-4 text-primary" /> MCQs Solved
+            </CardDescription>
+            <CardTitle className="text-3xl font-black">{quizPerformance?.totalAttempts || 0}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground font-medium">Across all specialties</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
+                <Clock className="h-4 w-4 text-primary" /> Access Level
             </CardDescription>
             <div className="flex items-baseline gap-2">
-              <CardTitle className="text-2xl font-bold">{isCurrentlyOnTrial ? 'Free Trial' : (user?.has_active_subscription ? 'Premium' : 'Standard')}</CardTitle>
+              <CardTitle className="text-2xl font-black">{isCurrentlyOnTrial ? 'Trial' : (user?.has_active_subscription ? 'Premium' : 'Standard')}</CardTitle>
               {user?.has_active_subscription && daysRemaining !== null && (
-                <span className={cn("text-xs font-bold", daysRemaining <= 1 ? "text-red-500 animate-pulse" : "text-muted-foreground")}>
-                  ({daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left)
+                <span className={cn("text-[10px] font-black uppercase", daysRemaining <= 1 ? "text-red-500 animate-pulse" : "text-muted-foreground")}>
+                  ({daysRemaining} {daysRemaining === 1 ? 'day' : 'days'})
                 </span>
               )}
             </div>
           </CardHeader>
           <CardContent>
-            <Link to="/user/subscriptions" className="text-xs text-primary font-bold hover:underline">
-                {user?.has_active_subscription ? 'Manage Access' : 'Upgrade for Full Access'}
+            <Link to="/user/subscriptions" className="text-[10px] text-primary font-black uppercase hover:underline">
+                {user?.has_active_subscription ? 'Manage Plan' : 'Upgrade Now'}
             </Link>
           </CardContent>
         </Card>
@@ -287,8 +359,8 @@ const UserDashboardPage = () => {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         <Card className="md:col-span-4 shadow-sm">
           <CardHeader>
-            <CardTitle>Performance by Specialty</CardTitle>
-            <CardDescription>Visual breakdown of your accuracy across different medical fields.</CardDescription>
+            <CardTitle>Specialty Performance</CardTitle>
+            <CardDescription>Accuracy rates across different medical fields.</CardDescription>
           </CardHeader>
           <CardContent className="h-[350px] pl-2">
             {chartData.length > 0 ? (
@@ -296,7 +368,7 @@ const UserDashboardPage = () => {
                 <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                   <XAxis type="number" domain={[0, 100]} hide />
-                  <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} style={{ fontSize: '12px' }} />
+                  <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} style={{ fontSize: '12px', fontWeight: 'bold' }} />
                   <Tooltip 
                     content={({ active, payload }) => {
                         if (active && payload && payload.length) {
@@ -321,55 +393,78 @@ const UserDashboardPage = () => {
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-muted/20 rounded-xl border-2 border-dashed">
                   <TrendingUp className="h-10 w-10 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground font-medium">Not enough data to visualize.</p>
-                  <p className="text-xs text-muted-foreground mt-1">Complete more quizzes to unlock charts.</p>
+                  <p className="text-muted-foreground font-medium uppercase text-xs">No analytics available yet</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Solve more MCQs to generate performance data.</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-3 shadow-sm">
-          <CardHeader>
-            <CardTitle>Focus Areas</CardTitle>
-            <CardDescription>Categories with the lowest accuracy.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {areasForImprovement.length > 0 ? (
-              areasForImprovement.map((area) => (
-                <div key={area.id} className="group relative flex items-center justify-between p-4 border rounded-xl hover:bg-muted/50 transition-colors">
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold">{area.name}</p>
-                    <div className="flex items-center gap-2">
-                        <Badge variant={area.accuracy < 40 ? "destructive" : "secondary"} className="text-[10px]">
-                            {area.accuracy.toFixed(1)}% Accuracy
-                        </Badge>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">{area.totalAttempts} Attempts</span>
-                    </div>
-                  </div>
-                  <Link to="/quiz">
-                    <Button size="icon" variant="ghost" className="rounded-full"><ArrowRight className="h-4 w-4" /></Button>
-                  </Link>
-                </div>
-              ))
-            ) : (
-                <div className="text-center py-10 opacity-50">
-                    <p>Continue practicing to see your focus areas.</p>
-                </div>
-            )}
-          </CardContent>
-          <CardFooter>
-             <Link to="/quiz" className="w-full">
-                <Button variant="outline" className="w-full">Improve Score</Button>
-             </Link>
-          </CardFooter>
-        </Card>
+        <div className="md:col-span-3 space-y-6">
+            <Card className="shadow-sm border-none bg-primary/5">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <PlayCircle className="h-5 w-5 text-primary" /> Continue Watching
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {recentVideos.length > 0 ? (
+                        recentVideos.map(video => (
+                            <Link key={video.id} to="/user/videos" className="flex items-center gap-3 p-3 rounded-xl bg-white border hover:border-primary transition-all group">
+                                <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary group-hover:text-white transition-colors">
+                                    <MonitorPlay className="h-4 w-4" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-black uppercase truncate">{video.title}</p>
+                                    <p className="text-[9px] text-muted-foreground font-bold">{video.group_name}</p>
+                                </div>
+                                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                            </Link>
+                        ))
+                    ) : (
+                        <div className="text-center py-8">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase">No recently watched videos</p>
+                            <Link to="/user/videos"><Button variant="link" size="sm" className="text-[10px] h-auto p-0 font-black">Browse Library</Button></Link>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Focus Areas</CardTitle>
+                    <CardDescription className="text-xs">Categories requiring immediate review.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {areasForImprovement.length > 0 ? (
+                    areasForImprovement.map((area) => (
+                        <div key={area.id} className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/30 transition-colors">
+                            <div className="min-w-0">
+                                <p className="text-xs font-black truncate uppercase tracking-tight">{area.name}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <Badge variant={area.accuracy < 40 ? "destructive" : "secondary"} className="text-[8px] h-4 px-1">
+                                        {area.accuracy.toFixed(1)}%
+                                    </Badge>
+                                </div>
+                            </div>
+                            <Link to="/quiz">
+                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full"><ArrowRight className="h-3 w-3" /></Button>
+                            </Link>
+                        </div>
+                    ))
+                    ) : (
+                        <p className="text-center py-4 text-[10px] font-bold text-muted-foreground uppercase">Not enough data</p>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
       </div>
 
       <div className="grid gap-6">
         <Card className="shadow-sm overflow-hidden">
           <CardHeader className="bg-muted/30 border-b">
-            <CardTitle className="text-lg">Recent Quiz Activity</CardTitle>
-            <CardDescription>Your last 5 individual question attempts.</CardDescription>
+            <CardTitle className="text-lg">Recent Question History</CardTitle>
+            <CardDescription className="text-xs">Audit of your last 5 individual MCQ attempts.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {recentAttempts.length > 0 ? (
@@ -380,23 +475,23 @@ const UserDashboardPage = () => {
                         {attempt.is_correct ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground line-clamp-1">
+                      <p className="text-xs font-bold text-foreground line-clamp-1">
                         {attempt.question_text}
                       </p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{new Date(attempt.attempt_timestamp).toLocaleDateString()}</span>
-                        <span className="text-[10px] bg-muted px-2 py-0.5 rounded font-bold">Answer: {attempt.selected_option}</span>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">{new Date(attempt.attempt_timestamp).toLocaleDateString()}</span>
+                        <span className="text-[9px] bg-muted px-2 py-0.5 rounded font-black uppercase">Result: {attempt.is_correct ? 'Correct' : 'Failed'}</span>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="py-20 text-center text-muted-foreground italic">No recent attempts. Start practicing today!</div>
+              <div className="py-20 text-center text-muted-foreground italic text-xs">No recent attempts. Start practicing today!</div>
             )}
           </CardContent>
           <CardFooter className="bg-muted/10 p-4 border-t text-center">
-             <Link to="/user/bookmarked-mcqs" className="text-xs text-primary font-bold hover:underline mx-auto">View Your Saved Questions</Link>
+             <Link to="/user/bookmarked-mcqs" className="text-xs text-primary font-black uppercase hover:underline mx-auto">Review Your Bookmarked MCQs</Link>
           </CardFooter>
         </Card>
       </div>

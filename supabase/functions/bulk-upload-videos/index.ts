@@ -36,12 +36,13 @@ serve(async (req: Request) => {
     console.log(`[bulk-upload-videos] Received ${videos?.length || 0} videos for processing.`);
 
     if (!Array.isArray(videos) || videos.length === 0) {
-      return new Response(JSON.stringify({ error: 'No videos provided or invalid input.' }), { 
+      return new Response(JSON.stringify({ error: 'No videos provided.' }), { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
+    // 1. Fetch current groups and subgroups to minimize DB calls
     const { data: allGroups } = await supabaseAdmin.from('video_groups').select('id, name');
     const { data: allSubgroups } = await supabaseAdmin.from('video_subgroups').select('id, name, group_id');
 
@@ -58,10 +59,13 @@ serve(async (req: Request) => {
         const platform = 'vimeo';
 
         // --- Handle Parent Category (Group) ---
-        const parentName = video.parent_category.trim();
+        const parentName = video.parent_category?.trim();
+        if (!parentName) throw new Error("Missing parent category");
+        
         let groupId = groupMap.get(parentName.toLowerCase());
 
         if (!groupId) {
+          console.log(`[bulk-upload-videos] Creating new group: ${parentName}`);
           const { data: newGroup, error: gErr } = await supabaseAdmin
             .from('video_groups')
             .insert({ name: parentName, order: 0 })
@@ -80,6 +84,7 @@ serve(async (req: Request) => {
           subgroupId = subgroupMap.get(subKey);
 
           if (!subgroupId) {
+            console.log(`[bulk-upload-videos] Creating new sub-group: ${subName}`);
             const { data: newSub, error: sErr } = await supabaseAdmin
               .from('video_subgroups')
               .insert({ 
@@ -95,8 +100,9 @@ serve(async (req: Request) => {
           }
         }
 
-        // --- Manual Upsert (Fix for missing constraint) ---
-        const { data: existingVideo } = await supabaseAdmin
+        // --- Check if video exists by ID before inserting ---
+        // Using youtube_video_id column to store the Vimeo ID
+        const { data: existing } = await supabaseAdmin
           .from('videos')
           .select('id')
           .eq('youtube_video_id', videoIdStr)
@@ -112,11 +118,11 @@ serve(async (req: Request) => {
           updated_at: new Date().toISOString()
         };
 
-        if (existingVideo) {
+        if (existing) {
           const { error: updateErr } = await supabaseAdmin
             .from('videos')
             .update(videoPayload)
-            .eq('id', existingVideo.id);
+            .eq('id', existing.id);
           if (updateErr) throw updateErr;
         } else {
           const { error: insertErr } = await supabaseAdmin
@@ -137,8 +143,8 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
-    return new Response(JSON.stringify({ error: (error as Error).message }), { 
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error.message }), { 
       status: 500, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });

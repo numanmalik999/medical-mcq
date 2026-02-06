@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,8 @@ import {
   UploadCloud,
   FileSpreadsheet,
   Loader2,
-  Table as TableIcon
+  Table as TableIcon,
+  List as ListIcon
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import EditVideoDialog from '@/components/EditVideoDialog';
@@ -66,6 +67,7 @@ interface StructuredLibrary {
 const ManageVideosPage = () => {
   const { toast } = useToast();
   
+  const [allVideos, setAllVideos] = useState<Video[]>([]);
   const [library, setLibrary] = useState<StructuredLibrary[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
   
@@ -94,17 +96,18 @@ const ManageVideosPage = () => {
       const [groupsRes, subRes, videoRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
         supabase.from('video_subgroups').select('*, video_groups(name)').order('order'),
-        supabase.from('videos').select('*').order('order', { ascending: true })
+        supabase.from('videos').select('*').order('created_at', { ascending: false })
       ]);
 
       if (groupsRes.error) throw groupsRes.error;
       if (subRes.error) throw subRes.error;
       if (videoRes.error) throw videoRes.error;
 
+      const videosData = videoRes.data || [];
+      setAllVideos(videosData);
       setGroups(groupsRes.data || []);
       setSubgroups(subRes.data || []);
 
-      const allVideos = videoRes.data || [];
       const allSubgroups = subRes.data || [];
       
       const structured: StructuredLibrary[] = (groupsRes.data || []).map(g => {
@@ -114,18 +117,18 @@ const ManageVideosPage = () => {
             id: sg.id,
             name: sg.name,
             description: sg.description,
-            videos: allVideos.filter(v => v.subgroup_id === sg.id)
+            videos: videosData.filter(v => v.subgroup_id === sg.id)
           }));
 
         return {
           id: g.id,
           name: g.name,
           subgroups: groupSubgroups,
-          standaloneVideos: allVideos.filter(v => v.group_id === g.id && !v.subgroup_id)
+          standaloneVideos: videosData.filter(v => v.group_id === g.id && !v.subgroup_id)
         };
       });
 
-      const uncategorized = allVideos.filter(v => !v.group_id);
+      const uncategorized = videosData.filter(v => !v.group_id);
       if (uncategorized.length > 0) {
         structured.push({
           id: 'uncategorized',
@@ -247,6 +250,32 @@ const ManageVideosPage = () => {
     }
   };
 
+  const videoListColumns: ColumnDef<Video>[] = useMemo(() => [
+    { accessorKey: "title", header: "Title", cell: ({ row }) => <span className="font-bold text-sm">{row.original.title}</span> },
+    { accessorKey: "youtube_video_id", header: "Vimeo ID", cell: ({ row }) => <code className="text-xs bg-muted p-1 rounded">{row.original.youtube_video_id}</code> },
+    { 
+      id: "placement", 
+      header: "Group", 
+      cell: ({ row }) => {
+        const group = groups.find(g => g.id === row.original.group_id);
+        return <Badge variant="outline">{group?.name || 'Uncategorized'}</Badge>;
+      } 
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={() => { setSelectedVideo(row.original); setIsVideoDialogOpen(true); }}>
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDeleteVideo(row.original.id)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      )
+    }
+  ], [groups]);
+
   const groupColumns: ColumnDef<VideoGroup>[] = [
     { accessorKey: "order", header: "Order" },
     { accessorKey: "name", header: "Group Name" },
@@ -330,7 +359,7 @@ const ManageVideosPage = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Curriculum Manager</h1>
-          <p className="text-muted-foreground text-sm">Organize medical lessons into structured categories and topics.</p>
+          <p className="text-muted-foreground text-sm">You have <strong>{allVideos.length}</strong> lessons total.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={() => { setSelectedVideo(null); setIsVideoDialogOpen(true); }} className="rounded-full shadow-md">
@@ -342,6 +371,9 @@ const ManageVideosPage = () => {
       <Tabs defaultValue="library" className="w-full">
         <TabsList className="inline-flex h-11 items-center justify-center rounded-full bg-muted p-1 mb-8">
           <TabsTrigger value="library" className="rounded-full px-6">Curriculum View</TabsTrigger>
+          <TabsTrigger value="all-lessons" className="rounded-full px-6 flex items-center gap-2">
+            <ListIcon className="h-4 w-4" /> All Lessons
+          </TabsTrigger>
           <TabsTrigger value="groups" className="rounded-full px-6">Groups</TabsTrigger>
           <TabsTrigger value="subgroups" className="rounded-full px-6">Sub-groups</TabsTrigger>
           <TabsTrigger value="bulk" className="rounded-full px-6 flex items-center gap-2">
@@ -417,6 +449,18 @@ const ManageVideosPage = () => {
                 </AccordionItem>
               ))}
             </Accordion>
+        </TabsContent>
+
+        <TabsContent value="all-lessons">
+          <Card className="shadow-sm border-none bg-muted/20">
+            <CardHeader>
+              <CardTitle>Complete Lesson List</CardTitle>
+              <CardDescription>Verify existence of all {allVideos.length} lessons in the database.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DataTable columns={videoListColumns} data={allVideos} />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="groups">

@@ -154,10 +154,19 @@ const ManageVideosPage = () => {
     }
   };
 
+  const findVal = (row: any, keys: string[]) => {
+    const rowKeys = Object.keys(row);
+    for (const key of keys) {
+      const found = rowKeys.find(rk => rk.toLowerCase().trim() === key.toLowerCase().trim());
+      if (found) return row[found];
+    }
+    return undefined;
+  };
+
   const handleBulkUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
-    setUploadProgress("Reading file...");
+    setUploadProgress("Reading and parsing spreadsheet...");
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -168,21 +177,24 @@ const ManageVideosPage = () => {
         const worksheet = workbook.Sheets[sheetName];
         const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
+        console.log("Parsed Excel Raw JSON:", json[0]); // Debugging
+
         const videosToUpload = json.map(row => ({
-          parent_category: row['Parent Category'],
-          sub_category: row['Sub-Category'],
-          sub_category_order: parseInt(row['Sub-Category Order']) || 0,
-          video_title: row['Video Title'],
-          order: parseInt(row['Display Number (Order)']) || 0,
-          video_id: String(row['Vimeo ID']),
+          parent_category: findVal(row, ['Parent Category', 'Category', 'Parent']),
+          sub_category: findVal(row, ['Sub-Category', 'Topic', 'Subcategory']),
+          sub_category_order: parseInt(findVal(row, ['Sub-Category Order', 'Sub Order'])) || 0,
+          video_title: findVal(row, ['Video Title', 'Title', 'Name']),
+          order: parseInt(findVal(row, ['Display Number (Order)', 'Display Order', 'Order'])) || 0,
+          video_id: String(findVal(row, ['Vimeo ID', 'Video ID', 'ID']) || '').trim(),
           platform: 'vimeo'
-        })).filter(v => v.parent_category && v.video_title && v.video_id);
+        })).filter(v => v.parent_category && v.video_title && v.video_id && v.video_id !== 'undefined' && v.video_id !== '');
+
+        console.log("Processed videos for upload:", videosToUpload.length);
 
         if (videosToUpload.length === 0) {
-          throw new Error("No valid data found. Ensure column headers match exactly.");
+          throw new Error("No valid data found. Check your column names: 'Parent Category', 'Video Title', and 'Vimeo ID' are required.");
         }
 
-        // CHUNKING LOGIC
         const CHUNK_SIZE = 50;
         let totalProcessed = 0;
         let totalErrors = 0;
@@ -198,7 +210,10 @@ const ManageVideosPage = () => {
             body: { videos: chunk },
           });
 
-          if (error) throw error;
+          if (error) {
+            console.error("Batch invoke error:", error);
+            throw error;
+          }
           
           totalProcessed += (res.successCount || 0);
           totalErrors += (res.errorCount || 0);
@@ -213,6 +228,7 @@ const ManageVideosPage = () => {
         setUploadProgress("");
         fetchAllData();
       } catch (err: any) {
+        console.error("Bulk upload handler error:", err);
         toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
       } finally {
         setIsUploading(false);

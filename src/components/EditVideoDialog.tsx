@@ -43,7 +43,7 @@ const EditVideoDialog = ({ open, onOpenChange, video, onSave }: EditVideoDialogP
       title: "", 
       description: "", 
       youtube_video_id: "", 
-      platform: 'vimeo',
+      platform: 'vimeo', // Corrected: default to vimeo
       group_id: 'none',
       subgroup_id: 'none',
       order: 0

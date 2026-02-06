@@ -66,7 +66,7 @@ const LandingPage = () => {
     if (!isLoadingSettings) {
       document.title = settings.seo.metaTitle;
       const updateMetaTag = (name: string, content: string) => {
-        let tag = document.querySelector(`meta[name="\${name}"]`);
+        let tag = document.querySelector(`meta[name="${name}"]`);
         if (!tag) {
           tag = document.createElement('meta');
           tag.setAttribute('name', name);
@@ -317,7 +317,7 @@ const LandingPage = () => {
                   )}
                 </CardContent>
                 <CardFooter className="pt-8">
-                  <Link to={user ? `/user/payment/\${tier.id}?priceId=\${tier.stripe_price_id}` : `/signup?tierId=\${tier.id}`} className="w-full">
+                  <Link to={user ? `/user/payment/${tier.id}?priceId=${tier.stripe_price_id}` : `/signup?tierId=${tier.id}`} className="w-full">
                     <Button className="w-full h-12 text-lg bg-white text-slate-900 hover:bg-slate-200 font-bold" disabled={!tier.stripe_price_id && !!user}>
                       {user ? 'Subscribe Now' : 'Sign Up & Subscribe'}
                     </Button>

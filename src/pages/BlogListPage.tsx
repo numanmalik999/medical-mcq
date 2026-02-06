@@ -80,7 +80,7 @@ const BlogListPage = () => {
                         {format(new Date(blog.created_at), 'MMMM dd, yyyy')}
                       </div>
                       <CardTitle className="text-2xl hover:text-primary transition-colors">
-                        <Link to={`/blog/\${blog.slug}`}>{blog.title}</Link>
+                        <Link to={`/blog/${blog.slug}`}>{blog.title}</Link>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0 mb-6">
@@ -88,7 +88,7 @@ const BlogListPage = () => {
                     </CardContent>
                     <CardFooter className="p-0">
                       <Button asChild variant="link" className="p-0 h-auto font-semibold">
-                        <Link to={`/blog/\${blog.slug}`} className="flex items-center gap-2">
+                        <Link to={`/blog/${blog.slug}`} className="flex items-center gap-2">
                           Read Full Article <ArrowRight className="h-4 w-4" />
                         </Link>
                       </Button>

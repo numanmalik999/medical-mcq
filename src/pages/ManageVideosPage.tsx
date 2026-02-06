@@ -16,8 +16,8 @@ import {
   UploadCloud,
   FileSpreadsheet,
   Loader2,
-  Table as TableIcon,
-  List as ListIcon
+  List as ListIcon,
+  Video as VideoIcon
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import EditVideoDialog from '@/components/EditVideoDialog';
@@ -71,21 +71,17 @@ const ManageVideosPage = () => {
   const [library, setLibrary] = useState<StructuredLibrary[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
   
-  // Video Dialog State
   const [isVideoDialogOpen, setIsVideoDialogOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
 
-  // Group Dialog State
   const [groups, setGroups] = useState<VideoGroup[]>([]);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<VideoGroup | null>(null);
 
-  // Subgroup Dialog State
   const [subgroups, setSubgroups] = useState<any[]>([]);
   const [isSubgroupDialogOpen, setIsSubgroupDialogOpen] = useState(false);
   const [selectedSubgroup, setSelectedSubgroup] = useState<any | null>(null);
 
-  // Bulk Upload State
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -188,7 +184,7 @@ const ManageVideosPage = () => {
           order: parseInt(findVal(row, ['Display Number (Order)', 'Display Order', 'Order'])) || 0,
           video_id: String(findVal(row, ['Vimeo ID', 'Video ID', 'ID']) || '').trim(),
           platform: 'vimeo'
-        })).filter(v => v.parent_category && v.video_title && v.video_id && v.video_id !== 'undefined' && v.video_id !== '');
+        })).filter(v => v.parent_category && v.video_title && v.video_id);
 
         if (videosToUpload.length === 0) {
           throw new Error("No valid records found. Verify headers: 'Parent Category', 'Video Title', 'Vimeo ID'.");
@@ -196,7 +192,6 @@ const ManageVideosPage = () => {
 
         const CHUNK_SIZE = 40;
         let totalProcessed = 0;
-        let totalErrors = 0;
 
         for (let i = 0; i < videosToUpload.length; i += CHUNK_SIZE) {
           const chunk = videosToUpload.slice(i, i + CHUNK_SIZE);
@@ -209,30 +204,15 @@ const ManageVideosPage = () => {
             body: { videos: chunk },
           });
 
-          if (error) {
-            console.error("Function Invoke Error:", error);
-            throw new Error(error.message || "The server encountered an error during processing.");
-          }
-          
-          if (res) {
-            totalProcessed += (res.successCount || 0);
-            totalErrors += (res.errorCount || 0);
-            if (res.errors && res.errors.length > 0) {
-                console.warn("Processing warnings:", res.errors);
-            }
-          }
+          if (error) throw error;
+          if (res) totalProcessed += (res.successCount || 0);
         }
 
-        toast({ 
-          title: "Import Finished", 
-          description: `Imported ${totalProcessed} videos successfully. Errors: ${totalErrors}.` 
-        });
-        
+        toast({ title: "Import Finished", description: `Processed ${totalProcessed} videos.` });
         setSelectedFile(null);
         setUploadProgress("");
         fetchAllData();
       } catch (err: any) {
-        console.error("Bulk upload logic error:", err);
         toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
       } finally {
         setIsUploading(false);
@@ -252,7 +232,16 @@ const ManageVideosPage = () => {
 
   const videoListColumns: ColumnDef<Video>[] = useMemo(() => [
     { accessorKey: "title", header: "Title", cell: ({ row }) => <span className="font-bold text-sm">{row.original.title}</span> },
-    { accessorKey: "youtube_video_id", header: "Vimeo ID", cell: ({ row }) => <code className="text-xs bg-muted p-1 rounded">{row.original.youtube_video_id}</code> },
+    { 
+        accessorKey: "platform", 
+        header: "Source", 
+        cell: ({ row }) => (
+            <Badge variant={row.original.platform === 'vimeo' ? 'default' : 'secondary'} className="uppercase text-[9px] font-black">
+                {row.original.platform}
+            </Badge>
+        ) 
+    },
+    { accessorKey: "youtube_video_id", header: "ID", cell: ({ row }) => <code className="text-xs bg-muted p-1 rounded">{row.original.youtube_video_id}</code> },
     { 
       id: "placement", 
       header: "Group", 
@@ -512,7 +501,7 @@ const ManageVideosPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-muted/50 p-5 rounded-2xl border space-y-4">
                   <h4 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                    <TableIcon className="h-4 w-4 text-primary" /> Required Column Headers
+                    <VideoIcon className="h-4 w-4 text-primary" /> Required Column Headers
                   </h4>
                   <div className="space-y-2">
                     {[

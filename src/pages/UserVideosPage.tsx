@@ -114,7 +114,6 @@ const UserVideosPage = () => {
   };
 
   const handleVideoClick = (video: Video) => {
-    // BLOCK TRIAL USERS FROM WATCHING
     const isPaid = user?.has_active_subscription && user?.subscription_end_date && differenceInDays(parseISO(user.subscription_end_date), new Date()) > 3;
     
     if (!isPaid) {
@@ -125,7 +124,9 @@ const UserVideosPage = () => {
   };
 
   const getEmbedUrl = (video: Video) => {
-    // Exclusively use Vimeo embed
+    if (video.platform === 'youtube') {
+        return `https://www.youtube.com/embed/${video.youtube_video_id}?autoplay=1&rel=0`;
+    }
     return `https://player.vimeo.com/video/${video.youtube_video_id}?autoplay=1&badge=0&autopause=0&player_id=0&app_id=58479`;
   };
 
@@ -149,7 +150,10 @@ const UserVideosPage = () => {
             <PlayCircle className="h-12 w-12 text-primary/40" />
           </div>
 
-          <div className="absolute top-2 right-2">
+          <div className="absolute top-2 right-2 flex items-center gap-2">
+            <Badge variant="outline" className="text-[7px] uppercase h-4 bg-background/50">
+                {video.platform}
+            </Badge>
             <Button 
                 variant="ghost" 
                 size="icon" 
@@ -180,7 +184,7 @@ const UserVideosPage = () => {
   return (
     <div className="space-y-10">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Vimeo Study Library</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Study Library</h1>
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 

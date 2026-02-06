@@ -439,68 +439,68 @@ const TakeTestPage = () => {
 
   if (showConfiguration) {
     return (
-      <div className="space-y-8 pb-20">
-        <Card className="w-full border-none shadow-xl rounded-3xl overflow-hidden">
-          <CardHeader className="bg-primary text-primary-foreground py-8 text-center">
-            <CardTitle className="text-3xl font-black uppercase tracking-tight">Simulated Mock Exam</CardTitle>
-            <CardDescription className="text-primary-foreground/80 font-medium">Design your practice session to mirror the real Prometric experience.</CardDescription>
+      <div className="space-y-4 pb-20 max-w-5xl mx-auto">
+        <Card className="w-full border-none shadow-lg rounded-2xl overflow-hidden">
+          <CardHeader className="bg-primary text-primary-foreground py-6 text-center">
+            <CardTitle className="text-2xl font-black uppercase tracking-tight">Mock Exam</CardTitle>
+            <CardDescription className="text-primary-foreground/80 font-medium">Design your practice session.</CardDescription>
           </CardHeader>
-          <CardContent className="p-8 space-y-8">
+          <CardContent className="p-6 space-y-6">
             {activeSavedTests.length > 0 && (
-              <div className="p-6 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-4">
-                <h3 className="font-bold text-lg flex items-center gap-2"><Play className="h-5 w-5 text-primary" /> Pending Sessions</h3>
+              <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
+                <h3 className="font-bold text-sm flex items-center gap-2 uppercase tracking-wider"><Play className="h-4 w-4 text-primary" /> Pending Sessions</h3>
                 {activeSavedTests.map((s) => (
-                  <div key={s.dbSessionId} className="flex flex-col sm:flex-row items-center justify-between p-4 rounded-xl bg-background shadow-sm border">
-                    <div>
-                      <p className="font-bold">{s.categoryNames.join(', ')}</p>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-1">Q: {s.currentQuestionIndex + 1}/{s.mcqs.length} • {formatTime(s.remainingTimeSeconds)} left</p>
+                  <div key={s.dbSessionId} className="flex items-center justify-between p-3 rounded-lg bg-background shadow-sm border text-sm">
+                    <div className="overflow-hidden">
+                      <p className="font-bold truncate">{s.categoryNames.join(', ')}</p>
+                      <p className="text-[10px] text-muted-foreground font-medium uppercase mt-0.5">Q: {s.currentQuestionIndex + 1}/{s.mcqs.length} • {formatTime(s.remainingTimeSeconds)} left</p>
                     </div>
-                    <div className="flex gap-2 mt-3 sm:mt-0">
-                      <Button onClick={() => continueTestSession(s)} size="sm" className="rounded-full px-6">Resume</Button>
-                      <Button onClick={() => clearSpecificTestState(s.dbSessionId)} variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 rounded-full"><Trash2 className="h-4 w-4" /></Button>
+                    <div className="flex gap-1 shrink-0 ml-2">
+                      <Button onClick={() => continueTestSession(s)} size="sm" className="rounded-lg h-8">Resume</Button>
+                      <Button onClick={() => clearSpecificTestState(s.dbSessionId)} variant="ghost" size="icon" className="text-red-500 h-8 w-8"><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                    <Label className="text-sm font-black uppercase tracking-[0.15em] text-muted-foreground px-1">Specialties</Label>
-                    <div className="grid grid-cols-1 gap-2 max-h-[350px] overflow-y-auto p-4 bg-muted/30 rounded-2xl border scrollbar-hide">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Specialties</Label>
+                    <div className="grid grid-cols-1 gap-1 max-h-[250px] overflow-y-auto p-3 bg-muted/20 rounded-xl border scrollbar-hide">
                         {allCategories.map((c) => (
-                            <div key={c.id} className="flex items-center space-x-3 p-2 hover:bg-background rounded-lg transition-colors">
+                            <div key={c.id} className="flex items-center space-x-2 p-1.5 hover:bg-background rounded-md transition-colors">
                                 <Checkbox id={`cat-${c.id}`} checked={selectedCategoryIds.includes(c.id)} onCheckedChange={() => handleCategoryToggle(c.id)} />
-                                <Label htmlFor={`cat-${c.id}`} className="text-sm font-bold cursor-pointer">{c.name}</Label>
+                                <Label htmlFor={`cat-${c.id}`} className="text-xs font-bold cursor-pointer line-clamp-1">{c.name}</Label>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                <div className="space-y-6">
-                    <div className="space-y-3">
-                        <Label className="text-sm font-black uppercase tracking-[0.15em] text-muted-foreground px-1">Difficulty</Label>
+                <div className="space-y-4">
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Difficulty</Label>
                         <Select onValueChange={(v) => setSelectedDifficulty(v === "all" ? null : v)} value={selectedDifficulty || "all"}>
-                            <SelectTrigger className="h-12 rounded-xl bg-muted/30 border-none font-bold shadow-inner"><SelectValue placeholder="Mixed Difficulty" /></SelectTrigger>
+                            <SelectTrigger className="h-10 rounded-xl bg-muted/30 border-none font-bold text-xs"><SelectValue placeholder="Mixed Difficulty" /></SelectTrigger>
                             <SelectContent><SelectItem value="all">Mixed (Random)</SelectItem><SelectItem value="Easy">Easy Level</SelectItem><SelectItem value="Medium">Medium Level</SelectItem><SelectItem value="Hard">Expert Level</SelectItem></SelectContent>
                         </Select>
                     </div>
 
-                    <div className="space-y-3">
-                        <Label className="text-sm font-black uppercase tracking-[0.15em] text-muted-foreground px-1">Questions ({numMcqsToSelect})</Label>
-                        <Input type="number" value={numMcqsToSelect} onChange={(e) => setNumMcqsToSelect(parseInt(e.target.value) || 0)} className="h-12 rounded-xl bg-muted/30 border-none font-bold shadow-inner" />
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Questions ({numMcqsToSelect})</Label>
+                        <Input type="number" value={numMcqsToSelect} onChange={(e) => setNumMcqsToSelect(parseInt(e.target.value) || 0)} className="h-10 rounded-xl bg-muted/30 border-none font-bold text-xs" />
                     </div>
 
-                    <div className="space-y-3">
-                        <Label className="text-sm font-black uppercase tracking-[0.15em] text-muted-foreground px-1">Time (Minutes)</Label>
-                        <Input type="number" value={testDurationMinutes} onChange={(e) => setTestDurationMinutes(parseInt(e.target.value) || 0)} className="h-12 rounded-xl bg-muted/30 border-none font-bold shadow-inner" />
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Time (Minutes)</Label>
+                        <Input type="number" value={testDurationMinutes} onChange={(e) => setTestDurationMinutes(parseInt(e.target.value) || 0)} className="h-10 rounded-xl bg-muted/30 border-none font-bold text-xs" />
                     </div>
                 </div>
             </div>
           </CardContent>
-          <CardFooter className="p-8 pt-0">
-            <Button onClick={startTestPreparation} className="w-full h-14 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl">
-               Start Exam Simulation
+          <CardFooter className="p-6 pt-0">
+            <Button onClick={startTestPreparation} className="w-full h-12 rounded-xl text-md font-black uppercase tracking-widest shadow-lg">
+               Start Simulation
             </Button>
           </CardFooter>
         </Card>
@@ -509,7 +509,7 @@ const TakeTestPage = () => {
            open={isUpgradeDialogOpen} 
            onOpenChange={setIsUpgradeDialogOpen} 
            featureName="Mock Exam Engine" 
-           description="Simulated mock tests are a premium feature. Upgrade your plan to activate the timer, scoring, and performance analytics for these full-length exams."
+           description="Full length timed exams are a premium feature."
         />
         <MadeWithDyad />
       </div>
@@ -518,29 +518,29 @@ const TakeTestPage = () => {
 
   if (showInstructions) {
     return (
-      <div className="max-w-3xl mx-auto py-8">
-        <Card className="border-none shadow-2xl rounded-3xl overflow-hidden">
-          <CardHeader className="bg-primary text-primary-foreground py-8">
-            <CardTitle className="text-3xl text-center font-black uppercase italic">Final Instructions</CardTitle>
+      <div className="max-w-2xl mx-auto py-8">
+        <Card className="border-none shadow-xl rounded-2xl overflow-hidden">
+          <CardHeader className="bg-primary text-primary-foreground py-6">
+            <CardTitle className="text-2xl text-center font-black uppercase italic">Instructions</CardTitle>
           </CardHeader>
-          <CardContent className="p-10 space-y-6">
+          <CardContent className="p-8 space-y-6">
             <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-muted/50 rounded-2xl text-center"><p className="text-xs text-muted-foreground uppercase font-black">Length</p><p className="text-2xl font-black">{mcqs.length} MCQs</p></div>
-                <div className="p-4 bg-muted/50 rounded-2xl text-center"><p className="text-xs text-muted-foreground uppercase font-black">Timer</p><p className="text-2xl font-black">{testDurationMinutes} Min</p></div>
+                <div className="p-3 bg-muted/50 rounded-xl text-center"><p className="text-[10px] text-muted-foreground uppercase font-black">Length</p><p className="text-xl font-black">{mcqs.length} MCQs</p></div>
+                <div className="p-3 bg-muted/50 rounded-xl text-center"><p className="text-[10px] text-muted-foreground uppercase font-black">Timer</p><p className="text-xl font-black">{testDurationMinutes} Min</p></div>
             </div>
-            <ul className="space-y-4">
+            <ul className="space-y-3">
               {[
-                  "One answer per question. No negative marking.",
-                  "The timer runs continuously. Use 'Pause' if necessary.",
-                  "Results and AI explanations are revealed only after submission.",
-                  "System will auto-submit when time expires."
+                  "No negative marking.",
+                  "Timer runs continuously.",
+                  "Results revealed only after submission.",
+                  "Auto-submit when time expires."
               ].map((text, i) => (
-                  <li key={i} className="flex gap-4 items-start"><CheckCircle2 className="h-6 w-6 text-primary shrink-0" /><p className="font-bold leading-tight">{text}</p></li>
+                  <li key={i} className="flex gap-3 items-start"><CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" /><p className="font-bold text-sm">{text}</p></li>
               ))}
             </ul>
           </CardContent>
-          <CardFooter className="p-10 pt-0">
-             <Button onClick={() => setShowInstructions(false)} className="w-full h-14 rounded-2xl font-black uppercase tracking-widest text-lg">Begin Assessment Now</Button>
+          <CardFooter className="p-8 pt-0">
+             <Button onClick={() => setShowInstructions(false)} className="w-full h-12 rounded-xl font-black uppercase tracking-widest">Begin Now</Button>
           </CardFooter>
         </Card>
       </div>
@@ -549,45 +549,43 @@ const TakeTestPage = () => {
 
   if (showResults) {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col lg:flex-row w-full gap-6">
+      <div className="space-y-4 max-w-6xl mx-auto">
+        <div className="flex flex-col lg:flex-row w-full gap-4">
           <QuizNavigator mcqs={mcqs} userAnswers={userAnswers} currentQuestionIndex={currentQuestionIndex} goToQuestion={(i) => setCurrentQuestionIndex(i)} showResults={true} score={score} />
-          <Card className="flex-1 border-none shadow-2xl rounded-3xl overflow-hidden">
-            <CardHeader className="bg-primary text-primary-foreground text-center py-10">
-              <CardTitle className="text-4xl font-black uppercase tracking-tighter">Final Assessment</CardTitle>
-              <div className="mt-4 flex justify-center items-baseline gap-2">
-                <span className="text-7xl font-black">{score}</span>
-                <span className="text-3xl text-primary-foreground/40">/ {mcqs.length}</span>
+          <Card className="flex-1 border-none shadow-xl rounded-2xl overflow-hidden">
+            <CardHeader className="bg-primary text-primary-foreground text-center py-8">
+              <CardTitle className="text-3xl font-black uppercase tracking-tighter">Results</CardTitle>
+              <div className="mt-2 flex justify-center items-baseline gap-1">
+                <span className="text-6xl font-black">{score}</span>
+                <span className="text-xl text-primary-foreground/40">/ {mcqs.length}</span>
               </div>
             </CardHeader>
-            <CardContent className="p-8">
-              <div className="space-y-8 max-h-[60vh] overflow-y-auto pr-4 scrollbar-thin">
+            <CardContent className="p-6">
+              <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-3 scrollbar-thin">
                 {mcqs.map((mcq, index) => {
                   const ans = userAnswers.get(mcq.id);
                   const exp = explanations.get(mcq.id);
                   return (
-                    <div key={mcq.id} className="border rounded-2xl p-6 bg-muted/10 space-y-4">
-                      <h4 className="font-black text-lg">Q{index + 1}. {mcq.question_text}</h4>
-                      <div className="grid grid-cols-1 gap-2">
+                    <div key={mcq.id} className="border rounded-xl p-4 bg-muted/10 space-y-3">
+                      <h4 className="font-bold text-md">Q{index + 1}. {mcq.question_text}</h4>
+                      <div className="grid grid-cols-1 gap-1.5">
                         {['A','B','C','D'].map(k => {
                             const isCorr = mcq.correct_answer === k;
                             const isUser = ans?.selectedOption === k;
                             return (
-                                <div key={k} className={cn("p-4 rounded-xl border-2 font-bold text-sm", 
+                                <div key={k} className={cn("p-3 rounded-lg border font-bold text-xs transition-all", 
                                     isCorr && "bg-green-50 border-green-500 text-green-700",
                                     !isCorr && isUser && "bg-red-50 border-red-500 text-red-700",
-                                    !isCorr && !isUser && "opacity-40"
+                                    !isCorr && !isUser && "opacity-50"
                                 )}>
                                     <span className="mr-2 opacity-50">{k}.</span> {mcq[`option_${k.toLowerCase()}` as keyof MCQ] as string}
-                                    {isCorr && isUser && " (Verified Correct)"}
-                                    {!isCorr && isUser && " (Your Choice)"}
                                 </div>
                             );
                         })}
                       </div>
                       {exp && (
-                          <div className="mt-4 p-6 bg-white rounded-2xl border-2 border-dashed border-primary/20 prose max-w-none">
-                              <h5 className="font-black uppercase text-xs tracking-widest text-primary mb-3">Clinical Insight</h5>
+                          <div className="mt-3 p-4 bg-white rounded-xl border border-dashed border-primary/20 prose prose-sm max-w-none">
+                              <h5 className="font-black uppercase text-[10px] tracking-widest text-primary mb-2">Insight</h5>
                               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{exp.explanation_text}</ReactMarkdown>
                           </div>
                       )}
@@ -596,9 +594,9 @@ const TakeTestPage = () => {
                 })}
               </div>
             </CardContent>
-            <CardFooter className="p-8 pt-0 border-t flex justify-center gap-4">
-               <Button onClick={handleBackToConfiguration} variant="outline" className="rounded-full px-8">New Config</Button>
-               <Button onClick={() => navigate('/user/dashboard')} className="rounded-full px-8">Dashboard</Button>
+            <CardFooter className="p-6 pt-0 border-t flex justify-center gap-3">
+               <Button onClick={handleBackToConfiguration} variant="outline" className="rounded-full px-6 h-10 text-xs uppercase font-bold">New Config</Button>
+               <Button onClick={() => navigate('/user/dashboard')} className="rounded-full px-6 h-10 text-xs uppercase font-bold">Dashboard</Button>
             </CardFooter>
           </Card>
         </div>
@@ -609,45 +607,63 @@ const TakeTestPage = () => {
   const currentAns = userAnswers.get(currentMcq.id)?.selectedOption || "";
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row w-full gap-6">
-        <QuizNavigator mcqs={mcqs} userAnswers={userAnswers} currentQuestionIndex={currentQuestionIndex} goToQuestion={(i) => setCurrentQuestionIndex(i)} showResults={false} score={0} skippedMcqIds={skippedMcqIds} />
-        <Card className="flex-1 border-none shadow-2xl rounded-3xl overflow-hidden">
-          <CardHeader className="border-b py-6 px-8 flex flex-row justify-between items-center bg-muted/10">
+    <div className="space-y-4 max-w-6xl mx-auto">
+      <div className="flex flex-col lg:flex-row w-full gap-4">
+        <div className="lg:w-64">
+           <QuizNavigator mcqs={mcqs} userAnswers={userAnswers} currentQuestionIndex={currentQuestionIndex} goToQuestion={(i) => setCurrentQuestionIndex(i)} showResults={false} score={0} skippedMcqIds={skippedMcqIds} />
+        </div>
+        
+        <Card className="flex-1 border-none shadow-xl rounded-2xl overflow-hidden flex flex-col">
+          <CardHeader className="border-b py-4 px-6 flex flex-row justify-between items-center bg-muted/5">
             <div>
-              <CardTitle className="text-xl font-bold tracking-tight">Question {currentQuestionIndex + 1} of {mcqs.length}</CardTitle>
-              <div className="flex items-center gap-2 mt-1">
-                 <Badge variant="secondary" className="text-[9px] uppercase font-black">{currentMcq.difficulty || 'Mixed'}</Badge>
-                 <span className="text-[10px] text-muted-foreground font-bold flex items-center gap-1"><TimerIcon className="h-3 w-3" /> {formatTime(timer)}</span>
+              <CardTitle className="text-lg font-bold tracking-tight">Question {currentQuestionIndex + 1} of {mcqs.length}</CardTitle>
+              <div className="flex items-center gap-2 mt-0.5">
+                 <Badge variant="secondary" className="text-[8px] h-4 px-1.5 uppercase font-black leading-none">{currentMcq.difficulty || 'Mixed'}</Badge>
+                 <span className="text-[10px] text-muted-foreground font-black flex items-center gap-1 uppercase"><TimerIcon className="h-3 w-3" /> {formatTime(timer)}</span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={togglePause} className="rounded-full">{isPaused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}</Button>
-                <Button variant="ghost" size="icon" onClick={toggleBookmark} className="rounded-full">{isBookmarked ? <BookmarkCheck className="h-5 w-5 text-primary fill-current" /> : <Bookmark className="h-5 w-5" />}</Button>
+            <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" onClick={togglePause} className="rounded-full h-8 w-8">{isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}</Button>
+                <Button variant="ghost" size="icon" onClick={toggleBookmark} className="rounded-full h-8 w-8">{isBookmarked ? <BookmarkCheck className="h-4 w-4 text-primary fill-current" /> : <Bookmark className="h-4 w-4" />}</Button>
             </div>
           </CardHeader>
-          <CardContent className="p-8 pt-10">
-             <div className="text-2xl font-medium leading-relaxed mb-10 text-foreground">
+          
+          <CardContent className="p-6 flex-grow">
+             <div className="text-lg font-semibold leading-relaxed mb-6 text-foreground">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{currentMcq.question_text}</ReactMarkdown>
              </div>
-             <RadioGroup onValueChange={handleOptionSelect} value={currentAns} className="space-y-4" disabled={isPaused}>
+             <RadioGroup onValueChange={handleOptionSelect} value={currentAns} className="space-y-2.5" disabled={isPaused}>
                 {['A','B','C','D'].map(k => (
-                    <div key={k} onClick={() => !isPaused && handleOptionSelect(k)} className={cn("flex items-center p-5 rounded-2xl border-2 transition-all cursor-pointer", currentAns === k ? "border-primary bg-primary/5 shadow-md" : "border-muted/30 hover:border-muted-foreground/30")}>
+                    <div 
+                        key={k} 
+                        onClick={() => !isPaused && handleOptionSelect(k)} 
+                        className={cn(
+                            "flex items-center p-3.5 rounded-xl border transition-all cursor-pointer", 
+                            currentAns === k ? "border-primary bg-primary/5 shadow-sm border-2" : "border-muted/50 hover:border-muted-foreground/30"
+                        )}
+                    >
                         <RadioGroupItem value={k} id={`q-${k}`} className="sr-only" />
-                        <Label htmlFor={`q-${k}`} className="flex-grow text-lg font-bold cursor-pointer"><span className="opacity-30 mr-4 font-black">{k}</span> {currentMcq[`option_${k.toLowerCase()}` as keyof MCQ] as string}</Label>
+                        <Label htmlFor={`q-${k}`} className="flex-grow text-sm font-bold cursor-pointer leading-tight">
+                            <span className="opacity-30 mr-3 font-black text-xs">{k}</span> 
+                            {currentMcq[`option_${k.toLowerCase()}` as keyof MCQ] as string}
+                        </Label>
                     </div>
                 ))}
              </RadioGroup>
           </CardContent>
-          <CardFooter className="p-8 pt-0 border-t bg-muted/10 flex justify-between">
-             <Button onClick={handlePrevious} variant="ghost" disabled={currentQuestionIndex === 0 || isPaused} className="rounded-full px-8">Back</Button>
+          
+          <CardFooter className="p-5 border-t bg-muted/5 flex justify-between">
+             <Button onClick={handlePrevious} variant="ghost" disabled={currentQuestionIndex === 0 || isPaused} className="rounded-lg h-10 px-4 text-xs font-bold uppercase tracking-tight">Back</Button>
              <div className="flex gap-2">
-                <Button onClick={() => !isPaused && handleSkip()} variant="outline" className="rounded-full px-8 gap-2">Skip <SkipForward className="h-4 w-4" /></Button>
-                <Button onClick={handleNext} disabled={isPaused} className="rounded-full px-12 font-bold uppercase tracking-widest">{currentQuestionIndex === mcqs.length - 1 ? 'Finish Exam' : 'Next'}</Button>
+                <Button onClick={() => !isPaused && handleSkip()} variant="outline" className="rounded-lg h-10 px-4 gap-2 text-xs font-bold uppercase tracking-tight">Skip <SkipForward className="h-3 w-3" /></Button>
+                <Button onClick={handleNext} disabled={isPaused} className="rounded-lg h-10 px-8 font-black uppercase tracking-widest text-xs">
+                    {currentQuestionIndex === mcqs.length - 1 ? 'Finish Exam' : 'Next'}
+                </Button>
              </div>
           </CardFooter>
         </Card>
       </div>
+      <MadeWithDyad />
     </div>
   );
 };

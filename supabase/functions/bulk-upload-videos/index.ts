@@ -42,7 +42,6 @@ serve(async (req: Request) => {
       });
     }
 
-    // 1. Fetch current structure to avoid redundant lookups
     const { data: allGroups } = await supabaseAdmin.from('video_groups').select('id, name');
     const { data: allSubgroups } = await supabaseAdmin.from('video_subgroups').select('id, name, group_id');
 
@@ -63,7 +62,6 @@ serve(async (req: Request) => {
         let groupId = groupMap.get(parentName.toLowerCase());
 
         if (!groupId) {
-          console.log(`[bulk-upload-videos] Creating new parent group: ${parentName}`);
           const { data: newGroup, error: gErr } = await supabaseAdmin
             .from('video_groups')
             .insert({ name: parentName, order: 0 })
@@ -82,7 +80,6 @@ serve(async (req: Request) => {
           subgroupId = subgroupMap.get(subKey);
 
           if (!subgroupId) {
-            console.log(`[bulk-upload-videos] Creating new sub-group: ${subName} under ${parentName}`);
             const { data: newSub, error: sErr } = await supabaseAdmin
               .from('video_subgroups')
               .insert({ 
@@ -98,42 +95,50 @@ serve(async (req: Request) => {
           }
         }
 
-        // --- Upsert/Insert Video ---
-        const { error: vErr } = await supabaseAdmin
+        // --- Manual Upsert (Fix for missing constraint) ---
+        const { data: existingVideo } = await supabaseAdmin
           .from('videos')
-          .upsert({
-            title: video.video_title.trim(),
-            youtube_video_id: videoIdStr,
-            platform: platform,
-            group_id: groupId,
-            subgroup_id: subgroupId,
-            order: parseInt(String(video.order)) || 0,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'youtube_video_id' });
+          .select('id')
+          .eq('youtube_video_id', videoIdStr)
+          .maybeSingle();
 
-        if (vErr) {
-            console.error(`[bulk-upload-videos] DB Error for "${video.video_title}":`, vErr);
-            throw new Error(vErr.message);
+        const videoPayload = {
+          title: video.video_title.trim(),
+          youtube_video_id: videoIdStr,
+          platform: platform,
+          group_id: groupId,
+          subgroup_id: subgroupId,
+          order: parseInt(String(video.order)) || 0,
+          updated_at: new Date().toISOString()
+        };
+
+        if (existingVideo) {
+          const { error: updateErr } = await supabaseAdmin
+            .from('videos')
+            .update(videoPayload)
+            .eq('id', existingVideo.id);
+          if (updateErr) throw updateErr;
+        } else {
+          const { error: insertErr } = await supabaseAdmin
+            .from('videos')
+            .insert(videoPayload);
+          if (insertErr) throw insertErr;
         }
 
         successCount++;
       } catch (e: any) {
-        console.error(`[bulk-upload-videos] Processing error:`, e.message);
         errorCount++;
         errors.push(`Failed "${video.video_title}": ${e.message}`);
       }
     }
-
-    console.log(`[bulk-upload-videos] Finished. Success: ${successCount}, Errors: ${errorCount}`);
 
     return new Response(JSON.stringify({ successCount, errorCount, errors }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: any) {
-    console.error(`[bulk-upload-videos] Critical Function Error:`, error.message);
-    return new Response(JSON.stringify({ error: error.message }), { 
+  } catch (error) {
+    return new Response(JSON.stringify({ error: (error as Error).message }), { 
       status: 500, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });

@@ -12,7 +12,8 @@ import {
   Layers, 
   FolderTree, 
   AlertCircle,
-  MonitorPlay
+  MonitorPlay,
+  ChevronRight
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useSession } from '@/components/SessionContextProvider';
@@ -34,6 +35,9 @@ interface Video {
   group_id: string | null;
   subgroup_id: string | null;
   order: number;
+  // Joined fields for search
+  video_groups?: { name: string } | null;
+  video_subgroups?: { name: string } | null;
 }
 
 interface VideoCounts {
@@ -163,7 +167,7 @@ const UserVideosPage = () => {
         while (hasMore) {
           const { data, error } = await supabase
             .from('videos')
-            .select('*')
+            .select('*, video_groups(name), video_subgroups(name)')
             .ilike('title', `%${searchTerm}%`)
             .order('title', { ascending: true })
             .range(offset, offset + CHUNK_SIZE - 1);
@@ -209,7 +213,7 @@ const UserVideosPage = () => {
     setSelectedVideo(video);
   };
 
-  const VideoCard = ({ video }: { video: Video }) => {
+  const VideoCard = ({ video, showPath = false }: { video: Video, showPath?: boolean }) => {
     const isWatched = progressMap.get(video.id) || false;
     
     return (
@@ -220,25 +224,43 @@ const UserVideosPage = () => {
         )}
         onClick={() => handleVideoClick(video)}
       >
-        <div className="p-2 flex items-center gap-2">
-            <div className={cn(
-                "h-6 w-6 shrink-0 rounded flex items-center justify-center font-black text-[10px] transition-colors",
-                isWatched ? "bg-green-600 text-white" : "bg-primary text-primary-foreground"
-            )}>
-                {video.order}
+        <div className="p-2 flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+                <div className={cn(
+                    "h-6 w-6 shrink-0 rounded flex items-center justify-center font-black text-[10px] transition-colors",
+                    isWatched ? "bg-green-600 text-white" : "bg-primary text-primary-foreground"
+                )}>
+                    {video.order}
+                </div>
+                <h4 className="font-bold text-[11px] leading-tight text-slate-800 line-clamp-1 flex-grow">
+                    {video.title}
+                </h4>
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-5 w-5 rounded-full shrink-0" 
+                    onClick={(e) => toggleWatched(video.id, e)}
+                    disabled={!user}
+                >
+                  {isWatched ? <CheckCircle2 className="h-3 w-3 text-green-600" /> : <Circle className="h-3 w-3 text-slate-300" />}
+                </Button>
             </div>
-            <h4 className="font-bold text-[11px] leading-tight text-slate-800 line-clamp-1 flex-grow">
-                {video.title}
-            </h4>
-            <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-5 w-5 rounded-full shrink-0" 
-                onClick={(e) => toggleWatched(video.id, e)}
-                disabled={!user}
-            >
-              {isWatched ? <CheckCircle2 className="h-3 w-3 text-green-600" /> : <Circle className="h-3 w-3 text-slate-300" />}
-            </Button>
+            
+            {showPath && (video.video_groups || video.video_subgroups) && (
+              <div className="flex items-center gap-1 mt-1 px-1">
+                <span className="text-[8px] font-black uppercase text-primary/40 truncate max-w-[45%]">
+                  {video.video_groups?.name || 'Uncategorized'}
+                </span>
+                {video.video_subgroups?.name && (
+                  <>
+                    <ChevronRight className="h-2 w-2 text-slate-300" />
+                    <span className="text-[8px] font-bold uppercase text-slate-400 truncate max-w-[45%]">
+                      {video.video_subgroups.name}
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
         </div>
       </Card>
     );
@@ -274,7 +296,7 @@ const UserVideosPage = () => {
                 <h2 className="text-xs font-black uppercase">Results</h2>
              </div>
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-               {searchResults.map(v => <VideoCard key={v.id} video={v} />)}
+               {searchResults.map(v => <VideoCard key={v.id} video={v} showPath={true} />)}
                {searchResults.length === 0 && !isSearching && (
                  <Card className="col-span-full py-6 text-center rounded-xl">
                     <AlertCircle className="h-6 w-6 text-slate-300 mx-auto mb-1" />

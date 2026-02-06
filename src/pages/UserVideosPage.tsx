@@ -65,30 +65,46 @@ const UserVideosPage = () => {
       progRes.data?.forEach(p => newProgressMap.set(p.video_id, p.is_watched));
       setProgressMap(newProgressMap);
 
-      const allVideos = videoRes.data || [];
-      const allSubgroups = subRes.data || [];
+      const vData = videoRes.data || [];
+      const sgData = subRes.data || [];
+      const gData = groupsRes.data || [];
       
-      const structuredLibrary: VideoGroup[] = (groupsRes.data || []).map(g => {
-        const groupSubgroups = allSubgroups
-          .filter(sg => sg.group_id === g.id)
-          .map(sg => ({
-            ...sg,
-            videos: allVideos.filter(v => v.subgroup_id === sg.id)
-          }));
+      // --- RESILIENT MAPPING ---
+      const sgMap = new Map(sgData.map(sg => [sg.id, { ...sg, videos: [] }]));
+      const gMap = new Map(gData.map(g => [g.id, { ...g, subgroups: [], standaloneVideos: [] }]));
+      const uncategorizedVideos: Video[] = [];
 
-        return {
-          ...g,
-          subgroups: groupSubgroups,
-          standaloneVideos: allVideos.filter(v => v.group_id === g.id && !v.subgroup_id)
-        };
+      // Link subgroups to their groups
+      sgData.forEach(sg => {
+        const parent = gMap.get(sg.group_id);
+        if (parent) parent.subgroups.push(sgMap.get(sg.id));
       });
 
-      const uncategorized = allVideos.filter(v => !v.group_id && !v.subgroup_id);
-      if (uncategorized.length > 0) {
-        structuredLibrary.push({ id: 'none', name: 'Other Content', description: 'Miscellaneous lessons.', subgroups: [], standaloneVideos: uncategorized });
+      // Place every single video
+      vData.forEach(video => {
+        let placed = false;
+        if (video.subgroup_id) {
+          const targetSg = sgMap.get(video.subgroup_id);
+          if (targetSg) { targetSg.videos.push(video); placed = true; }
+        }
+        if (!placed && video.group_id) {
+          const targetG = gMap.get(video.group_id);
+          if (targetG) { targetG.standaloneVideos.push(video); placed = true; }
+        }
+        if (!placed) uncategorizedVideos.push(video);
+      });
+
+      const structured: VideoGroup[] = Array.from(gMap.values()).map(g => ({
+        ...g,
+        subgroups: g.subgroups,
+        standaloneVideos: g.standaloneVideos
+      }));
+
+      if (uncategorizedVideos.length > 0) {
+        structured.push({ id: 'none', name: 'Other Content', description: 'Miscellaneous lessons.', subgroups: [], standaloneVideos: uncategorizedVideos });
       }
 
-      setLibrary(structuredLibrary);
+      setLibrary(structured);
     } catch (error: any) {
       toast({ title: "Error", description: "Failed to load library.", variant: "destructive" });
     } finally {

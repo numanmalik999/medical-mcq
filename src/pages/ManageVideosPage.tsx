@@ -90,55 +90,84 @@ const ManageVideosPage = () => {
   const fetchAllData = useCallback(async () => {
     setIsPageLoading(true);
     try {
-      // Use simple selects to ensure stability, matching the user-side logic
       const [groupsRes, subRes, videoRes] = await Promise.all([
         supabase.from('video_groups').select('*').order('order'),
         supabase.from('video_subgroups').select('*').order('order'),
-        supabase.from('videos').select('*').order('created_at', { ascending: false })
+        supabase.from('videos').select('*').order('order', { ascending: true })
       ]);
 
       if (groupsRes.error) throw groupsRes.error;
       if (subRes.error) throw subRes.error;
       if (videoRes.error) throw videoRes.error;
 
-      const videosData = videoRes.data || [];
-      const groupsData = groupsRes.data || [];
-      const subgroupsData = subRes.data || [];
+      const vData = videoRes.data || [];
+      const gData = groupsRes.data || [];
+      const sgData = subRes.data || [];
 
-      setAllVideos(videosData);
-      setGroups(groupsData);
-      setSubgroups(subgroupsData);
+      setAllVideos(vData);
+      setGroups(gData);
+      setSubgroups(sgData);
 
-      const validGroupIds = new Set(groupsData.map(g => g.id));
-      const validSubgroupIds = new Set(subgroupsData.map(sg => sg.id));
+      // --- RESILIENT MAPPING ---
+      // 1. Create maps for quick lookup
+      const sgMap = new Map(sgData.map(sg => [sg.id, { ...sg, videos: [] }]));
+      const gMap = new Map(gData.map(g => [g.id, { ...g, subgroups: [], standaloneVideos: [] }]));
+      const uncategorizedVideos: Video[] = [];
 
-      const structured: StructuredLibrary[] = groupsData.map(g => {
-        const groupSubgroups = subgroupsData
-          .filter(sg => sg.group_id === g.id)
-          .map(sg => ({
-            id: sg.id,
-            name: sg.name,
-            description: sg.description,
-            videos: videosData.filter(v => v.subgroup_id === sg.id)
-          }));
-
-        return {
-          id: g.id,
-          name: g.name,
-          subgroups: groupSubgroups,
-          standaloneVideos: videosData.filter(v => v.group_id === g.id && (!v.subgroup_id || !validSubgroupIds.has(v.subgroup_id)))
-        };
+      // 2. Track which groups subgroups belong to
+      sgData.forEach(sg => {
+        const parentGroup = gMap.get(sg.group_id);
+        if (parentGroup) {
+          parentGroup.subgroups.push(sgMap.get(sg.id));
+        }
       });
 
-      // Find videos that aren't mapped to any existing group
-      const uncategorized = videosData.filter(v => !v.group_id || !validGroupIds.has(v.group_id));
-      
-      if (uncategorized.length > 0) {
+      // 3. Place every video into its proper slot
+      vData.forEach(video => {
+        let placed = false;
+
+        // Try placing in subgroup first
+        if (video.subgroup_id) {
+          const targetSg = sgMap.get(video.subgroup_id);
+          if (targetSg) {
+            targetSg.videos.push(video);
+            placed = true;
+          }
+        }
+
+        // If not placed in subgroup, try placing in group
+        if (!placed && video.group_id) {
+          const targetG = gMap.get(video.group_id);
+          if (targetG) {
+            targetG.standaloneVideos.push(video);
+            placed = true;
+          }
+        }
+
+        // Final fallback: Uncategorized
+        if (!placed) {
+          uncategorizedVideos.push(video);
+        }
+      });
+
+      const structured: StructuredLibrary[] = Array.from(gMap.values()).map(g => ({
+        id: g.id,
+        name: g.name,
+        subgroups: g.subgroups.map((sg: any) => ({
+          id: sg.id,
+          name: sg.name,
+          description: sg.description,
+          videos: sg.videos
+        })),
+        standaloneVideos: g.standaloneVideos
+      }));
+
+      if (uncategorizedVideos.length > 0) {
         structured.push({
           id: 'uncategorized',
           name: 'Uncategorized / Pending Sort',
           subgroups: [],
-          standaloneVideos: uncategorized
+          standaloneVideos: uncategorizedVideos
         });
       }
 

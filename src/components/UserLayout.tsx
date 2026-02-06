@@ -22,17 +22,20 @@ const UserLayout = () => {
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
+      {/* Sidebar is fixed top-16 */}
       <UserSidebar 
         isCollapsed={isCollapsed} 
         onToggleCollapse={() => setIsCollapsed(!isCollapsed)} 
       />
+      
+      {/* Content wrapper handles top offset for the fixed header */}
       <div className={cn(
-        "flex-1 min-w-0 transition-all duration-300 flex flex-col",
+        "flex-1 min-w-0 transition-all duration-300 flex flex-col pt-16",
         !isMobile && (isCollapsed ? "ml-14" : "ml-60")
       )}>
         <main className={cn(
-          "flex-grow transition-all duration-300 pt-16",
-          isStudyMode ? "p-1 sm:p-3 lg:p-4" : "p-4 sm:p-6 lg:p-8"
+          "flex-grow transition-all duration-300",
+          isStudyMode ? "p-2 sm:p-4" : "p-4 sm:p-6 lg:p-8"
         )}>
           <Outlet />
         </main>

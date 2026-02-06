@@ -517,7 +517,7 @@ const QuizPage = () => {
         const cur = mcqsData[loadedSession.currentQuestionIndex];
         const ans = loadedSession.userAnswers.get(cur.id);
         setSelectedAnswer(ans?.selectedOption || null);
-        setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: \${cur.correct_answer}.`) : null);
+        setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${cur.correct_answer}.`) : null);
         setShowExplanation(ans?.submitted || false);
         if (ans?.submitted && cur.explanation_id) fetchExplanation(cur.explanation_id);
 
@@ -548,7 +548,7 @@ const QuizPage = () => {
       setCurrentQuestionIndex(index);
       const ans = userAnswers.get(quizQuestions[index].id);
       setSelectedAnswer(ans?.selectedOption || null);
-      setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: \${quizQuestions[index].correct_answer}.`) : null);
+      setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${quizQuestions[index].correct_answer}.`) : null);
       setShowExplanation(ans?.submitted || false);
       if (ans?.submitted && quizQuestions[index].explanation_id) {
           fetchExplanation(quizQuestions[index].explanation_id!);
@@ -586,7 +586,7 @@ const QuizPage = () => {
   const handleSubmitAnswer = async () => {
     if (!selectedAnswer || !currentMcq) return;
     const isCorrect = selectedAnswer === currentMcq.correct_answer;
-    setFeedback(isCorrect ? 'Correct!' : `Incorrect. Correct: \${currentMcq.correct_answer}.`);
+    setFeedback(isCorrect ? 'Correct!' : `Incorrect. Correct: ${currentMcq.correct_answer}.`);
     setShowExplanation(true);
     setUserAnswers(prev => new Map(prev).set(currentMcq.id, { selectedOption: selectedAnswer, isCorrect, submitted: true }));
 
@@ -810,9 +810,9 @@ const QuizPage = () => {
             {feedback && (
               <div className={cn("mt-4 p-3 rounded-xl flex items-center gap-2 font-bold text-sm border animate-in fade-in zoom-in-95", 
                 feedback.startsWith('Correct') 
-                    ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-700 dark:text-green-200" 
-                    : "bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-700 dark:text-red-200")}>
-                {feedback.startsWith('Correct') ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+                    ? "bg-green-100 border-green-600 text-green-900" 
+                    : "bg-red-100 border-red-600 text-red-900")}>
+                {feedback.startsWith('Correct') ? <CheckCircle2 className="h-5 w-5 text-green-700" /> : <AlertCircle className="h-5 w-5 text-red-700" />}
                 {feedback}
               </div>
             )}

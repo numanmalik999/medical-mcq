@@ -5,7 +5,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { isPast, parseISO, differenceInDays } from 'date-fns';
-import { toast } from "sonner"; // Directly using sonner for the specific trial notification
+import { toast } from "sonner";
 
 interface AuthUser extends User {
   is_admin?: boolean;
@@ -35,7 +35,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const location = useLocation();
   const isMounted = useRef(true);
   const maintenancePerformed = useRef<string | null>(null);
-  const hasNotifiedTrial = useRef<string | null>(null); // Track if we've shown the trial toast this session
+  const hasNotifiedTrial = useRef<string | null>(null);
 
   const hydrateProfile = useCallback(async (supabaseUser: User) => {
     if (!isMounted.current) return;
@@ -65,6 +65,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let currentHasActiveSubscription = profileData?.has_active_subscription || false;
       const latestSubEndDate = latestSub?.end_date || null;
 
+      // If the profile says active but we found an expired sub, fix it
       if (currentHasActiveSubscription && latestSubEndDate) {
         const endDate = parseISO(latestSubEndDate);
         if (isPast(endDate)) {
@@ -76,16 +77,13 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             }).catch(err => console.error("[Session] Maintenance failed:", err));
           }
         } else {
-            // Check if this is a 3-day trial and notify the user
             const daysLeft = differenceInDays(endDate, new Date());
-            // If it's an active sub and expires within 4 days (handling the 3-day interval), it's likely a trial or expiring sub
             if (daysLeft >= 0 && daysLeft <= 3 && hasNotifiedTrial.current !== supabaseUser.id) {
                 hasNotifiedTrial.current = supabaseUser.id;
                 
                 toast.success("Active Trial Detected!", {
-                    description: `Welcome! You have \${daysLeft === 0 ? 'less than 24 hours' : daysLeft + ' days'} of Premium access remaining. Enjoy!`,
+                    description: `Welcome! You have ${daysLeft === 0 ? 'less than 24 hours' : daysLeft + ' days'} of Premium access remaining. Enjoy!`,
                     duration: 6000,
-                    position: "top-center",
                 });
             }
         }
@@ -94,8 +92,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setUser({
         ...supabaseUser,
         is_admin: profileData?.is_admin || false,
-        first_name: profileData?.first_name || null,
-        last_name: profileData?.last_name || null,
+        first_name: profileData?.first_name || supabaseUser.user_metadata?.first_name || null,
+        last_name: profileData?.last_name || supabaseUser.user_metadata?.last_name || null,
         phone_number: profileData?.phone_number || null,
         whatsapp_number: profileData?.whatsapp_number || null,
         has_active_subscription: currentHasActiveSubscription,
@@ -114,7 +112,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       if (!isMounted.current) return;
       setSession(initialSession);
       if (initialSession) {
-        setUser(initialSession.user as AuthUser);
         hydrateProfile(initialSession.user);
       }
       setHasCheckedInitialSession(true);
@@ -131,7 +128,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         }
       } else {
         setUser(null);
-        hasNotifiedTrial.current = null; // Reset notification tracker on sign out
+        hasNotifiedTrial.current = null;
       }
       setHasCheckedInitialSession(true);
     });

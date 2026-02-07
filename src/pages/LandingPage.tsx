@@ -135,7 +135,7 @@ const LandingPage = () => {
   const hideSubscriptionSection = user?.has_active_subscription;
 
   return (
-    <div className="bg-background text-foreground pt-16">
+    <div className="bg-background text-foreground">
       {/* Hero Section */}
       <section className="relative w-full py-10 md:py-16 bg-primary text-primary-foreground text-center overflow-hidden" aria-label="Introduction">
         <div className="container mx-auto px-4 relative z-10">

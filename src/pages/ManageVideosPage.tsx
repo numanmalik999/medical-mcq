@@ -227,7 +227,7 @@ const ManageVideosPage = () => {
 
   const groupColumns: ColumnDef<any>[] = [
     { accessorKey: 'order', header: 'Order' },
-    { accessorKey: 'name', header: 'Group Name' },
+    { accessorKey: 'name', header: 'Group Name', cell: ({ row }) => <span className="font-bold">{row.original.name}</span> },
     { id: 'actions', cell: ({ row }) => (
       <div className="flex gap-1 justify-end">
         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setSelectedGroup(row.original); setIsGroupDialogOpen(true); }}><Edit className="h-3 w-3"/></Button>
@@ -311,7 +311,7 @@ const ManageVideosPage = () => {
                      </div>
                   </div>
                   <CardHeader className="p-4 space-y-1">
-                    <CardTitle className="text-sm font-black uppercase tracking-tighter line-clamp-1">{group.name}</CardTitle>
+                    <CardTitle className="text-sm font-black uppercase tracking-tighter leading-tight whitespace-normal">{group.name}</CardTitle>
                     <CardDescription className="text-[10px] font-medium line-clamp-2 h-7 italic">
                         {group.description || "Comprehensive clinical video modules."}
                     </CardDescription>
@@ -341,10 +341,10 @@ const ManageVideosPage = () => {
                         <FolderTree className="h-5 w-5" />
                     </div>
                     <div>
-                        <h2 className="text-xl font-black uppercase tracking-tighter">Curriculum Breakdown</h2>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                        <h2 className="text-xl font-black uppercase tracking-tighter leading-tight whitespace-normal">
                             {groups.find(g => g.id === activeGroupId)?.name}
-                        </p>
+                        </h2>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Curriculum Breakdown</p>
                     </div>
                 </div>
 
@@ -376,7 +376,7 @@ const ManageVideosPage = () => {
                                             <Badge variant="outline" className="h-7 w-7 rounded-full p-0 flex items-center justify-center font-black">
                                                 {sg.order}
                                             </Badge>
-                                            <span className="font-bold text-sm uppercase tracking-tight text-slate-800">{sg.name}</span>
+                                            <span className="font-bold text-sm uppercase tracking-tight text-slate-800 leading-tight whitespace-normal text-left">{sg.name}</span>
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <Badge className="font-black text-[9px] px-2 h-5 bg-slate-100 text-slate-900 border">{subVideoCount} LESSONS</Badge>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import LoadingBar from '@/components/LoadingBar';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import * as XLSX from 'xlsx';
@@ -50,6 +49,7 @@ interface VideoCounts {
 
 const ManageVideosPage = () => {
   const { toast } = useToast();
+  const detailsRef = useRef<HTMLDivElement>(null);
   
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [groups, setGroups] = useState<VideoGroup[]>([]);
@@ -152,8 +152,16 @@ const ManageVideosPage = () => {
   };
 
   const handleGroupCardClick = (groupId: string) => {
-    setActiveGroupId(activeGroupId === groupId ? null : groupId);
-    fetchVideosForSection(groupId, 'group');
+    const isTogglingOff = activeGroupId === groupId;
+    setActiveGroupId(isTogglingOff ? null : groupId);
+    
+    if (!isTogglingOff) {
+        fetchVideosForSection(groupId, 'group');
+        // Smooth scroll to the details section
+        setTimeout(() => {
+            detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
   };
 
   const handleDeleteVideo = async (id: string) => {
@@ -335,7 +343,7 @@ const ManageVideosPage = () => {
           </div>
 
           {activeGroupId && (
-            <div className="pt-8 border-t space-y-6 animate-in slide-in-from-bottom-4 duration-300">
+            <div ref={detailsRef} className="pt-8 border-t space-y-6 animate-in slide-in-from-bottom-4 duration-300">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary rounded-xl text-white shadow-lg">
                         <FolderTree className="h-5 w-5" />
@@ -450,7 +458,7 @@ const ManageVideosPage = () => {
             </CardHeader>
             <CardContent className="p-8 space-y-8">
                <div className="p-10 border-4 border-dashed border-primary/10 rounded-3xl bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer text-center relative group">
-                  <Input 
+                  <input 
                     type="file" 
                     accept=".xlsx, .xls, .csv" 
                     onChange={handleFileChange}

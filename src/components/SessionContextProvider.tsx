@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { isPast, parseISO, differenceInDays } from 'date-fns';
+import { isPast, parseISO, differenceInHours } from 'date-fns';
 import { toast } from "sonner";
 
 interface AuthUser extends User {
@@ -37,12 +37,10 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const maintenancePerformed = useRef<string | null>(null);
   const hasNotifiedTrial = useRef<string | null>(null);
 
-  // hydrateProfile no longer depends on hasCheckedInitialSession to prevent loops
   const hydrateProfile = useCallback(async (supabaseUser: User) => {
     if (!isMounted.current) return;
 
     try {
-      // 1. Fetch profile and subscription data in parallel
       const [profileRes, subRes] = await Promise.all([
         supabase
           .from('profiles')
@@ -67,7 +65,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let currentHasActiveSubscription = profileData?.has_active_subscription || false;
       const latestSubEndDate = latestSub?.end_date || null;
 
-      // Handle subscription logic
       if (currentHasActiveSubscription && latestSubEndDate) {
         const endDate = parseISO(latestSubEndDate);
         if (isPast(endDate)) {
@@ -79,12 +76,16 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             }).catch(err => console.error("[Session] Maintenance failed:", err));
           }
         } else {
-            const daysLeft = differenceInDays(endDate, new Date());
-            if (daysLeft >= 0 && daysLeft <= 3 && hasNotifiedTrial.current !== supabaseUser.id) {
+            const hoursLeft = differenceInHours(endDate, new Date());
+            const daysLeft = Math.ceil(hoursLeft / 24);
+
+            if (hoursLeft >= 0 && hoursLeft <= 72 && hasNotifiedTrial.current !== supabaseUser.id) {
                 hasNotifiedTrial.current = supabaseUser.id;
+                const timeStr = hoursLeft < 24 ? 'less than 24 hours' : `approximately ${daysLeft} days`;
+                
                 toast.success("Active Trial Detected!", {
-                    description: `Welcome! You have ${daysLeft === 0 ? 'less than 24 hours' : daysLeft + ' days'} of Premium access remaining.`,
-                    duration: 6000,
+                    description: `Welcome! You have ${timeStr} of Premium access remaining.`,
+                    duration: 8000,
                 });
             }
         }
@@ -104,7 +105,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     } catch (e: any) {
       console.error("[Session] Profile hydration error:", e);
     } finally {
-      // Always unblock the UI in the finally block
       setHasCheckedInitialSession(true);
     }
   }, []);
@@ -112,21 +112,16 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   useEffect(() => {
     isMounted.current = true;
     
-    // Safety fallback: Never block the UI for more than 3 seconds
     const safetyTimeout = setTimeout(() => {
         if (!hasCheckedInitialSession) {
-            console.warn("[Session] Safety fallback triggered. Unblocking UI.");
             setHasCheckedInitialSession(true);
         }
     }, 3000);
 
-    // Initial Load Check
     supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
       if (!isMounted.current) return;
       
       if (error) {
-          console.error("[Session] getSession error:", error);
-          // If cookies are corrupt, clearing them and signing out is a safe fallback
           if (error.message?.includes("JWN") || error.status === 400) {
               supabase.auth.signOut().finally(() => setHasCheckedInitialSession(true));
               return;
@@ -143,7 +138,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       }
     });
 
-    // Listen for Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (!isMounted.current) return;
       
@@ -168,9 +162,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, [hydrateProfile]); // hydrateProfile is now stable since its dependencies were reduced
+  }, [hydrateProfile]);
 
-  // Automatic redirect if on login/signup pages and already logged in
   useEffect(() => {
     if (hasCheckedInitialSession && session && (location.pathname === '/login' || location.pathname === '/signup')) {
       const isAdmin = user?.is_admin || false;

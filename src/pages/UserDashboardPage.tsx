@@ -11,7 +11,7 @@ import { Link } from 'react-router-dom';
 import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight, Sparkles, PlayCircle, MonitorPlay } from 'lucide-react'; 
 import LoadingBar from '@/components/LoadingBar';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
-import { differenceInDays, parseISO } from 'date-fns';
+import { parseISO, differenceInHours } from 'date-fns';
 import { cn } from "@/lib/utils";
 import TrialOfferDialog from '@/components/TrialOfferDialog';
 
@@ -62,11 +62,9 @@ const UserDashboardPage = () => {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [areasForImprovement, setAreasForImprovement] = useState<PerformanceSummary[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
-  
-  // Trial Popup State
   const [showTrialPopup, setShowTrialPopup] = useState(false);
 
-  const isGuestMode = !user; 
+  const isGuestMode = !user;
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
@@ -79,7 +77,6 @@ const UserDashboardPage = () => {
           fetchVideoStats()
         ]);
         
-        // Trigger trial popup if eligible and not already shown in this browser session
         const trialShownThisSession = sessionStorage.getItem('trial_popup_shown');
         if (user && !user.has_active_subscription && !user.trial_taken && !trialShownThisSession) {
             setShowTrialPopup(true);
@@ -99,21 +96,14 @@ const UserDashboardPage = () => {
 
   const fetchVideoStats = async () => {
     if (!user) return;
-
     try {
-      const { count: totalVideos } = await supabase
-        .from('videos')
-        .select('*', { count: 'exact', head: true });
-
+      const { count: totalVideos } = await supabase.from('videos').select('*', { count: 'exact', head: true });
       const { data: progressData } = await supabase
         .from('user_video_progress')
         .select(`
           video_id,
           last_watched_at,
-          videos (
-            title,
-            video_groups (name)
-          )
+          videos (title, video_groups (name))
         `)
         .eq('user_id', user.id)
         .eq('is_watched', true)
@@ -138,20 +128,18 @@ const UserDashboardPage = () => {
         setRecentVideos(formattedVideos);
       }
     } catch (e) {
-      console.error("Error fetching video stats:", e);
+      console.error(e);
     }
   };
 
   const fetchQuizPerformance = async () => {
     if (!user) return; 
-
     const { data: attemptsData, error: attemptsError } = await supabase
       .from('user_quiz_attempts')
       .select('is_correct, category_id') 
       .eq('user_id', user.id);
 
     if (attemptsError) {
-      console.error('Error fetching quiz performance:', attemptsError);
       setQuizPerformance(null);
       return;
     }
@@ -160,53 +148,29 @@ const UserDashboardPage = () => {
     const correctAttempts = attemptsData.filter(attempt => attempt.is_correct).length;
     const accuracy = totalAttempts > 0 ? (correctAttempts / totalAttempts) * 100 : 0;
 
-    setQuizPerformance({
-      totalAttempts,
-      correctAttempts,
-      accuracy,
-    });
-
+    setQuizPerformance({ totalAttempts, correctAttempts, accuracy });
     generateRecommendationsAndCharts(attemptsData);
   };
 
   const generateRecommendationsAndCharts = (attemptsData: any[]) => {
     const categoryPerformance: { [key: string]: { total: number; correct: number } } = {};
-
     attemptsData.forEach(attempt => {
       if (attempt.category_id) {
-        if (!categoryPerformance[attempt.category_id]) {
-          categoryPerformance[attempt.category_id] = { total: 0, correct: 0 };
-        }
+        if (!categoryPerformance[attempt.category_id]) categoryPerformance[attempt.category_id] = { total: 0, correct: 0 };
         categoryPerformance[attempt.category_id].total++;
-        if (attempt.is_correct) {
-          categoryPerformance[attempt.category_id].correct++;
-        }
+        if (attempt.is_correct) categoryPerformance[attempt.category_id].correct++;
       }
     });
 
     const performanceSummaries: PerformanceSummary[] = [];
     const visualData: any[] = [];
-
     Object.keys(categoryPerformance).forEach(catId => {
       const cat = allCategories.find(c => c.id === catId);
       if (cat) {
         const perf = categoryPerformance[catId];
         const accuracy = perf.total > 0 ? (perf.correct / perf.total) * 100 : 0;
-        performanceSummaries.push({
-          id: catId,
-          name: cat.name,
-          type: 'category',
-          totalAttempts: perf.total,
-          correctAttempts: perf.correct,
-          accuracy: accuracy,
-        });
-
-        visualData.push({
-          name: cat.name.length > 10 ? cat.name.substring(0, 10) + '...' : cat.name,
-          accuracy: parseFloat(accuracy.toFixed(1)),
-          attempts: perf.total,
-          fullName: cat.name
-        });
+        performanceSummaries.push({ id: catId, name: cat.name, type: 'category', totalAttempts: perf.total, correctAttempts: perf.correct, accuracy });
+        visualData.push({ name: cat.name.length > 10 ? cat.name.substring(0, 10) + '...' : cat.name, accuracy: parseFloat(accuracy.toFixed(1)), attempts: perf.total, fullName: cat.name });
       }
     });
 
@@ -216,43 +180,33 @@ const UserDashboardPage = () => {
 
   const fetchRecentAttempts = async () => {
     if (!user) return; 
-
     const { data } = await supabase
       .from('user_quiz_attempts')
-      .select(`
-        id,
-        mcq_id,
-        selected_option,
-        is_correct,
-        attempt_timestamp,
-        mcqs (question_text)
-      `)
+      .select(`id, mcq_id, selected_option, is_correct, attempt_timestamp, mcqs (question_text)`)
       .eq('user_id', user.id)
       .order('attempt_timestamp', { ascending: false })
       .limit(5); 
 
     if (data) {
-      const formattedAttempts: RecentAttempt[] = data.map((attempt: any) => ({
+      setRecentAttempts(data.map((attempt: any) => ({
         id: attempt.id,
         mcq_id: attempt.mcq_id,
         question_text: attempt.mcqs?.question_text || 'N/A',
         selected_option: attempt.selected_option,
         is_correct: attempt.is_correct,
         attempt_timestamp: attempt.attempt_timestamp,
-      }));
-      setRecentAttempts(formattedAttempts);
+      })));
     }
   };
 
-  if (!hasCheckedInitialSession || isPageLoading) {
-    return <LoadingBar />;
-  }
+  if (!hasCheckedInitialSession || isPageLoading) return <LoadingBar />;
 
-  const daysRemaining = user?.subscription_end_date 
-    ? differenceInDays(parseISO(user.subscription_end_date), new Date()) 
-    : null;
-
-  const isCurrentlyOnTrial = user?.has_active_subscription && daysRemaining !== null && daysRemaining <= 3;
+  const hoursRemaining = user?.subscription_end_date 
+    ? differenceInHours(parseISO(user.subscription_end_date), new Date()) 
+    : 0;
+  
+  const daysRemaining = Math.max(0, Math.ceil(hoursRemaining / 24));
+  const isCurrentlyOnTrial = user?.has_active_subscription && hoursRemaining > 0 && hoursRemaining <= 72;
 
   return (
     <div className="space-y-8 pb-12">
@@ -277,7 +231,7 @@ const UserDashboardPage = () => {
               <div>
                 <CardTitle className="text-xl font-black">Welcome to Premium Trial!</CardTitle>
                 <CardDescription className="text-foreground/80 font-medium">
-                  You have full access to all features for the next {daysRemaining + 1} days. Explore the full question bank and AI cases!
+                  You have full access to all features for the next {hoursRemaining < 24 ? 'few hours' : daysRemaining + ' days'}. Explore the full question bank and AI cases!
                 </CardDescription>
               </div>
             </div>
@@ -311,13 +265,8 @@ const UserDashboardPage = () => {
             </CardDescription>
             <CardTitle className="text-3xl font-black">{quizPerformance?.accuracy.toFixed(1) || '0.0'}%</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="h-2 w-full bg-white/20 rounded-full mt-2">
-                <div className="h-full bg-white rounded-full" style={{ width: `${quizPerformance?.accuracy || 0}%` }}></div>
-            </div>
-          </CardContent>
+          <CardContent><div className="h-2 w-full bg-white/20 rounded-full mt-2"><div className="h-full bg-white rounded-full" style={{ width: `${quizPerformance?.accuracy || 0}%` }}></div></div></CardContent>
         </Card>
-
         <Card className="border-none shadow-sm">
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
@@ -325,13 +274,8 @@ const UserDashboardPage = () => {
             </CardDescription>
             <CardTitle className="text-3xl font-black">{videoProgress.watched} <span className="text-sm text-muted-foreground font-medium">/ {videoProgress.total}</span></CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="h-2 w-full bg-muted rounded-full mt-2">
-                <div className="h-full bg-primary rounded-full" style={{ width: `${videoProgress.percentage}%` }}></div>
-            </div>
-          </CardContent>
+          <CardContent><div className="h-2 w-full bg-muted rounded-full mt-2"><div className="h-full bg-primary rounded-full" style={{ width: `${videoProgress.percentage}%` }}></div></div></CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
@@ -339,11 +283,8 @@ const UserDashboardPage = () => {
             </CardDescription>
             <CardTitle className="text-3xl font-black">{quizPerformance?.totalAttempts || 0}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground font-medium">Across all specialties</p>
-          </CardContent>
+          <CardContent><p className="text-xs text-muted-foreground font-medium">Across all specialties</p></CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
@@ -351,27 +292,20 @@ const UserDashboardPage = () => {
             </CardDescription>
             <div className="flex items-baseline gap-2">
               <CardTitle className="text-2xl font-black">{isCurrentlyOnTrial ? 'Trial' : (user?.has_active_subscription ? 'Premium' : 'Standard')}</CardTitle>
-              {user?.has_active_subscription && daysRemaining !== null && (
-                <span className={cn("text-[10px] font-black uppercase", daysRemaining <= 1 ? "text-red-500 animate-pulse" : "text-muted-foreground")}>
-                  ({daysRemaining + 1} {daysRemaining === 0 ? 'day' : 'days'})
+              {user?.has_active_subscription && hoursRemaining > 0 && (
+                <span className={cn("text-[10px] font-black uppercase", hoursRemaining <= 24 ? "text-red-500 animate-pulse" : "text-muted-foreground")}>
+                  ({hoursRemaining < 24 ? '< 24h' : daysRemaining + ' days'})
                 </span>
               )}
             </div>
           </CardHeader>
-          <CardContent>
-            <Link to="/user/subscriptions" className="text-[10px] text-primary font-black uppercase hover:underline">
-                {user?.has_active_subscription ? 'Manage Plan' : 'Upgrade Now'}
-            </Link>
-          </CardContent>
+          <CardContent><Link to="/user/subscriptions" className="text-[10px] text-primary font-black uppercase hover:underline">{user?.has_active_subscription ? 'Manage Plan' : 'Upgrade Now'}</Link></CardContent>
         </Card>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         <Card className="md:col-span-4 shadow-sm">
-          <CardHeader>
-            <CardTitle>Specialty Performance</CardTitle>
-            <CardDescription>Accuracy rates across different medical fields.</CardDescription>
-          </CardHeader>
+          <CardHeader><CardTitle>Specialty Performance</CardTitle><CardDescription>Accuracy rates across different medical fields.</CardDescription></CardHeader>
           <CardContent className="h-[350px] pl-2">
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -379,8 +313,7 @@ const UserDashboardPage = () => {
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                   <XAxis type="number" domain={[0, 100]} hide />
                   <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} style={{ fontSize: '12px', fontWeight: 'bold' }} />
-                  <Tooltip 
-                    content={({ active, payload }) => {
+                  <Tooltip content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                             return (
                                 <div className="bg-white p-3 border rounded-lg shadow-xl text-xs text-black">
@@ -401,70 +334,29 @@ const UserDashboardPage = () => {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-muted/20 rounded-xl border-2 border-dashed">
-                  <TrendingUp className="h-10 w-10 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground font-medium uppercase text-xs">No analytics available yet</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">Solve more MCQs to generate performance data.</p>
-              </div>
+              <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-muted/20 rounded-xl border-2 border-dashed"><TrendingUp className="h-10 w-10 text-muted-foreground mb-4" /><p className="text-muted-foreground font-medium uppercase text-xs">No analytics available yet</p><p className="text-[10px] text-muted-foreground mt-1">Solve more MCQs to generate performance data.</p></div>
             )}
           </CardContent>
         </Card>
-
         <div className="md:col-span-3 space-y-6">
             <Card className="shadow-sm border-none bg-primary/5">
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <PlayCircle className="h-5 w-5 text-primary" /> Continue Watching
-                    </CardTitle>
-                </CardHeader>
+                <CardHeader className="pb-3"><CardTitle className="text-lg flex items-center gap-2"><PlayCircle className="h-5 w-5 text-primary" /> Continue Watching</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                     {recentVideos.length > 0 ? (
                         recentVideos.map(video => (
-                            <Link key={video.id} to="/user/videos" className="flex items-center gap-3 p-3 rounded-xl bg-white border hover:border-primary transition-all group">
-                                <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary group-hover:text-white transition-colors">
-                                    <MonitorPlay className="h-4 w-4" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-black uppercase truncate">{video.title}</p>
-                                    <p className="text-[9px] text-muted-foreground font-bold">{video.group_name}</p>
-                                </div>
-                                <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                            </Link>
+                            <Link key={video.id} to="/user/videos" className="flex items-center gap-3 p-3 rounded-xl bg-white border hover:border-primary transition-all group"><div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary group-hover:text-white transition-colors"><MonitorPlay className="h-4 w-4" /></div><div className="flex-1 min-w-0"><p className="text-xs font-black uppercase truncate">{video.title}</p><p className="text-[9px] text-muted-foreground font-bold">{video.group_name}</p></div><ArrowRight className="h-3 w-3 text-muted-foreground" /></Link>
                         ))
-                    ) : (
-                        <div className="text-center py-8">
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase">No recently watched videos</p>
-                            <Link to="/user/videos"><Button variant="link" size="sm" className="text-[10px] h-auto p-0 font-black">Browse Library</Button></Link>
-                        </div>
-                    )}
+                    ) : (<div className="text-center py-8"><p className="text-[10px] font-bold text-muted-foreground uppercase">No recently watched videos</p><Link to="/user/videos"><Button variant="link" size="sm" className="text-[10px] h-auto p-0 font-black">Browse Library</Button></Link></div>)}
                 </CardContent>
             </Card>
-
             <Card className="shadow-sm">
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">Focus Areas</CardTitle>
-                    <CardDescription className="text-xs">Categories requiring immediate review.</CardDescription>
-                </CardHeader>
+                <CardHeader className="pb-3"><CardTitle className="text-lg">Focus Areas</CardTitle><CardDescription className="text-xs">Categories requiring immediate review.</CardDescription></CardHeader>
                 <CardContent className="space-y-3">
                     {areasForImprovement.length > 0 ? (
                     areasForImprovement.map((area) => (
-                        <div key={area.id} className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/30 transition-colors">
-                            <div className="min-w-0">
-                                <p className="text-xs font-black truncate uppercase tracking-tight">{area.name}</p>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <Badge variant={area.accuracy < 40 ? "destructive" : "secondary"} className="text-[8px] h-4 px-1">
-                                        {area.accuracy.toFixed(1)}%
-                                    </Badge>
-                                </div>
-                            </div>
-                            <Link to="/quiz">
-                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full"><ArrowRight className="h-3 w-3" /></Button>
-                            </Link>
-                        </div>
+                        <div key={area.id} className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/30 transition-colors"><div className="min-w-0"><p className="text-xs font-black truncate uppercase tracking-tight">{area.name}</p><div className="flex items-center gap-2 mt-0.5"><Badge variant={area.accuracy < 40 ? "destructive" : "secondary"} className="text-[8px] h-4 px-1">{area.accuracy.toFixed(1)}%</Badge></div></div><Link to="/quiz"><Button size="icon" variant="ghost" className="h-8 w-8 rounded-full"><ArrowRight className="h-3 w-3" /></Button></Link></div>
                     ))
-                    ) : (
-                        <p className="text-center py-4 text-[10px] font-bold text-muted-foreground uppercase">Not enough data</p>
-                    )}
+                    ) : (<p className="text-center py-4 text-[10px] font-bold text-muted-foreground uppercase">Not enough data</p>)}
                 </CardContent>
             </Card>
         </div>
@@ -472,49 +364,23 @@ const UserDashboardPage = () => {
 
       <div className="grid gap-6">
         <Card className="shadow-sm overflow-hidden">
-          <CardHeader className="bg-muted/30 border-b">
-            <CardTitle className="text-lg">Recent Question History</CardTitle>
-            <CardDescription className="text-xs">Audit of your last 5 individual MCQ attempts.</CardDescription>
-          </CardHeader>
+          <CardHeader className="bg-muted/30 border-b"><CardTitle className="text-lg">Recent Question History</CardTitle><CardDescription className="text-xs">Audit of your last 5 individual MCQ attempts.</CardDescription></CardHeader>
           <CardContent className="p-0">
             {recentAttempts.length > 0 ? (
               <div className="divide-y">
                 {recentAttempts.map((attempt) => (
-                  <div key={attempt.id} className="p-4 hover:bg-muted/30 transition-colors flex items-start gap-4">
-                    <div className={cn("mt-1 p-1 rounded-full", attempt.is_correct ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600")}>
-                        {attempt.is_correct ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-foreground line-clamp-1">
-                        {attempt.question_text}
-                      </p>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">{new Date(attempt.attempt_timestamp).toLocaleDateString()}</span>
-                        <span className="text-[9px] bg-muted px-2 py-0.5 rounded font-black uppercase">Result: {attempt.is_correct ? 'Correct' : 'Failed'}</span>
-                      </div>
-                    </div>
-                  </div>
+                  <div key={attempt.id} className="p-4 hover:bg-muted/30 transition-colors flex items-start gap-4"><div className={cn("mt-1 p-1 rounded-full", attempt.is_correct ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600")}>{attempt.is_correct ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}</div><div className="flex-1 min-w-0"><p className="text-xs font-bold text-foreground line-clamp-1">{attempt.question_text}</p><div className="flex items-center gap-3 mt-1.5"><span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">{new Date(attempt.attempt_timestamp).toLocaleDateString()}</span><span className="text-[9px] bg-muted px-2 py-0.5 rounded font-black uppercase">Result: {attempt.is_correct ? 'Correct' : 'Failed'}</span></div></div></div>
                 ))}
               </div>
-            ) : (
-              <div className="py-20 text-center text-muted-foreground italic text-xs">No recent attempts. Start practicing today!</div>
-            )}
+            ) : (<div className="py-20 text-center text-muted-foreground italic text-xs">No recent attempts. Start practicing today!</div>)}
           </CardContent>
-          <CardFooter className="bg-muted/10 p-4 border-t text-center">
-             <Link to="/user/bookmarked-mcqs" className="text-xs text-primary font-black uppercase hover:underline mx-auto">Review Your Bookmarked MCQs</Link>
-          </CardFooter>
+          <CardFooter className="bg-muted/10 p-4 border-t text-center"><Link to="/user/bookmarked-mcqs" className="text-xs text-primary font-black uppercase hover:underline mx-auto">Review Your Bookmarked MCQs</Link></CardFooter>
         </Card>
       </div>
       
       {user && (
-        <TrialOfferDialog 
-            open={showTrialPopup} 
-            onOpenChange={setShowTrialPopup} 
-            userId={user.id} 
-            onActivated={() => window.location.reload()} 
-        />
+        <TrialOfferDialog open={showTrialPopup} onOpenChange={setShowTrialPopup} userId={user.id} onActivated={() => window.location.reload()} />
       )}
-
       <MadeWithDyad />
     </div>
   );

@@ -20,11 +20,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { User } from '@supabase/supabase-js';
 import EditUserDialog from '@/components/EditUserDialog';
-import AddUserDialog from '@/components/AddUserDialog'; // Import new component
+import AddUserDialog from '@/components/AddUserDialog'; 
 import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/SessionContextProvider';
-import { differenceInDays, parseISO } from 'date-fns'; // Import date-fns helpers
-import { dismissToast } from '@/utils/toast'; // Import dismissToast
+import { parseISO, differenceInHours } from 'date-fns'; 
+import { dismissToast } from '@/utils/toast'; 
 
 interface UserProfile {
   id: string;
@@ -37,7 +37,6 @@ interface UserProfile {
   phone_number: string | null;
   whatsapp_number: string | null;
   has_active_subscription: boolean;
-  // NEW FIELDS
   subscription_status: string | null;
   subscription_end_date: string | null;
 }
@@ -48,7 +47,7 @@ const ManageUsersPage = () => {
   const [isPageLoading, setIsPageLoading] = useState(true);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false); // New state for Add User dialog
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false); 
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserProfile | null>(null);
 
   const { hasCheckedInitialSession } = useSession();
@@ -61,8 +60,6 @@ const ManageUsersPage = () => {
 
   const fetchUsers = async () => {
     setIsPageLoading(true);
-
-    // 1. Fetch all users from Supabase Auth via Edge Function
     const { data: authUsersResponse, error: edgeFunctionError } = await supabase.functions.invoke('list-users');
 
     let authUsersData: User[] = [];
@@ -75,19 +72,10 @@ const ManageUsersPage = () => {
       authUsersData = authUsersResponse as User[];
     }
 
-    // 2. Fetch all profiles from the public.profiles table
-    const { data: profilesData, error: profilesError } = await supabase
-      .from('profiles')
-      .select('*');
-
-    if (profilesError) {
-      console.error('Error fetching user profiles:', profilesError);
-      toast({ title: "Error", description: "Failed to load user profiles.", variant: "destructive" });
-    }
-
+    const { data: profilesData, error: profilesError } = await supabase.from('profiles').select('*');
+    if (profilesError) console.error('Error fetching user profiles:', profilesError);
     const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile]) || []);
 
-    // 2.5 Fetch all active subscriptions (latest end date first)
     const { data: activeSubscriptions, error: subsError } = await supabase
         .from('user_subscriptions')
         .select('user_id, end_date, status')
@@ -96,19 +84,11 @@ const ManageUsersPage = () => {
 
     const activeSubsMap = new Map<string, { end_date: string, status: string }>();
     if (!subsError && activeSubscriptions) {
-        // Only keep the first (latest) active subscription per user
         activeSubscriptions.forEach(sub => {
-            if (!activeSubsMap.has(sub.user_id)) {
-                activeSubsMap.set(sub.user_id, { end_date: sub.end_date, status: sub.status });
-            }
+            if (!activeSubsMap.has(sub.user_id)) activeSubsMap.set(sub.user_id, { end_date: sub.end_date, status: sub.status });
         });
-    } else if (subsError) {
-        console.error('Error fetching active subscriptions:', subsError);
-        toast({ title: "Error", description: "Failed to load active subscriptions.", variant: "destructive" });
     }
 
-
-    // 3. Combine the data: Iterate through authUsersData and merge with profile data
     const combinedUsers: UserProfile[] = authUsersData.map(authUser => {
       const profile = profilesMap.get(authUser.id);
       const activeSub = activeSubsMap.get(authUser.id);
@@ -124,7 +104,6 @@ const ManageUsersPage = () => {
         phone_number: profile?.phone_number || null,
         whatsapp_number: profile?.whatsapp_number || null,
         has_active_subscription: profile?.has_active_subscription || false,
-        // NEW MAPPING
         subscription_status: activeSub?.status || null,
         subscription_end_date: activeSub?.end_date || null,
       };
@@ -140,27 +119,14 @@ const ManageUsersPage = () => {
   };
 
   const handleDeleteUser = async (userId: string, email: string | null) => {
-    if (!window.confirm(`Are you sure you want to permanently delete the user: ${email || userId}? This action cannot be undone.`)) {
-      return;
-    }
-
-    const loadingToastId = toast({
-      title: "Deleting User...",
-      description: `Attempting to delete user ${email || userId}...`,
-      duration: 999999,
-    });
+    if (!window.confirm(`Are you sure you want to permanently delete the user: ${email || userId}? This action cannot be undone.`)) return;
+    const loadingToastId = toast({ title: "Deleting User...", description: `Attempting to delete user ${email || userId}...`, duration: 999999 });
 
     try {
-      const { error } = await supabase.functions.invoke('admin-delete-user', {
-        body: { user_id: userId },
-      });
-
-      if (error) {
-        throw error;
-      }
-
+      const { error } = await supabase.functions.invoke('admin-delete-user', { body: { user_id: userId } });
+      if (error) throw error;
       toast({ title: "Success", description: `User ${email || userId} deleted successfully.` });
-      fetchUsers(); // Refresh the list
+      fetchUsers();
     } catch (error: any) {
       console.error("Error deleting user:", error);
       toast({ title: "Error", description: `Failed to delete user: ${error.message || 'Unknown error'}`, variant: "destructive" });
@@ -176,69 +142,36 @@ const ManageUsersPage = () => {
       cell: ({ row }) => (
         <Avatar>
           <AvatarImage src={row.original.avatar_url || undefined} alt={`${row.original.first_name} ${row.original.last_name}`} />
-          <AvatarFallback>
-            <UserIcon className="h-5 w-5" />
-          </AvatarFallback>
+          <AvatarFallback><UserIcon className="h-5 w-5" /></AvatarFallback>
         </Avatar>
       ),
     },
+    { accessorKey: 'first_name', header: 'First Name', cell: ({ row }) => row.original.first_name || 'N/A' },
+    { accessorKey: 'last_name', header: 'Last Name', cell: ({ row }) => row.original.last_name || 'N/A' },
+    { accessorKey: 'email', header: 'Email', cell: ({ row }) => row.original.email || 'N/A' },
+    { accessorKey: 'created_at', header: 'Joined On', cell: ({ row }) => new Date(row.original.created_at).toLocaleDateString() },
+    { accessorKey: 'is_admin', header: 'Admin', cell: ({ row }) => (row.original.is_admin ? 'Yes' : 'No') },
     {
-      accessorKey: 'first_name',
-      header: 'First Name',
-      cell: ({ row }) => row.original.first_name || 'N/A',
-    },
-    {
-      accessorKey: 'last_name',
-      header: 'Last Name',
-      cell: ({ row }) => row.original.last_name || 'N/A',
-    },
-    {
-      accessorKey: 'email',
-      header: 'Email',
-      cell: ({ row }) => row.original.email || 'N/A',
-    },
-    {
-      accessorKey: 'created_at',
-      header: 'Joined On',
-      cell: ({ row }) => new Date(row.original.created_at).toLocaleDateString(),
-    },
-    {
-      accessorKey: 'is_admin',
-      header: 'Admin',
-      cell: ({ row }) => (row.original.is_admin ? 'Yes' : 'No'),
-    },
-    {
-      accessorKey: 'subscription_end_date', // Use end date as accessor for sorting/filtering
+      accessorKey: 'subscription_end_date',
       header: 'Subscription',
       cell: ({ row }) => {
         const { subscription_end_date } = row.original;
-        
-        if (!subscription_end_date) {
-          return <Badge variant="secondary">Inactive</Badge>;
-        }
+        if (!subscription_end_date) return <Badge variant="secondary">Inactive</Badge>;
 
-        const endDate = parseISO(subscription_end_date);
-        const today = new Date();
-        const daysRemaining = differenceInDays(endDate, today);
+        const hoursLeft = differenceInHours(parseISO(subscription_end_date), new Date());
+        if (hoursLeft <= 0) return <Badge variant="secondary">Expired</Badge>;
         
-        if (daysRemaining <= 0) {
-          return <Badge variant="secondary">Expired</Badge>;
-        }
+        const daysLeft = Math.ceil(hoursLeft / 24);
 
         let variant: "default" | "secondary" | "destructive" | "outline" = "default";
-        if (daysRemaining <= 7) {
-          variant = "destructive";
-        } else if (daysRemaining <= 30) {
-          variant = "outline";
-        }
+        if (daysLeft <= 3) variant = "destructive";
+        else if (daysLeft <= 30) variant = "outline";
 
         return (
           <div className="flex flex-col space-y-1">
-            <Badge variant={variant}>
-              Active
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              {daysRemaining} day{daysRemaining === 1 ? '' : 's'} left
+            <Badge variant={variant}>Active</Badge>
+            <span className="text-[10px] text-muted-foreground font-black uppercase">
+              {hoursLeft < 24 ? '< 24h left' : `${daysLeft} days left`}
             </span>
           </div>
         );
@@ -251,23 +184,13 @@ const ManageUsersPage = () => {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
+              <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleEditClick(userProfile)}>
-                Edit User
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleEditClick(userProfile)}>Edit User</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={() => handleDeleteUser(userProfile.id, userProfile.email)}
-                className="text-red-600"
-              >
-                Delete User
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDeleteUser(userProfile.id, userProfile.email)} className="text-red-600">Delete User</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -276,44 +199,25 @@ const ManageUsersPage = () => {
   ];
 
   if (!hasCheckedInitialSession || isPageLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-gray-700 dark:text-gray-300">Loading users...</p>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900"><p className="text-gray-700 dark:text-gray-300">Loading users...</p></div>;
   }
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Manage Users</h1>
-
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-xl">All Registered Users</CardTitle>
           <Button onClick={() => setIsAddDialogOpen(true)}>Add New User</Button>
         </CardHeader>
         <CardDescription className="px-6">View, edit, and manage user profiles and subscriptions.</CardDescription>
-        <CardContent>
-          <DataTable columns={columns} data={users} />
-        </CardContent>
+        <CardContent><DataTable columns={columns} data={users} /></CardContent>
       </Card>
-
       <MadeWithDyad />
-
       {selectedUserForEdit && (
-        <EditUserDialog
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          userProfile={selectedUserForEdit}
-          onSave={fetchUsers} // Refresh the list after saving
-        />
+        <EditUserDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} userProfile={selectedUserForEdit} onSave={fetchUsers} />
       )}
-
-      <AddUserDialog
-        open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
-        onSave={fetchUsers}
-      />
+      <AddUserDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} onSave={fetchUsers} />
     </div>
   );
 };

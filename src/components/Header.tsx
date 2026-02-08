@@ -82,16 +82,16 @@ const Header = () => {
           </Button>
         </form>
 
-        <div className="flex justify-end items-center gap-3 shrink-0">
+        <div className="flex justify-end items-center gap-2 sm:gap-3 shrink-0">
           {hasCheckedInitialSession && !user && (
             <>
-              <Link to="/login" className="hidden sm:block">
-                <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-white/10 font-bold uppercase tracking-wider">
+              <Link to="/login">
+                <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-white/10 font-bold uppercase tracking-wider text-xs sm:text-sm px-2 sm:px-4">
                   Login
                 </Button>
               </Link>
               <Link to="/signup">
-                <Button variant="secondary" size="sm" className="text-primary font-extrabold shadow-sm uppercase tracking-wider px-6 rounded-full">
+                <Button variant="secondary" size="sm" className="text-primary font-extrabold shadow-sm uppercase tracking-wider px-3 sm:px-6 rounded-full text-xs sm:text-sm">
                   Register
                 </Button>
               </Link>
@@ -103,7 +103,7 @@ const Header = () => {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-full font-bold uppercase"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-full font-bold uppercase text-xs sm:text-sm px-2 sm:px-4"
                 >
                   Dashboard
                 </Button>

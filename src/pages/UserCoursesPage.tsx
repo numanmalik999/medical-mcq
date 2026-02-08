@@ -10,7 +10,6 @@ import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
 import { BookOpenText, Loader2 } from 'lucide-react';
 import SubscribePromptDialog from '@/components/SubscribePromptDialog';
-import { differenceInDays, parseISO } from 'date-fns';
 
 interface Course {
   id: string;
@@ -36,7 +35,7 @@ const UserCoursesPage = () => {
 
   const fetchCourses = async () => {
     setIsPageLoading(true);
-    const { data, error } = await supabase
+    const { data: data, error: error } = await supabase
       .from('courses')
       .select('*')
       .order('title', { ascending: true });
@@ -52,13 +51,8 @@ const UserCoursesPage = () => {
   };
 
   const handleCourseClick = (courseId: string) => {
-    const daysRemaining = user?.subscription_end_date 
-      ? differenceInDays(parseISO(user.subscription_end_date), new Date()) 
-      : null;
-    
-    const isPaid = user?.has_active_subscription && daysRemaining !== null && daysRemaining > 3;
-
-    if (!isPaid) {
+    // FIX: Just check if user is active. Trial users are active.
+    if (!user?.has_active_subscription) {
       setIsUpgradeDialogOpen(true);
       return;
     }

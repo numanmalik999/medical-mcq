@@ -24,7 +24,6 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import SubscribePromptDialog from '@/components/SubscribePromptDialog';
-import { differenceInDays, parseISO } from 'date-fns';
 
 interface Video {
   id: string;
@@ -205,8 +204,8 @@ const UserVideosPage = () => {
   };
 
   const handleVideoClick = (video: Video) => {
-    const isPaid = user?.has_active_subscription && user?.subscription_end_date && differenceInDays(parseISO(user.subscription_end_date), new Date()) > 3;
-    if (!isPaid) {
+    // FIX: Just check active status
+    if (!user?.has_active_subscription) {
       setIsUpgradeDialogOpen(true);
       return;
     }

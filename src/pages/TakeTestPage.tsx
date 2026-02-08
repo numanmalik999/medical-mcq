@@ -21,7 +21,6 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import SubscribePromptDialog from '@/components/SubscribePromptDialog';
-import { differenceInDays, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
@@ -297,7 +296,8 @@ const TakeTestPage = () => {
   };
 
   const startTestPreparation = async () => {
-    if (!user?.has_active_subscription || (user?.subscription_end_date && differenceInDays(parseISO(user.subscription_end_date), new Date()) <= 3)) {
+    // FIX: Allow access if subscription is active, regardless of 3-day threshold
+    if (!user?.has_active_subscription) {
       setIsUpgradeDialogOpen(true);
       return;
     }
@@ -363,7 +363,8 @@ const TakeTestPage = () => {
   };
 
   const continueTestSession = useCallback(async (loadedSession: LoadedTestSession) => {
-    if (!user?.has_active_subscription || (user?.subscription_end_date && differenceInDays(parseISO(user.subscription_end_date), new Date()) <= 3)) {
+    // FIX: Allow access if subscription is active
+    if (!user?.has_active_subscription) {
       setIsUpgradeDialogOpen(true);
       return;
     }

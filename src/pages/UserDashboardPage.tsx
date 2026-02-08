@@ -79,9 +79,11 @@ const UserDashboardPage = () => {
           fetchVideoStats()
         ]);
         
-        // Trigger trial popup if eligible
-        if (user && !user.has_active_subscription && !user.trial_taken) {
+        // Trigger trial popup if eligible and not already shown in this browser session
+        const trialShownThisSession = sessionStorage.getItem('trial_popup_shown');
+        if (user && !user.has_active_subscription && !user.trial_taken && !trialShownThisSession) {
             setShowTrialPopup(true);
+            sessionStorage.setItem('trial_popup_shown', 'true');
         }
         
         setIsPageLoading(false);
@@ -275,7 +277,7 @@ const UserDashboardPage = () => {
               <div>
                 <CardTitle className="text-xl font-black">Welcome to Premium Trial!</CardTitle>
                 <CardDescription className="text-foreground/80 font-medium">
-                  You have full access to all features for the next {daysRemaining} days. Explore the full question bank and AI cases!
+                  You have full access to all features for the next {daysRemaining + 1} days. Explore the full question bank and AI cases!
                 </CardDescription>
               </div>
             </div>
@@ -351,7 +353,7 @@ const UserDashboardPage = () => {
               <CardTitle className="text-2xl font-black">{isCurrentlyOnTrial ? 'Trial' : (user?.has_active_subscription ? 'Premium' : 'Standard')}</CardTitle>
               {user?.has_active_subscription && daysRemaining !== null && (
                 <span className={cn("text-[10px] font-black uppercase", daysRemaining <= 1 ? "text-red-500 animate-pulse" : "text-muted-foreground")}>
-                  ({daysRemaining} {daysRemaining === 1 ? 'day' : 'days'})
+                  ({daysRemaining + 1} {daysRemaining === 0 ? 'day' : 'days'})
                 </span>
               )}
             </div>

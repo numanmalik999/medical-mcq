@@ -65,17 +65,9 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let currentHasActiveSubscription = profileData?.has_active_subscription || false;
       const latestSubEndDate = latestSub?.end_date || null;
 
-      console.log("[Session] Hydrating user:", supabaseUser.id, { 
-        profileActive: currentHasActiveSubscription, 
-        latestSubEndDate,
-        trialTaken: profileData?.trial_taken 
-      });
-
-      // If the profile says active but we found an expired sub, fix it
       if (currentHasActiveSubscription && latestSubEndDate) {
         const endDate = parseISO(latestSubEndDate);
         if (isPast(endDate)) {
-          console.log("[Session] Found expired subscription. Updating status...");
           currentHasActiveSubscription = false;
           if (maintenancePerformed.current !== supabaseUser.id) {
             maintenancePerformed.current = supabaseUser.id;
@@ -87,9 +79,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             const daysLeft = differenceInDays(endDate, new Date());
             if (daysLeft >= 0 && daysLeft <= 3 && hasNotifiedTrial.current !== supabaseUser.id) {
                 hasNotifiedTrial.current = supabaseUser.id;
-                
                 toast.success("Active Trial Detected!", {
-                    description: `Welcome! You have ${daysLeft === 0 ? 'less than 24 hours' : daysLeft + ' days'} of Premium access remaining. Enjoy!`,
+                    description: `Welcome! You have ${daysLeft === 0 ? 'less than 24 hours' : daysLeft + ' days'} of Premium access remaining.`,
                     duration: 6000,
                 });
             }
@@ -109,35 +100,39 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } as AuthUser);
     } catch (e: any) {
       console.error("[Session] Profile hydration failed:", e);
+    } finally {
+      setHasCheckedInitialSession(true); // Signal completion only after profile data is fetched
     }
   }, []);
 
   useEffect(() => {
     isMounted.current = true;
     
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (!isMounted.current) return;
       setSession(initialSession);
       if (initialSession) {
-        hydrateProfile(initialSession.user);
+        await hydrateProfile(initialSession.user);
+      } else {
+        setHasCheckedInitialSession(true);
       }
-      setHasCheckedInitialSession(true);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) return;
       setSession(currentSession);
       if (currentSession) {
-        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-          hydrateProfile(currentSession.user);
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
+          await hydrateProfile(currentSession.user);
         } else {
           setUser(currentSession.user as AuthUser);
+          setHasCheckedInitialSession(true);
         }
       } else {
         setUser(null);
         hasNotifiedTrial.current = null;
+        setHasCheckedInitialSession(true);
       }
-      setHasCheckedInitialSession(true);
     });
 
     return () => {

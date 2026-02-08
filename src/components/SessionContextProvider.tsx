@@ -34,35 +34,15 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const navigate = useNavigate();
   const location = useLocation();
   const isMounted = useRef(true);
-  const hydrationId = useRef<string | null>(null);
   const maintenancePerformed = useRef<string | null>(null);
   const hasNotifiedTrial = useRef<string | null>(null);
 
+  // hydrateProfile no longer depends on hasCheckedInitialSession to prevent loops
   const hydrateProfile = useCallback(async (supabaseUser: User) => {
     if (!isMounted.current) return;
-    
-    // Create a unique ID for this hydration attempt to prevent overlaps
-    const currentAttemptId = Math.random().toString(36).substring(7);
-    hydrationId.current = currentAttemptId;
-
-    // Safety Timeout: If hydration takes more than 5 seconds, unblock the app
-    const timeoutId = setTimeout(() => {
-        if (hydrationId.current === currentAttemptId && !hasCheckedInitialSession) {
-            console.warn("[Session] Hydration timed out, unblocking UI...");
-            setHasCheckedInitialSession(true);
-        }
-    }, 5000);
 
     try {
-      // 1. Set basic user info immediately from metadata so the UI isn't blank
-      setUser({
-        ...supabaseUser,
-        is_admin: false,
-        first_name: supabaseUser.user_metadata?.first_name || null,
-        last_name: supabaseUser.user_metadata?.last_name || null,
-      } as AuthUser);
-
-      // 2. Fetch extended data from DB
+      // 1. Fetch profile and subscription data in parallel
       const [profileRes, subRes] = await Promise.all([
         supabase
           .from('profiles')
@@ -79,8 +59,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           .maybeSingle()
       ]);
 
-      // If a newer hydration started, ignore this one
-      if (hydrationId.current !== currentAttemptId || !isMounted.current) return;
+      if (!isMounted.current) return;
 
       const profileData = profileRes.data;
       const latestSub = subRes.data;
@@ -88,7 +67,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let currentHasActiveSubscription = profileData?.has_active_subscription || false;
       const latestSubEndDate = latestSub?.end_date || null;
 
-      // Handle subscription expiry maintenance
+      // Handle subscription logic
       if (currentHasActiveSubscription && latestSubEndDate) {
         const endDate = parseISO(latestSubEndDate);
         if (isPast(endDate)) {
@@ -123,46 +102,56 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         subscription_end_date: latestSubEndDate,
       } as AuthUser);
     } catch (e: any) {
-      console.error("[Session] Profile hydration failed:", e);
-      // If DB fails, we still have the basic user info set above
+      console.error("[Session] Profile hydration error:", e);
     } finally {
-      clearTimeout(timeoutId);
-      if (hydrationId.current === currentAttemptId) {
-        setHasCheckedInitialSession(true);
-      }
+      // Always unblock the UI in the finally block
+      setHasCheckedInitialSession(true);
     }
-  }, [hasCheckedInitialSession]);
+  }, []);
 
   useEffect(() => {
     isMounted.current = true;
     
+    // Safety fallback: Never block the UI for more than 3 seconds
+    const safetyTimeout = setTimeout(() => {
+        if (!hasCheckedInitialSession) {
+            console.warn("[Session] Safety fallback triggered. Unblocking UI.");
+            setHasCheckedInitialSession(true);
+        }
+    }, 3000);
+
     // Initial Load Check
-    supabase.auth.getSession().then(async ({ data: { session: initialSession }, error }) => {
+    supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
       if (!isMounted.current) return;
       
       if (error) {
-          console.error("[Session] Initial session fetch error:", error);
+          console.error("[Session] getSession error:", error);
+          // If cookies are corrupt, clearing them and signing out is a safe fallback
+          if (error.message?.includes("JWN") || error.status === 400) {
+              supabase.auth.signOut().finally(() => setHasCheckedInitialSession(true));
+              return;
+          }
           setHasCheckedInitialSession(true);
           return;
       }
 
       setSession(initialSession);
       if (initialSession) {
-        await hydrateProfile(initialSession.user);
+        hydrateProfile(initialSession.user);
       } else {
         setHasCheckedInitialSession(true);
       }
     });
 
     // Listen for Auth Changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (!isMounted.current) return;
       
       setSession(currentSession);
       
       if (currentSession) {
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
-          await hydrateProfile(currentSession.user);
+          hydrateProfile(currentSession.user);
         } else {
           setUser(currentSession.user as AuthUser);
           setHasCheckedInitialSession(true);
@@ -176,9 +165,10 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
     return () => {
       isMounted.current = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, [hydrateProfile]);
+  }, [hydrateProfile]); // hydrateProfile is now stable since its dependencies were reduced
 
   // Automatic redirect if on login/signup pages and already logged in
   useEffect(() => {

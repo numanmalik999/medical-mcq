@@ -26,23 +26,36 @@ serve(async (req: Request) => {
 
   try {
     const { user_id } = await req.json();
+    console.log("[activate-trial] Starting activation for user:", user_id);
 
     if (!user_id) throw new Error('User ID is required');
 
     // 1. Get the '3-Day Trial' tier ID
-    const { data: tier } = await supabaseAdmin
+    console.log("[activate-trial] Looking for '3-Day Trial' tier...");
+    const { data: tier, error: tierError } = await supabaseAdmin
       .from('subscription_tiers')
-      .select('id')
+      .select('id, duration_in_months')
       .eq('name', '3-Day Trial')
-      .single();
+      .maybeSingle();
 
-    if (!tier) throw new Error("Subscription tier '3-Day Trial' not found. Please create it in Admin Settings.");
+    if (tierError) {
+      console.error("[activate-trial] Error fetching tier:", tierError);
+      throw tierError;
+    }
+
+    if (!tier) {
+      console.error("[activate-trial] '3-Day Trial' tier NOT FOUND in subscription_tiers table.");
+      throw new Error("Subscription tier '3-Day Trial' not found. Please create it in Admin Settings.");
+    }
+
+    console.log("[activate-trial] Tier found. ID:", tier.id);
 
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 3);
 
     // 2. Create the subscription record
+    console.log("[activate-trial] Inserting user_subscriptions record...");
     const { error: subError } = await supabaseAdmin
       .from('user_subscriptions')
       .insert({
@@ -53,9 +66,13 @@ serve(async (req: Request) => {
         status: 'active'
       });
 
-    if (subError) throw subError;
+    if (subError) {
+      console.error("[activate-trial] Error inserting subscription:", subError);
+      throw subError;
+    }
 
     // 3. Update the profile
+    console.log("[activate-trial] Updating profile status...");
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({ 
@@ -64,7 +81,12 @@ serve(async (req: Request) => {
       })
       .eq('id', user_id);
 
-    if (profileError) throw profileError;
+    if (profileError) {
+      console.error("[activate-trial] Error updating profile:", profileError);
+      throw profileError;
+    }
+
+    console.log("[activate-trial] Success! Trial activated.");
 
     return new Response(JSON.stringify({ message: "Trial activated successfully" }), {
       status: 200,
@@ -72,6 +94,7 @@ serve(async (req: Request) => {
     });
 
   } catch (error: any) {
+    console.error("[activate-trial] Final Error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), { 
       status: 500, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

@@ -65,10 +65,17 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let currentHasActiveSubscription = profileData?.has_active_subscription || false;
       const latestSubEndDate = latestSub?.end_date || null;
 
+      console.log("[Session] Hydrating user:", supabaseUser.id, { 
+        profileActive: currentHasActiveSubscription, 
+        latestSubEndDate,
+        trialTaken: profileData?.trial_taken 
+      });
+
       // If the profile says active but we found an expired sub, fix it
       if (currentHasActiveSubscription && latestSubEndDate) {
         const endDate = parseISO(latestSubEndDate);
         if (isPast(endDate)) {
+          console.log("[Session] Found expired subscription. Updating status...");
           currentHasActiveSubscription = false;
           if (maintenancePerformed.current !== supabaseUser.id) {
             maintenancePerformed.current = supabaseUser.id;

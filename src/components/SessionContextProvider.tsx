@@ -34,13 +34,35 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const navigate = useNavigate();
   const location = useLocation();
   const isMounted = useRef(true);
+  const hydrationId = useRef<string | null>(null);
   const maintenancePerformed = useRef<string | null>(null);
   const hasNotifiedTrial = useRef<string | null>(null);
 
   const hydrateProfile = useCallback(async (supabaseUser: User) => {
     if (!isMounted.current) return;
+    
+    // Create a unique ID for this hydration attempt to prevent overlaps
+    const currentAttemptId = Math.random().toString(36).substring(7);
+    hydrationId.current = currentAttemptId;
+
+    // Safety Timeout: If hydration takes more than 5 seconds, unblock the app
+    const timeoutId = setTimeout(() => {
+        if (hydrationId.current === currentAttemptId && !hasCheckedInitialSession) {
+            console.warn("[Session] Hydration timed out, unblocking UI...");
+            setHasCheckedInitialSession(true);
+        }
+    }, 5000);
 
     try {
+      // 1. Set basic user info immediately from metadata so the UI isn't blank
+      setUser({
+        ...supabaseUser,
+        is_admin: false,
+        first_name: supabaseUser.user_metadata?.first_name || null,
+        last_name: supabaseUser.user_metadata?.last_name || null,
+      } as AuthUser);
+
+      // 2. Fetch extended data from DB
       const [profileRes, subRes] = await Promise.all([
         supabase
           .from('profiles')
@@ -57,7 +79,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           .maybeSingle()
       ]);
 
-      if (!isMounted.current) return;
+      // If a newer hydration started, ignore this one
+      if (hydrationId.current !== currentAttemptId || !isMounted.current) return;
 
       const profileData = profileRes.data;
       const latestSub = subRes.data;
@@ -65,6 +88,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let currentHasActiveSubscription = profileData?.has_active_subscription || false;
       const latestSubEndDate = latestSub?.end_date || null;
 
+      // Handle subscription expiry maintenance
       if (currentHasActiveSubscription && latestSubEndDate) {
         const endDate = parseISO(latestSubEndDate);
         if (isPast(endDate)) {
@@ -100,16 +124,28 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } as AuthUser);
     } catch (e: any) {
       console.error("[Session] Profile hydration failed:", e);
+      // If DB fails, we still have the basic user info set above
     } finally {
-      setHasCheckedInitialSession(true); // Signal completion only after profile data is fetched
+      clearTimeout(timeoutId);
+      if (hydrationId.current === currentAttemptId) {
+        setHasCheckedInitialSession(true);
+      }
     }
-  }, []);
+  }, [hasCheckedInitialSession]);
 
   useEffect(() => {
     isMounted.current = true;
     
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+    // Initial Load Check
+    supabase.auth.getSession().then(async ({ data: { session: initialSession }, error }) => {
       if (!isMounted.current) return;
+      
+      if (error) {
+          console.error("[Session] Initial session fetch error:", error);
+          setHasCheckedInitialSession(true);
+          return;
+      }
+
       setSession(initialSession);
       if (initialSession) {
         await hydrateProfile(initialSession.user);
@@ -118,9 +154,12 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       }
     });
 
+    // Listen for Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted.current) return;
+      
       setSession(currentSession);
+      
       if (currentSession) {
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
           await hydrateProfile(currentSession.user);
@@ -141,6 +180,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     };
   }, [hydrateProfile]);
 
+  // Automatic redirect if on login/signup pages and already logged in
   useEffect(() => {
     if (hasCheckedInitialSession && session && (location.pathname === '/login' || location.pathname === '/signup')) {
       const isAdmin = user?.is_admin || false;

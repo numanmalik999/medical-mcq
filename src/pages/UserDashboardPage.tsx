@@ -13,6 +13,7 @@ import LoadingBar from '@/components/LoadingBar';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { differenceInDays, parseISO } from 'date-fns';
 import { cn } from "@/lib/utils";
+import TrialOfferDialog from '@/components/TrialOfferDialog';
 
 interface QuizPerformance {
   totalAttempts: number;
@@ -61,6 +62,9 @@ const UserDashboardPage = () => {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [areasForImprovement, setAreasForImprovement] = useState<PerformanceSummary[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
+  
+  // Trial Popup State
+  const [showTrialPopup, setShowTrialPopup] = useState(false);
 
   const isGuestMode = !user; 
 
@@ -74,6 +78,12 @@ const UserDashboardPage = () => {
           fetchRecentAttempts(),
           fetchVideoStats()
         ]);
+        
+        // Trigger trial popup if eligible
+        if (user && !user.has_active_subscription && !user.trial_taken) {
+            setShowTrialPopup(true);
+        }
+        
         setIsPageLoading(false);
       };
       fetchData();
@@ -89,12 +99,10 @@ const UserDashboardPage = () => {
     if (!user) return;
 
     try {
-      // Fetch total video count
       const { count: totalVideos } = await supabase
         .from('videos')
         .select('*', { count: 'exact', head: true });
 
-      // Fetch watched count
       const { data: progressData } = await supabase
         .from('user_video_progress')
         .select(`
@@ -495,6 +503,15 @@ const UserDashboardPage = () => {
           </CardFooter>
         </Card>
       </div>
+      
+      {user && (
+        <TrialOfferDialog 
+            open={showTrialPopup} 
+            onOpenChange={setShowTrialPopup} 
+            userId={user.id} 
+            onActivated={() => window.location.reload()} 
+        />
+      )}
 
       <MadeWithDyad />
     </div>

@@ -30,6 +30,7 @@ import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
+import { dismissToast, showLoading } from '@/utils/toast';
 
 interface Video {
   id: string;
@@ -182,6 +183,7 @@ const ManageVideosPage = () => {
   const handleBulkUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
+    let loadingId: string | number | undefined;
     
     try {
       const reader = new FileReader();
@@ -191,20 +193,46 @@ const ManageVideosPage = () => {
         const sheetName = workbook.SheetNames[0];
         const json = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
         
-        const { data: response, error } = await supabase.functions.invoke('bulk-upload-videos', {
-          body: { videos: json }
-        });
+        const BATCH_SIZE = 50;
+        let totalSuccess = 0;
+        let totalError = 0;
+        const allErrors: string[] = [];
 
-        if (error) throw error;
+        loadingId = showLoading(`Preparing to import ${json.length} videos...`);
+
+        for (let i = 0; i < json.length; i += BATCH_SIZE) {
+            const batch = json.slice(i, i + BATCH_SIZE);
+            const currentBatchNum = Math.floor(i / BATCH_SIZE) + 1;
+            const totalBatches = Math.ceil(json.length / BATCH_SIZE);
+
+            toast({ title: "Importing...", description: `Processing batch ${currentBatchNum} of ${totalBatches}...` });
+
+            const { data: response, error } = await supabase.functions.invoke('bulk-upload-videos', {
+              body: { videos: batch }
+            });
+
+            if (error) {
+                totalError += batch.length;
+                allErrors.push(`Batch ${currentBatchNum} failed: ${error.message}`);
+                continue;
+            }
+
+            totalSuccess += response.successCount;
+            totalError += response.errorCount;
+            if (response.errors) allErrors.push(...response.errors);
+        }
+
+        if (loadingId) dismissToast(loadingId);
         
-        if (response.errorCount > 0) {
+        if (totalError > 0) {
             toast({ 
-                title: "Partial Success", 
-                description: `Imported ${response.successCount} videos. ${response.errorCount} failed.`,
+                title: "Upload Completed with Errors", 
+                description: `Imported ${totalSuccess} videos. ${totalError} items failed. See console for details.`,
                 variant: "destructive"
             });
+            console.error("Bulk Upload Errors:", allErrors);
         } else {
-            toast({ title: "Upload Success", description: `${response.successCount} videos have been imported.` });
+            toast({ title: "Upload Success", description: `Successfully imported ${totalSuccess} videos.` });
         }
         
         setSelectedFile(null);
@@ -213,6 +241,7 @@ const ManageVideosPage = () => {
       };
       reader.readAsArrayBuffer(selectedFile);
     } catch (error: any) {
+      if (loadingId) dismissToast(loadingId);
       toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
     } finally {
       setIsUploading(false);

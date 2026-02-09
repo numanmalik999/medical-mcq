@@ -27,6 +27,9 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
+// 30 minutes in milliseconds
+const INACTIVITY_LIMIT = 30 * 60 * 1000;
+
 export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -36,6 +39,9 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const isMounted = useRef(true);
   const maintenancePerformed = useRef<string | null>(null);
   const hasNotifiedTrial = useRef<string | null>(null);
+  
+  // Timer ref to persist across re-renders
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const hydrateProfile = useCallback(async (supabaseUser: User) => {
     if (!isMounted.current) return;
@@ -109,6 +115,29 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     }
   }, []);
 
+  // Inactivity Logout Logic
+  const handleInactivityLogout = useCallback(async () => {
+    if (user) {
+      await supabase.auth.signOut();
+      toast.info("Session Expired", {
+        description: "You have been logged out due to inactivity for security.",
+        duration: 5000,
+      });
+      navigate('/login', { replace: true });
+    }
+  }, [user, navigate]);
+
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    
+    // Only set the timer if there is an active user session
+    if (user) {
+      inactivityTimerRef.current = setTimeout(handleInactivityLogout, INACTIVITY_LIMIT);
+    }
+  }, [user, handleInactivityLogout]);
+
   useEffect(() => {
     isMounted.current = true;
     
@@ -163,6 +192,38 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       subscription.unsubscribe();
     };
   }, [hydrateProfile]);
+
+  // Monitor Activity
+  useEffect(() => {
+    if (!user) {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      return;
+    }
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const activityHandler = () => resetInactivityTimer();
+
+    // Initialize timer
+    resetInactivityTimer();
+
+    // Set up listeners
+    events.forEach(event => {
+      window.addEventListener(event, activityHandler);
+    });
+
+    return () => {
+      // Cleanup listeners and timer
+      events.forEach(event => {
+        window.removeEventListener(event, activityHandler);
+      });
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [user, resetInactivityTimer]);
 
   useEffect(() => {
     if (hasCheckedInitialSession && session && (location.pathname === '/login' || location.pathname === '/signup')) {

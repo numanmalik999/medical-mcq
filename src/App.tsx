@@ -12,6 +12,7 @@ import Header from "./components/Header";
 import SchemaMarkup from "./components/SchemaMarkup";
 import LoadingBar from "./components/LoadingBar";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
+import WhatsappChatBubble from "./components/WhatsappChatBubble";
 
 // Lazy-loaded Pages
 const LandingPage = lazy(() => import("./pages/LandingPage"));
@@ -173,6 +174,7 @@ const AppContent = () => {
       </Suspense>
       <Suspense fallback={null}>
         <AiChatbot />
+        <WhatsappChatBubble />
       </Suspense>
     </>
   );

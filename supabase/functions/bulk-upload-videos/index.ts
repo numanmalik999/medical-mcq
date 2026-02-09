@@ -36,6 +36,7 @@ serve(async (req: Request) => {
       });
     }
 
+    // Pre-fetch groups and subgroups for mapping
     const { data: allGroups } = await supabaseAdmin.from('video_groups').select('id, name');
     const { data: allSubgroups } = await supabaseAdmin.from('video_subgroups').select('id, name, group_id');
 
@@ -46,25 +47,35 @@ serve(async (req: Request) => {
     let errorCount = 0;
     const errors: string[] = [];
 
-    const getVal = (obj: any, ...keys: string[]) => {
-      for (const key of keys) {
-        if (obj[key] !== undefined && obj[key] !== null) return obj[key];
+    // Improved helper to find values regardless of capitalization or exact naming
+    const getFlexibleVal = (obj: any, targetKeys: string[]) => {
+      const entryKeys = Object.keys(obj);
+      for (const target of targetKeys) {
+        // Try exact match
+        if (obj[target] !== undefined) return obj[target];
+        
+        // Try case-insensitive and space-normalized match
+        const normalizedTarget = target.toLowerCase().replace(/\s/g, '');
+        const foundKey = entryKeys.find(ek => ek.toLowerCase().replace(/\s/g, '') === normalizedTarget);
+        if (foundKey) return obj[foundKey];
       }
       return undefined;
     };
 
     for (const item of videos) {
       try {
-        const parentName = String(getVal(item, 'Parent Category', 'parent_category') || '').trim();
-        const subName = String(getVal(item, 'Sub-Category', 'sub_category') || '').trim();
-        const videoTitle = String(getVal(item, 'Video Title', 'title') || '').trim();
-        const videoIdStr = String(getVal(item, 'Vimeo ID', 'video_id', 'youtube_video_id') || '').trim();
-        const imageUrl = String(getVal(item, 'Image URL', 'image_url') || '').trim();
+        const parentName = String(getFlexibleVal(item, ['Parent Category', 'parent_category', 'Category', 'Specialty']) || '').trim();
+        const subName = String(getFlexibleVal(item, ['Sub-Category', 'sub_category', 'Topic', 'Subtopic']) || '').trim();
+        const videoTitle = String(getFlexibleVal(item, ['Video Title', 'title', 'Name', 'Lesson Title']) || '').trim();
+        const videoIdStr = String(getFlexibleVal(item, ['Vimeo ID', 'video_id', 'ID', 'vimeo_id', 'youtube_video_id']) || '').trim();
+        const imageUrl = String(getFlexibleVal(item, ['Image URL', 'image_url', 'Thumbnail']) || '').trim();
+        const orderVal = parseInt(String(getFlexibleVal(item, ['Display Number (Order)', 'order', 'Position', 'Order']) || '0'));
 
         if (!parentName || !videoTitle || !videoIdStr) {
-          throw new Error(`Missing required data for video: ${videoTitle || 'Unknown'}`);
+          throw new Error(`Missing required columns for video: "${videoTitle || 'Unknown'}". Ensure Parent Category, Video Title, and Vimeo ID are present.`);
         }
 
+        // 1. Resolve or Create Group
         let groupId = groupMap.get(parentName.toLowerCase());
         if (!groupId) {
           const { data: newGroup, error: gErr } = await supabaseAdmin
@@ -76,7 +87,7 @@ serve(async (req: Request) => {
           groupMap.set(parentName.toLowerCase(), groupId);
         }
 
-        // FIX: Changed 'const' to 'let' to allow assignment
+        // 2. Resolve or Create Subgroup
         let subgroupId = null;
         if (subName) {
           const subKey = `${groupId}_${subName.toLowerCase()}`;
@@ -92,6 +103,7 @@ serve(async (req: Request) => {
           }
         }
 
+        // 3. Upsert Video
         const videoPayload = {
           title: videoTitle,
           youtube_video_id: videoIdStr,
@@ -99,7 +111,7 @@ serve(async (req: Request) => {
           group_id: groupId,
           subgroup_id: subgroupId,
           image_url: imageUrl || null,
-          order: parseInt(String(getVal(item, 'Display Number (Order)', 'order') || '0')),
+          order: orderVal,
           updated_at: new Date().toISOString()
         };
 

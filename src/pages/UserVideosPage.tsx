@@ -351,19 +351,17 @@ const UserVideosPage = () => {
                                     <ImageIcon className="h-12 w-12" />
                                 </div>
                             )}
-                            <div className="absolute top-3 right-3">
-                                <Badge className="font-black text-[10px] h-7 px-4 rounded-full shadow-lg bg-slate-900/80 backdrop-blur-md text-white border-white/20">
-                                    {totalVideos} LESSONS
-                                </Badge>
                             </div>
-                            </div>
-                            <CardHeader className="p-6 flex-grow space-y-2">
+                            <CardHeader className="p-6 flex-grow space-y-1">
                             <CardTitle className="text-lg font-black uppercase tracking-tighter leading-tight whitespace-normal text-slate-900 group-hover:text-primary transition-colors">
                                 {group.name}
                             </CardTitle>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-primary/60">
+                                {totalVideos} Lectures
+                            </p>
                             </CardHeader>
                             <CardFooter className="px-6 py-4 bg-slate-50/50 border-t border-slate-50 flex items-center justify-between">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Study Now</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-primary/40">Study Now</span>
                                 <ChevronRight className="h-5 w-5 text-primary group-hover:translate-x-1 transition-transform" />
                             </CardFooter>
                         </Card>
@@ -385,7 +383,7 @@ const UserVideosPage = () => {
                               </p>
                             )}
                             <div className="flex items-center gap-2 mt-3">
-                                <Badge variant="secondary" className="font-black text-[10px]">{counts.groups[activeGroupId]} Lessons Total</Badge>
+                                <Badge variant="secondary" className="font-black text-[10px]">{counts.groups[activeGroupId]} Lectures Total</Badge>
                             </div>
                         </div>
                         <Button 
@@ -403,7 +401,7 @@ const UserVideosPage = () => {
                         <div className="flex justify-center py-20"><Loader2 className="animate-spin h-8 w-8 text-primary/20" /></div>
                         ) : loadedVideos[activeGroupId]?.length > 0 && (
                         <section className="space-y-4">
-                            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-primary/40 px-1">Foundation Lessons</h3>
+                            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-primary/40 px-1">Foundation Lectures</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                 {loadedVideos[activeGroupId].map(v => <VideoCard key={v.id} video={v} />)}
                             </div>
@@ -429,7 +427,7 @@ const UserVideosPage = () => {
                                                     </div>
                                                     <span className="font-bold text-sm uppercase tracking-tight text-left leading-tight whitespace-normal">{sg.name}</span>
                                                 </div>
-                                                <Badge variant="outline" className="font-black text-[10px] h-6 px-3">{counts.subgroups[sg.id]} Lessons</Badge>
+                                                <Badge variant="outline" className="font-black text-[10px] h-6 px-3">{counts.subgroups[sg.id]} Lectures</Badge>
                                             </div>
                                         </AccordionTrigger>
                                         <AccordionContent className="px-4 pb-4 pt-1 bg-slate-50/20 border-t border-slate-50">

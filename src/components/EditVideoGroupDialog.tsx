@@ -65,7 +65,13 @@ const EditVideoGroupDialog = ({ open, onOpenChange, group, onSave }: EditVideoGr
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Basic validation
+    // Check if the user is logged in
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        toast({ title: "Error", description: "You must be logged in to upload files.", variant: "destructive" });
+        return;
+    }
+
     if (!file.type.startsWith('image/')) {
       toast({ title: "Invalid file", description: "Please upload an image file.", variant: "destructive" });
       return;
@@ -77,11 +83,21 @@ const EditVideoGroupDialog = ({ open, onOpenChange, group, onSave }: EditVideoGr
       const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `video-covers/${fileName}`;
 
+      // Upload the file to the 'media' bucket
       const { error: uploadError } = await supabase.storage
         .from('media')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+          // If the error is 'Bucket not found', give a more helpful message
+          if (uploadError.message.includes('not found')) {
+              throw new Error("The 'media' storage bucket does not exist. Please run the SQL fix in your Supabase Dashboard.");
+          }
+          throw uploadError;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('media')

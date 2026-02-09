@@ -338,7 +338,7 @@ const UserVideosPage = () => {
                         <Card 
                             key={group.id} 
                             className={cn(
-                                "group flex flex-col cursor-pointer overflow-hidden transition-all duration-300 border-2 rounded-3xl hover:shadow-2xl",
+                                "group flex flex-col cursor-pointer overflow-hidden transition-all duration-300 border-2 rounded-2xl hover:shadow-xl",
                                 activeGroupId === group.id ? "border-primary shadow-xl bg-primary/5" : "border-transparent bg-white hover:border-primary/20"
                             )}
                             onClick={() => handleGroupClick(group.id)}
@@ -348,21 +348,21 @@ const UserVideosPage = () => {
                                 <img src={group.image_url} alt={group.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center opacity-20">
-                                    <ImageIcon className="h-12 w-12" />
+                                    <ImageIcon className="h-10 w-10" />
                                 </div>
                             )}
                             </div>
-                            <CardHeader className="p-6 flex-grow space-y-1">
-                            <CardTitle className="text-lg font-black uppercase tracking-tighter leading-tight whitespace-normal text-slate-900 group-hover:text-primary transition-colors">
+                            <CardHeader className="p-4 flex-grow space-y-1">
+                            <CardTitle className="text-base font-black uppercase tracking-tighter leading-tight whitespace-normal text-slate-900 group-hover:text-primary transition-colors">
                                 {group.name}
                             </CardTitle>
                             <p className="text-[10px] font-black uppercase tracking-widest text-primary/60">
                                 {totalVideos} Lectures
                             </p>
                             </CardHeader>
-                            <CardFooter className="px-6 py-4 bg-slate-50/50 border-t border-slate-50 flex items-center justify-between">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-primary/40">Study Now</span>
-                                <ChevronRight className="h-5 w-5 text-primary group-hover:translate-x-1 transition-transform" />
+                            <CardFooter className="px-4 py-3 bg-slate-50/50 border-t border-slate-50 flex items-center justify-between">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-primary/40">Study Now</span>
+                                <ChevronRight className="h-4 w-4 text-primary group-hover:translate-x-1 transition-transform" />
                             </CardFooter>
                         </Card>
                     );

@@ -68,6 +68,13 @@ const UserVideosPage = () => {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
 
+  // Helper to extract ID from potential full URLs
+  const getCleanVimeoId = (input: string) => {
+    if (!input) return "";
+    const match = input.match(/(?:www\.|player\.)?vimeo.com\/(?:channels\/(?:\w+\/)?|groups\/(?:\w+\/)?|album\/(?:\d+\/)?video\/|video\/|)(\d+)(?:$|\/|\?)/);
+    return match ? match[1] : input.trim();
+  };
+
   const fetchMetadata = useCallback(async () => {
     try {
       const [groupsRes, subRes, progRes] = await Promise.all([
@@ -154,7 +161,6 @@ const UserVideosPage = () => {
   const handleGroupClick = (id: string) => {
     setActiveGroupId(id);
     loadVideosForId(id, 'group');
-    // Smooth scroll to the content area
     setTimeout(() => {
         contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
@@ -178,7 +184,7 @@ const UserVideosPage = () => {
           const { data, error = null } = await supabase
             .from('videos')
             .select('*, video_groups(name), video_subgroups(name)')
-            .or(`title.ilike.%\${searchTerm}%,description.ilike.%\${searchTerm}%`)
+            .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
             .order('title', { ascending: true })
             .range(offset, offset + CHUNK_SIZE - 1);
           
@@ -467,7 +473,7 @@ const UserVideosPage = () => {
           <div className="aspect-video w-full bg-black relative">
             {selectedVideo && (
               <iframe 
-                src={`https://player.vimeo.com/video/\${selectedVideo.youtube_video_id}?autoplay=1&badge=0&autopause=0`}
+                src={`https://player.vimeo.com/video/${getCleanVimeoId(selectedVideo.youtube_video_id)}?autoplay=1&badge=0&autopause=0`}
                 width="100%"
                 height="100%"
                 frameBorder="0" 

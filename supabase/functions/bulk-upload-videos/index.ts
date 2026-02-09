@@ -59,6 +59,7 @@ serve(async (req: Request) => {
         const subName = String(getVal(item, 'Sub-Category', 'sub_category') || '').trim();
         const videoTitle = String(getVal(item, 'Video Title', 'title') || '').trim();
         const videoIdStr = String(getVal(item, 'Vimeo ID', 'video_id', 'youtube_video_id') || '').trim();
+        const imageUrl = String(getVal(item, 'Image URL', 'image_url') || '').trim();
 
         if (!parentName || !videoTitle || !videoIdStr) {
           throw new Error(`Missing required data for video: ${videoTitle || 'Unknown'}`);
@@ -75,6 +76,7 @@ serve(async (req: Request) => {
           groupMap.set(parentName.toLowerCase(), groupId);
         }
 
+        // FIX: Changed 'const' to 'let' to allow assignment
         let subgroupId = null;
         if (subName) {
           const subKey = `${groupId}_${subName.toLowerCase()}`;
@@ -96,6 +98,7 @@ serve(async (req: Request) => {
           platform: 'vimeo',
           group_id: groupId,
           subgroup_id: subgroupId,
+          image_url: imageUrl || null,
           order: parseInt(String(getVal(item, 'Display Number (Order)', 'order') || '0')),
           updated_at: new Date().toISOString()
         };

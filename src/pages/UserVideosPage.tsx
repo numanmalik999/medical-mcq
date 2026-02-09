@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { 
   Search, 
@@ -284,6 +284,8 @@ const UserVideosPage = () => {
 
   if (!hasCheckedInitialSession || isLoading) return <LoadingBar />;
 
+  const activeGroup = groups.find(g => g.id === activeGroupId);
+
   return (
     <div className="space-y-6 pb-12">
       <section className="relative overflow-hidden bg-primary rounded-2xl p-6 md:p-10 text-primary-foreground shadow-lg">
@@ -359,9 +361,6 @@ const UserVideosPage = () => {
                             <CardTitle className="text-lg font-black uppercase tracking-tighter leading-tight whitespace-normal text-slate-900 group-hover:text-primary transition-colors">
                                 {group.name}
                             </CardTitle>
-                            <CardDescription className="text-xs font-medium leading-relaxed italic line-clamp-2 h-8">
-                                {group.description || "Master core concepts and high-yield topics for this specialty."}
-                            </CardDescription>
                             </CardHeader>
                             <CardFooter className="px-6 py-4 bg-slate-50/50 border-t border-slate-50 flex items-center justify-between">
                                 <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Study Now</span>
@@ -378,9 +377,14 @@ const UserVideosPage = () => {
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-6">
                         <div>
                             <h2 className="text-3xl font-black uppercase tracking-tighter leading-tight whitespace-normal max-w-3xl">
-                                {groups.find(g => g.id === activeGroupId)?.name}
+                                {activeGroup?.name}
                             </h2>
-                            <div className="flex items-center gap-2 mt-2">
+                            {activeGroup?.description && (
+                              <p className="mt-2 text-sm text-muted-foreground italic leading-relaxed max-w-2xl">
+                                {activeGroup.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-3">
                                 <Badge variant="secondary" className="font-black text-[10px]">{counts.groups[activeGroupId]} Lessons Total</Badge>
                             </div>
                         </div>

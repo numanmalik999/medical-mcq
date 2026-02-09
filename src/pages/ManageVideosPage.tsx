@@ -188,20 +188,31 @@ const ManageVideosPage = () => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const json = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
         
-        const { error } = await supabase.functions.invoke('bulk-upload-videos', {
+        const { data: response, error } = await supabase.functions.invoke('bulk-upload-videos', {
           body: { videos: json }
         });
 
         if (error) throw error;
-        toast({ title: "Upload Success", description: "Videos have been imported." });
+        
+        if (response.errorCount > 0) {
+            toast({ 
+                title: "Partial Success", 
+                description: `Imported \${response.successCount} videos. \${response.errorCount} failed.`,
+                variant: "destructive"
+            });
+        } else {
+            toast({ title: "Upload Success", description: `\${response.successCount} videos have been imported.` });
+        }
+        
         setSelectedFile(null);
+        setLoadedVideos({});
         fetchMetadata();
       };
-      reader.readAsBinaryString(selectedFile);
+      reader.readAsArrayBuffer(selectedFile);
     } catch (error: any) {
       toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
     } finally {

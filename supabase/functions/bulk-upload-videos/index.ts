@@ -3,46 +3,39 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
+declare global {
+  namespace Deno {
+    namespace env {
+      function get(key: string): string | undefined;
+    }
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-interface IncomingVideo {
-  parent_category: string;
-  sub_category?: string;
-  sub_category_order?: number;
-  video_title: string;
-  order: number;
-  video_id: string;
-  platform?: string;
-}
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // @ts-ignore
   const supabaseAdmin = createClient(
-    // @ts-ignore
     Deno.env.get('SUPABASE_URL') ?? '',
-    // @ts-ignore
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
   try {
     const { videos } = await req.json();
-    console.log(`[bulk-upload-videos] Received ${videos?.length || 0} videos for processing.`);
 
     if (!Array.isArray(videos) || videos.length === 0) {
-      return new Response(JSON.stringify({ error: 'No videos provided.' }), { 
+      return new Response(JSON.stringify({ error: 'No data provided.' }), { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
-    // 1. Fetch current groups and subgroups to minimize DB calls
     const { data: allGroups } = await supabaseAdmin.from('video_groups').select('id, name');
     const { data: allSubgroups } = await supabaseAdmin.from('video_subgroups').select('id, name, group_id');
 
@@ -53,88 +46,67 @@ serve(async (req: Request) => {
     let errorCount = 0;
     const errors: string[] = [];
 
-    for (const video of (videos as IncomingVideo[])) {
+    const getVal = (obj: any, ...keys: string[]) => {
+      for (const key of keys) {
+        if (obj[key] !== undefined && obj[key] !== null) return obj[key];
+      }
+      return undefined;
+    };
+
+    for (const item of videos) {
       try {
-        const videoIdStr = String(video.video_id).trim();
-        const platform = 'vimeo';
+        const parentName = String(getVal(item, 'Parent Category', 'parent_category') || '').trim();
+        const subName = String(getVal(item, 'Sub-Category', 'sub_category') || '').trim();
+        const videoTitle = String(getVal(item, 'Video Title', 'title') || '').trim();
+        const videoIdStr = String(getVal(item, 'Vimeo ID', 'video_id', 'youtube_video_id') || '').trim();
 
-        // --- Handle Parent Category (Group) ---
-        const parentName = video.parent_category?.trim();
-        if (!parentName) throw new Error("Missing parent category");
-        
+        if (!parentName || !videoTitle || !videoIdStr) {
+          throw new Error(`Missing required data for video: ${videoTitle || 'Unknown'}`);
+        }
+
         let groupId = groupMap.get(parentName.toLowerCase());
-
         if (!groupId) {
-          console.log(`[bulk-upload-videos] Creating new group: ${parentName}`);
           const { data: newGroup, error: gErr } = await supabaseAdmin
             .from('video_groups')
             .insert({ name: parentName, order: 0 })
             .select('id').single();
-          
-          if (gErr) throw new Error(`Failed to create group "${parentName}": ${gErr.message}`);
+          if (gErr) throw gErr;
           groupId = newGroup.id;
           groupMap.set(parentName.toLowerCase(), groupId);
         }
 
-        // --- Handle Sub-Category (Subgroup) ---
         let subgroupId = null;
-        if (video.sub_category?.trim()) {
-          const subName = video.sub_category.trim();
+        if (subName) {
           const subKey = `${groupId}_${subName.toLowerCase()}`;
           subgroupId = subgroupMap.get(subKey);
-
           if (!subgroupId) {
-            console.log(`[bulk-upload-videos] Creating new sub-group: ${subName}`);
             const { data: newSub, error: sErr } = await supabaseAdmin
               .from('video_subgroups')
-              .insert({ 
-                name: subName, 
-                group_id: groupId, 
-                order: parseInt(String(video.sub_category_order)) || 0 
-              })
+              .insert({ name: subName, group_id: groupId, order: 0 })
               .select('id').single();
-            
-            if (sErr) throw new Error(`Failed to create sub-group "${subName}": ${sErr.message}`);
+            if (sErr) throw sErr;
             subgroupId = newSub.id;
             subgroupMap.set(subKey, subgroupId);
           }
         }
 
-        // --- Check if video exists by ID before inserting ---
-        // Using youtube_video_id column to store the Vimeo ID
-        const { data: existing } = await supabaseAdmin
-          .from('videos')
-          .select('id')
-          .eq('youtube_video_id', videoIdStr)
-          .maybeSingle();
-
         const videoPayload = {
-          title: video.video_title.trim(),
+          title: videoTitle,
           youtube_video_id: videoIdStr,
-          platform: platform,
+          platform: 'vimeo',
           group_id: groupId,
           subgroup_id: subgroupId,
-          order: parseInt(String(video.order)) || 0,
+          order: parseInt(String(getVal(item, 'Display Number (Order)', 'order') || '0')),
           updated_at: new Date().toISOString()
         };
 
-        if (existing) {
-          const { error: updateErr } = await supabaseAdmin
-            .from('videos')
-            .update(videoPayload)
-            .eq('id', existing.id);
-          if (updateErr) throw updateErr;
-        } else {
-          const { error: insertErr } = await supabaseAdmin
-            .from('videos')
-            .insert(videoPayload);
-          if (insertErr) throw insertErr;
-        }
+        const { error: upsertErr } = await supabaseAdmin.from('videos').upsert(videoPayload, { onConflict: 'youtube_video_id' });
+        if (upsertErr) throw upsertErr;
 
         successCount++;
       } catch (e: any) {
         errorCount++;
-        errors.push(`Failed "${video.video_title}": ${e.message}`);
+        errors.push(e.message);
       }
     }
 

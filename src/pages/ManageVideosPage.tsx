@@ -157,7 +157,6 @@ const ManageVideosPage = () => {
     
     if (!isTogglingOff) {
         fetchVideosForSection(groupId, 'group');
-        // Smooth scroll to the details section
         setTimeout(() => {
             detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
@@ -201,11 +200,11 @@ const ManageVideosPage = () => {
         if (response.errorCount > 0) {
             toast({ 
                 title: "Partial Success", 
-                description: `Imported \${response.successCount} videos. \${response.errorCount} failed.`,
+                description: `Imported ${response.successCount} videos. ${response.errorCount} failed.`,
                 variant: "destructive"
             });
         } else {
-            toast({ title: "Upload Success", description: `\${response.successCount} videos have been imported.` });
+            toast({ title: "Upload Success", description: `${response.successCount} videos have been imported.` });
         }
         
         setSelectedFile(null);
@@ -368,7 +367,6 @@ const ManageVideosPage = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {/* Videos directly in group */}
                   {loadedVideos[activeGroupId]?.length > 0 && (
                      <div className="space-y-2">
                         <h3 className="text-[10px] font-black uppercase tracking-widest text-primary/60 px-1">Ungrouped Lessons</h3>
@@ -378,7 +376,6 @@ const ManageVideosPage = () => {
                      </div>
                   )}
 
-                  {/* Subgroups */}
                   <Accordion type="multiple" className="space-y-3">
                     {subgroups.filter(sg => sg.group_id === activeGroupId).map((sg) => {
                         const subVideoCount = counts.subgroups[sg.id] || 0;

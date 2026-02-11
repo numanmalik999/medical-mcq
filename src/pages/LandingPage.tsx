@@ -177,10 +177,6 @@ const LandingPage = () => {
               <p className="text-xs text-muted-foreground font-medium uppercase">Verified MCQs</p>
             </div>
             <div>
-              <p className="text-xl font-bold text-primary">10,000+</p>
-              <p className="text-xs text-muted-foreground font-medium uppercase">Active Students</p>
-            </div>
-            <div>
               <p className="text-xl font-bold text-primary">6 Countries</p>
               <p className="text-xs text-muted-foreground font-medium uppercase">Exam Blueprints</p>
             </div>

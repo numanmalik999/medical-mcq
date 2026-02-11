@@ -12,7 +12,7 @@ import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Wand2, Loader2 } from 'lucide-react'; 
+import { Wand2, Loader2, Sparkles, CircleDashed } from 'lucide-react'; 
 import { useSession } from '@/components/SessionContextProvider'; 
 import { RowSelectionState } from '@tanstack/react-table';
 import LoadingBar from '@/components/LoadingBar';
@@ -42,6 +42,7 @@ const ManageMcqsPage = () => {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<string | null>(null);
+  const [enhancementFilter, setEnhancementFilter] = useState<'all' | 'enhanced' | 'unenhanced'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -228,18 +229,28 @@ const ManageMcqsPage = () => {
   }, [searchTerm, hasCheckedInitialSession]);
 
   const filteredMcqs = useMemo(() => {
-    if (!selectedFilterCategory || selectedFilterCategory === "all") {
-      return rawMcqs;
+    let result = rawMcqs;
+
+    // 1. Filter by Category
+    if (selectedFilterCategory && selectedFilterCategory !== "all") {
+      if (selectedFilterCategory === UNCATEGORIZED_ID) {
+        result = result.filter(mcq => mcq.category_links.length === 0);
+      } else {
+        result = result.filter(mcq =>
+          mcq.category_links.some(link => link.category_id === selectedFilterCategory)
+        );
+      }
     }
 
-    if (selectedFilterCategory === UNCATEGORIZED_ID) {
-      return rawMcqs.filter(mcq => mcq.category_links.length === 0);
+    // 2. Filter by Enhancement Status
+    if (enhancementFilter === 'enhanced') {
+      result = result.filter(mcq => !!mcq.difficulty);
+    } else if (enhancementFilter === 'unenhanced') {
+      result = result.filter(mcq => !mcq.difficulty);
     }
 
-    return rawMcqs.filter(mcq =>
-      mcq.category_links.some(link => link.category_id === selectedFilterCategory)
-    );
-  }, [rawMcqs, selectedFilterCategory]);
+    return result;
+  }, [rawMcqs, selectedFilterCategory, enhancementFilter]);
 
   const handleDeleteMcq = async (mcqId: string, explanationId: string | null) => {
     if (!window.confirm("Are you sure you want to delete this MCQ? This action cannot be undone.")) {
@@ -267,7 +278,7 @@ const ManageMcqsPage = () => {
       return;
     }
 
-    if (!window.confirm(`You are about to enhance \${selectedMcqIds.length} MCQs with AI. Continue?`)) {
+    if (!window.confirm(`You are about to enhance ${selectedMcqIds.length} MCQs with AI. Continue?`)) {
       return;
     }
 
@@ -282,18 +293,18 @@ const ManageMcqsPage = () => {
       if (data.errorCount > 0) {
         toast({
           title: "Partial Success",
-          description: `Enhanced \${data.successCount} MCQs. \${data.errorCount} failed. Check console for details.`,
+          description: `Enhanced ${data.successCount} MCQs. ${data.errorCount} failed. Check console for details.`,
           variant: "default",
         });
         console.error("Bulk Enhance Errors:", data.errors);
       } else {
-        toast({ title: "Success!", description: `Successfully enhanced \${data.successCount} MCQs.` });
+        toast({ title: "Success!", description: `Successfully enhanced ${data.successCount} MCQs.` });
       }
       setRowSelection({});
       refreshAllData();
     } catch (error: any) {
       console.error("Error bulk enhancing MCQs:", error);
-      toast({ title: "Error", description: `Failed to enhance MCQs: \${error.message || 'Unknown error'}`, variant: "destructive" });
+      toast({ title: "Error", description: `Failed to enhance MCQs: ${error.message || 'Unknown error'}`, variant: "destructive" });
     } finally {
       setIsEnhancing(false);
     }
@@ -319,16 +330,16 @@ const ManageMcqsPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Filter & Search</CardTitle>
-          <CardDescription>Filter questions by category or search by text.</CardDescription>
+          <CardDescription>Narrow down questions by category, AI status, or text.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex-1">
             <Label htmlFor="search-term">Search Question Text</Label>
             <Input id="search-term" placeholder="Enter keywords to search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <Label htmlFor="filterCategory">Filter by Category</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="filterCategory">Specialty</Label>
               <Select onValueChange={(value) => setSelectedFilterCategory(value === "all" ? null : value)} value={selectedFilterCategory || "all"}>
                 <SelectTrigger id="filterCategory"><SelectValue placeholder="All Categories" /></SelectTrigger>
                 <SelectContent>
@@ -339,8 +350,23 @@ const ManageMcqsPage = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="enhancementStatus">AI Status</Label>
+              <Select onValueChange={(value: any) => setEnhancementFilter(value)} value={enhancementFilter}>
+                <SelectTrigger id="enhancementStatus"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Questions</SelectItem>
+                  <SelectItem value="enhanced">
+                    <div className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-blue-500" /> Enhanced Only</div>
+                  </SelectItem>
+                  <SelectItem value="unenhanced">
+                    <div className="flex items-center gap-2"><CircleDashed className="h-3.5 w-3.5 text-muted-foreground" /> Un-enhanced Only</div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-end">
-                <Button onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); }} variant="outline" className="w-full sm:w-auto">Reset Filters</Button>
+                <Button onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); setEnhancementFilter('all'); }} variant="outline" className="w-full">Reset Filters</Button>
             </div>
           </div>
         </CardContent>

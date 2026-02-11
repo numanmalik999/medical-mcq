@@ -16,6 +16,7 @@ import { Wand2, Loader2, Sparkles, CircleDashed, LayoutList } from 'lucide-react
 import { useSession } from '@/components/SessionContextProvider'; 
 import { RowSelectionState } from '@tanstack/react-table';
 import LoadingBar from '@/components/LoadingBar';
+import { showLoading, dismissToast, showError, showSuccess } from '@/utils/toast';
 
 interface Category {
   id: string;
@@ -61,7 +62,6 @@ const ManageMcqsPage = () => {
       console.error('[ManageMcqsPage] Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories for filter.", variant: "destructive" });
     } else {
-      // Get count of MCQs that are linked to any category to calculate uncategorized
       const { count: linkedCount } = await supabase
         .from('mcq_category_links')
         .select('mcq_id', { count: 'exact', head: true });
@@ -80,7 +80,6 @@ const ManageMcqsPage = () => {
         .from('mcqs')
         .select('id', { count: 'exact', head: true });
 
-      // Approximation for uncategorized
       const uncategorizedMcqCount = (totalMcqCount || 0) - (linkedCount || 0);
 
       setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'General Medical Practice', mcq_count: Math.max(0, uncategorizedMcqCount) }]);
@@ -96,7 +95,6 @@ const ManageMcqsPage = () => {
     try {
       let mcqIdsToFetch: string[] | null = null;
 
-      // If a category is selected, find the IDs first for targeted fetching
       if (categoryId && categoryId !== "all") {
         if (categoryId === UNCATEGORIZED_ID) {
           const { data: linked } = await supabase.from('mcq_category_links').select('mcq_id');
@@ -109,7 +107,6 @@ const ManageMcqsPage = () => {
         }
       }
 
-      // Fetch MCQs based on IDs or fetch all if no category filter (with search support)
       let offsetMcqs = 0;
       let hasMoreMcqs = true;
       
@@ -142,7 +139,6 @@ const ManageMcqsPage = () => {
         }
       }
 
-      // Hydrate links
       const mcqIds = allMcqs.map(m => m.id);
       if (mcqIds.length > 0) {
         const { data: linksData } = await supabase
@@ -225,20 +221,33 @@ const ManageMcqsPage = () => {
       return;
     }
 
-    if (!window.confirm(`Enhance ${selectedMcqIds.length} MCQs with AI?`)) return;
+    if (!window.confirm(`Enhance ${selectedMcqIds.length} MCQs with AI? This process may take a minute.`)) return;
 
     setIsEnhancing(true);
+    const toastId = showLoading(`AI is analyzing and optimizing ${selectedMcqIds.length} clinical questions...`);
+
     try {
       const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
         body: { mcq_ids: selectedMcqIds },
       });
 
+      dismissToast(toastId);
+
       if (error) throw error;
-      toast({ title: "Success!", description: `Enhanced ${data.successCount} MCQs.` });
+
+      if (data.errorCount > 0) {
+        showError(`Enhanced ${data.successCount} MCQs, but ${data.errorCount} failed. Check the console for details.`);
+        console.error("Bulk Enhance Partial Errors:", data.errors);
+      } else {
+        showSuccess(`Successfully enhanced ${data.successCount} clinical scenarios with AI explanations.`);
+      }
+
       setRowSelection({});
       if (selectedFilterCategory) fetchMcqs(selectedFilterCategory);
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      dismissToast(toastId);
+      showError(`Enhancement Failed: ${error.message || 'The request timed out or encountered an error.'}`);
+      console.error("Bulk Enhance Error:", error);
     } finally {
       setIsEnhancing(false);
     }

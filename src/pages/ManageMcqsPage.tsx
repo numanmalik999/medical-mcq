@@ -227,16 +227,16 @@ const ManageMcqsPage = () => {
     let successCount = 0;
     let errorCount = 0;
     
-    // Initial loading toast
-    const toastId = showLoading(`Initializing AI optimization for ${selectedMcqIds.length} scenarios...`);
+    // Tracking the active toast ID so we can properly dismiss/update it
+    let activeToastId = showLoading(`Initializing AI optimization for ${selectedMcqIds.length} scenarios...`);
 
     try {
       for (let i = 0; i < selectedMcqIds.length; i++) {
         const currentId = selectedMcqIds[i];
         
-        // Update toast content for the current item
-        dismissToast(toastId);
-        showLoading(`AI Optimizing scenario ${i + 1} of ${selectedMcqIds.length}...`);
+        // Dismiss previous loop toast and create new one with updated counter
+        dismissToast(activeToastId);
+        activeToastId = showLoading(`AI Optimizing scenario ${i + 1} of ${selectedMcqIds.length}...`);
 
         try {
           const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
@@ -254,8 +254,9 @@ const ManageMcqsPage = () => {
         }
       }
 
-      // Final summary
-      dismissToast(toastId);
+      // Final cleanup of loading toast
+      dismissToast(activeToastId);
+      
       if (errorCount > 0) {
         showError(`Optimization complete. Successfully updated ${successCount} items. ${errorCount} failed.`);
       } else {
@@ -265,7 +266,7 @@ const ManageMcqsPage = () => {
       setRowSelection({});
       if (selectedFilterCategory) fetchMcqs(selectedFilterCategory);
     } catch (error: any) {
-      dismissToast(toastId);
+      dismissToast(activeToastId);
       showError(`Enhancement Interrupted: ${error.message}`);
     } finally {
       setIsEnhancing(false);

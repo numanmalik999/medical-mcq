@@ -13,18 +13,15 @@ const corsHeaders = {
 // Helper to sanitize and parse AI JSON responses
 function parseAiJson(text: string) {
   try {
-    // 1. Strip markdown code blocks
     let cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
     
-    // 2. Locate the first '{' and last '}' to handle any surrounding text
     const start = cleaned.indexOf('{');
     const end = cleaned.lastIndexOf('}');
     if (start !== -1 && end !== -1) {
       cleaned = cleaned.substring(start, end + 1);
     }
 
-    // 3. Replace internal raw newlines within string literals (common source of "Bad control character" error)
-    // This looks for content between quotes and ensures literal newlines are escaped
+    // Escape internal raw newlines within string literals
     cleaned = cleaned.replace(/(?<=[:[])\s*"(?:[^"\\]|\\.)*"/gs, (match) => {
       return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
     });
@@ -60,7 +57,7 @@ async function generateEnhancedContent(
   1. Return ONLY a valid JSON object.
   2. Use the keys: "correct_answer", "explanation_text", "difficulty", "suggested_category_name".
   3. "difficulty" must be exactly one of: "Easy", "Medium", or "Hard".
-  4. CRITICAL: Ensure all internal newlines in strings are escaped as "\\n". No raw unescaped newlines in the string values.
+  4. "suggested_category_name" should be the best fit from the provided list, or a new relevant specialty if none fit.
 
   Expected JSON structure:
   {"correct_answer": "...", "explanation_text": "...", "difficulty": "...", "suggested_category_name": "..."}`;
@@ -90,7 +87,6 @@ serve(async (req: Request) => {
     const { data: categories } = await supabaseAdmin.from('categories').select('id, name');
     const categoryList = categories ? categories.map((c: any) => c.name) : [];
     
-    // Fetch MCQs in chunks or as a set
     const { data: mcqs } = await supabaseAdmin.from('mcqs').select('*').in('id', mcq_ids);
 
     let successCount = 0;
@@ -105,15 +101,27 @@ serve(async (req: Request) => {
           model
         );
 
-        let categoryId;
-        let existingCategory = (categories || []).find((c: any) => c.name.toLowerCase() === aiResponse.suggested_category_name?.toLowerCase());
-        
-        if (existingCategory) {
-          categoryId = existingCategory.id;
-        } else if (aiResponse.suggested_category_name) {
-          const { data: newCat } = await supabaseAdmin.from('categories').insert({ name: aiResponse.suggested_category_name }).select('id').single();
-          categoryId = newCat.id;
-          if (categories) categories.push({ id: categoryId, name: aiResponse.suggested_category_name });
+        // --- Category Logic: ONLY update if currently uncategorized ---
+        const { count: linkCount } = await supabaseAdmin
+          .from('mcq_category_links')
+          .select('*', { count: 'exact', head: true })
+          .eq('mcq_id', mcq.id);
+
+        if (linkCount === 0 && aiResponse.suggested_category_name) {
+            let categoryId;
+            let existingCategory = (categories || []).find((c: any) => c.name.toLowerCase() === aiResponse.suggested_category_name?.toLowerCase());
+            
+            if (existingCategory) {
+              categoryId = existingCategory.id;
+            } else {
+              const { data: newCat } = await supabaseAdmin.from('categories').insert({ name: aiResponse.suggested_category_name }).select('id').single();
+              categoryId = newCat.id;
+              if (categories) categories.push({ id: categoryId, name: aiResponse.suggested_category_name });
+            }
+
+            if (categoryId) {
+              await supabaseAdmin.from('mcq_category_links').insert({ mcq_id: mcq.id, category_id: categoryId });
+            }
         }
 
         // Update or Insert Explanation
@@ -122,18 +130,12 @@ serve(async (req: Request) => {
           explanation_text: aiResponse.explanation_text,
         }).select('id').single();
 
-        // Update MCQ metadata
+        // Update MCQ metadata (keeping correct answer and difficulty as determined by AI)
         await supabaseAdmin.from('mcqs').update({
           correct_answer: aiResponse.correct_answer,
           difficulty: aiResponse.difficulty,
           explanation_id: exp.id,
         }).eq('id', mcq.id);
-
-        // Update Category Links
-        if (categoryId) {
-          await supabaseAdmin.from('mcq_category_links').delete().eq('mcq_id', mcq.id);
-          await supabaseAdmin.from('mcq_category_links').insert({ mcq_id: mcq.id, category_id: categoryId });
-        }
 
         successCount++;
       } catch (e: any) {

@@ -214,40 +214,59 @@ const ManageMcqsPage = () => {
 
   const handleBulkEnhance = async () => {
     const selectedIndices = Object.keys(rowSelection);
-    const selectedMcqIds = selectedIndices.map(_index => filteredMcqs[parseInt(_index)].id);
+    const selectedMcqIds = selectedIndices.map(index => filteredMcqs[parseInt(index)].id);
 
     if (selectedMcqIds.length === 0) {
       toast({ title: "No MCQs Selected", variant: "destructive" });
       return;
     }
 
-    if (!window.confirm(`Enhance ${selectedMcqIds.length} MCQs with AI? This process may take a minute.`)) return;
+    if (!window.confirm(`Optimize ${selectedMcqIds.length} MCQs one-by-one?`)) return;
 
     setIsEnhancing(true);
-    const toastId = showLoading(`AI is analyzing and optimizing ${selectedMcqIds.length} clinical questions...`);
+    let successCount = 0;
+    let errorCount = 0;
+    
+    // Initial loading toast
+    const toastId = showLoading(`Initializing AI optimization for ${selectedMcqIds.length} scenarios...`);
 
     try {
-      const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
-        body: { mcq_ids: selectedMcqIds },
-      });
+      for (let i = 0; i < selectedMcqIds.length; i++) {
+        const currentId = selectedMcqIds[i];
+        
+        // Update toast content for the current item
+        dismissToast(toastId);
+        showLoading(`AI Optimizing scenario ${i + 1} of ${selectedMcqIds.length}...`);
 
+        try {
+          const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
+            body: { mcq_ids: [currentId] },
+          });
+
+          if (error || data.errorCount > 0) {
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (e) {
+          console.error(`Error enhancing MCQ ${currentId}:`, e);
+          errorCount++;
+        }
+      }
+
+      // Final summary
       dismissToast(toastId);
-
-      if (error) throw error;
-
-      if (data.errorCount > 0) {
-        showError(`Enhanced ${data.successCount} MCQs, but ${data.errorCount} failed. Check the console for details.`);
-        console.error("Bulk Enhance Partial Errors:", data.errors);
+      if (errorCount > 0) {
+        showError(`Optimization complete. Successfully updated ${successCount} items. ${errorCount} failed.`);
       } else {
-        showSuccess(`Successfully enhanced ${data.successCount} clinical scenarios with AI explanations.`);
+        showSuccess(`Successfully optimized all ${successCount} scenarios with clinical AI insights.`);
       }
 
       setRowSelection({});
       if (selectedFilterCategory) fetchMcqs(selectedFilterCategory);
     } catch (error: any) {
       dismissToast(toastId);
-      showError(`Enhancement Failed: ${error.message || 'The request timed out or encountered an error.'}`);
-      console.error("Bulk Enhance Error:", error);
+      showError(`Enhancement Interrupted: ${error.message}`);
     } finally {
       setIsEnhancing(false);
     }

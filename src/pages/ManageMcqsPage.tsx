@@ -12,7 +12,7 @@ import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Wand2, Loader2, Sparkles, CircleDashed } from 'lucide-react'; 
+import { Wand2, Loader2, Sparkles, CircleDashed, LayoutList } from 'lucide-react'; 
 import { useSession } from '@/components/SessionContextProvider'; 
 import { RowSelectionState } from '@tanstack/react-table';
 import LoadingBar from '@/components/LoadingBar';
@@ -35,6 +35,7 @@ const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id';
 const ManageMcqsPage = () => {
   const [rawMcqs, setRawMcqs] = useState<DisplayMCQ[]>([]); 
   const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isFetchingMcqs, setIsFetchingMcqs] = useState(false);
   const { toast } = useToast();
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -53,48 +54,24 @@ const ManageMcqsPage = () => {
   const fetchCategories = async () => {
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
-      .select('*');
+      .select('*')
+      .order('name');
+    
     if (categoriesError) {
       console.error('[ManageMcqsPage] Error fetching categories:', categoriesError);
       toast({ title: "Error", description: "Failed to load categories for filter.", variant: "destructive" });
     } else {
-      let allLinkedMcqIdsData: { mcq_id: string }[] = [];
-      let offsetLinkedIds = 0;
-      const limitLinkedIds = 1000;
-      let hasMoreLinkedIds = true;
-
-      while (hasMoreLinkedIds) {
-        const { data: chunkData, error: linkedMcqIdsError } = await supabase
-          .from('mcq_category_links')
-          .select('mcq_id')
-          .range(offsetLinkedIds, offsetLinkedIds + limitLinkedIds - 1);
-
-        if (linkedMcqIdsError) {
-          console.error('[ManageMcqsPage] Error fetching all linked MCQ IDs:', linkedMcqIdsError);
-          break; 
-        }
-
-        if (chunkData && chunkData.length > 0) {
-          allLinkedMcqIdsData = allLinkedMcqIdsData.concat(chunkData);
-          offsetLinkedIds += chunkData.length;
-          hasMoreLinkedIds = chunkData.length === limitLinkedIds;
-        } else {
-          hasMoreLinkedIds = false;
-        }
-      }
-      const allLinkedMcqIds = allLinkedMcqIdsData.map(link => link.mcq_id);
-      const uniqueLinkedMcqIds = new Set(allLinkedMcqIds);
+      // Get count of MCQs that are linked to any category to calculate uncategorized
+      const { count: linkedCount } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id', { count: 'exact', head: true });
 
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
-          const { count: mcqCount, error: mcqCountError } = await supabase
+          const { count: mcqCount } = await supabase
             .from('mcq_category_links')
             .select('mcq_id', { count: 'exact', head: true })
             .eq('category_id', category.id);
-
-          if (mcqCountError) {
-            console.error(`[ManageMcqsPage] Error fetching count for ${category.name}:`, mcqCountError);
-          }
           return { ...category, mcq_count: mcqCount || 0 };
         })
       );
@@ -103,169 +80,139 @@ const ManageMcqsPage = () => {
         .from('mcqs')
         .select('id', { count: 'exact', head: true });
 
-      const uncategorizedMcqCount = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
+      // Approximation for uncategorized
+      const uncategorizedMcqCount = (totalMcqCount || 0) - (linkedCount || 0);
 
       setCategories([...categoriesWithCounts, { id: UNCATEGORIZED_ID, name: 'General Medical Practice', mcq_count: Math.max(0, uncategorizedMcqCount) }]);
     }
   };
 
-  const fetchMcqs = async () => {
+  const fetchMcqs = async (categoryId: string | null) => {
+    setIsFetchingMcqs(true);
     let allMcqs: any[] = [];
     let allMcqCategoryLinks: DbMcqCategoryLink[] = [];
     const limit = 1000; 
 
-    let offsetMcqs = 0;
-    let hasMoreMcqs = true;
-    while (hasMoreMcqs) {
-      let mcqsQuery = supabase
-        .from('mcqs')
-        .select(`
-          id,
-          question_text,
-          option_a,
-          option_b,
-          option_c,
-          option_d,
-          correct_answer,
-          explanation_id,
-          difficulty,
-          is_trial_mcq
-        `)
-        .range(offsetMcqs, offsetMcqs + limit - 1);
+    try {
+      let mcqIdsToFetch: string[] | null = null;
 
-      if (searchTerm) {
-        mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
-      }
-      mcqsQuery = mcqsQuery.order('created_at', { ascending: true });
-
-      const { data: mcqsData, error: mcqsError } = await mcqsQuery;
-
-      if (mcqsError) {
-        console.error('[ManageMcqsPage] Error fetching MCQs:', mcqsError.message);
-        toast({ title: "Error", description: "Failed to load MCQs.", variant: "destructive" });
-        setRawMcqs([]);
-        setIsPageLoading(false);
-        return;
+      // If a category is selected, find the IDs first for targeted fetching
+      if (categoryId && categoryId !== "all") {
+        if (categoryId === UNCATEGORIZED_ID) {
+          const { data: linked } = await supabase.from('mcq_category_links').select('mcq_id');
+          const linkedIds = new Set(linked?.map(l => l.mcq_id) || []);
+          const { data: all } = await supabase.from('mcqs').select('id');
+          mcqIdsToFetch = (all?.map(m => m.id) || []).filter(id => !linkedIds.has(id));
+        } else {
+          const { data: links } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', categoryId);
+          mcqIdsToFetch = links?.map(l => l.mcq_id) || [];
+        }
       }
 
-      if (mcqsData && mcqsData.length > 0) {
-        allMcqs = allMcqs.concat(mcqsData);
-        offsetMcqs += mcqsData.length;
-        hasMoreMcqs = mcqsData.length === limit;
-      } else {
-        hasMoreMcqs = false;
+      // Fetch MCQs based on IDs or fetch all if no category filter (with search support)
+      let offsetMcqs = 0;
+      let hasMoreMcqs = true;
+      
+      while (hasMoreMcqs) {
+        let mcqsQuery = supabase
+          .from('mcqs')
+          .select(`id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation_id, difficulty, is_trial_mcq`)
+          .range(offsetMcqs, offsetMcqs + limit - 1);
+
+        if (mcqIdsToFetch) {
+          if (mcqIdsToFetch.length === 0) break;
+          mcqsQuery = mcqsQuery.in('id', mcqIdsToFetch);
+        }
+
+        if (searchTerm) {
+          mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
+        }
+        
+        mcqsQuery = mcqsQuery.order('created_at', { ascending: true });
+
+        const { data, error } = await mcqsQuery;
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allMcqs = allMcqs.concat(data);
+          offsetMcqs += data.length;
+          hasMoreMcqs = data.length === limit;
+        } else {
+          hasMoreMcqs = false;
+        }
       }
+
+      // Hydrate links
+      const mcqIds = allMcqs.map(m => m.id);
+      if (mcqIds.length > 0) {
+        const { data: linksData } = await supabase
+          .from('mcq_category_links')
+          .select('mcq_id, category_id')
+          .in('mcq_id', mcqIds);
+        allMcqCategoryLinks = linksData || [];
+      }
+
+      const categoryNameMap = new Map(categories.map(cat => [cat.id, cat.name]));
+      const mcqLinksMap = new Map<string, DbMcqCategoryLink[]>();
+      allMcqCategoryLinks.forEach(link => { 
+        if (!mcqLinksMap.has(link.mcq_id)) mcqLinksMap.set(link.mcq_id, []);
+        mcqLinksMap.get(link.mcq_id)?.push(link);
+      });
+
+      const displayMcqs: DisplayMCQ[] = allMcqs.map((mcq: any) => { 
+        const linksForMcq = mcqLinksMap.get(mcq.id) || [];
+        const hydratedLinks = linksForMcq.map(link => ({
+          category_id: link.category_id,
+          category_name: categoryNameMap.get(link.category_id) || null,
+        }));
+        return { ...mcq, category_links: hydratedLinks };
+      });
+      
+      setRawMcqs(displayMcqs);
+    } catch (error: any) {
+      console.error('[ManageMcqsPage] Error fetching MCQs:', error.message);
+      toast({ title: "Error", description: "Failed to load MCQs.", variant: "destructive" });
+      setRawMcqs([]);
+    } finally {
+      setIsFetchingMcqs(false);
     }
-
-    let offsetLinks = 0;
-    let hasMoreLinks = true;
-    while (hasMoreLinks) {
-      const { data: mcqCategoryLinksData, error: mcqCategoryLinksError } = await supabase
-        .from('mcq_category_links')
-        .select('mcq_id, category_id')
-        .range(offsetLinks, offsetLinks + limit - 1);
-
-      if (mcqCategoryLinksError) {
-        console.error('[ManageMcqsPage] Error fetching links:', mcqCategoryLinksError);
-        toast({ title: "Error", description: "Failed to load links.", variant: "destructive" });
-        setRawMcqs([]);
-        setIsPageLoading(false);
-        return;
-      }
-
-      if (mcqCategoryLinksData && mcqCategoryLinksData.length > 0) {
-        allMcqCategoryLinks = allMcqCategoryLinks.concat(mcqCategoryLinksData);
-        offsetLinks += mcqCategoryLinksData.length;
-        hasMoreLinks = mcqCategoryLinksData.length === limit;
-      } else {
-        hasMoreLinks = false;
-      }
-    }
-
-    const categoryNameMap = new Map(categories.map(cat => [cat.id, cat.name]));
-    const mcqLinksMap = new Map<string, DbMcqCategoryLink[]>();
-    allMcqCategoryLinks.forEach(link => { 
-      if (!mcqLinksMap.has(link.mcq_id)) {
-        mcqLinksMap.set(link.mcq_id, []);
-      }
-      mcqLinksMap.get(link.mcq_id)?.push(link);
-    });
-
-    const displayMcqs: DisplayMCQ[] = (allMcqs || []).map((mcq: any) => { 
-      const linksForMcq = mcqLinksMap.get(mcq.id) || [];
-      const hydratedLinks = linksForMcq.map(link => ({
-        category_id: link.category_id,
-        category_name: categoryNameMap.get(link.category_id) || null,
-      }));
-      return {
-        ...mcq,
-        category_links: hydratedLinks,
-      };
-    });
-    setRawMcqs(displayMcqs || []);
-  };
-
-  const refreshAllData = async () => {
-    setIsPageLoading(true);
-    await fetchCategories(); 
-    await fetchMcqs(); 
-    setIsPageLoading(false);
   };
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
-      refreshAllData();
+      fetchCategories().then(() => setIsPageLoading(false));
     }
   }, [hasCheckedInitialSession]);
 
-  // Handle search with separate effect to avoid re-fetching categories unnecessarily
   useEffect(() => {
-    if (hasCheckedInitialSession && categories.length > 0) {
-      const debounceTimer = setTimeout(() => {
-        fetchMcqs().then(() => setIsPageLoading(false));
-      }, 500);
-      return () => clearTimeout(debounceTimer);
+    if (selectedFilterCategory) {
+      fetchMcqs(selectedFilterCategory);
+    } else {
+      setRawMcqs([]);
     }
-  }, [searchTerm, hasCheckedInitialSession]);
+  }, [selectedFilterCategory, searchTerm]);
 
   const filteredMcqs = useMemo(() => {
     let result = rawMcqs;
-
-    // 1. Filter by Category
-    if (selectedFilterCategory && selectedFilterCategory !== "all") {
-      if (selectedFilterCategory === UNCATEGORIZED_ID) {
-        result = result.filter(mcq => mcq.category_links.length === 0);
-      } else {
-        result = result.filter(mcq =>
-          mcq.category_links.some(link => link.category_id === selectedFilterCategory)
-        );
-      }
-    }
-
-    // 2. Filter by Enhancement Status
     if (enhancementFilter === 'enhanced') {
       result = result.filter(mcq => !!mcq.difficulty);
     } else if (enhancementFilter === 'unenhanced') {
       result = result.filter(mcq => !mcq.difficulty);
     }
-
     return result;
-  }, [rawMcqs, selectedFilterCategory, enhancementFilter]);
+  }, [rawMcqs, enhancementFilter]);
 
   const handleDeleteMcq = async (mcqId: string, explanationId: string | null) => {
-    if (!window.confirm("Are you sure you want to delete this MCQ? This action cannot be undone.")) {
-      return;
-    }
+    if (!window.confirm("Are you sure you want to delete this MCQ?")) return;
     try {
       await supabase.from('mcq_category_links').delete().eq('mcq_id', mcqId);
       const { error: mcqError } = await supabase.from('mcqs').delete().eq('id', mcqId);
       if (mcqError) throw mcqError;
       if (explanationId) await supabase.from('mcq_explanations').delete().eq('id', explanationId);
       toast({ title: "Success!", description: "MCQ deleted successfully." });
-      refreshAllData();
+      if (selectedFilterCategory) fetchMcqs(selectedFilterCategory);
     } catch (error: any) {
-      console.error("Error deleting MCQ:", error);
-      toast({ title: "Error", description: `Failed to delete MCQ: ${error.message}`, variant: "destructive" });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
@@ -274,13 +221,11 @@ const ManageMcqsPage = () => {
     const selectedMcqIds = selectedIndices.map(_index => filteredMcqs[parseInt(_index)].id);
 
     if (selectedMcqIds.length === 0) {
-      toast({ title: "No MCQs Selected", description: "Please select one or more MCQs to enhance.", variant: "destructive" });
+      toast({ title: "No MCQs Selected", variant: "destructive" });
       return;
     }
 
-    if (!window.confirm(`You are about to enhance ${selectedMcqIds.length} MCQs with AI. Continue?`)) {
-      return;
-    }
+    if (!window.confirm(`Enhance ${selectedMcqIds.length} MCQs with AI?`)) return;
 
     setIsEnhancing(true);
     try {
@@ -289,22 +234,11 @@ const ManageMcqsPage = () => {
       });
 
       if (error) throw error;
-
-      if (data.errorCount > 0) {
-        toast({
-          title: "Partial Success",
-          description: `Enhanced ${data.successCount} MCQs. ${data.errorCount} failed. Check console for details.`,
-          variant: "default",
-        });
-        console.error("Bulk Enhance Errors:", data.errors);
-      } else {
-        toast({ title: "Success!", description: `Successfully enhanced ${data.successCount} MCQs.` });
-      }
+      toast({ title: "Success!", description: `Enhanced ${data.successCount} MCQs.` });
       setRowSelection({});
-      refreshAllData();
+      if (selectedFilterCategory) fetchMcqs(selectedFilterCategory);
     } catch (error: any) {
-      console.error("Error bulk enhancing MCQs:", error);
-      toast({ title: "Error", description: `Failed to enhance MCQs: ${error.message || 'Unknown error'}`, variant: "destructive" });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setIsEnhancing(false);
     }
@@ -317,9 +251,7 @@ const ManageMcqsPage = () => {
 
   const columns = useMemo(() => createMcqColumns({ onDelete: handleDeleteMcq, onEdit: handleEditClick }), []);
 
-  if (!hasCheckedInitialSession || (isPageLoading && rawMcqs.length === 0)) {
-    return <LoadingBar />;
-  }
+  if (!hasCheckedInitialSession || isPageLoading) return <LoadingBar />;
 
   const numSelected = Object.keys(rowSelection).length;
 
@@ -327,79 +259,122 @@ const ManageMcqsPage = () => {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Manage MCQs</h1>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Filter & Search</CardTitle>
-          <CardDescription>Narrow down questions by category, AI status, or text.</CardDescription>
+      <Card className="border-primary/20 shadow-lg">
+        <CardHeader className="bg-primary/5 border-b pb-4">
+          <CardTitle className="text-xl flex items-center gap-2">
+            <LayoutList className="h-5 w-5 text-primary" /> Select Specialty to Manage
+          </CardTitle>
+          <CardDescription>Select a category first to view and edit its questions.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex-1">
-            <Label htmlFor="search-term">Search Question Text</Label>
-            <Input id="search-term" placeholder="Enter keywords to search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filterCategory">Specialty</Label>
-              <Select onValueChange={(value) => setSelectedFilterCategory(value === "all" ? null : value)} value={selectedFilterCategory || "all"}>
-                <SelectTrigger id="filterCategory"><SelectValue placeholder="All Categories" /></SelectTrigger>
+        <CardContent className="pt-6 flex flex-col gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div className="space-y-1.5 flex-1">
+              <Label htmlFor="filterCategory">Specialty Category</Label>
+              <Select onValueChange={(value) => setSelectedFilterCategory(value)} value={selectedFilterCategory || ""}>
+                <SelectTrigger id="filterCategory" className="h-11 rounded-xl">
+                  <SelectValue placeholder="-- Select Category --" />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="all">View All (Advanced Users)</SelectItem>
                   {categories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>{cat.name} ({cat.mcq_count})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="enhancementStatus">AI Status</Label>
+
+            <div className="space-y-1.5 flex-1">
+              <Label htmlFor="search-term">Search within Specialty</Label>
+              <Input 
+                id="search-term" 
+                placeholder="Keywords..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5 flex-1">
+              <Label htmlFor="enhancementStatus">AI Enhancement Status</Label>
               <Select onValueChange={(value: any) => setEnhancementFilter(value)} value={enhancementFilter}>
-                <SelectTrigger id="enhancementStatus"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                <SelectTrigger id="enhancementStatus" className="h-11 rounded-xl">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Questions</SelectItem>
                   <SelectItem value="enhanced">
-                    <div className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-blue-500" /> Enhanced Only</div>
+                    <div className="flex items-center gap-2 text-blue-600 font-bold"><Sparkles className="h-3.5 w-3.5" /> Enhanced</div>
                   </SelectItem>
                   <SelectItem value="unenhanced">
-                    <div className="flex items-center gap-2"><CircleDashed className="h-3.5 w-3.5 text-muted-foreground" /> Un-enhanced Only</div>
+                    <div className="flex items-center gap-2 text-muted-foreground"><CircleDashed className="h-3.5 w-3.5" /> Un-enhanced</div>
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end">
-                <Button onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); setEnhancementFilter('all'); }} variant="outline" className="w-full">Reset Filters</Button>
-            </div>
+
+            <Button 
+                onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); setEnhancementFilter('all'); setRawMcqs([]); }} 
+                variant="outline" 
+                className="h-11 rounded-xl"
+            >
+                Clear All
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Bulk Actions</CardTitle>
-          <CardDescription>Perform actions on multiple selected questions.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <Button onClick={handleBulkEnhance} disabled={isEnhancing || numSelected === 0}>
-              {isEnhancing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-              Bulk Enhance with AI ({numSelected})
-            </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Multiple Choice Questions</CardTitle>
-          <CardDescription>View and manage all MCQs in your database.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DataTable columns={columns} data={filteredMcqs} rowSelection={rowSelection} setRowSelection={setRowSelection} />
-          {!isPageLoading && filteredMcqs.length === 0 && (
-            <div className="mt-8 text-center text-muted-foreground">No questions found matching your filters.</div>
-          )}
-        </CardContent>
-      </Card>
+      {!selectedFilterCategory ? (
+        <Card className="py-20 text-center rounded-3xl border-2 border-dashed bg-muted/20">
+            <div className="max-w-md mx-auto space-y-4">
+                <div className="p-4 bg-white rounded-full w-fit mx-auto shadow-sm">
+                    <LayoutList className="h-10 w-10 text-primary/30" />
+                </div>
+                <div>
+                    <h3 className="text-lg font-bold">No Specialty Selected</h3>
+                    <p className="text-muted-foreground text-sm">Please select a category above to load the corresponding MCQs and start managing them.</p>
+                </div>
+            </div>
+        </Card>
+      ) : (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b pb-4">
+                    <div>
+                        <CardTitle className="text-xl flex items-center gap-2">
+                            {isFetchingMcqs && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
+                            {filteredMcqs.length} Questions in {categories.find(c => c.id === selectedFilterCategory)?.name || 'Selected Filter'}
+                        </CardTitle>
+                        <CardDescription>Managing all questions on one page for faster auditing.</CardDescription>
+                    </div>
+                    <Button onClick={handleBulkEnhance} disabled={isEnhancing || numSelected === 0} className="rounded-xl font-bold">
+                        {isEnhancing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                        Bulk Enhance Selected ({numSelected})
+                    </Button>
+                </CardHeader>
+                <CardContent className="pt-6">
+                    <DataTable 
+                        columns={columns} 
+                        data={filteredMcqs} 
+                        rowSelection={rowSelection} 
+                        setRowSelection={setRowSelection}
+                        pageSize={1000} 
+                    />
+                    {isFetchingMcqs && filteredMcqs.length === 0 && (
+                        <div className="py-20 text-center flex flex-col items-center gap-3">
+                            <Loader2 className="h-10 w-10 animate-spin text-primary/20" />
+                            <p className="text-muted-foreground font-black uppercase tracking-widest text-xs">Fetching Clinical Data...</p>
+                        </div>
+                    )}
+                    {!isFetchingMcqs && filteredMcqs.length === 0 && (
+                        <div className="py-20 text-center text-muted-foreground">No questions found matching your filters.</div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+      )}
 
       {selectedMcqForEdit && (
-        <EditMcqDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mcq={selectedMcqForEdit} onSave={refreshAllData} />
+        <EditMcqDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mcq={selectedMcqForEdit} onSave={() => fetchMcqs(selectedFilterCategory)} />
       )}
       <MadeWithDyad />
     </div>

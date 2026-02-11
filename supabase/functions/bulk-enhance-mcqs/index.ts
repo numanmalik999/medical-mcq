@@ -37,13 +37,20 @@ async function generateEnhancedContent(
   question: string,
   options: { A: string; B: string; C: string; D: string },
   categoryList: string[],
-  model: any
+  model: any,
+  isUncategorized: boolean
 ) {
+  const categoryInstruction = isUncategorized 
+    ? `The question is currently UN-CATEGORIZED. Suggest the best "suggested_category_name" from the provided list or a relevant medical specialty.`
+    : `The question already has a category. Return null for "suggested_category_name". DO NOT suggest a category.`;
+
   const prompt = `You are an expert medical educator for 'Study Prometric'. Analyze this MCQ:
   Question: "${question}"
   Options: A: ${options.A}, B: ${options.B}, C: ${options.C}, D: ${options.D}
 
   Available categories: ${categoryList.join(', ')}
+
+  ${categoryInstruction}
 
   Generate a structured explanation including:
   - Scenario Analysis
@@ -57,7 +64,6 @@ async function generateEnhancedContent(
   1. Return ONLY a valid JSON object.
   2. Use the keys: "correct_answer", "explanation_text", "difficulty", "suggested_category_name".
   3. "difficulty" must be exactly one of: "Easy", "Medium", or "Hard".
-  4. "suggested_category_name" should be the best fit from the provided list, or a new relevant specialty if none fit.
 
   Expected JSON structure:
   {"correct_answer": "...", "explanation_text": "...", "difficulty": "...", "suggested_category_name": "..."}`;
@@ -94,29 +100,35 @@ serve(async (req: Request) => {
 
     for (const mcq of (mcqs || [])) {
       try {
-        const aiResponse = await generateEnhancedContent(
-          mcq.question_text, 
-          { A: mcq.option_a, B: mcq.option_b, C: mcq.option_c, D: mcq.option_d }, 
-          categoryList, 
-          model
-        );
-
-        // --- Category Logic: ONLY update if currently uncategorized ---
+        // 1. Double check current category status in the database
         const { count: linkCount } = await supabaseAdmin
           .from('mcq_category_links')
           .select('*', { count: 'exact', head: true })
           .eq('mcq_id', mcq.id);
 
-        if (linkCount === 0 && aiResponse.suggested_category_name) {
+        const isUncategorized = (linkCount || 0) === 0;
+
+        const aiResponse = await generateEnhancedContent(
+          mcq.question_text, 
+          { A: mcq.option_a, B: mcq.option_b, C: mcq.option_c, D: mcq.option_d }, 
+          categoryList, 
+          model,
+          isUncategorized
+        );
+
+        // 2. Category Logic: Only apply if we verified the question was uncategorized before the AI call
+        if (isUncategorized && aiResponse.suggested_category_name) {
             let categoryId;
             let existingCategory = (categories || []).find((c: any) => c.name.toLowerCase() === aiResponse.suggested_category_name?.toLowerCase());
             
             if (existingCategory) {
               categoryId = existingCategory.id;
             } else {
-              const { data: newCat } = await supabaseAdmin.from('categories').insert({ name: aiResponse.suggested_category_name }).select('id').single();
-              categoryId = newCat.id;
-              if (categories) categories.push({ id: categoryId, name: aiResponse.suggested_category_name });
+              const { data: newCat, error: catInsertError } = await supabaseAdmin.from('categories').insert({ name: aiResponse.suggested_category_name }).select('id').single();
+              if (!catInsertError && newCat) {
+                categoryId = newCat.id;
+                if (categories) categories.push({ id: categoryId, name: aiResponse.suggested_category_name });
+              }
             }
 
             if (categoryId) {
@@ -124,13 +136,15 @@ serve(async (req: Request) => {
             }
         }
 
-        // Update or Insert Explanation
-        const { data: exp } = await supabaseAdmin.from('mcq_explanations').upsert({
+        // 3. Update or Insert Explanation
+        const { data: exp, error: expError } = await supabaseAdmin.from('mcq_explanations').upsert({
           id: mcq.explanation_id || undefined,
           explanation_text: aiResponse.explanation_text,
         }).select('id').single();
 
-        // Update MCQ metadata (keeping correct answer and difficulty as determined by AI)
+        if (expError) throw expError;
+
+        // 4. Update MCQ metadata
         await supabaseAdmin.from('mcqs').update({
           correct_answer: aiResponse.correct_answer,
           difficulty: aiResponse.difficulty,

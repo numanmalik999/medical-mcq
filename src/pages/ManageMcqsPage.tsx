@@ -87,10 +87,7 @@ const ManageMcqsPage = () => {
   };
 
   const fetchMcqs = async () => {
-    if (!selectedFilterCategory) {
-        toast({ title: "Select Specialty", description: "Please select a specialty category first.", variant: "default" });
-        return;
-    }
+    if (!selectedFilterCategory) return;
 
     setIsFetchingMcqs(true);
     let allMcqs: any[] = [];
@@ -170,11 +167,9 @@ const ManageMcqsPage = () => {
       });
       
       setRawMcqs(displayMcqs);
-      toast({ title: "Filters Applied", description: `Found ${displayMcqs.length} questions.` });
     } catch (error: any) {
       console.error('[ManageMcqsPage] Error fetching MCQs:', error.message);
       toast({ title: "Error", description: "Failed to load MCQs.", variant: "destructive" });
-      setRawMcqs([]);
     } finally {
       setIsFetchingMcqs(false);
     }
@@ -231,6 +226,7 @@ const ManageMcqsPage = () => {
       for (let i = 0; i < selectedMcqIds.length; i++) {
         const currentId = selectedMcqIds[i];
         
+        // Update the existing toast if possible, or clear and show new one
         dismissToast(activeToastId);
         activeToastId = showLoading(`AI Optimizing scenario ${i + 1} of ${selectedMcqIds.length}...`);
 
@@ -239,7 +235,7 @@ const ManageMcqsPage = () => {
             body: { mcq_ids: [currentId] },
           });
 
-          if (error || data.errorCount > 0) {
+          if (error || data?.errorCount > 0) {
             errorCount++;
           } else {
             successCount++;
@@ -250,6 +246,7 @@ const ManageMcqsPage = () => {
         }
       }
 
+      // Final cleanup of loading toast
       dismissToast(activeToastId);
       
       if (errorCount > 0) {
@@ -259,7 +256,9 @@ const ManageMcqsPage = () => {
       }
 
       setRowSelection({});
-      fetchMcqs();
+      // Small delay to let DB settle before re-fetch
+      setTimeout(() => fetchMcqs(), 500);
+      fetchCategories(); // Update counts in sidebar/filter
     } catch (error: any) {
       dismissToast(activeToastId);
       showError(`Enhancement Interrupted: ${error.message}`);
@@ -356,11 +355,11 @@ const ManageMcqsPage = () => {
         </CardContent>
       </Card>
 
-      {!selectedFilterCategory || rawMcqs.length === 0 ? (
+      {!selectedFilterCategory || (rawMcqs.length === 0 && !isFetchingMcqs) ? (
         <Card className="py-20 text-center rounded-3xl border-2 border-dashed bg-muted/20">
             <div className="max-w-md mx-auto space-y-4">
                 <div className="p-4 bg-white rounded-full w-fit mx-auto shadow-sm">
-                    <LayoutList className="h-10 w-10 text-primary/30" />
+                    {isFetchingMcqs ? <Loader2 className="h-10 w-10 animate-spin text-primary" /> : <LayoutList className="h-10 w-10 text-primary/30" />}
                 </div>
                 <div>
                     <h3 className="text-lg font-bold">{isFetchingMcqs ? "Loading Clinical Data..." : "Question List Ready"}</h3>

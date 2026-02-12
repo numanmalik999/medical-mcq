@@ -12,7 +12,7 @@ import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Wand2, Loader2, Sparkles, CircleDashed, LayoutList } from 'lucide-react'; 
+import { Wand2, Loader2, Sparkles, CircleDashed, LayoutList, Search, Filter } from 'lucide-react'; 
 import { useSession } from '@/components/SessionContextProvider'; 
 import { RowSelectionState } from '@tanstack/react-table';
 import LoadingBar from '@/components/LoadingBar';
@@ -86,7 +86,12 @@ const ManageMcqsPage = () => {
     }
   };
 
-  const fetchMcqs = async (categoryId: string | null) => {
+  const fetchMcqs = async () => {
+    if (!selectedFilterCategory) {
+        toast({ title: "Select Specialty", description: "Please select a specialty category first.", variant: "default" });
+        return;
+    }
+
     setIsFetchingMcqs(true);
     let allMcqs: any[] = [];
     let allMcqCategoryLinks: DbMcqCategoryLink[] = [];
@@ -95,14 +100,14 @@ const ManageMcqsPage = () => {
     try {
       let mcqIdsToFetch: string[] | null = null;
 
-      if (categoryId && categoryId !== "all") {
-        if (categoryId === UNCATEGORIZED_ID) {
+      if (selectedFilterCategory !== "all") {
+        if (selectedFilterCategory === UNCATEGORIZED_ID) {
           const { data: linked } = await supabase.from('mcq_category_links').select('mcq_id');
           const linkedIds = new Set(linked?.map(l => l.mcq_id) || []);
           const { data: all } = await supabase.from('mcqs').select('id');
           mcqIdsToFetch = (all?.map(m => m.id) || []).filter(id => !linkedIds.has(id));
         } else {
-          const { data: links } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', categoryId);
+          const { data: links } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', selectedFilterCategory);
           mcqIdsToFetch = links?.map(l => l.mcq_id) || [];
         }
       }
@@ -165,6 +170,7 @@ const ManageMcqsPage = () => {
       });
       
       setRawMcqs(displayMcqs);
+      toast({ title: "Filters Applied", description: `Found ${displayMcqs.length} questions.` });
     } catch (error: any) {
       console.error('[ManageMcqsPage] Error fetching MCQs:', error.message);
       toast({ title: "Error", description: "Failed to load MCQs.", variant: "destructive" });
@@ -179,14 +185,6 @@ const ManageMcqsPage = () => {
       fetchCategories().then(() => setIsPageLoading(false));
     }
   }, [hasCheckedInitialSession]);
-
-  useEffect(() => {
-    if (selectedFilterCategory) {
-      fetchMcqs(selectedFilterCategory);
-    } else {
-      setRawMcqs([]);
-    }
-  }, [selectedFilterCategory, searchTerm]);
 
   const filteredMcqs = useMemo(() => {
     let result = rawMcqs;
@@ -206,7 +204,7 @@ const ManageMcqsPage = () => {
       if (mcqError) throw mcqError;
       if (explanationId) await supabase.from('mcq_explanations').delete().eq('id', explanationId);
       toast({ title: "Success!", description: "MCQ deleted successfully." });
-      if (selectedFilterCategory) fetchMcqs(selectedFilterCategory);
+      fetchMcqs();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -227,14 +225,12 @@ const ManageMcqsPage = () => {
     let successCount = 0;
     let errorCount = 0;
     
-    // Tracking the active toast ID so we can properly dismiss/update it
     let activeToastId = showLoading(`Initializing AI optimization for ${selectedMcqIds.length} scenarios...`);
 
     try {
       for (let i = 0; i < selectedMcqIds.length; i++) {
         const currentId = selectedMcqIds[i];
         
-        // Dismiss previous loop toast and create new one with updated counter
         dismissToast(activeToastId);
         activeToastId = showLoading(`AI Optimizing scenario ${i + 1} of ${selectedMcqIds.length}...`);
 
@@ -254,7 +250,6 @@ const ManageMcqsPage = () => {
         }
       }
 
-      // Final cleanup of loading toast
       dismissToast(activeToastId);
       
       if (errorCount > 0) {
@@ -264,7 +259,7 @@ const ManageMcqsPage = () => {
       }
 
       setRowSelection({});
-      if (selectedFilterCategory) fetchMcqs(selectedFilterCategory);
+      fetchMcqs();
     } catch (error: any) {
       dismissToast(activeToastId);
       showError(`Enhancement Interrupted: ${error.message}`);
@@ -291,12 +286,12 @@ const ManageMcqsPage = () => {
       <Card className="border-primary/20 shadow-lg">
         <CardHeader className="bg-primary/5 border-b pb-4">
           <CardTitle className="text-xl flex items-center gap-2">
-            <LayoutList className="h-5 w-5 text-primary" /> Select Specialty to Manage
+            <Filter className="h-5 w-5 text-primary" /> Audit Filter Configuration
           </CardTitle>
-          <CardDescription>Select a category first to view and edit its questions.</CardDescription>
+          <CardDescription>Select a specialty and optional search terms, then click "Apply Filters" to load the question set.</CardDescription>
         </CardHeader>
         <CardContent className="pt-6 flex flex-col gap-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
             <div className="space-y-1.5 flex-1">
               <Label htmlFor="filterCategory">Specialty Category</Label>
               <Select onValueChange={(value) => setSelectedFilterCategory(value)} value={selectedFilterCategory || ""}>
@@ -313,7 +308,7 @@ const ManageMcqsPage = () => {
             </div>
 
             <div className="space-y-1.5 flex-1">
-              <Label htmlFor="search-term">Search within Specialty</Label>
+              <Label htmlFor="search-term">Search Keywords</Label>
               <Input 
                 id="search-term" 
                 placeholder="Keywords..." 
@@ -324,7 +319,7 @@ const ManageMcqsPage = () => {
             </div>
 
             <div className="space-y-1.5 flex-1">
-              <Label htmlFor="enhancementStatus">AI Enhancement Status</Label>
+              <Label htmlFor="enhancementStatus">AI Status</Label>
               <Select onValueChange={(value: any) => setEnhancementFilter(value)} value={enhancementFilter}>
                 <SelectTrigger id="enhancementStatus" className="h-11 rounded-xl">
                   <SelectValue placeholder="All Statuses" />
@@ -342,25 +337,38 @@ const ManageMcqsPage = () => {
             </div>
 
             <Button 
+                onClick={fetchMcqs} 
+                className="h-11 rounded-xl font-bold bg-primary text-primary-foreground"
+                disabled={isFetchingMcqs || !selectedFilterCategory}
+            >
+                {isFetchingMcqs ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />} 
+                Apply Filters
+            </Button>
+
+            <Button 
                 onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); setEnhancementFilter('all'); setRawMcqs([]); }} 
                 variant="outline" 
                 className="h-11 rounded-xl"
             >
-                Clear All
+                Clear
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {!selectedFilterCategory ? (
+      {!selectedFilterCategory || rawMcqs.length === 0 ? (
         <Card className="py-20 text-center rounded-3xl border-2 border-dashed bg-muted/20">
             <div className="max-w-md mx-auto space-y-4">
                 <div className="p-4 bg-white rounded-full w-fit mx-auto shadow-sm">
                     <LayoutList className="h-10 w-10 text-primary/30" />
                 </div>
                 <div>
-                    <h3 className="text-lg font-bold">No Specialty Selected</h3>
-                    <p className="text-muted-foreground text-sm">Please select a category above to load the corresponding MCQs and start managing them.</p>
+                    <h3 className="text-lg font-bold">{isFetchingMcqs ? "Loading Clinical Data..." : "Question List Ready"}</h3>
+                    <p className="text-muted-foreground text-sm">
+                        {isFetchingMcqs 
+                            ? "Please wait while we sync with the medical database." 
+                            : "Configure your specialty and keywords above, then click 'Apply Filters' to start managing scenarios."}
+                    </p>
                 </div>
             </div>
         </Card>
@@ -370,10 +378,9 @@ const ManageMcqsPage = () => {
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b pb-4">
                     <div>
                         <CardTitle className="text-xl flex items-center gap-2">
-                            {isFetchingMcqs && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
-                            {filteredMcqs.length} Questions in {categories.find(c => c.id === selectedFilterCategory)?.name || 'Selected Filter'}
+                            {filteredMcqs.length} Questions Loaded
                         </CardTitle>
-                        <CardDescription>Managing all questions on one page for faster auditing.</CardDescription>
+                        <CardDescription>Filtering specialty: {categories.find(c => c.id === selectedFilterCategory)?.name || 'Custom selection'}</CardDescription>
                     </div>
                     <Button onClick={handleBulkEnhance} disabled={isEnhancing || numSelected === 0} className="rounded-xl font-bold">
                         {isEnhancing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
@@ -386,24 +393,15 @@ const ManageMcqsPage = () => {
                         data={filteredMcqs} 
                         rowSelection={rowSelection} 
                         setRowSelection={setRowSelection}
-                        pageSize={1000} 
+                        pageSize={100} 
                     />
-                    {isFetchingMcqs && filteredMcqs.length === 0 && (
-                        <div className="py-20 text-center flex flex-col items-center gap-3">
-                            <Loader2 className="h-10 w-10 animate-spin text-primary/20" />
-                            <p className="text-muted-foreground font-black uppercase tracking-widest text-xs">Fetching Clinical Data...</p>
-                        </div>
-                    )}
-                    {!isFetchingMcqs && filteredMcqs.length === 0 && (
-                        <div className="py-20 text-center text-muted-foreground">No questions found matching your filters.</div>
-                    )}
                 </CardContent>
             </Card>
         </div>
       )}
 
       {selectedMcqForEdit && (
-        <EditMcqDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mcq={selectedMcqForEdit} onSave={() => fetchMcqs(selectedFilterCategory)} />
+        <EditMcqDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mcq={selectedMcqForEdit} onSave={fetchMcqs} />
       )}
       <MadeWithDyad />
     </div>

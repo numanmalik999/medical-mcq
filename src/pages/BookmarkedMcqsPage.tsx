@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
-import { Bookmark, BookmarkCheck, MessageSquare, FileDown } from 'lucide-react'; 
+import { Bookmark, BookmarkCheck, MessageSquare } from 'lucide-react'; 
 import { MCQ } from '@/components/mcq-columns';
 import { useBookmark } from '@/hooks/use-bookmark';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';

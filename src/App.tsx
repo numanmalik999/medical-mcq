@@ -61,6 +61,7 @@ const AboutUsPage = lazy(() => import("./pages/AboutUsPage"));
 const SitemapPage = lazy(() => import("./pages/SitemapPage"));
 const BlogListPage = lazy(() => import("./pages/BlogListPage"));
 const BlogDetailsPage = lazy(() => import("./pages/BlogDetailsPage"));
+const StudyPlannerPage = lazy(() => import("./pages/StudyPlannerPage"));
 
 // Components & Layouts
 const AdminLayout = lazy(() => import("./components/AdminLayout"));
@@ -150,6 +151,7 @@ const AppContent = () => {
               <Route path="user">
                 <Route index element={<UserDashboardPage />} />
                 <Route path="dashboard" element={<UserDashboardPage />} />
+                <Route path="planner" element={<StudyPlannerPage />} />
                 <Route path="profile" element={<UserProfilePage />} />
                 <Route path="subscriptions" element={<UserSubscriptionsPage />} />
                 <Route path="submit-mcq" element={<SubmitMcqPage />} />

@@ -24,7 +24,7 @@ async function generatePrometricTip(model: any) {
   
   The tip should focus on a high-probability clinical topic, a common exam "trap", or a memory mnemonic.
   
-  Return ONLY a JSON object:
+  Return ONLY a valid JSON object:
   {
     "title": "Short catchy title",
     "content": "A 2-3 paragraph explanation in Markdown with clinical pearls",
@@ -46,12 +46,24 @@ serve(async (req: Request) => {
   );
 
   try {
+    const { preview = false } = await req.json();
+    
     const geminiKey = Deno.env.get('GEMINI_API_KEY');
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     console.log("[weekly-tip] Generating AI content...");
     const tipData = await generatePrometricTip(model);
+
+    if (preview) {
+      return new Response(JSON.stringify({ 
+        message: "Preview generated successfully", 
+        tip: tipData 
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // 2. Fetch all unique emails
     const { data: subscribers } = await supabaseAdmin.from('marketing_subscriptions').select('email');
@@ -97,7 +109,7 @@ serve(async (req: Request) => {
       </div>
     `;
 
-    // 4. Send in batches (to avoid timeouts/limits)
+    // 4. Send in batches
     const BATCH_SIZE = 50;
     for (let i = 0; i < recipientList.length; i += BATCH_SIZE) {
       const batch = recipientList.slice(i, i + BATCH_SIZE);

@@ -8,18 +8,33 @@ import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, ShieldCheck, AlertTriangle, Loader2, Send } from 'lucide-react';
+import { MoreHorizontal, ShieldCheck, AlertTriangle, Loader2, Send, Eye, Sparkles } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import EditStaticPageDialog, { StaticPage } from '@/components/EditStaticPageDialog';
 import { useSession } from '@/components/SessionContextProvider';
 import { Badge } from '@/components/ui/badge';
 import SocialMediaSettingsCard from '@/components/SocialMediaSettingsCard';
 import { cn } from '@/lib/utils';
+import ReactMarkdown from 'react-markdown';
+
+interface WeeklyTipPreview {
+  title: string;
+  content: string;
+  subject: string;
+}
 
 const roadToGulfContent = `
 # Your Road to Practicing in the Gulf
@@ -139,7 +154,12 @@ const AdminSettingsPage = () => {
   const [isCheckingTrial, setIsCheckingTrial] = useState(true);
   const [isTrialConfigured, setIsTrialConfigured] = useState(false);
   const [isFixingTrial, setIsFixingTrial] = useState(false);
+  
+  // Weekly Tip States
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [isSendingTip, setIsSendingTip] = useState(false);
+  const [tipPreview, setTipPreview] = useState<WeeklyTipPreview | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedPageForEdit, setSelectedPageForEdit] = useState<StaticPage | null>(null);
@@ -202,12 +222,36 @@ const AdminSettingsPage = () => {
     }
   };
 
-  const handleTestWeeklyTip = async () => {
-    if (!window.confirm("This will trigger an AI-generated study tip and send it to all unique users and subscribers. Continue?")) return;
+  const handlePreviewWeeklyTip = async () => {
+    setIsGeneratingPreview(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('weekly-prometric-tip', {
+        body: { preview: true },
+      });
+      
+      if (error) throw error;
+      setTipPreview(data.tip);
+      setIsPreviewOpen(true);
+    } catch (error: any) {
+      console.error("Error previewing weekly tip:", error);
+      toast({ 
+        title: "Preview Failed", 
+        description: error.message || "Failed to generate AI tip.",
+        variant: "destructive" 
+      });
+    } finally {
+      setIsGeneratingPreview(false);
+    }
+  };
+
+  const handleSendWeeklyTip = async () => {
+    if (!window.confirm("Confirm sending this tip to ALL unique users and subscribers?")) return;
     
     setIsSendingTip(true);
     try {
-      const { data, error } = await supabase.functions.invoke('weekly-prometric-tip');
+      const { data, error } = await supabase.functions.invoke('weekly-prometric-tip', {
+        body: { preview: false },
+      });
       
       if (error) throw error;
       
@@ -216,11 +260,12 @@ const AdminSettingsPage = () => {
         description: `Successfully sent AI study tips to ${data.count} recipients.`,
         variant: "default" 
       });
+      setIsPreviewOpen(false);
     } catch (error: any) {
-      console.error("Error testing weekly tip:", error);
+      console.error("Error sending weekly tip:", error);
       toast({ 
-        title: "Test Failed", 
-        description: error.message || "Failed to trigger weekly tip.",
+        title: "Sending Failed", 
+        description: error.message || "Failed to trigger mailing list.",
         variant: "destructive" 
       });
     } finally {
@@ -379,14 +424,14 @@ const AdminSettingsPage = () => {
                     <Send className="h-5 w-5 text-blue-500" />
                     <CardTitle className="text-lg">Marketing Automation</CardTitle>
                 </div>
-                <CardDescription>Manually trigger the weekly AI study tip email to all users.</CardDescription>
+                <CardDescription>Preview and send the weekly AI study tip email to all users.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <p className="text-sm text-muted-foreground">The AI will generate content and send it to your unique email list.</p>
-                    <Button onClick={handleTestWeeklyTip} disabled={isSendingTip} size="sm">
-                        {isSendingTip ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                        Send Weekly Tip Now
+                    <p className="text-sm text-muted-foreground">The AI will generate content based on high-yield Gulf medical topics.</p>
+                    <Button onClick={handlePreviewWeeklyTip} disabled={isGeneratingPreview || isSendingTip} size="sm">
+                        {isGeneratingPreview ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                        Preview Weekly Tip
                     </Button>
                 </div>
             </CardContent>
@@ -406,6 +451,49 @@ const AdminSettingsPage = () => {
       </Card>
 
       <MadeWithDyad />
+
+      {/* Tip Preview Dialog */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" /> AI Generated Weekly Tip
+            </DialogTitle>
+            <DialogDescription>
+              Review the clinical content before broadcasting to all users and subscribers.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {tipPreview && (
+            <div className="space-y-6 py-4">
+              <div className="p-4 bg-muted rounded-lg border">
+                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-1">Email Subject:</p>
+                <p className="font-bold text-primary">🧠 Study Prometric: {tipPreview.subject}</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 border-b pb-2">
+                   <Badge variant="outline">Email Body Preview</Badge>
+                </div>
+                <div className="prose dark:prose-invert max-w-none border p-6 rounded-2xl bg-white shadow-inner">
+                   <h2 className="text-xl font-black text-blue-900 mb-4">{tipPreview.title}</h2>
+                   <ReactMarkdown>{tipPreview.content}</ReactMarkdown>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setIsPreviewOpen(false)} disabled={isSendingTip}>
+              Discard & Close
+            </Button>
+            <Button onClick={handleSendWeeklyTip} disabled={isSendingTip} className="font-bold uppercase tracking-wider">
+              {isSendingTip ? <Loader2 className="mr-2 h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+              Broadcast to All Recipients
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <EditStaticPageDialog
         open={isEditDialogOpen}

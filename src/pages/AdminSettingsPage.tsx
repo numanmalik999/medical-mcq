@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, ShieldCheck, AlertTriangle, Loader2 } from 'lucide-react';
+import { MoreHorizontal, ShieldCheck, AlertTriangle, Loader2, Send } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -139,6 +139,7 @@ const AdminSettingsPage = () => {
   const [isCheckingTrial, setIsCheckingTrial] = useState(true);
   const [isTrialConfigured, setIsTrialConfigured] = useState(false);
   const [isFixingTrial, setIsFixingTrial] = useState(false);
+  const [isSendingTip, setIsSendingTip] = useState(false);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedPageForEdit, setSelectedPageForEdit] = useState<StaticPage | null>(null);
@@ -186,7 +187,7 @@ const AdminSettingsPage = () => {
           name: '3-Day Trial',
           price: 0,
           currency: 'USD',
-          duration_in_months: 1, // Stored as integer, used for the trial metadata
+          duration_in_months: 1,
           description: 'Automatic 3-day full access for new signups.',
           features: ['Full Question Bank', 'AI Clinical Cases', 'Timed Exams', 'All Videos']
         });
@@ -198,6 +199,32 @@ const AdminSettingsPage = () => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setIsFixingTrial(false);
+    }
+  };
+
+  const handleTestWeeklyTip = async () => {
+    if (!window.confirm("This will trigger an AI-generated study tip and send it to all unique users and subscribers. Continue?")) return;
+    
+    setIsSendingTip(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('weekly-prometric-tip');
+      
+      if (error) throw error;
+      
+      toast({ 
+        title: "Weekly Tip Sent", 
+        description: `Successfully sent AI study tips to ${data.count} recipients.`,
+        variant: "default" 
+      });
+    } catch (error: any) {
+      console.error("Error testing weekly tip:", error);
+      toast({ 
+        title: "Test Failed", 
+        description: error.message || "Failed to trigger weekly tip.",
+        variant: "destructive" 
+      });
+    } finally {
+      setIsSendingTip(false);
     }
   };
 
@@ -317,32 +344,54 @@ const AdminSettingsPage = () => {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Admin Settings</h1>
 
-      {/* Trial Tier Configuration Check */}
-      <Card className={cn("border-l-4", isTrialConfigured ? "border-l-green-500" : "border-l-orange-500")}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-3">
-            {isCheckingTrial ? <Loader2 className="h-5 w-5 animate-spin" /> : isTrialConfigured ? <ShieldCheck className="h-5 w-5 text-green-500" /> : <AlertTriangle className="h-5 w-5 text-orange-500" />}
-            <CardTitle className="text-lg">System Health: 3-Day Trial Access</CardTitle>
-          </div>
-          <CardDescription>Ensures the mandatory '3-Day Trial' tier exists for new user automation.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isTrialConfigured ? (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Automation is active. New users correctly receive trial access upon signup.</p>
-              <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100 border-none">Ready</Badge>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Trial Tier Configuration Check */}
+        <Card className={cn("border-l-4", isTrialConfigured ? "border-l-green-500" : "border-l-orange-500")}>
+            <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+                {isCheckingTrial ? <Loader2 className="h-5 w-5 animate-spin" /> : isTrialConfigured ? <ShieldCheck className="h-5 w-5 text-green-500" /> : <AlertTriangle className="h-5 w-5 text-orange-500" />}
+                <CardTitle className="text-lg">System Health: Trial Access</CardTitle>
             </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <p className="text-sm text-orange-700 font-medium">The '3-Day Trial' tier is missing! New signups will NOT receive automatic access until this is fixed.</p>
-              <Button onClick={handleFixTrial} disabled={isFixingTrial} size="sm" variant="default">
-                {isFixingTrial ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Fix Trial Tier Now
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            <CardDescription>Ensures the mandatory '3-Day Trial' tier exists for automation.</CardDescription>
+            </CardHeader>
+            <CardContent>
+            {isTrialConfigured ? (
+                <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Automation is active. Signups correctly receive trial access.</p>
+                <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100 border-none">Ready</Badge>
+                </div>
+            ) : (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <p className="text-sm text-orange-700 font-medium">The '3-Day Trial' tier is missing!</p>
+                <Button onClick={handleFixTrial} disabled={isFixingTrial} size="sm" variant="default">
+                    {isFixingTrial ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Fix Trial Tier
+                </Button>
+                </div>
+            )}
+            </CardContent>
+        </Card>
+
+        {/* Weekly Tip Manual Trigger */}
+        <Card className="border-l-4 border-l-blue-500">
+            <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                    <Send className="h-5 w-5 text-blue-500" />
+                    <CardTitle className="text-lg">Marketing Automation</CardTitle>
+                </div>
+                <CardDescription>Manually trigger the weekly AI study tip email to all users.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <p className="text-sm text-muted-foreground">The AI will generate content and send it to your unique email list.</p>
+                    <Button onClick={handleTestWeeklyTip} disabled={isSendingTip} size="sm">
+                        {isSendingTip ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+                        Send Weekly Tip Now
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+      </div>
 
       <SocialMediaSettingsCard />
 

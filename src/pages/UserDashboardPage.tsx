@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight, Sparkles, PlayCircle, MonitorPlay } from 'lucide-react'; 
+import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight, Sparkles, PlayCircle, MonitorPlay, Zap } from 'lucide-react'; 
 import LoadingBar from '@/components/LoadingBar';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { parseISO, differenceInHours } from 'date-fns';
@@ -63,6 +63,7 @@ const UserDashboardPage = () => {
   const [areasForImprovement, setAreasForImprovement] = useState<PerformanceSummary[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [showTrialPopup, setShowTrialPopup] = useState(false);
+  const [cardsDue, setCardsDue] = useState(0);
 
   const isGuestMode = !user;
 
@@ -74,7 +75,8 @@ const UserDashboardPage = () => {
           fetchAllCategories(),
           fetchQuizPerformance(),
           fetchRecentAttempts(),
-          fetchVideoStats()
+          fetchVideoStats(),
+          fetchFlashcardStats()
         ]);
         
         const trialShownThisSession = sessionStorage.getItem('trial_popup_shown');
@@ -88,6 +90,20 @@ const UserDashboardPage = () => {
       fetchData();
     }
   }, [user, hasCheckedInitialSession]);
+
+  const fetchFlashcardStats = async () => {
+    if (!user) return;
+    try {
+        const { count } = await supabase
+            .from('user_flashcard_progress')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .lte('next_review_at', new Date().toISOString());
+        setCardsDue(count || 0);
+    } catch (e) {
+        console.error(e);
+    }
+  };
 
   const fetchAllCategories = async () => {
     const { data: categoriesData } = await supabase.from('categories').select('*');
@@ -276,14 +292,20 @@ const UserDashboardPage = () => {
           </CardHeader>
           <CardContent><div className="h-2 w-full bg-muted rounded-full mt-2"><div className="h-full bg-primary rounded-full" style={{ width: `${videoProgress.percentage}%` }}></div></div></CardContent>
         </Card>
-        <Card>
+        <Card className={cn(cardsDue > 0 ? "border-orange-500 bg-orange-50/10 shadow-md" : "")}>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
-                <TrendingUp className="h-4 w-4 text-primary" /> MCQs Solved
+                <Zap className={cn("h-4 w-4", cardsDue > 0 ? "text-orange-500 fill-orange-500" : "text-primary")} /> Memory Bank
             </CardDescription>
-            <CardTitle className="text-3xl font-black">{quizPerformance?.totalAttempts || 0}</CardTitle>
+            <CardTitle className="text-3xl font-black">{cardsDue} <span className="text-sm text-muted-foreground font-medium">Cards Due</span></CardTitle>
           </CardHeader>
-          <CardContent><p className="text-xs text-muted-foreground font-medium">Across all specialties</p></CardContent>
+          <CardContent>
+             <Link to="/user/flashcards">
+                <Button variant="link" size="sm" className="p-0 h-auto font-black text-[10px] uppercase">
+                    Review Now <ArrowRight className="ml-1 h-3 w-3" />
+                </Button>
+             </Link>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">

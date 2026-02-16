@@ -25,7 +25,8 @@ import {
     Youtube, 
     Search,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Zap
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
@@ -95,6 +96,7 @@ const AdminSidebar = ({ isCollapsed, onToggleCollapse }: AdminSidebarProps) => {
     { to: "/admin/manage-categories", icon: <FolderKanban className="h-4 w-4" />, label: "Manage Categories" },
     { to: "/admin/manage-courses", icon: <GraduationCap className="h-4 w-4" />, label: "Manage Courses" },
     { to: "/admin/manage-videos", icon: <Youtube className="h-4 w-4" />, label: "Manage Videos" },
+    { to: "/admin/manage-flashcards", icon: <Zap className="h-4 w-4" />, label: "Manage Flashcards" },
     { to: "/admin/manage-subscriptions", icon: <CreditCard className="h-4 w-4" />, label: "Manage Subscriptions" },
     { to: "/admin/manage-users", icon: <Users className="h-4 w-4" />, label: "Manage Users" },
     { to: "/admin/manage-feedback", icon: <MessageSquareWarning className="h-4 w-4" />, label: "Manage Feedback" },

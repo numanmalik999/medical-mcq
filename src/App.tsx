@@ -63,6 +63,7 @@ const BlogListPage = lazy(() => import("./pages/BlogListPage"));
 const BlogDetailsPage = lazy(() => import("./pages/BlogDetailsPage"));
 const StudyPlannerPage = lazy(() => import("./pages/StudyPlannerPage"));
 const FlashcardsPage = lazy(() => import("./pages/FlashcardsPage"));
+const ManageFlashcardsPage = lazy(() => import("./pages/ManageFlashcardsPage"));
 
 // Components & Layouts
 const AdminLayout = lazy(() => import("./components/AdminLayout"));
@@ -131,6 +132,7 @@ const AppContent = () => {
               <Route path="manage-courses" element={<ManageCoursesPage />} />
               <Route path="manage-courses/:courseId/topics" element={<ManageCourseTopicsPage />} />
               <Route path="manage-videos" element={<ManageVideosPage />} />
+              <Route path="manage-flashcards" element={<ManageFlashcardsPage />} />
               <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
               <Route path="manage-users" element={<ManageUsersPage />} />
               <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />

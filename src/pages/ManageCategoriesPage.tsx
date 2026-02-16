@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -23,7 +23,7 @@ import { useSession } from '@/components/SessionContextProvider';
 interface Category {
   id: string;
   name: string;
-  display_order: number; // Added field
+  display_order: number;
   mcq_count?: number;
 }
 
@@ -35,7 +35,7 @@ const ManageCategoriesPage = () => {
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState('');
-  const [displayOrder, setDisplayOrder] = useState('0'); // Added state
+  const [displayOrder, setDisplayOrder] = useState('0');
 
   const { hasCheckedInitialSession } = useSession();
 
@@ -47,26 +47,40 @@ const ManageCategoriesPage = () => {
 
   const fetchCategories = async () => {
     setIsPageLoading(true);
-    const { data: categoriesData, error: categoriesError } = await supabase
+    
+    // Attempt to fetch with order, fallback if column doesn't exist yet
+    let { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('*')
-      .order('display_order', { ascending: true }); // Sort by order
+      .order('display_order', { ascending: true });
 
     if (categoriesError) {
-      console.error('Error fetching categories:', categoriesError);
-      toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
-    } else {
+      console.warn('Could not sort by display_order, trying default fetch...');
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name', { ascending: true });
+      
+      if (fallbackError) {
+          toast({ title: "Error", description: "Failed to load categories.", variant: "destructive" });
+      } else {
+          categoriesData = fallbackData;
+      }
+    }
+
+    if (categoriesData) {
       const categoriesWithCounts = await Promise.all(
         (categoriesData || []).map(async (category) => {
-          const { count: mcqCount, error: mcqCountError } = await supabase
+          const { count: mcqCount } = await supabase
             .from('mcq_category_links')
             .select('mcq_id', { count: 'exact', head: true })
             .eq('category_id', category.id);
-
-          if (mcqCountError) {
-            console.error(`Error fetching MCQ count for category ${category.name}:`, mcqCountError);
-          }
-          return { ...category, mcq_count: mcqCount || 0 };
+          
+          return { 
+            ...category, 
+            display_order: category.display_order ?? 0,
+            mcq_count: mcqCount || 0 
+          };
         })
       );
       setCategories(categoriesWithCounts || []);
@@ -94,7 +108,7 @@ const ManageCategoriesPage = () => {
       resetForm();
     } catch (error: any) {
       console.error("Error adding category:", error);
-      toast({ title: "Error", description: `Failed to add category: ${error.message}`, variant: "destructive" });
+      toast({ title: "Error", description: `Failed to add category: ${error.message}. Ensure you have added the 'display_order' column to the database.`, variant: "destructive" });
     }
   };
 
@@ -119,7 +133,7 @@ const ManageCategoriesPage = () => {
       resetForm();
     } catch (error: any) {
       console.error("Error updating category:", error);
-      toast({ title: "Error", description: `Failed to update category: ${error.message}`, variant: "destructive" });
+      toast({ title: "Error", description: `Failed to update category: ${error.message}. Ensure you have added the 'display_order' column to the database.`, variant: "destructive" });
     }
   };
 
@@ -134,25 +148,12 @@ const ManageCategoriesPage = () => {
       return;
     }
     try {
-      const { error: deleteLinksError } = await supabase
-        .from('mcq_category_links')
-        .delete()
-        .eq('category_id', id);
-
-      if (deleteLinksError) {
-        console.warn("Error deleting associated category links:", deleteLinksError);
-      }
-
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id);
-
+      await supabase.from('mcq_category_links').delete().eq('category_id', id);
+      const { error } = await supabase.from('categories').delete().eq('id', id);
       if (error) throw error;
       toast({ title: "Success", description: "Category deleted successfully." });
       fetchCategories();
     } catch (error: any) {
-      console.error("Error deleting category:", error);
       toast({ title: "Error", description: `Failed to delete category: ${error.message}`, variant: "destructive" });
     }
   };
@@ -161,7 +162,7 @@ const ManageCategoriesPage = () => {
     if (category) {
       setCurrentCategory(category);
       setCategoryName(category.name);
-      setDisplayOrder(category.display_order.toString());
+      setDisplayOrder((category.display_order ?? 0).toString());
     } else {
       resetForm();
     }
@@ -171,10 +172,10 @@ const ManageCategoriesPage = () => {
   const categoryColumns: ColumnDef<Category>[] = [
     {
       accessorKey: 'display_order',
-      header: 'Order',
+      header: 'Serial No.',
       cell: ({ row }) => (
         <div className="font-mono text-xs text-muted-foreground">
-          #{row.original.display_order}
+          #{row.original.display_order ?? 0}
         </div>
       ),
     },
@@ -216,6 +217,7 @@ const ManageCategoriesPage = () => {
           <CardTitle className="text-xl">Categories</CardTitle>
           <Button onClick={() => openCategoryDialog()}>Add Category</Button>
         </CardHeader>
+        <CardDescription className="px-6">Set the 'Serial No.' to control the order in which specialties appear for users.</CardDescription>
         <CardContent>
           <DataTable columns={categoryColumns} data={categories} />
         </CardContent>

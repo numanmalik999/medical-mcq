@@ -476,8 +476,25 @@ const AdminSettingsPage = () => {
                    <Badge variant="outline">Email Body Preview</Badge>
                 </div>
                 <div className="prose dark:prose-invert max-w-none border p-6 rounded-2xl bg-white shadow-inner">
-                   <h2 className="text-xl font-black text-blue-900 mb-4">{tipPreview.title}</h2>
-                   <ReactMarkdown>{tipPreview.content}</ReactMarkdown>
+                   <h2 className="text-xl font-black text-blue-900 mb-2">{tipPreview.title}</h2>
+                   <div className="mb-8">
+                     <ReactMarkdown>{tipPreview.content}</ReactMarkdown>
+                   </div>
+                   
+                   {/* Promotional Preview */}
+                   <div className="mt-8 p-6 bg-blue-50 border border-blue-100 rounded-xl">
+                      <h3 className="text-blue-900 font-bold flex items-center gap-2 mt-0">
+                        Unlock Premium Tools
+                      </h3>
+                      <ul className="text-sm text-blue-800 list-disc pl-5 mb-4">
+                        <li>5,000+ Verified MCQs</li>
+                        <li>AI Clinical Cases</li>
+                        <li>Realistic Mock Exams</li>
+                      </ul>
+                      <div className="text-center">
+                        <Button size="sm" className="bg-blue-900 text-white font-bold h-9">Upgrade to Premium</Button>
+                      </div>
+                   </div>
                 </div>
               </div>
             </div>

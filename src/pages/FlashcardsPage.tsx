@@ -8,9 +8,10 @@ import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/c
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import Flashcard from '@/components/Flashcard';
-import { Loader2, BrainCircuit, Zap, Sparkles } from 'lucide-react';
+import { Loader2, BrainCircuit, Zap, Sparkles, Lock, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import SubscribePromptDialog from '@/components/SubscribePromptDialog';
 
 interface CardData {
   id: string;
@@ -22,7 +23,7 @@ interface CardData {
 }
 
 const FlashcardsPage = () => {
-  const { user } = useSession();
+  const { user, hasCheckedInitialSession } = useSession();
   const { toast } = useToast();
   
   const [cards, setCards] = useState<CardData[]>([]);
@@ -30,9 +31,16 @@ const FlashcardsPage = () => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
+
+  const isSubscribed = !!user?.has_active_subscription;
 
   const fetchDueCards = useCallback(async () => {
-    if (!user) return;
+    if (!user || !isSubscribed) {
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true);
     try {
       // 1. Fetch due cards first
@@ -67,11 +75,13 @@ const FlashcardsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, isSubscribed]);
 
   useEffect(() => {
-    fetchDueCards();
-  }, [fetchDueCards]);
+    if (hasCheckedInitialSession) {
+      fetchDueCards();
+    }
+  }, [hasCheckedInitialSession, fetchDueCards]);
 
   const handleSRS = async (quality: 1 | 2 | 3 | 4) => {
     if (!user || !cards[currentIndex]) return;
@@ -127,7 +137,53 @@ const FlashcardsPage = () => {
     }
   };
 
-  if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>;
+  if (!hasCheckedInitialSession || isLoading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>;
+
+  // --- Locked View for Non-Subscribed Users ---
+  if (!isSubscribed) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8 pb-20">
+        <div className="flex flex-col md:flex-row justify-between items-end gap-4 opacity-40 grayscale pointer-events-none">
+          <div>
+            <h1 className="text-3xl font-black uppercase italic tracking-tighter flex items-center gap-3">
+                <Zap className="h-8 w-8 text-primary fill-primary" /> Memory Master
+            </h1>
+            <p className="text-muted-foreground font-medium">Spaced repetition for clinical dominance.</p>
+          </div>
+        </div>
+
+        <div className="relative">
+          <Card className="border-none shadow-2xl rounded-3xl overflow-hidden p-12 text-center bg-white/80 backdrop-blur-sm relative z-10">
+            <div className="mx-auto bg-primary/10 p-6 rounded-full w-fit mb-6">
+                <Lock className="h-12 w-12 text-primary" />
+            </div>
+            <CardTitle className="text-3xl font-black uppercase tracking-tight mb-4">Premium Study Tool</CardTitle>
+            <CardDescription className="text-lg font-medium text-slate-600 max-w-lg mx-auto mb-8">
+                The **Memory Master** deck uses advanced Spaced Repetition (SRS) to help you memorize high-yield clinical pearls for the Prometric exams.
+            </CardDescription>
+            <Button 
+                onClick={() => setIsUpgradeDialogOpen(true)}
+                className="h-14 rounded-2xl px-10 text-lg font-black uppercase tracking-widest shadow-xl group"
+            >
+                Upgrade to Unlock <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </Card>
+          
+          {/* Background decoration to show a "hint" of what they are missing */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[400px] border-2 border-dashed border-primary/10 rounded-3xl -rotate-2 scale-95 opacity-20"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[400px] border-2 border-dashed border-primary/10 rounded-3xl rotate-1 scale-90 opacity-10"></div>
+        </div>
+
+        <SubscribePromptDialog 
+            open={isUpgradeDialogOpen} 
+            onOpenChange={setIsUpgradeDialogOpen} 
+            featureName="Memory Master (Anki System)" 
+            description="The Spaced Repetition flashcard system is an exclusive premium feature designed for high-speed retention of Gulf licensing clinical facts."
+        />
+        <MadeWithDyad />
+      </div>
+    );
+  }
 
   if (cards.length === 0) {
     return (

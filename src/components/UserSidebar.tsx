@@ -21,7 +21,8 @@ import {
     Lock,
     ChevronLeft,
     ChevronRight,
-    CalendarCheck
+    CalendarCheck,
+    Zap
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
@@ -90,6 +91,7 @@ const UserSidebar = ({ isCollapsed, onToggleCollapse }: UserSidebarProps) => {
   const navItems = [
     { to: "/user/dashboard", icon: <LayoutDashboard className="h-4 w-4" />, label: "Dashboard", premium: false },
     { to: "/user/planner", icon: <CalendarCheck className="h-4 w-4" />, label: "Study Planner", premium: false },
+    { to: "/user/flashcards", icon: <Zap className="h-4 w-4" />, label: "Flashcards", premium: true },
     { to: "/user/profile", icon: <User className="h-4 w-4" />, label: "Profile", premium: false },
     { to: "/quiz", icon: <BookOpenText className="h-4 w-4" />, label: "Take Quiz", premium: false },
     { to: "/user/take-test", icon: <ClipboardCheck className="h-4 w-4" />, label: "Take A Test", premium: true },

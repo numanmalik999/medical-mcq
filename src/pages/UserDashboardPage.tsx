@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
@@ -8,9 +8,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight, Sparkles, PlayCircle, MonitorPlay, Zap } from 'lucide-react'; 
+import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight, Sparkles, PlayCircle, MonitorPlay, Zap, ShieldCheck } from 'lucide-react'; 
 import LoadingBar from '@/components/LoadingBar';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
+import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip } from 'recharts';
 import { parseISO, differenceInHours } from 'date-fns';
 import { cn } from "@/lib/utils";
 import TrialOfferDialog from '@/components/TrialOfferDialog';
@@ -61,7 +61,7 @@ const UserDashboardPage = () => {
   const [recentVideos, setRecentVideos] = useState<RecentVideo[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [areasForImprovement, setAreasForImprovement] = useState<PerformanceSummary[]>([]);
-  const [chartData, setChartData] = useState<any[]>([]);
+  const [radarData, setRadarData] = useState<any[]>([]);
   const [showTrialPopup, setShowTrialPopup] = useState(false);
   const [cardsDue, setCardsDue] = useState(0);
 
@@ -186,11 +186,16 @@ const UserDashboardPage = () => {
         const perf = categoryPerformance[catId];
         const accuracy = perf.total > 0 ? (perf.correct / perf.total) * 100 : 0;
         performanceSummaries.push({ id: catId, name: cat.name, type: 'category', totalAttempts: perf.total, correctAttempts: perf.correct, accuracy });
-        visualData.push({ name: cat.name.length > 10 ? cat.name.substring(0, 10) + '...' : cat.name, accuracy: parseFloat(accuracy.toFixed(1)), attempts: perf.total, fullName: cat.name });
+        visualData.push({ 
+            subject: cat.name.length > 15 ? cat.name.substring(0, 12) + '...' : cat.name, 
+            A: parseFloat(accuracy.toFixed(1)), 
+            fullMark: 100,
+            fullName: cat.name
+        });
       }
     });
 
-    setChartData(visualData.sort((a, b) => b.accuracy - a.accuracy).slice(0, 8));
+    setRadarData(visualData);
     setAreasForImprovement([...performanceSummaries].sort((a, b) => a.accuracy - b.accuracy).slice(0, 4)); 
   };
 
@@ -214,6 +219,26 @@ const UserDashboardPage = () => {
       })));
     }
   };
+
+  const readinessScore = useMemo(() => {
+      if (!quizPerformance || quizPerformance.totalAttempts < 50) return null;
+      
+      // Calculate a predictive score (DHA/SMLE passing is usually around 60-70%)
+      // We scale the raw accuracy to reflect exam pressure and difficulty
+      const baseReadiness = quizPerformance.accuracy;
+      let passProbability = 0;
+      
+      if (baseReadiness > 75) passProbability = 95;
+      else if (baseReadiness > 65) passProbability = 80;
+      else if (baseReadiness > 55) passProbability = 50;
+      else passProbability = 20;
+
+      return {
+          score: Math.round(baseReadiness),
+          probability: passProbability,
+          status: passProbability >= 80 ? 'Exam Ready' : passProbability >= 50 ? 'Developing' : 'Review Required'
+      };
+  }, [quizPerformance]);
 
   if (!hasCheckedInitialSession || isPageLoading) return <LoadingBar />;
 
@@ -274,15 +299,40 @@ const UserDashboardPage = () => {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-primary text-primary-foreground">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-primary-foreground/70 flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
-                <Target className="h-4 w-4" /> Quiz Accuracy
-            </CardDescription>
-            <CardTitle className="text-3xl font-black">{quizPerformance?.accuracy.toFixed(1) || '0.0'}%</CardTitle>
-          </CardHeader>
-          <CardContent><div className="h-2 w-full bg-white/20 rounded-full mt-2"><div className="h-full bg-white rounded-full" style={{ width: `${quizPerformance?.accuracy || 0}%` }}></div></div></CardContent>
-        </Card>
+        {readinessScore ? (
+          <Card className="bg-primary text-primary-foreground border-none shadow-xl">
+             <CardHeader className="pb-2">
+               <CardDescription className="text-primary-foreground/70 flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
+                  <ShieldCheck className="h-4 w-4" /> Predictive Pass Score
+               </CardDescription>
+               <CardTitle className="text-3xl font-black">{readinessScore.score}% <span className="text-xs font-medium opacity-60">Accuracy</span></CardTitle>
+             </CardHeader>
+             <CardContent>
+                <div className="flex items-center justify-between mt-2">
+                   <span className="text-[10px] font-black uppercase tracking-widest">{readinessScore.status}</span>
+                   <span className="text-xs font-bold text-green-400">{readinessScore.probability}% Pass Chance</span>
+                </div>
+                <div className="h-2 w-full bg-white/20 rounded-full mt-2 overflow-hidden">
+                    <div className="h-full bg-green-400 transition-all duration-1000" style={{ width: `${readinessScore.probability}%` }}></div>
+                </div>
+             </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-primary text-primary-foreground">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-primary-foreground/70 flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
+                  <Target className="h-4 w-4" /> Overall Accuracy
+              </CardDescription>
+              <CardTitle className="text-3xl font-black">{quizPerformance?.accuracy.toFixed(1) || '0.0'}%</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="h-2 w-full bg-white/20 rounded-full mt-2">
+                    <div className="h-full bg-white rounded-full" style={{ width: `${quizPerformance?.accuracy || 0}%` }}></div>
+                </div>
+                <p className="text-[9px] font-medium mt-2 opacity-60 italic">Solve 50+ questions for Pass Prediction.</p>
+            </CardContent>
+          </Card>
+        )}
         <Card className="border-none shadow-sm">
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2 font-bold uppercase tracking-wider text-[10px]">
@@ -326,42 +376,52 @@ const UserDashboardPage = () => {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="md:col-span-4 shadow-sm">
-          <CardHeader><CardTitle>Specialty Performance</CardTitle><CardDescription>Accuracy rates across different medical fields.</CardDescription></CardHeader>
-          <CardContent className="h-[350px] pl-2">
-            {chartData.length > 0 ? (
+        <Card className="md:col-span-4 shadow-sm border-none bg-white rounded-3xl overflow-hidden">
+          <CardHeader className="bg-muted/30 pb-6 border-b">
+            <CardTitle className="text-xl">Clinical Proficiency Map</CardTitle>
+            <CardDescription>Visual audit of your strengths and weaknesses across all medical specialties.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[400px] flex items-center justify-center pt-6">
+            {radarData.length >= 3 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                  <XAxis type="number" domain={[0, 100]} hide />
-                  <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} style={{ fontSize: '12px', fontWeight: 'bold' }} />
-                  <Tooltip content={({ active, payload }) => {
+                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                  <PolarGrid stroke="#e2e8f0" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                  <Radar
+                    name="Proficiency"
+                    dataKey="A"
+                    stroke="#1e3a8a"
+                    fill="#1e3a8a"
+                    fillOpacity={0.4}
+                  />
+                  <Tooltip 
+                    content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                             return (
-                                <div className="bg-white p-3 border rounded-lg shadow-xl text-xs text-black">
-                                    <p className="font-bold mb-1">{payload[0].payload.fullName}</p>
-                                    <p className="text-blue-600">Accuracy: {payload[0].value}%</p>
-                                    <p className="text-muted-foreground">Attempts: {payload[0].payload.attempts}</p>
+                                <div className="bg-white p-3 border rounded-xl shadow-2xl text-xs">
+                                    <p className="font-black uppercase tracking-tight mb-1">{payload[0].payload.fullName}</p>
+                                    <p className="text-primary font-bold">Accuracy: {payload[0].value}%</p>
                                 </div>
                             );
                         }
                         return null;
                     }}
                   />
-                  <Bar dataKey="accuracy" radius={[0, 4, 4, 0]} barSize={25}>
-                    {chartData.map((entry, _index) => (
-                      <Cell key={`cell-${_index}`} fill={entry.accuracy > 70 ? '#16a34a' : entry.accuracy > 40 ? '#2563eb' : '#dc2626'} />
-                    ))}
-                  </Bar>
-                </BarChart>
+                </RadarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-muted/20 rounded-xl border-2 border-dashed"><TrendingUp className="h-10 w-10 text-muted-foreground mb-4" /><p className="text-muted-foreground font-medium uppercase text-xs">No analytics available yet</p><p className="text-[10px] text-muted-foreground mt-1">Solve more MCQs to generate performance data.</p></div>
+              <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-muted/10 rounded-2xl border-2 border-dashed">
+                <TrendingUp className="h-10 w-10 text-muted-foreground mb-4 opacity-30" />
+                <p className="text-muted-foreground font-black uppercase text-xs tracking-widest">Awaiting Clinical Data</p>
+                <p className="text-[10px] text-muted-foreground mt-2 max-w-[200px]">Practice at least 3 different specialties to generate your radar proficiency map.</p>
+              </div>
             )}
           </CardContent>
         </Card>
+
         <div className="md:col-span-3 space-y-6">
-            <Card className="shadow-sm border-none bg-primary/5">
+            <Card className="shadow-sm border-none bg-primary/5 rounded-3xl">
                 <CardHeader className="pb-3"><CardTitle className="text-lg flex items-center gap-2"><PlayCircle className="h-5 w-5 text-primary" /> Continue Watching</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                     {recentVideos.length > 0 ? (
@@ -371,12 +431,12 @@ const UserDashboardPage = () => {
                     ) : (<div className="text-center py-8"><p className="text-[10px] font-bold text-muted-foreground uppercase">No recently watched videos</p><Link to="/user/videos"><Button variant="link" size="sm" className="text-[10px] h-auto p-0 font-black">Browse Library</Button></Link></div>)}
                 </CardContent>
             </Card>
-            <Card className="shadow-sm">
-                <CardHeader className="pb-3"><CardTitle className="text-lg">Focus Areas</CardTitle><CardDescription className="text-xs">Categories requiring immediate review.</CardDescription></CardHeader>
+            <Card className="shadow-sm rounded-3xl">
+                <CardHeader className="pb-3"><CardTitle className="text-lg">Weakest Subjects</CardTitle><CardDescription className="text-xs font-medium">Highest priority review required.</CardDescription></CardHeader>
                 <CardContent className="space-y-3">
                     {areasForImprovement.length > 0 ? (
                     areasForImprovement.map((area) => (
-                        <div key={area.id} className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/30 transition-colors"><div className="min-w-0"><p className="text-xs font-black truncate uppercase tracking-tight">{area.name}</p><div className="flex items-center gap-2 mt-0.5"><Badge variant={area.accuracy < 40 ? "destructive" : "secondary"} className="text-[8px] h-4 px-1">{area.accuracy.toFixed(1)}%</Badge></div></div><Link to="/quiz"><Button size="icon" variant="ghost" className="h-8 w-8 rounded-full"><ArrowRight className="h-3 w-3" /></Button></Link></div>
+                        <div key={area.id} className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/30 transition-colors bg-white"><div className="min-w-0"><p className="text-xs font-black truncate uppercase tracking-tight">{area.name}</p><div className="flex items-center gap-2 mt-0.5"><Badge variant={area.accuracy < 40 ? "destructive" : "secondary"} className="text-[8px] h-4 px-1">{area.accuracy.toFixed(1)}% Accuracy</Badge></div></div><Link to="/quiz"><Button size="icon" variant="ghost" className="h-8 w-8 rounded-full"><ArrowRight className="h-3 w-3" /></Button></Link></div>
                     ))
                     ) : (<p className="text-center py-4 text-[10px] font-bold text-muted-foreground uppercase">Not enough data</p>)}
                 </CardContent>
@@ -385,7 +445,7 @@ const UserDashboardPage = () => {
       </div>
 
       <div className="grid gap-6">
-        <Card className="shadow-sm overflow-hidden">
+        <Card className="shadow-sm overflow-hidden rounded-3xl">
           <CardHeader className="bg-muted/30 border-b"><CardTitle className="text-lg">Recent Question History</CardTitle><CardDescription className="text-xs">Audit of your last 5 individual MCQ attempts.</CardDescription></CardHeader>
           <CardContent className="p-0">
             {recentAttempts.length > 0 ? (

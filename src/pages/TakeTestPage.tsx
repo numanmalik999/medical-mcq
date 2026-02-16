@@ -10,7 +10,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
-import { TimerIcon, Pause, Play, SkipForward, Bookmark, BookmarkCheck, Loader2, Trash2, CheckCircle2 } from 'lucide-react';
+import { TimerIcon, Pause, Play, SkipForward, Bookmark, BookmarkCheck, Loader2, Trash2, CheckCircle2, MessageSquare } from 'lucide-react'; 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { McqCategoryLink } from '@/components/mcq-columns'; 
@@ -23,6 +23,7 @@ import remarkGfm from 'remark-gfm';
 import SubscribePromptDialog from '@/components/SubscribePromptDialog';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import McqDiscussionDialog from '@/components/McqDiscussionDialog';
 
 interface MCQ {
   id: string;
@@ -115,13 +116,14 @@ const TakeTestPage = () => {
   const [activeSavedTests, setActiveSavedTests] = useState<LoadedTestSession[]>([]);
   
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
+  const [isDiscussionOpen, setIsDiscussionOpen] = useState(false);
+  const [discussionMcq, setDiscussionMcq] = useState<MCQ | null>(null);
 
   const timerIntervalRef = useRef<number | null>(null);
 
   const currentMcq = mcqs[currentQuestionIndex];
   const { isBookmarked, toggleBookmark } = useBookmark(currentMcq?.id || null);
 
-  // --- Scroll to top on question change ---
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentQuestionIndex, showConfiguration, showInstructions, showResults]);
@@ -296,7 +298,6 @@ const TakeTestPage = () => {
   };
 
   const startTestPreparation = async () => {
-    // FIX: Allow access if subscription is active, regardless of 3-day threshold
     if (!user?.has_active_subscription) {
       setIsUpgradeDialogOpen(true);
       return;
@@ -363,7 +364,6 @@ const TakeTestPage = () => {
   };
 
   const continueTestSession = useCallback(async (loadedSession: LoadedTestSession) => {
-    // FIX: Allow access if subscription is active
     if (!user?.has_active_subscription) {
       setIsUpgradeDialogOpen(true);
       return;
@@ -434,6 +434,11 @@ const TakeTestPage = () => {
     const currentId = mcqs[currentQuestionIndex].id;
     setSkippedMcqIds(new Set(skippedMcqIds).add(currentId));
     handleNext();
+  };
+
+  const handleOpenDiscussion = (mcq: MCQ) => {
+    setDiscussionMcq(mcq);
+    setIsDiscussionOpen(true);
   };
 
   if (!hasCheckedInitialSession || isPageLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
@@ -570,7 +575,17 @@ const TakeTestPage = () => {
                   const exp = explanations.get(mcq.id);
                   return (
                     <div key={mcq.id} className="border rounded-xl p-3 bg-muted/10 space-y-2">
-                      <h4 className="font-bold text-sm">Q{index + 1}. {mcq.question_text}</h4>
+                      <div className="flex justify-between items-start gap-4">
+                        <h4 className="font-bold text-sm">Q{index + 1}. {mcq.question_text}</h4>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-full shrink-0"
+                          onClick={() => handleOpenDiscussion(mcq)}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <div className="grid grid-cols-1 gap-1">
                         {['A','B','C','D'].map(k => {
                             const isCorr = mcq.correct_answer === k;
@@ -603,6 +618,16 @@ const TakeTestPage = () => {
             </CardFooter>
           </Card>
         </div>
+        
+        {/* Discussion Dialog */}
+        {discussionMcq && (
+          <McqDiscussionDialog 
+            open={isDiscussionOpen} 
+            onOpenChange={setIsDiscussionOpen} 
+            mcqId={discussionMcq.id} 
+            questionText={discussionMcq.question_text}
+          />
+        )}
       </div>
     );
   }

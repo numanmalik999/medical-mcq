@@ -11,7 +11,7 @@ import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
-import { AlertCircle, CheckCircle2, RotateCcw, Save, Bookmark, BookmarkCheck, ArrowLeft, WifiOff, Info, Search, Lock, ArrowRight, Trash2, Zap, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RotateCcw, Save, Bookmark, BookmarkCheck, ArrowLeft, WifiOff, Info, Search, Lock, ArrowRight, Trash2, Zap, Loader2, MessageSquare } from 'lucide-react'; 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import QuizNavigator from '@/components/QuizNavigator';
@@ -24,6 +24,7 @@ import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import LoadingBar from '@/components/LoadingBar';
 import { Badge } from '@/components/ui/badge';
+import McqDiscussionDialog from '@/components/McqDiscussionDialog';
 
 interface MCQExplanation {
   id: string;
@@ -35,7 +36,7 @@ interface CategoryStat {
   id: string;
   name: string;
   description: string | null;
-  display_order: number; // Added field
+  display_order: number;
   total_mcqs: number;
   total_trial_mcqs: number;
   user_attempts: number;
@@ -121,6 +122,9 @@ const QuizPage = () => {
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+
+  // Discussion Dialog
+  const [isDiscussionOpen, setIsDiscussionOpen] = useState(false);
 
   const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<LoadedQuizSession[]>([]);
   const [currentCorrectnessPercentage, setCurrentCorrectnessPercentage] = useState('0.00%');
@@ -273,8 +277,8 @@ const QuizPage = () => {
 
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
-      .select('id, name, description, display_order') // Added field
-      .order('display_order', { ascending: true }); // Primary sort
+      .select('id, name, description, display_order') 
+      .order('display_order', { ascending: true }); 
 
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
@@ -338,7 +342,7 @@ const QuizPage = () => {
         id: ALL_TRIAL_MCQS_ID,
         name: 'All Trial MCQs',
         description: 'Explore our complete collection of free trial questions from all medical specialties.',
-        display_order: -1, // Ensure it's first
+        display_order: -1, 
         total_mcqs: globalTrialRes.count || 0,
         total_trial_mcqs: globalTrialRes.count || 0,
         user_attempts: 0,
@@ -372,7 +376,7 @@ const QuizPage = () => {
         id: UNCATEGORIZED_ID,
         name: 'General Medical Practice',
         description: 'Comprehensive clinical questions covering essential foundations of medicine and shared specialty knowledge.',
-        display_order: 9999, // Ensure it's last
+        display_order: 9999, 
         total_mcqs: uncategorizedTotal,
         total_trial_mcqs: 0,
         user_attempts: userAtt.total,
@@ -707,8 +711,8 @@ const QuizPage = () => {
             )}
 
             <div className="relative">
+               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                <Input placeholder="Search for a medical specialty..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-12 pl-12 rounded-2xl shadow-sm text-base" />
-               <Search className="absolute left-4 top-3 text-muted-foreground" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -823,7 +827,17 @@ const QuizPage = () => {
 
             {showExplanation && (
               <div className="mt-4 p-4 bg-background rounded-2xl border-2 border-dashed border-border animate-in slide-in-from-bottom-4 duration-500">
-                <h3 className="text-base font-bold mb-2 flex items-center gap-2 text-foreground"><Info className="h-4 w-4 text-primary" /> Clinical AI Explanation</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                  <h3 className="text-base font-bold flex items-center gap-2 text-foreground"><Info className="h-4 w-4 text-primary" /> Clinical AI Explanation</h3>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 rounded-full font-bold uppercase text-[10px] gap-2 border-primary/20 text-primary hover:bg-primary/5"
+                    onClick={() => setIsDiscussionOpen(true)}
+                  >
+                    <MessageSquare className="h-3 w-3" /> Discuss this Question
+                  </Button>
+                </div>
                 <div className="prose dark:prose-invert max-w-none text-foreground/90 text-[13px] leading-relaxed">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{explanations.get(currentMcq.id || '')?.explanation_text || "Analyzing clinical scenario..."}</ReactMarkdown>
                 </div>
@@ -838,7 +852,9 @@ const QuizPage = () => {
               {!isSub ? (
                 <Button onClick={handleSubmitAnswer} disabled={!isSelected} className="px-6 rounded-full font-bold h-8 text-xs">Check Answer</Button>
               ) : (
-                <Button onClick={handleNextQuestion} className="px-6 rounded-full font-bold h-8 text-xs">Next <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>
+                <div className="flex gap-2">
+                   <Button onClick={handleNextQuestion} className="px-6 rounded-full font-bold h-8 text-xs">Next <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>
+                </div>
               )}
           </CardFooter>
         </Card>
@@ -855,6 +871,16 @@ const QuizPage = () => {
           <DialogFooter><Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()} className="w-full rounded-xl h-10 font-bold text-sm">Submit to Clinical Board</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Discussion Dialog */}
+      {currentMcq && (
+        <McqDiscussionDialog 
+          open={isDiscussionOpen} 
+          onOpenChange={setIsDiscussionOpen} 
+          mcqId={currentMcq.id} 
+          questionText={currentMcq.question_text}
+        />
+      )}
     </div>
   );
 };

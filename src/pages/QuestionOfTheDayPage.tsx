@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { CheckCircle2, AlertCircle, Loader2, Trophy } from 'lucide-react'; // Import Trophy icon
+import { CheckCircle2, AlertCircle, Loader2, Trophy, MessageSquare } from 'lucide-react'; 
 import { Link } from 'react-router-dom';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
@@ -19,6 +19,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
+import McqDiscussionDialog from '@/components/McqDiscussionDialog';
 
 interface DailyMcq {
   daily_mcq_id: string;
@@ -43,7 +44,7 @@ interface SubmissionResult {
   total_points: number | null;
   free_month_awarded: boolean;
   error?: string;
-  selected_option?: string; // Added this property
+  selected_option?: string; 
 }
 
 interface MCQExplanation {
@@ -59,7 +60,7 @@ interface LeaderboardEntry {
   guest_email: string | null;
   points_awarded: number;
   created_at: string;
-  user_display_name: string; // Combined name for display
+  user_display_name: string; 
 }
 
 const guestFormSchema = z.object({
@@ -77,8 +78,9 @@ const QuestionOfTheDayPage = () => {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [explanation, setExplanation] = useState<MCQExplanation | null>(null);
-  const [userTotalPoints, setUserTotalPoints] = useState<number | null>(null); // For logged-in users
+  const [userTotalPoints, setUserTotalPoints] = useState<number | null>(null); 
   const [dailyLeaderboard, setDailyLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [isDiscussionOpen, setIsDiscussionOpen] = useState(false);
 
   const isGuest = !user;
 
@@ -97,7 +99,7 @@ const QuestionOfTheDayPage = () => {
       .eq('id', explanationId)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+    if (error && error.code !== 'PGRST116') {
       console.error('Supabase Error fetching explanation:', error);
       toast({
         title: "Error",
@@ -123,7 +125,7 @@ const QuestionOfTheDayPage = () => {
       `)
       .eq('daily_mcq_id', currentDailyMcqId)
       .order('points_awarded', { ascending: false })
-      .order('created_at', { ascending: true }) // Tie-break by submission time
+      .order('created_at', { ascending: true }) 
       .limit(10);
 
     if (submissionsError) {
@@ -134,20 +136,16 @@ const QuestionOfTheDayPage = () => {
     }
 
     const userIds = submissions.map(s => s.user_id).filter(Boolean) as string[];
-    // Updated type definition for publicProfilesMap to include email
     let publicProfilesMap = new Map<string, { first_name: string | null; last_name: string | null; email: string | null }>();
 
     if (userIds.length > 0) {
-      // The Edge Function now returns email as well
       const { data: publicProfiles, error: profilesError = null } = await supabase.functions.invoke('get-public-profiles', {
         body: { user_ids: userIds },
       });
 
       if (profilesError) {
         console.error('Error fetching public profiles from Edge Function:', profilesError);
-        toast({ title: "Error", description: "Failed to load user names for leaderboard.", variant: "destructive" });
       } else if (publicProfiles) {
-        // Updated mapping to include email
         publicProfiles.forEach((profile: { id: string; first_name: string | null; last_name: string | null; email: string | null }) => {
           publicProfilesMap.set(profile.id, { first_name: profile.first_name, last_name: profile.last_name, email: profile.email });
         });
@@ -163,7 +161,6 @@ const QuestionOfTheDayPage = () => {
         if (fullName) {
           displayName = fullName;
         } else if (profile?.email) {
-          // Fallback to email if name is missing
           displayName = profile.email;
         } else {
           displayName = `User (${entry.user_id.substring(0, 4)})`;
@@ -189,7 +186,6 @@ const QuestionOfTheDayPage = () => {
     let fetchedMcq: DailyMcq | null = null;
 
     try {
-      // 1. Fetch the Daily MCQ (Primary operation)
       const { data, error } = await supabase.functions.invoke('get-daily-mcq');
 
       if (error) {
@@ -213,14 +209,10 @@ const QuestionOfTheDayPage = () => {
       return;
     }
 
-    // 2. Handle subsequent data fetches (Secondary operations)
     if (fetchedMcq?.daily_mcq_id) {
-      // Fetch leaderboard (can run in background)
       fetchDailyLeaderboard(fetchedMcq.daily_mcq_id); 
 
-      // Check submission status and fetch points (wrap in try/catch)
       try {
-        // Check if user has already submitted for today
         if (user) {
           const { data: existingSubmission, error: subError } = await supabase
             .from('daily_mcq_submissions')
@@ -231,13 +223,12 @@ const QuestionOfTheDayPage = () => {
 
           if (subError && subError.code !== 'PGRST116') {
             console.error('Error checking existing submission:', subError);
-            // Do not throw, just log
           } else if (existingSubmission) {
             setSubmissionResult({
               message: 'You have already submitted an answer for today\'s question.',
               is_correct: existingSubmission.is_correct,
               points_awarded: existingSubmission.points_awarded,
-              total_points: null, // Will be fetched separately by fetchDailyMcq
+              total_points: null, 
               free_month_awarded: false,
               selected_option: existingSubmission.selected_option,
             });
@@ -246,7 +237,7 @@ const QuestionOfTheDayPage = () => {
               fetchExplanation(fetchedMcq.mcq.explanation_id);
             }
           }
-        } else { // Guest user check for existing submission
+        } else { 
           const guestEmail = localStorage.getItem('qod_guest_email');
           if (guestEmail) {
             const { data: existingGuestSubmission, error: guestSubError } = await supabase
@@ -276,7 +267,6 @@ const QuestionOfTheDayPage = () => {
           }
         }
         
-        // Fetch user's total points if logged in
         if (user) {
           const { data: scoreData, error: scoreError } = await supabase
             .from('user_daily_mcq_scores')
@@ -289,14 +279,13 @@ const QuestionOfTheDayPage = () => {
           } else if (scoreData) {
             setUserTotalPoints(scoreData.total_points);
           } else {
-            setUserTotalPoints(0); // User has no score yet
+            setUserTotalPoints(0); 
           }
         } else {
-          setUserTotalPoints(null); // Guests don't have cumulative scores
+          setUserTotalPoints(null); 
         }
       } catch (e) {
-        console.error("Error during secondary QOD data fetch (submission/points):", e);
-        // Log error, but do not interrupt rendering the main question
+        console.error("Error during secondary QOD data fetch:", e);
       }
     }
     
@@ -331,20 +320,18 @@ const QuestionOfTheDayPage = () => {
       });
 
       if (invokeError) {
-        // Handle 409 Conflict specifically from the invokeError object
         if (invokeError.status === 409 && invokeError.message?.includes("already submitted")) {
-          // The Edge Function's 409 response body is in invokeError.details
           const errorDetails = invokeError.details as SubmissionResult;
           setSubmissionResult({
             message: errorDetails.error || 'You have already submitted an answer for today\'s question.',
             is_correct: errorDetails.is_correct,
             points_awarded: errorDetails.points_awarded,
-            total_points: null, // Will be fetched separately by fetchDailyMcq
+            total_points: null, 
             free_month_awarded: false,
             error: errorDetails.error,
-            selected_option: errorDetails.selected_option, // Use selected_option from errorDetails
+            selected_option: errorDetails.selected_option, 
           });
-          setSelectedOption(errorDetails.selected_option || null); // Set selected option from previous submission
+          setSelectedOption(errorDetails.selected_option || null); 
           if (dailyMcq.mcq.explanation_id) {
             fetchExplanation(dailyMcq.mcq.explanation_id);
           }
@@ -353,11 +340,10 @@ const QuestionOfTheDayPage = () => {
             description: errorDetails.error || 'You have already submitted an answer for today\'s question.',
             variant: "default",
           });
-          // Re-fetch daily MCQ to ensure all states (like total points) are updated
           fetchDailyMcq();
-          return; // Exit early as we've handled the 409
+          return; 
         }
-        throw invokeError; // Re-throw other errors
+        throw invokeError; 
       }
 
       setSubmissionResult(responseData as SubmissionResult);
@@ -383,13 +369,11 @@ const QuestionOfTheDayPage = () => {
         });
       }
 
-      // Store guest info in local storage
       if (isGuest && guestValues) {
         localStorage.setItem('qod_guest_name', guestValues.guest_name);
         localStorage.setItem('qod_guest_email', guestValues.guest_email);
       }
       
-      // Refresh leaderboard after submission
       if (dailyMcq.daily_mcq_id) {
         fetchDailyLeaderboard(dailyMcq.daily_mcq_id);
       }
@@ -409,7 +393,6 @@ const QuestionOfTheDayPage = () => {
 
   const handleGuestSubmit = guestForm.handleSubmit(handleSubmit);
 
-  // Load guest info from local storage on component mount
   useEffect(() => {
     if (isGuest) {
       const savedGuestName = localStorage.getItem('qod_guest_name');
@@ -452,7 +435,6 @@ const QuestionOfTheDayPage = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
       <div className="flex flex-col lg:flex-row w-full max-w-6xl gap-6">
-        {/* Main Content Area */}
         <Card className="flex-1">
           <CardHeader>
             <CardTitle className="text-3xl text-center">Question of the Day</CardTitle>
@@ -525,7 +507,17 @@ const QuestionOfTheDayPage = () => {
 
                 {explanation && (
                   <div className="p-4 bg-white rounded-md border border-gray-200">
-                    <h3 className="text-lg font-semibold mb-2 text-gray-900">Explanation by AI:</h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Explanation by AI:</h3>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 rounded-full font-bold uppercase text-[10px] gap-2 border-primary/20 text-primary hover:bg-primary/5"
+                        onClick={() => setIsDiscussionOpen(true)}
+                      >
+                        <MessageSquare className="h-3 w-3" /> Discuss this Question
+                      </Button>
+                    </div>
                     <div className="prose max-w-none">
                       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                         {explanation.explanation_text}
@@ -599,7 +591,6 @@ const QuestionOfTheDayPage = () => {
           </CardFooter>
         </Card>
 
-        {/* Leaderboard Sidebar */}
         <Card className="w-full lg:w-80 flex-shrink-0">
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
@@ -626,6 +617,16 @@ const QuestionOfTheDayPage = () => {
         </Card>
       </div>
       <MadeWithDyad />
+
+      {/* Discussion Dialog */}
+      {dailyMcq && (
+        <McqDiscussionDialog 
+          open={isDiscussionOpen} 
+          onOpenChange={setIsDiscussionOpen} 
+          mcqId={dailyMcq.mcq.id} 
+          questionText={dailyMcq.mcq.question_text}
+        />
+      )}
     </div>
   );
 };

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
-import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark, BookmarkCheck, MessageSquare } from 'lucide-react'; 
 import { MCQ } from '@/components/mcq-columns';
 import { useBookmark } from '@/hooks/use-bookmark';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -17,6 +17,7 @@ import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
+import McqDiscussionDialog from '@/components/McqDiscussionDialog';
 
 interface MCQExplanation {
   id: string;
@@ -32,6 +33,7 @@ const BookmarkedMcqsPage = () => {
   const [currentMcqIndex, setCurrentMcqIndex] = useState(0);
   const [showExplanation, setShowExplanation] = useState(false);
   const [explanations, setExplanations] = useState<Map<string, MCQExplanation>>(new Map());
+  const [isDiscussionOpen, setIsDiscussionOpen] = useState(false);
 
   const currentMcq = bookmarkedMcqs[currentMcqIndex];
   const { isBookmarked, toggleBookmark, isLoading: isBookmarkLoading } = useBookmark(currentMcq?.id || null);
@@ -86,7 +88,6 @@ const BookmarkedMcqsPage = () => {
         return;
       }
 
-      // Fetch MCQs and their category links
       const { data: mcqsData, error: mcqsError } = await supabase
         .from('mcqs')
         .select(`
@@ -100,7 +101,6 @@ const BookmarkedMcqsPage = () => {
 
       if (mcqsError) throw mcqsError;
 
-      // Order MCQs based on the order of mcqIds from bookmarkedLinks
       const orderedMcqs = mcqIds.map(id => mcqsData.find(mcq => mcq.id === id)).filter((mcq): mcq is any => mcq !== undefined);
 
       const formattedMcqs: MCQ[] = orderedMcqs.map((mcq: any) => ({
@@ -112,8 +112,8 @@ const BookmarkedMcqsPage = () => {
       }));
 
       setBookmarkedMcqs(formattedMcqs);
-      setCurrentMcqIndex(0); // Reset to first MCQ when bookmarks are fetched
-      setShowExplanation(false); // Hide explanation initially
+      setCurrentMcqIndex(0); 
+      setShowExplanation(false); 
     } catch (error: any) {
       console.error("Error fetching bookmarked MCQs:", error);
       toast({
@@ -131,11 +131,10 @@ const BookmarkedMcqsPage = () => {
     if (hasCheckedInitialSession && user) {
       fetchBookmarkedMcqs();
     } else if (hasCheckedInitialSession && !user) {
-      setIsPageLoading(false); // Not logged in, no bookmarks to show
+      setIsPageLoading(false); 
     }
   }, [user, hasCheckedInitialSession, fetchBookmarkedMcqs]);
 
-  // Effect to fetch explanation when currentMcq changes and explanation is needed
   useEffect(() => {
     if (currentMcq && showExplanation && currentMcq.explanation_id) {
       fetchExplanation(currentMcq.explanation_id);
@@ -163,10 +162,9 @@ const BookmarkedMcqsPage = () => {
   const handleBookmarkToggle = async () => {
     if (currentMcq) {
       await toggleBookmark();
-      // After toggling, re-fetch bookmarks to update the list if it was removed
-      if (isBookmarked) { // If it was bookmarked and now removed
+      if (isBookmarked) { 
         setTimeout(() => fetchBookmarkedMcqs(), 300);
-      } else { // If it was not bookmarked and now added
+      } else { 
         setTimeout(() => fetchBookmarkedMcqs(), 300);
       }
     }
@@ -240,16 +238,26 @@ const BookmarkedMcqsPage = () => {
               </CardDescription>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleBookmarkToggle}
-            disabled={isBookmarkLoading}
-            className="text-primary hover:text-primary-foreground/90"
-          >
-            {isBookmarked ? <BookmarkCheck className="h-6 w-6 fill-current" /> : <Bookmark className="h-6 w-6" />}
-            <span className="sr-only">{isBookmarked ? "Remove bookmark" : "Add bookmark"}</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-9 rounded-full font-bold uppercase text-[10px] gap-2"
+              onClick={() => setIsDiscussionOpen(true)}
+            >
+              <MessageSquare className="h-4 w-4" /> Discuss
+            </Button>
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBookmarkToggle}
+                disabled={isBookmarkLoading}
+                className="text-primary hover:text-primary-foreground/90"
+            >
+                {isBookmarked ? <BookmarkCheck className="h-6 w-6 fill-current" /> : <Bookmark className="h-6 w-6" />}
+                <span className="sr-only">{isBookmarked ? "Remove bookmark" : "Add bookmark"}</span>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <p className="text-lg font-semibold mb-4">{currentMcq?.question_text}</p>
@@ -301,6 +309,16 @@ const BookmarkedMcqsPage = () => {
         </CardFooter>
       </Card>
       <MadeWithDyad />
+
+      {/* Discussion Dialog */}
+      {currentMcq && (
+        <McqDiscussionDialog 
+          open={isDiscussionOpen} 
+          onOpenChange={setIsDiscussionOpen} 
+          mcqId={currentMcq.id} 
+          questionText={currentMcq.question_text}
+        />
+      )}
     </div>
   );
 };

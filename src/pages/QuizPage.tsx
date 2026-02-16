@@ -35,6 +35,7 @@ interface CategoryStat {
   id: string;
   name: string;
   description: string | null;
+  display_order: number; // Added field
   total_mcqs: number;
   total_trial_mcqs: number;
   user_attempts: number;
@@ -272,7 +273,8 @@ const QuizPage = () => {
 
     const { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
-      .select('id, name, description');
+      .select('id, name, description, display_order') // Added field
+      .order('display_order', { ascending: true }); // Primary sort
 
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
@@ -336,6 +338,7 @@ const QuizPage = () => {
         id: ALL_TRIAL_MCQS_ID,
         name: 'All Trial MCQs',
         description: 'Explore our complete collection of free trial questions from all medical specialties.',
+        display_order: -1, // Ensure it's first
         total_mcqs: globalTrialRes.count || 0,
         total_trial_mcqs: globalTrialRes.count || 0,
         user_attempts: 0,
@@ -369,6 +372,7 @@ const QuizPage = () => {
         id: UNCATEGORIZED_ID,
         name: 'General Medical Practice',
         description: 'Comprehensive clinical questions covering essential foundations of medicine and shared specialty knowledge.',
+        display_order: 9999, // Ensure it's last
         total_mcqs: uncategorizedTotal,
         total_trial_mcqs: 0,
         user_attempts: userAtt.total,

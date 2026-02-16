@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
-import { Bookmark, BookmarkCheck, MessageSquare } from 'lucide-react'; 
+import { Bookmark, BookmarkCheck, MessageSquare, FileDown } from 'lucide-react'; 
 import { MCQ } from '@/components/mcq-columns';
 import { useBookmark } from '@/hooks/use-bookmark';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -18,6 +18,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import McqDiscussionDialog from '@/components/McqDiscussionDialog';
+import CheatSheetGenerator from '@/components/CheatSheetGenerator';
 
 interface MCQExplanation {
   id: string;
@@ -92,6 +93,7 @@ const BookmarkedMcqsPage = () => {
         .from('mcqs')
         .select(`
           *,
+          mcq_explanations (explanation_text),
           mcq_category_links (
             category_id,
             categories (name)
@@ -105,6 +107,7 @@ const BookmarkedMcqsPage = () => {
 
       const formattedMcqs: MCQ[] = orderedMcqs.map((mcq: any) => ({
         ...mcq,
+        explanation_text: mcq.mcq_explanations?.explanation_text,
         category_links: mcq.mcq_category_links.map((link: any) => ({
           category_id: link.category_id,
           category_name: link.categories?.name || null,
@@ -226,8 +229,26 @@ const BookmarkedMcqsPage = () => {
     );
   }
 
+  const cheatSheetItems = bookmarkedMcqs.map(mcq => ({
+    title: mcq.question_text,
+    content: mcq.explanation_text || "Review the full explanation in-app for clinical pearls.",
+    category: mcq.category_links?.[0]?.category_name || "General Medicine",
+    difficulty: mcq.difficulty || "Mixed"
+  }));
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 pt-16">
+      <div className="w-full max-w-3xl flex justify-between items-center mb-4 px-2">
+         <h1 className="text-2xl font-black uppercase tracking-tighter italic">Your Bookmarks</h1>
+         <CheatSheetGenerator 
+            title="High-Yield Bookmarks"
+            subtitle="A customized summary of your saved clinical scenarios for quick review before your DHA/SMLE exam."
+            items={cheatSheetItems}
+            buttonText="Export All Bookmarks (PDF)"
+            variant="default"
+         />
+      </div>
+
       <Card className="w-full max-w-3xl">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>

@@ -8,12 +8,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight, Sparkles, PlayCircle, MonitorPlay, Zap, ShieldCheck } from 'lucide-react'; 
+import { CheckCircle2, AlertCircle, TrendingUp, Clock, Target, ArrowRight, Sparkles, PlayCircle, MonitorPlay, Zap, ShieldCheck, FileDown } from 'lucide-react'; 
 import LoadingBar from '@/components/LoadingBar';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip } from 'recharts';
 import { parseISO, differenceInHours } from 'date-fns';
 import { cn } from "@/lib/utils";
 import TrialOfferDialog from '@/components/TrialOfferDialog';
+import CheatSheetGenerator from '@/components/CheatSheetGenerator';
 
 interface QuizPerformance {
   totalAttempts: number;
@@ -249,6 +250,14 @@ const UserDashboardPage = () => {
   const daysRemaining = Math.max(0, Math.ceil(hoursRemaining / 24));
   const isCurrentlyOnTrial = user?.has_active_subscription && hoursRemaining > 0 && hoursRemaining <= 72;
 
+  // Items for the Weak Point summary
+  const weakPointItems = areasForImprovement.map(area => ({
+    title: `Specialty Focus: ${area.name}`,
+    content: `You currently have a ${area.accuracy.toFixed(1)}% accuracy in this field after ${area.totalAttempts} attempts. High priority review is recommended. Master the core clinical blueprints for this system to improve your overall exam readiness index.`,
+    category: area.name,
+    difficulty: area.accuracy < 40 ? "HIGH PRIORITY" : "REVIEW"
+  }));
+
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -432,7 +441,19 @@ const UserDashboardPage = () => {
                 </CardContent>
             </Card>
             <Card className="shadow-sm rounded-3xl">
-                <CardHeader className="pb-3"><CardTitle className="text-lg">Weakest Subjects</CardTitle><CardDescription className="text-xs font-medium">Highest priority review required.</CardDescription></CardHeader>
+                <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                  <div className="space-y-1">
+                    <CardTitle className="text-lg">Weakest Subjects</CardTitle>
+                    <CardDescription className="text-xs font-medium">Highest priority review required.</CardDescription>
+                  </div>
+                  <CheatSheetGenerator 
+                    title="High-Priority Study Plan"
+                    subtitle="Our AI has identified these specialties as your biggest areas for improvement. Focus on these to pass your licensing exam."
+                    items={weakPointItems}
+                    buttonText="Get Plan (PDF)"
+                    className="h-8 px-3"
+                  />
+                </CardHeader>
                 <CardContent className="space-y-3">
                     {areasForImprovement.length > 0 ? (
                     areasForImprovement.map((area) => (

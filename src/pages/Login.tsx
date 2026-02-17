@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,27 +10,33 @@ import { Link } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 
 const Login = () => {
-  const { hasCheckedInitialSession, session } = useSession();
+  const { hasCheckedInitialSession, session, user } = useSession();
+  const navigate = useNavigate();
+
+  // Automatic redirect if session is detected
+  useEffect(() => {
+    if (hasCheckedInitialSession && session && user) {
+      console.log("[Auth] Active session detected, redirecting to dashboard...");
+      navigate('/redirect');
+    }
+  }, [hasCheckedInitialSession, session, user, navigate]);
 
   // Clear any existing session fragments if the user is on the login page but not fully logged in
   useEffect(() => {
     const clearStaleSession = async () => {
-      if (!session) {
-        // This ensures local storage is wiped of old IDs
+      if (!session && !window.location.hash.includes('access_token')) {
         await supabase.auth.signOut();
-        console.log("[Auth] Stale session cleared for fresh login.");
       }
     };
     clearStaleSession();
   }, [session]);
 
-  // Use the window origin for more reliable redirects in this environment
   const redirectToUrl = `${window.location.origin}/redirect`;
 
   if (!hasCheckedInitialSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 pt-16">
-        <p className="text-gray-700">Loading login security...</p>
+        <p className="text-gray-700">Loading security protocols...</p>
       </div>
     );
   }

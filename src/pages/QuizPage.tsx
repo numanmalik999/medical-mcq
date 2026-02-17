@@ -25,6 +25,7 @@ import remarkGfm from 'remark-gfm';
 import LoadingBar from '@/components/LoadingBar';
 import { Badge } from '@/components/ui/badge';
 import McqDiscussionDialog from '@/components/McqDiscussionDialog';
+import SubscribePromptDialog from '@/components/SubscribePromptDialog';
 
 interface MCQExplanation {
   id: string;
@@ -118,13 +119,12 @@ const QuizPage = () => {
   const [isTrialActiveSession, setIsTrialActiveSession] = useState(false);
   const [isOfflineQuiz, setIsOfflineQuiz] = useState(false);
 
-  // Feedback Dialog
+  // UI Dialogs
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
-
-  // Discussion Dialog
   const [isDiscussionOpen, setIsDiscussionOpen] = useState(false);
+  const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
 
   const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<LoadedQuizSession[]>([]);
   const [currentCorrectnessPercentage, setCurrentCorrectnessPercentage] = useState('0.00%');
@@ -287,14 +287,12 @@ const QuizPage = () => {
     }
     const categoriesMap = new Map(categoriesData?.map(cat => [cat.id, cat]) || []);
     
-    // Optimized counts using parallelized head-only queries with inner join hints
     const countPromises = (categoriesData || []).map(async (cat) => {
         const { count: total } = await supabase
             .from('mcq_category_links')
             .select('mcq_id', { count: 'exact', head: true })
             .eq('category_id', cat.id);
             
-        // Use inner join hint to filter counts by related table mcqs
         const { count: trial } = await supabase
             .from('mcq_category_links')
             .select('mcqs!inner(id)', { count: 'exact', head: true })
@@ -312,7 +310,6 @@ const QuizPage = () => {
 
     const categoryMcqCounts = new Map(countsResults.map(r => [r.id, { total: r.total, trial: r.trial }]));
     
-    // Logic for Uncategorized count
     const { data: linkedIdsRes } = await supabase.from('mcq_category_links').select('mcq_id');
     const uniqueLinkedIds = new Set(linkedIdsRes?.map(l => l.mcq_id) || []);
     const uncategorizedTotal = (totalMcqRes.count || 0) - uniqueLinkedIds.size;
@@ -337,7 +334,6 @@ const QuizPage = () => {
     let offlineCounts = new Map<string, number>();
     if (isNative && isDbInitialized) offlineCounts = await getOfflineCategoryCounts();
 
-    // Add Global Trial Category at the top
     categoriesWithStats.push({
         id: ALL_TRIAL_MCQS_ID,
         name: 'All Trial MCQs',
@@ -413,6 +409,12 @@ const QuizPage = () => {
     const isSubscribed = user?.has_active_subscription;
     const isGuestUser = !user;
 
+    // Check if user is allowed to access this category
+    if (!isSubscribed && selectedCategoryId !== ALL_TRIAL_MCQS_ID) {
+      setIsUpgradeDialogOpen(true);
+      return;
+    }
+
     let sessionIsTrial = selectedCategoryId === ALL_TRIAL_MCQS_ID || isGuestUser || !isSubscribed;
     
     if (sessionIsTrial && mode === 'incorrect') {
@@ -455,7 +457,6 @@ const QuizPage = () => {
           let finalIds = shuffleArray(mcqIdsToConsider);
           if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) finalIds = finalIds.slice(0, TRIAL_MCQ_LIMIT);
 
-          // Fetch full data for only the selected IDs
           const { data: mcqs } = await supabase.from('mcqs').select('*, mcq_category_links(category_id, categories(name))').in('id', finalIds);
           
           mcqsToLoad = finalIds.map(id => {
@@ -516,7 +517,6 @@ const QuizPage = () => {
             mcqsData = (data || []).map((m: any) => ({ ...m, category_links: m.mcq_category_links.map((l: any) => ({ category_id: l.category_id, category_name: l.categories?.name })) }));
         }
 
-        // Maintain order
         mcqsData = loadedSession.mcqs.map(l => mcqsData.find(f => f.id === l.id)).filter((m): m is MCQ => !!m);
         setQuizQuestions(mcqsData);
         setUserAnswers(loadedSession.userAnswers);
@@ -644,12 +644,6 @@ const QuizPage = () => {
 
   const filteredCategories = categoryStats.filter(cat => cat.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  useEffect(() => {
-    if (hasCheckedInitialSession) {
-      fetchQuizOverview();
-    }
-  }, [hasCheckedInitialSession]);
-
   if (!hasCheckedInitialSession || isPageLoading) return <LoadingBar />;
 
   if (isInitializingQuiz) {
@@ -754,6 +748,13 @@ const QuizPage = () => {
             </div>
           </CardContent>
         </Card>
+        
+        <SubscribePromptDialog 
+            open={isUpgradeDialogOpen} 
+            onOpenChange={setIsUpgradeDialogOpen} 
+            featureName="Specialty Question Bank" 
+            description="Accessing full specialties and historical mistake reviews is a premium feature. Please upgrade to unlock the complete Gulf licensing curriculum."
+        />
         <MadeWithDyad />
       </div>
     );

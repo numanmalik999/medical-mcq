@@ -93,7 +93,7 @@ const UserSidebar = ({ isCollapsed, onToggleCollapse }: UserSidebarProps) => {
     { to: "/user/planner", icon: <CalendarCheck className="h-4 w-4" />, label: "Study Planner", premium: false },
     { to: "/user/flashcards", icon: <Zap className="h-4 w-4" />, label: "Flashcards", premium: true },
     { to: "/user/profile", icon: <User className="h-4 w-4" />, label: "Profile", premium: false },
-    { to: "/quiz", icon: <BookOpenText className="h-4 w-4" />, label: "Take Quiz", premium: false },
+    { to: "/quiz", icon: <BookOpenText className="h-4 w-4" />, label: "Take Quiz", premium: true },
     { to: "/user/take-test", icon: <ClipboardCheck className="h-4 w-4" />, label: "Take A Test", premium: true },
     { to: "/user/case-studies", icon: <Stethoscope className="h-4 w-4" />, label: "Case Studies", premium: true },
     { to: "/user/videos", icon: <Youtube className="h-4 w-4" />, label: "Videos", premium: true },

@@ -4,8 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { isPast, parseISO, differenceInHours } from 'date-fns';
-import { toast } from "sonner";
+import { isPast, parseISO } from 'date-fns';
 
 interface AuthUser extends User {
   is_admin?: boolean;
@@ -27,22 +26,18 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-const INACTIVITY_LIMIT = 30 * 60 * 1000;
-
 export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false);
   const navigate = useNavigate();
   const isMounted = useRef(true);
-  const maintenancePerformed = useRef<string | null>(null);
-  const hasNotifiedTrial = useRef<string | null>(null);
-  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const hydrateProfile = useCallback(async (supabaseUser: User) => {
     if (!isMounted.current) return;
 
     try {
+      // Fetch profile and subscription in parallel
       const [profileRes, subRes] = await Promise.all([
         supabase
           .from('profiles')
@@ -67,25 +62,15 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let currentHasActiveSubscription = profileData?.has_active_subscription || false;
       const latestSubEndDate = latestSub?.end_date || null;
 
+      // Handle subscription expiry check
       if (currentHasActiveSubscription && latestSubEndDate) {
         const endDate = parseISO(latestSubEndDate);
         if (isPast(endDate)) {
           currentHasActiveSubscription = false;
-          if (maintenancePerformed.current !== supabaseUser.id) {
-            maintenancePerformed.current = supabaseUser.id;
-            supabase.functions.invoke('update-expired-subscription-status', {
-              body: { user_id: supabaseUser.id, is_active: false },
-            }).catch(err => console.error("[Session] Maintenance failed:", err));
-          }
-        } else {
-            const hoursLeft = differenceInHours(endDate, new Date());
-            if (hoursLeft >= 0 && hoursLeft <= 72 && hasNotifiedTrial.current !== supabaseUser.id) {
-                hasNotifiedTrial.current = supabaseUser.id;
-                toast.success("Premium Access Active!", {
-                    description: `Welcome! You have approximately ${Math.ceil(hoursLeft/24)} days of Premium access remaining.`,
-                    duration: 6000,
-                });
-            }
+          // Trigger background update for expired sub (don't await to avoid blocking)
+          supabase.functions.invoke('update-expired-subscription-status', {
+            body: { user_id: supabaseUser.id, is_active: false },
+          }).catch(console.error);
         }
       }
     
@@ -102,41 +87,41 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } as AuthUser);
     } catch (e: any) {
       console.error("[Session] Profile hydration error:", e);
+      // Fallback to basic auth user so login doesn't break
+      setUser(supabaseUser as AuthUser);
     } finally {
       setHasCheckedInitialSession(true);
     }
   }, []);
 
-  const handleInactivityLogout = useCallback(async () => {
-    if (user) {
-      await supabase.auth.signOut();
-      toast.info("Session Expired", { description: "Logged out due to inactivity." });
-      navigate('/login', { replace: true });
-    }
-  }, [user, navigate]);
-
-  const resetInactivityTimer = useCallback(() => {
-    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-    if (user) inactivityTimerRef.current = setTimeout(handleInactivityLogout, INACTIVITY_LIMIT);
-  }, [user, handleInactivityLogout]);
-
   useEffect(() => {
     isMounted.current = true;
     
+    // Initial session check
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       if (!isMounted.current) return;
       setSession(initialSession);
-      if (initialSession) hydrateProfile(initialSession.user);
-      else setHasCheckedInitialSession(true);
+      if (initialSession) {
+        hydrateProfile(initialSession.user);
+      } else {
+        setHasCheckedInitialSession(true);
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+    // Listen for auth changes (Login, Logout, Token Refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (!isMounted.current) return;
+      
       setSession(currentSession);
-      if (currentSession) hydrateProfile(currentSession.user);
-      else {
+      
+      if (currentSession) {
+        hydrateProfile(currentSession.user);
+      } else {
         setUser(null);
         setHasCheckedInitialSession(true);
+        if (event === 'SIGNED_OUT') {
+           navigate('/login');
+        }
       }
     });
 
@@ -144,19 +129,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       isMounted.current = false;
       subscription.unsubscribe();
     };
-  }, [hydrateProfile]);
-
-  useEffect(() => {
-    if (!user) return;
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    const activityHandler = () => resetInactivityTimer();
-    resetInactivityTimer();
-    events.forEach(event => window.addEventListener(event, activityHandler));
-    return () => {
-      events.forEach(event => window.removeEventListener(event, activityHandler));
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-    };
-  }, [user, resetInactivityTimer]);
+  }, [hydrateProfile, navigate]);
 
   return (
     <SessionContext.Provider value={{ session, user, hasCheckedInitialSession }}>

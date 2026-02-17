@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from 'react';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,16 +9,27 @@ import { Link } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 
 const Login = () => {
-  const { hasCheckedInitialSession } = useSession();
+  const { hasCheckedInitialSession, session } = useSession();
 
-  // Use VITE_PUBLIC_BASE_URL for production redirect, fallback to current origin for development
-  const baseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
-  const redirectToUrl = `${baseUrl}/redirect`;
+  // Clear any existing session fragments if the user is on the login page but not fully logged in
+  useEffect(() => {
+    const clearStaleSession = async () => {
+      if (!session) {
+        // This ensures local storage is wiped of old IDs
+        await supabase.auth.signOut();
+        console.log("[Auth] Stale session cleared for fresh login.");
+      }
+    };
+    clearStaleSession();
+  }, [session]);
+
+  // Use the window origin for more reliable redirects in this environment
+  const redirectToUrl = `${window.location.origin}/redirect`;
 
   if (!hasCheckedInitialSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 pt-16">
-        <p className="text-gray-700">Loading login page...</p>
+        <p className="text-gray-700">Loading login security...</p>
       </div>
     );
   }
@@ -43,16 +55,6 @@ const Login = () => {
           theme="light"
           view="sign_in"
           redirectTo={redirectToUrl}
-          localization={{
-            variables: {
-              sign_in: {
-                link_text: '',
-              },
-              sign_up: {
-                link_text: '',
-              },
-            },
-          }}
         />
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Don't have an account?{" "}

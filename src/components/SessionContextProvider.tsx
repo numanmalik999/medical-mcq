@@ -37,7 +37,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     if (!isMounted.current) return;
 
     try {
-      // 1. Fetch profile and subscription status in parallel
       const [profileRes, subRes] = await Promise.all([
         supabase
           .from('profiles')
@@ -62,12 +61,10 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let currentHasActiveSubscription = profileData?.has_active_subscription || false;
       const latestSubEndDate = latestSub?.end_date || null;
 
-      // Handle subscription expiry logic
       if (currentHasActiveSubscription && latestSubEndDate) {
         const endDate = parseISO(latestSubEndDate);
         if (isPast(endDate)) {
           currentHasActiveSubscription = false;
-          // Silently trigger background update
           supabase.functions.invoke('update-expired-subscription-status', {
             body: { user_id: supabaseUser.id, is_active: false },
           }).catch(() => {});
@@ -87,10 +84,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } as AuthUser);
     } catch (e: any) {
       console.error("[Session] Profile hydration error:", e);
-      // Fallback to basic auth user so app doesn't hang
       setUser(supabaseUser as AuthUser);
     } finally {
-      // ALWAYS set this to true, even on failure
       setHasCheckedInitialSession(true);
     }
   }, []);
@@ -98,7 +93,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   useEffect(() => {
     isMounted.current = true;
     
-    // Initial check
+    // Check session on mount
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       if (!isMounted.current) return;
       setSession(initialSession);
@@ -109,7 +104,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       }
     });
 
-    // Listen for events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (!isMounted.current) return;
       
@@ -120,6 +114,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } else {
         setUser(null);
         setHasCheckedInitialSession(true);
+        // Only redirect on explicit sign-out, not on initial "no-session" check
         if (event === 'SIGNED_OUT') {
            navigate('/login');
         }

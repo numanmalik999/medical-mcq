@@ -37,7 +37,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     if (!isMounted.current) return;
 
     try {
-      // Fetch profile and subscription in parallel
+      // 1. Fetch profile and subscription status in parallel
       const [profileRes, subRes] = await Promise.all([
         supabase
           .from('profiles')
@@ -62,15 +62,15 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let currentHasActiveSubscription = profileData?.has_active_subscription || false;
       const latestSubEndDate = latestSub?.end_date || null;
 
-      // Handle subscription expiry check
+      // Handle subscription expiry logic
       if (currentHasActiveSubscription && latestSubEndDate) {
         const endDate = parseISO(latestSubEndDate);
         if (isPast(endDate)) {
           currentHasActiveSubscription = false;
-          // Trigger background update for expired sub (don't await to avoid blocking)
+          // Silently trigger background update
           supabase.functions.invoke('update-expired-subscription-status', {
             body: { user_id: supabaseUser.id, is_active: false },
-          }).catch(console.error);
+          }).catch(() => {});
         }
       }
     
@@ -87,9 +87,10 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       } as AuthUser);
     } catch (e: any) {
       console.error("[Session] Profile hydration error:", e);
-      // Fallback to basic auth user so login doesn't break
+      // Fallback to basic auth user so app doesn't hang
       setUser(supabaseUser as AuthUser);
     } finally {
+      // ALWAYS set this to true, even on failure
       setHasCheckedInitialSession(true);
     }
   }, []);
@@ -97,7 +98,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   useEffect(() => {
     isMounted.current = true;
     
-    // Initial session check
+    // Initial check
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       if (!isMounted.current) return;
       setSession(initialSession);
@@ -108,7 +109,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       }
     });
 
-    // Listen for auth changes (Login, Logout, Token Refresh)
+    // Listen for events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (!isMounted.current) return;
       

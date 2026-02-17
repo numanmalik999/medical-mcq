@@ -482,7 +482,7 @@ const UserDashboardPage = () => {
       </div>
       
       {user && (
-        <TrialOfferDialog open={showTrialPopup} onOpenChange={setShowTrialPopup} userId={user.id} onActivated={() => window.location.reload()} />
+        <TrialOfferDialog open={showTrialPopup} onOpenChange={setShowTrialPopup} userId={user.id} />
       )}
       <MadeWithDyad />
     </div>

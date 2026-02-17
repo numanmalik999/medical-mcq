@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { isPast, parseISO, differenceInHours } from 'date-fns';
 import { toast } from "sonner";
 
@@ -27,7 +27,6 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-// 30 minutes in milliseconds
 const INACTIVITY_LIMIT = 30 * 60 * 1000;
 
 export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
@@ -35,12 +34,9 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const [user, setUser] = useState<AuthUser | null>(null);
   const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
   const isMounted = useRef(true);
   const maintenancePerformed = useRef<string | null>(null);
   const hasNotifiedTrial = useRef<string | null>(null);
-  
-  // Timer ref to persist across re-renders
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const hydrateProfile = useCallback(async (supabaseUser: User) => {
@@ -83,15 +79,11 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           }
         } else {
             const hoursLeft = differenceInHours(endDate, new Date());
-            const daysLeft = Math.ceil(hoursLeft / 24);
-
             if (hoursLeft >= 0 && hoursLeft <= 72 && hasNotifiedTrial.current !== supabaseUser.id) {
                 hasNotifiedTrial.current = supabaseUser.id;
-                const timeStr = hoursLeft < 24 ? 'less than 24 hours' : `approximately ${daysLeft} days`;
-                
-                toast.success("Active Trial Detected!", {
-                    description: `Welcome! You have ${timeStr} of Premium access remaining.`,
-                    duration: 8000,
+                toast.success("Premium Access Active!", {
+                    description: `Welcome! You have approximately ${Math.ceil(hoursLeft/24)} days of Premium access remaining.`,
+                    duration: 6000,
                 });
             }
         }
@@ -115,125 +107,56 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     }
   }, []);
 
-  // Inactivity Logout Logic
   const handleInactivityLogout = useCallback(async () => {
     if (user) {
       await supabase.auth.signOut();
-      toast.info("Session Expired", {
-        description: "You have been logged out due to inactivity for security.",
-        duration: 5000,
-      });
+      toast.info("Session Expired", { description: "Logged out due to inactivity." });
       navigate('/login', { replace: true });
     }
   }, [user, navigate]);
 
   const resetInactivityTimer = useCallback(() => {
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-    }
-    
-    // Only set the timer if there is an active user session
-    if (user) {
-      inactivityTimerRef.current = setTimeout(handleInactivityLogout, INACTIVITY_LIMIT);
-    }
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    if (user) inactivityTimerRef.current = setTimeout(handleInactivityLogout, INACTIVITY_LIMIT);
   }, [user, handleInactivityLogout]);
 
   useEffect(() => {
     isMounted.current = true;
     
-    const safetyTimeout = setTimeout(() => {
-        if (!hasCheckedInitialSession) {
-            setHasCheckedInitialSession(true);
-        }
-    }, 3000);
-
-    supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       if (!isMounted.current) return;
-      
-      if (error) {
-          if (error.message?.includes("JWN") || error.status === 400) {
-              supabase.auth.signOut().finally(() => setHasCheckedInitialSession(true));
-              return;
-          }
-          setHasCheckedInitialSession(true);
-          return;
-      }
-
       setSession(initialSession);
-      if (initialSession) {
-        hydrateProfile(initialSession.user);
-      } else {
-        setHasCheckedInitialSession(true);
-      }
+      if (initialSession) hydrateProfile(initialSession.user);
+      else setHasCheckedInitialSession(true);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       if (!isMounted.current) return;
-      
       setSession(currentSession);
-      
-      if (currentSession) {
-        if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
-          hydrateProfile(currentSession.user);
-        } else {
-          setUser(currentSession.user as AuthUser);
-          setHasCheckedInitialSession(true);
-        }
-      } else {
+      if (currentSession) hydrateProfile(currentSession.user);
+      else {
         setUser(null);
-        hasNotifiedTrial.current = null;
         setHasCheckedInitialSession(true);
       }
     });
 
     return () => {
       isMounted.current = false;
-      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, [hydrateProfile]);
 
-  // Monitor Activity
   useEffect(() => {
-    if (!user) {
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-      }
-      return;
-    }
-
+    if (!user) return;
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    
     const activityHandler = () => resetInactivityTimer();
-
-    // Initialize timer
     resetInactivityTimer();
-
-    // Set up listeners
-    events.forEach(event => {
-      window.addEventListener(event, activityHandler);
-    });
-
+    events.forEach(event => window.addEventListener(event, activityHandler));
     return () => {
-      // Cleanup listeners and timer
-      events.forEach(event => {
-        window.removeEventListener(event, activityHandler);
-      });
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-      }
+      events.forEach(event => window.removeEventListener(event, activityHandler));
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
     };
   }, [user, resetInactivityTimer]);
-
-  useEffect(() => {
-    if (hasCheckedInitialSession && session && (location.pathname === '/login' || location.pathname === '/signup')) {
-      const isAdmin = user?.is_admin || false;
-      const timer = setTimeout(() => {
-        navigate(isAdmin ? '/admin/dashboard' : '/user/dashboard', { replace: true });
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [session, user?.is_admin, hasCheckedInitialSession, navigate, location.pathname]);
 
   return (
     <SessionContext.Provider value={{ session, user, hasCheckedInitialSession }}>
@@ -244,8 +167,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
 export const useSession = () => {
   const context = useContext(SessionContext);
-  if (context === undefined) {
-    throw new Error('useSession must be used within a SessionContextProvider');
-  }
+  if (context === undefined) throw new Error('useSession must be used within a SessionContextProvider');
   return context;
 };

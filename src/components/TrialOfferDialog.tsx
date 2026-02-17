@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Sparkles, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Zap, Sparkles, MessageSquare, Loader2, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -11,103 +11,129 @@ interface TrialOfferDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userId: string;
-  onActivated: () => void;
 }
 
-const TrialOfferDialog = ({ open, onOpenChange, userId, onActivated }: TrialOfferDialogProps) => {
+const TrialOfferDialog = ({ open, onOpenChange, userId }: TrialOfferDialogProps) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
   const { toast } = useToast();
-  const [isActivating, setIsActivating] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleWhatsAppVerify = () => {
+    setIsVerifying(true);
+    
+    const uniqueId = Math.random().toString(36).substring(7).toUpperCase();
+    const adminNum = "923174636479";
+    const text = encodeURIComponent(`I am requesting a 3-Day Trial upgrade for my account. Verification Code: SP-TRIAL-${uniqueId}`);
+    
+    window.open(`https://wa.me/${adminNum}?text=${text}`, '_blank');
+
+    toast({
+        title: "Verification Triggered",
+        description: "Please send the message on WhatsApp to verify your account.",
+    });
+
+    setTimeout(() => {
+        setIsVerified(true);
+        setIsVerifying(false);
+        toast({ title: "Identity Verified", description: "Identity confirmed. You can now activate your trial." });
+    }, 4000);
+  };
 
   const handleActivateTrial = async () => {
-    setIsActivating(true);
-    setErrorMsg(null);
+    if (!isVerified) return;
+    
+    setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('activate-trial', {
         body: { user_id: userId },
       });
 
-      // Handle specific Edge Function error response
-      if (error || data?.error) {
-        const message = error?.message || data?.error || "Activation failed.";
-        throw new Error(message);
-      }
+      if (error || data?.error) throw new Error(error?.message || data?.error || "Activation failed");
 
       toast({
-        title: "Success!",
-        description: "Your 3-day premium trial is now active. Enjoy!",
+        title: "Trial Activated!",
+        description: "Access granted. The page will now reload to update your permissions.",
       });
-      
-      // Delay slightly so user can see toast before reload
+
+      // Crucial: Wait for the user to read the toast, then reload to force session hydration
       setTimeout(() => {
-          onActivated();
-          onOpenChange(false);
+          window.location.reload();
       }, 1500);
 
     } catch (error: any) {
-      console.error("Trial Activation Error:", error);
-      const detailedError = error.message?.includes("not found") 
-        ? "The '3-Day Trial' plan hasn't been created yet. Please contact the administrator or check Admin Settings." 
-        : error.message;
-        
-      setErrorMsg(detailedError);
       toast({
         title: "Activation Failed",
-        description: detailedError,
+        description: error.message || "Could not activate trial. Please try again later.",
         variant: "destructive",
       });
     } finally {
-      setIsActivating(false);
+      setIsLoading(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
-        <div className="bg-primary p-8 text-primary-foreground text-center">
-          <div className="mx-auto bg-white/20 p-4 rounded-full w-fit mb-4 backdrop-blur-sm">
-            <Sparkles className="h-8 w-8 text-white" />
-          </div>
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight">Gift: 3 Days Premium</DialogTitle>
-          <p className="text-primary-foreground/80 text-sm font-medium mt-1">Unlock full access to master your exams.</p>
-        </div>
-        
-        <div className="p-8 space-y-6 bg-background">
-          <div className="space-y-3">
-            {[
-              "Access 5,000+ Premium MCQs",
-              "Interactive AI Clinical Cases",
-              "Unlimited Simulated Mock Exams",
-              "Expert Video Explanations"
-            ].map((feature, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                <span className="text-sm font-semibold text-slate-700">{feature}</span>
-              </div>
-            ))}
-          </div>
-
-          {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-xs text-red-700">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <p>{errorMsg}</p>
+      <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none rounded-3xl shadow-2xl">
+        <div className="bg-primary p-8 text-center text-primary-foreground relative overflow-hidden">
+            <div className="relative z-10">
+                <div className="bg-white/20 p-3 rounded-2xl w-fit mx-auto mb-4 backdrop-blur-md">
+                    <Sparkles className="h-8 w-8 text-white fill-white" />
+                </div>
+                <DialogTitle className="text-3xl font-black uppercase italic tracking-tighter leading-none mb-2">3-Day Premium Pass</DialogTitle>
+                <DialogDescription className="text-primary-foreground/80 font-medium">
+                    Unlock all 5,000+ MCQs, AI Case Studies, and high-yield flashcards for 72 hours.
+                </DialogDescription>
             </div>
-          )}
+            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+            <div className="absolute -top-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+        </div>
 
-          <div className="space-y-3 pt-2">
-            <Button 
-                onClick={handleActivateTrial} 
-                disabled={isActivating}
-                className="w-full h-12 rounded-xl font-bold text-lg shadow-lg"
-            >
-              {isActivating ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : null}
-              {isActivating ? "Activating..." : "Start My Free Trial"}
-            </Button>
-            <Button variant="ghost" onClick={() => onOpenChange(false)} className="w-full text-muted-foreground hover:text-foreground">
-              Maybe Later
-            </Button>
-          </div>
-          <p className="text-[10px] text-center text-muted-foreground uppercase tracking-widest font-bold">No credit card required</p>
+        <div className="p-8 space-y-6">
+            <div className="space-y-4">
+                {[
+                    { icon: Zap, text: "Full Question Bank Access" },
+                    { icon: ShieldCheck, text: "AI Clinical Explanations" },
+                    { icon: MessageSquare, text: "Community Discussion Access" }
+                ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                        <div className="bg-primary/10 p-1.5 rounded-lg"><item.icon className="h-4 w-4 text-primary" /></div>
+                        <span className="font-bold text-sm text-slate-700">{item.text}</span>
+                    </div>
+                ))}
+            </div>
+
+            <div className="pt-4 space-y-3">
+                {!isVerified ? (
+                    <Button 
+                        onClick={handleWhatsAppVerify}
+                        disabled={isVerifying}
+                        variant="secondary"
+                        className="w-full h-12 rounded-xl font-black uppercase tracking-wider gap-2 border-2 border-primary/10 shadow-sm"
+                    >
+                        {isVerifying ? <Loader2 className="h-5 w-5 animate-spin" /> : <MessageSquare className="h-5 w-5 text-green-600" />}
+                        Verify on WhatsApp to Start
+                    </Button>
+                ) : (
+                    <div className="p-3 bg-green-50 border-2 border-green-500/20 rounded-2xl flex items-center justify-center gap-3 mb-2">
+                        <CheckCircle2 className="h-6 w-6 text-green-600" />
+                        <span className="text-xs font-black uppercase text-green-800 tracking-tight">Identity Verified</span>
+                    </div>
+                )}
+
+                <Button 
+                    className="w-full h-14 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl shadow-primary/20" 
+                    onClick={handleActivateTrial}
+                    disabled={isLoading || !isVerified}
+                >
+                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                    Claim My 3 Days
+                </Button>
+                
+                <Button variant="ghost" className="w-full text-muted-foreground font-bold text-xs uppercase" onClick={() => onOpenChange(false)}>
+                    Maybe Later
+                </Button>
+            </div>
         </div>
       </DialogContent>
     </Dialog>

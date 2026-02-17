@@ -275,44 +275,52 @@ const QuizPage = () => {
   const fetchQuizOverview = async () => {
     setIsPageLoading(true);
 
-    const { data: categoriesData, error: categoriesError } = await supabase
+    let { data: categoriesData, error: categoriesError } = await supabase
       .from('categories')
       .select('id, name, description, display_order') 
       .order('display_order', { ascending: true }); 
 
     if (categoriesError) {
-      console.error('Error fetching categories:', categoriesError);
-      setIsPageLoading(false);
-      return;
+      console.warn('Could not sort by display_order, trying name sort...');
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('categories')
+        .select('id, name, description, display_order')
+        .order('name', { ascending: true });
+      
+      if (fallbackError) {
+          console.error('Error fetching categories:', fallbackError);
+          setIsPageLoading(false);
+          return;
+      }
+      categoriesData = fallbackData;
     }
+
     const categoriesMap = new Map(categoriesData?.map(cat => [cat.id, cat]) || []);
     
-    const countPromises = (categoriesData || []).map(async (cat) => {
-        const { count: total } = await supabase
-            .from('mcq_category_links')
-            .select('mcq_id', { count: 'exact', head: true })
-            .eq('category_id', cat.id);
-            
-        const { count: trial } = await supabase
-            .from('mcq_category_links')
-            .select('mcqs!inner(id)', { count: 'exact', head: true })
-            .eq('category_id', cat.id)
-            .eq('mcqs.is_trial_mcq', true);
-
-        return { id: cat.id, total: total || 0, trial: trial || 0 };
+    // Efficiently count all MCQs and Trial MCQs in a single step to avoid N+1 queries
+    const { data: totalLinks } = await supabase.from('mcq_category_links').select('category_id');
+    const { data: trialMcqs } = await supabase.from('mcqs').select('id').eq('is_trial_mcq', true);
+    const trialMcqSet = new Set(trialMcqs?.map(m => m.id) || []);
+    
+    const { data: trialLinks } = await supabase.from('mcq_category_links').select('category_id, mcq_id');
+    
+    const categoryTotalCounts = new Map<string, number>();
+    const categoryTrialCounts = new Map<string, number>();
+    
+    totalLinks?.forEach(l => {
+        categoryTotalCounts.set(l.category_id, (categoryTotalCounts.get(l.category_id) || 0) + 1);
+    });
+    
+    trialLinks?.forEach(l => {
+        if (trialMcqSet.has(l.mcq_id)) {
+            categoryTrialCounts.set(l.category_id, (categoryTrialCounts.get(l.category_id) || 0) + 1);
+        }
     });
 
-    const [countsResults, totalMcqRes, globalTrialRes] = await Promise.all([
-        Promise.all(countPromises),
-        supabase.from('mcqs').select('id', { count: 'exact', head: true }),
-        supabase.from('mcqs').select('id', { count: 'exact', head: true }).eq('is_trial_mcq', true)
-    ]);
-
-    const categoryMcqCounts = new Map(countsResults.map(r => [r.id, { total: r.total, trial: r.trial }]));
+    const { count: totalMcqCount } = await supabase.from('mcqs').select('id', { count: 'exact', head: true });
     
-    const { data: linkedIdsRes } = await supabase.from('mcq_category_links').select('mcq_id');
-    const uniqueLinkedIds = new Set(linkedIdsRes?.map(l => l.mcq_id) || []);
-    const uncategorizedTotal = (totalMcqRes.count || 0) - uniqueLinkedIds.size;
+    const uniqueLinkedMcqIds = new Set(totalLinks?.map(l => (l as any).mcq_id) || []);
+    const uncategorizedTotal = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
     
     let userAttemptsData: any[] = [];
     if (user) {
@@ -339,8 +347,8 @@ const QuizPage = () => {
         name: 'All Trial MCQs',
         description: 'Explore our complete collection of free trial questions from all medical specialties.',
         display_order: -1, 
-        total_mcqs: globalTrialRes.count || 0,
-        total_trial_mcqs: globalTrialRes.count || 0,
+        total_mcqs: trialMcqSet.size,
+        total_trial_mcqs: trialMcqSet.size,
         user_attempts: 0,
         user_correct: 0,
         user_incorrect: 0,
@@ -350,13 +358,14 @@ const QuizPage = () => {
     });
 
     categoriesData?.forEach(category => {
-      const mcqCounts = categoryMcqCounts.get(category.id) || { total: 0, trial: 0 };
+      const total = categoryTotalCounts.get(category.id) || 0;
+      const trial = categoryTrialCounts.get(category.id) || 0;
       const userAttempts = categoryUserAttempts.get(category.id) || { total: 0, correct: 0 };
       const accuracy = userAttempts.total > 0 ? ((userAttempts.correct / userAttempts.total) * 100).toFixed(2) : '0.00';
       categoriesWithStats.push({
         ...category,
-        total_mcqs: mcqCounts.total,
-        total_trial_mcqs: mcqCounts.trial,
+        total_mcqs: total,
+        total_trial_mcqs: trial,
         user_attempts: userAttempts.total,
         user_correct: userAttempts.correct,
         user_incorrect: userAttempts.total - userAttempts.correct,
@@ -643,6 +652,12 @@ const QuizPage = () => {
   };
 
   const filteredCategories = categoryStats.filter(cat => cat.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  useEffect(() => {
+    if (hasCheckedInitialSession) {
+      fetchQuizOverview();
+    }
+  }, [hasCheckedInitialSession, user]);
 
   if (!hasCheckedInitialSession || isPageLoading) return <LoadingBar />;
 

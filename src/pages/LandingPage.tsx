@@ -152,7 +152,7 @@ const LandingPage = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {settings.features.map((feature, index) => (
               <div key={index} className="bg-slate-50 dark:bg-slate-900/50 p-8 rounded-3xl border border-transparent hover:border-primary/10 hover:bg-white hover:shadow-xl transition-all duration-300 group">
-                <h3 className="text-xl font-black mb-3 text-slate-900 group-hover:text-black dark:text-white dark:group-hover:text-white uppercase tracking-tight transition-colors">
+                <h3 className="text-xl font-black mb-3 text-slate-700 dark:text-slate-300 group-hover:text-black dark:group-hover:text-white uppercase tracking-tight transition-colors">
                   {feature.title}
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
@@ -273,7 +273,6 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Global Footer will render here from PublicLayout */}
       <MadeWithDyad />
     </div>
   );

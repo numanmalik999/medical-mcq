@@ -30,32 +30,76 @@ serve(async (req: Request) => {
 
     if (!user_id) throw new Error('User ID is required');
 
-    // 1. Get the '3-Day Trial' tier ID
-    console.log("[activate-trial] Looking for '3-Day Trial' tier...");
+    // 1. Fetch the current user's profile to get their identifiers
+    const { data: currentUser, error: userFetchError } = await supabaseAdmin
+      .from('profiles')
+      .select('phone_number, whatsapp_number, first_name, last_name')
+      .eq('id', user_id)
+      .single();
+
+    if (userFetchError) throw userFetchError;
+
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user_id);
+    const userEmail = authUser?.user?.email || 'Unknown';
+
+    // 2. FRAUD CHECK: Check if these phone numbers have been used for a trial before
+    if (currentUser.phone_number || currentUser.whatsapp_number) {
+        const { data: duplicateTrials, error: dupError } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('trial_taken', true)
+            .neq('id', user_id) // Don't check the current record
+            .or(`phone_number.eq.${currentUser.phone_number},whatsapp_number.eq.${currentUser.whatsapp_number}`);
+
+        if (dupError) console.error("[activate-trial] Duplicate check error:", dupError);
+
+        if (duplicateTrials && duplicateTrials.length > 0) {
+            console.warn(`[activate-trial] Fraud detected! User ${userEmail} tried to claim trial with duplicate numbers.`);
+            
+            // Notify Admin
+            await supabaseAdmin.functions.invoke('send-email', {
+                body: {
+                    to: 'ADMIN_EMAIL',
+                    subject: '⚠️ Suspicious Trial Attempt Detected',
+                    body: `
+                        <h3>Fraud Alert: Duplicate Trial Request</h3>
+                        <p>A user attempted to activate a 3-day trial on a new account, but their phone numbers are already linked to an existing trial.</p>
+                        <ul>
+                            <li><strong>New Email:</strong> ${userEmail}</li>
+                            <li><strong>Name:</strong> ${currentUser.first_name} ${currentUser.last_name}</li>
+                            <li><strong>Phone:</strong> ${currentUser.phone_number}</li>
+                            <li><strong>WhatsApp:</strong> ${currentUser.whatsapp_number}</li>
+                        </ul>
+                        <p>The system has automatically blocked this request.</p>
+                    `
+                }
+            });
+
+            return new Response(JSON.stringify({ 
+                error: "Activation blocked. Our records show that a free trial has already been utilized with these contact details. Please subscribe to continue." 
+            }), { 
+                status: 403, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            });
+        }
+    }
+
+    // 3. Get the '3-Day Trial' tier ID
     const { data: tier, error: tierError } = await supabaseAdmin
       .from('subscription_tiers')
       .select('id, duration_in_months')
       .eq('name', '3-Day Trial')
       .maybeSingle();
 
-    if (tierError) {
-      console.error("[activate-trial] Error fetching tier:", tierError);
-      throw tierError;
+    if (!tier || tierError) {
+      throw new Error("Subscription tier '3-Day Trial' not configured.");
     }
-
-    if (!tier) {
-      console.error("[activate-trial] '3-Day Trial' tier NOT FOUND in subscription_tiers table.");
-      throw new Error("Subscription tier '3-Day Trial' not found. Please create it in Admin Settings.");
-    }
-
-    console.log("[activate-trial] Tier found. ID:", tier.id);
 
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 3);
 
-    // 2. Create the subscription record
-    console.log("[activate-trial] Inserting user_subscriptions record...");
+    // 4. Create the subscription record
     const { error: subError } = await supabaseAdmin
       .from('user_subscriptions')
       .insert({
@@ -66,13 +110,9 @@ serve(async (req: Request) => {
         status: 'active'
       });
 
-    if (subError) {
-      console.error("[activate-trial] Error inserting subscription:", subError);
-      throw subError;
-    }
+    if (subError) throw subError;
 
-    // 3. Update the profile
-    console.log("[activate-trial] Updating profile status...");
+    // 5. Update the profile
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({ 
@@ -81,12 +121,7 @@ serve(async (req: Request) => {
       })
       .eq('id', user_id);
 
-    if (profileError) {
-      console.error("[activate-trial] Error updating profile:", profileError);
-      throw profileError;
-    }
-
-    console.log("[activate-trial] Success! Trial activated.");
+    if (profileError) throw profileError;
 
     return new Response(JSON.stringify({ message: "Trial activated successfully" }), {
       status: 200,
@@ -94,7 +129,7 @@ serve(async (req: Request) => {
     });
 
   } catch (error: any) {
-    console.error("[activate-trial] Final Error:", error.message);
+    console.error("[activate-trial] Error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), { 
       status: 500, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

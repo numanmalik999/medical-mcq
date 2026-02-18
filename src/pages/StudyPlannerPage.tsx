@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Loader2, Calendar as CalendarIcon, CheckCircle2, Circle, Sparkles, Trash2, ArrowRight } from 'lucide-react';
 import { format, isToday, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -253,7 +252,6 @@ const StudyPlannerPage = () => {
           </div>
         </div>
       )}
-      <MadeWithDyad />
     </div>
   );
 };

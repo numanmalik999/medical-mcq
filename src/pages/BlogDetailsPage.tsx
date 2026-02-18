@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft, Calendar, Tag, Facebook, Twitter, Link as LinkIcon, User, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
@@ -53,7 +52,6 @@ const BlogDetailsPage = () => {
         setBlog(data);
         document.title = data.title;
         
-        // Fetch related blogs
         const { data: related } = await supabase
           .from('blogs')
           .select('title, slug, created_at')
@@ -90,7 +88,6 @@ const BlogDetailsPage = () => {
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
           
-          {/* Main Content */}
           <article className="lg:col-span-3">
             <Button asChild variant="ghost" className="mb-8 pl-0 hover:bg-transparent hover:text-primary">
               <Link to="/blog" className="flex items-center gap-2">
@@ -142,19 +139,18 @@ const BlogDetailsPage = () => {
               </div>
             )}
 
-            <div className="prose dark:prose-invert max-w-none prose-lg">
+            <div className="prose dark:prose-invert max-w-none prose-lg text-foreground">
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                 {blog.content}
               </ReactMarkdown>
             </div>
 
-            {/* Author Section */}
             <section className="mt-12 p-8 bg-muted/50 rounded-2xl border border-border flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
               <Avatar className="h-20 w-20">
                 <AvatarFallback className="bg-primary text-primary-foreground"><User className="h-10 w-10" /></AvatarFallback>
               </Avatar>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold">Study Prometric Clinical Board</h3>
+                <h3 className="text-xl font-bold text-foreground">Study Prometric Clinical Board</h3>
                 <p className="text-muted-foreground">This article was curated and reviewed by our clinical board to ensure adherence to current international medical guidelines and exam blueprints.</p>
                 <Link to="/about" className="text-primary font-semibold inline-flex items-center gap-1 hover:underline">
                   Learn about our review process <ExternalLink className="h-3 w-3" />
@@ -163,7 +159,7 @@ const BlogDetailsPage = () => {
             </section>
 
             <section className="mt-16 p-8 bg-primary/5 rounded-2xl text-center border border-primary/20">
-              <h3 className="text-2xl font-bold mb-4">Ready to test your knowledge?</h3>
+              <h3 className="text-2xl font-bold mb-4 text-foreground">Ready to test your knowledge?</h3>
               <p className="mb-6 text-muted-foreground max-w-xl mx-auto">Join thousands of medical professionals preparing for their licensing exams with our AI-enhanced question bank.</p>
               <div className="flex justify-center gap-4 flex-wrap">
                 <Button asChild size="lg"><Link to="/signup">Start Free Trial</Link></Button>
@@ -172,15 +168,14 @@ const BlogDetailsPage = () => {
             </section>
           </article>
 
-          {/* Sidebar */}
           <aside className="lg:col-span-1 space-y-8">
              <section className="space-y-4">
-                <h4 className="font-bold text-lg border-b pb-2">Recent Guides</h4>
+                <h4 className="font-bold text-lg border-b pb-2 text-foreground">Recent Guides</h4>
                 <div className="space-y-6">
                   {relatedBlogs.map((item) => (
                     <div key={item.slug} className="group">
                       <p className="text-xs text-muted-foreground mb-1">{format(new Date(item.created_at), 'MMM dd, yyyy')}</p>
-                      <Link to={`/blog/${item.slug}`} className="font-semibold text-sm group-hover:text-primary transition-colors line-clamp-2">
+                      <Link to={`/blog/${item.slug}`} className="font-semibold text-sm group-hover:text-primary transition-colors line-clamp-2 text-foreground">
                         {item.title}
                       </Link>
                     </div>
@@ -203,7 +198,6 @@ const BlogDetailsPage = () => {
 
         </div>
       </div>
-      <MadeWithDyad />
     </div>
   );
 };

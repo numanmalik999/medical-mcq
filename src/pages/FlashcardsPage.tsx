@@ -6,7 +6,6 @@ import { useSession } from '@/components/SessionContextProvider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import Flashcard from '@/components/Flashcard';
 import { Loader2, BrainCircuit, Zap, Sparkles, Lock, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -43,14 +42,12 @@ const FlashcardsPage = () => {
     
     setIsLoading(true);
     try {
-      // 1. Fetch due cards first
       const { data: progress } = await supabase
         .from('user_flashcard_progress')
         .select('flashcard_id, ease_factor, interval_days')
         .eq('user_id', user.id)
         .lte('next_review_at', new Date().toISOString());
       
-      // 2. Fetch some cards to study
       let allCards: any[] = [];
       
       const { data: flashcards } = await supabase
@@ -91,16 +88,15 @@ const FlashcardsPage = () => {
     let newEase = currentCard.ease_factor;
     let newInterval = 0;
 
-    // Simplified SM-2 Logic
-    if (quality === 1) { // Again
+    if (quality === 1) { 
         newEase = Math.max(1.3, newEase - 0.2);
         newInterval = 0;
-    } else if (quality === 2) { // Hard
+    } else if (quality === 2) { 
         newEase = Math.max(1.3, newEase - 0.15);
         newInterval = currentCard.interval_days === 0 ? 1 : Math.ceil(currentCard.interval_days * 1.2);
-    } else if (quality === 3) { // Good
+    } else if (quality === 3) { 
         newInterval = currentCard.interval_days === 0 ? 1 : currentCard.interval_days === 1 ? 4 : Math.ceil(currentCard.interval_days * newEase);
-    } else { // Easy
+    } else { 
         newEase = Math.min(3.0, newEase + 0.15);
         newInterval = currentCard.interval_days === 0 ? 4 : Math.ceil(currentCard.interval_days * newEase * 1.3);
     }
@@ -139,7 +135,6 @@ const FlashcardsPage = () => {
 
   if (!hasCheckedInitialSession || isLoading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>;
 
-  // --- Locked View for Non-Subscribed Users ---
   if (!isSubscribed) {
     return (
       <div className="max-w-4xl mx-auto space-y-8 pb-20">
@@ -169,7 +164,6 @@ const FlashcardsPage = () => {
             </Button>
           </Card>
           
-          {/* Background decoration to show a "hint" of what they are missing */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[400px] border-2 border-dashed border-primary/10 rounded-3xl -rotate-2 scale-95 opacity-20"></div>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[400px] border-2 border-dashed border-primary/10 rounded-3xl rotate-1 scale-90 opacity-10"></div>
         </div>
@@ -180,7 +174,6 @@ const FlashcardsPage = () => {
             featureName="Memory Master (Anki System)" 
             description="The Spaced Repetition flashcard system is an exclusive premium feature designed for high-speed retention of Gulf licensing clinical facts."
         />
-        <MadeWithDyad />
       </div>
     );
   }
@@ -282,8 +275,6 @@ const FlashcardsPage = () => {
             </div>
          </CardContent>
       </Card>
-      
-      <MadeWithDyad />
     </div>
   );
 };

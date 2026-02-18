@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal, Plus, Zap, Search, Wand2, Loader2 } from 'lucide-react';
@@ -26,7 +25,6 @@ const ManageFlashcardsPage = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Bulk Gen State
   const [selectedCatId, setSelectedCatId] = useState<string>('');
   const [isBulkGenerating, setIsBulkGenerating] = useState(false);
 
@@ -126,7 +124,6 @@ const ManageFlashcardsPage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Bulk Tool */}
         <Card className="lg:col-span-1 border-primary/20 bg-primary/5 shadow-inner">
            <CardHeader>
               <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
@@ -136,7 +133,7 @@ const ManageFlashcardsPage = () => {
            </CardHeader>
            <CardContent className="space-y-4">
               <div className="space-y-2">
-                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Target Specialty</Label>
+                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Target Specialty</Label>
                  <Select onValueChange={setSelectedCatId} value={selectedCatId}>
                     <SelectTrigger className="bg-white"><SelectValue placeholder="Select specialty..." /></SelectTrigger>
                     <SelectContent>
@@ -155,7 +152,6 @@ const ManageFlashcardsPage = () => {
            </CardContent>
         </Card>
 
-        {/* Data Table */}
         <Card className="lg:col-span-2 border-none shadow-xl rounded-2xl overflow-hidden">
             <CardHeader className="bg-muted/30 border-b">
                 <div className="relative">
@@ -180,7 +176,6 @@ const ManageFlashcardsPage = () => {
         card={selectedCard} 
         onSave={fetchMetadata} 
       />
-      <MadeWithDyad />
     </div>
   );
 };

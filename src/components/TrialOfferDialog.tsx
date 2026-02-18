@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ShieldCheck, Zap, Sparkles, MessageSquare, Loader2, CheckCircle2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ShieldCheck, Sparkles, MessageSquare, Loader2, Phone } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,59 +16,45 @@ interface TrialOfferDialogProps {
 }
 
 const TrialOfferDialog = ({ open, onOpenChange, userId }: TrialOfferDialogProps) => {
+  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
   const { toast } = useToast();
 
-  const handleWhatsAppVerify = () => {
-    setIsVerifying(true);
-    
-    const uniqueId = Math.random().toString(36).substring(7).toUpperCase();
-    const adminNum = "923174636479";
-    const text = encodeURIComponent(`I am requesting a 3-Day Trial upgrade for my account. Verification Code: SP-TRIAL-${uniqueId}`);
-    
-    window.open(`https://wa.me/${adminNum}?text=${text}`, '_blank');
-
-    toast({
-        title: "Verification Triggered",
-        description: "Please send the message on WhatsApp to verify your account.",
-    });
-
-    setTimeout(() => {
-        setIsVerified(true);
-        setIsVerifying(false);
-        toast({ title: "Identity Verified", description: "Identity confirmed. You can now activate your trial." });
-    }, 4000);
-  };
-
-  const handleActivateTrial = async () => {
-    if (!isVerified) return;
-    
+  const handleSendOtp = async () => {
+    if (!phoneNumber.trim()) return;
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('activate-trial', {
-        body: { user_id: userId },
+      const { error } = await supabase.functions.invoke('send-whatsapp-otp', {
+        body: { user_id: userId, phone_number: phoneNumber },
+      });
+      if (error) throw error;
+
+      toast({ title: "Code Sent", description: "Check your WhatsApp for the 6-digit code." });
+      setStep('otp');
+    } catch (error: any) {
+      toast({ title: "Failed to send", description: error.message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otpCode.length < 6) return;
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-whatsapp-otp', {
+        body: { user_id: userId, code: otpCode },
       });
 
-      if (error || data?.error) throw new Error(error?.message || data?.error || "Activation failed");
+      if (error || data?.error) throw new Error(error?.message || data?.error);
 
-      toast({
-        title: "Trial Activated!",
-        description: "Access granted. The page will now reload to update your permissions.",
-      });
-
-      // Crucial: Wait for the user to read the toast, then reload to force session hydration
-      setTimeout(() => {
-          window.location.reload();
-      }, 1500);
+      toast({ title: "Success!", description: "Account verified. Enjoy your 3-day trial." });
+      setTimeout(() => window.location.reload(), 1500);
 
     } catch (error: any) {
-      toast({
-        title: "Activation Failed",
-        description: error.message || "Could not activate trial. Please try again later.",
-        variant: "destructive",
-      });
+      toast({ title: "Verification Failed", description: error.message, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -80,57 +68,70 @@ const TrialOfferDialog = ({ open, onOpenChange, userId }: TrialOfferDialogProps)
                 <div className="bg-white/20 p-3 rounded-2xl w-fit mx-auto mb-4 backdrop-blur-md">
                     <Sparkles className="h-8 w-8 text-white fill-white" />
                 </div>
-                <DialogTitle className="text-3xl font-black uppercase italic tracking-tighter leading-none mb-2">3-Day Premium Pass</DialogTitle>
-                <DialogDescription className="text-primary-foreground/80 font-medium">
-                    Unlock all 5,000+ MCQs, AI Case Studies, and high-yield flashcards for 72 hours.
+                <DialogTitle className="text-3xl font-black uppercase italic tracking-tighter leading-none mb-2">Verified Access</DialogTitle>
+                <DialogDescription className="text-primary-foreground/80 font-medium text-sm">
+                    Protect your account and unlock your 3-day premium pass.
                 </DialogDescription>
             </div>
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-            <div className="absolute -top-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         </div>
 
         <div className="p-8 space-y-6">
-            <div className="space-y-4">
-                {[
-                    { icon: Zap, text: "Full Question Bank Access" },
-                    { icon: ShieldCheck, text: "AI Clinical Explanations" },
-                    { icon: MessageSquare, text: "Community Discussion Access" }
-                ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                        <div className="bg-primary/10 p-1.5 rounded-lg"><item.icon className="h-4 w-4 text-primary" /></div>
-                        <span className="font-bold text-sm text-slate-700">{item.text}</span>
+            {step === 'phone' ? (
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Mobile Number</Label>
+                        <div className="relative">
+                            <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                                placeholder="+971..." 
+                                className="pl-10 h-12 rounded-xl" 
+                                value={phoneNumber}
+                                onChange={(e) => setPhoneNumber(e.target.value)}
+                            />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground italic">Enter your WhatsApp number with country code.</p>
                     </div>
-                ))}
-            </div>
 
-            <div className="pt-4 space-y-3">
-                {!isVerified ? (
                     <Button 
-                        onClick={handleWhatsAppVerify}
-                        disabled={isVerifying}
-                        variant="secondary"
-                        className="w-full h-12 rounded-xl font-black uppercase tracking-wider gap-2 border-2 border-primary/10 shadow-sm"
+                        className="w-full h-12 rounded-xl font-black uppercase tracking-widest shadow-lg" 
+                        onClick={handleSendOtp}
+                        disabled={isLoading || !phoneNumber}
                     >
-                        {isVerifying ? <Loader2 className="h-5 w-5 animate-spin" /> : <MessageSquare className="h-5 w-5 text-green-600" />}
-                        Verify on WhatsApp to Start
+                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-2" />}
+                        Send WhatsApp Code
                     </Button>
-                ) : (
-                    <div className="p-3 bg-green-50 border-2 border-green-500/20 rounded-2xl flex items-center justify-center gap-3 mb-2">
-                        <CheckCircle2 className="h-6 w-6 text-green-600" />
-                        <span className="text-xs font-black uppercase text-green-800 tracking-tight">Identity Verified</span>
+                </div>
+            ) : (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                    <div className="space-y-2 text-center">
+                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Enter 6-Digit Code</Label>
+                        <Input 
+                            placeholder="000000" 
+                            className="h-14 text-center text-2xl font-black tracking-[0.5em] rounded-xl"
+                            maxLength={6}
+                            value={otpCode}
+                            onChange={(e) => setOtpCode(e.target.value)}
+                        />
                     </div>
-                )}
-
-                <Button 
-                    className="w-full h-14 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl shadow-primary/20" 
-                    onClick={handleActivateTrial}
-                    disabled={isLoading || !isVerified}
-                >
-                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                    Claim My 3 Days
-                </Button>
-                
-                <Button variant="ghost" className="w-full text-muted-foreground font-bold text-xs uppercase" onClick={() => onOpenChange(false)}>
+                    <Button 
+                        className="w-full h-14 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl" 
+                        onClick={handleVerifyOtp}
+                        disabled={isLoading || otpCode.length < 6}
+                    >
+                        {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Verify & Activate"}
+                    </Button>
+                    <Button variant="ghost" className="w-full text-[10px] font-bold uppercase" onClick={() => setStep('phone')}>
+                        Change Phone Number
+                    </Button>
+                </div>
+            )}
+            
+            <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-3 opacity-60">
+                    <ShieldCheck className="h-4 w-4 text-primary" />
+                    <span className="text-[10px] font-bold uppercase tracking-tight text-slate-500">Secure Meta Verification</span>
+                </div>
+                <Button variant="ghost" className="w-full text-muted-foreground font-bold text-[10px] uppercase" onClick={() => onOpenChange(false)}>
                     Maybe Later
                 </Button>
             </div>

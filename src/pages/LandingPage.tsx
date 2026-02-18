@@ -7,15 +7,9 @@ import {
   Check, 
   Star, 
   ArrowRight, 
-  BookOpen, 
-  Stethoscope,
-  ClipboardCheck,
-  Zap,
-  Youtube,
-  CalendarCheck,
-  ShieldCheck,
   ExternalLink,
-  MonitorPlay
+  MonitorPlay,
+  Zap
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { MadeWithDyad } from "@/components/made-with-dyad";
@@ -56,24 +50,11 @@ const LandingPage = () => {
     fetchTiers();
   }, [settings.seo]);
 
-  const getIcon = (iconName: string) => {
-    const iconClass = "w-10 h-10 text-primary";
-    switch (iconName) {
-      case 'Stethoscope': return <Stethoscope className={iconClass} />;
-      case 'ClipboardCheck': return <ClipboardCheck className={iconClass} />;
-      case 'Zap': return <Zap className={iconClass} />;
-      case 'Youtube': return <Youtube className={iconClass} />;
-      case 'CalendarCheck': return <CalendarCheck className={iconClass} />;
-      case 'ShieldCheck': return <ShieldCheck className={iconClass} />;
-      default: return <BookOpen className={iconClass} />;
-    }
-  };
-
   if (settingsLoading) return <LoadingBar />;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* Hero Section - Dark background for better contrast with white text */}
+      {/* Hero Section */}
       <section className="relative py-16 lg:py-24 overflow-hidden bg-slate-900 text-white">
         <div className="absolute inset-0 opacity-20 pointer-events-none">
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2"></div>
@@ -159,22 +140,21 @@ const LandingPage = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 lg:py-24 bg-white dark:bg-background">
-        <div className="container px-4 mx-auto text-center mb-16">
+      <section className="py-16 lg:py-20 bg-white dark:bg-background">
+        <div className="container px-4 mx-auto text-center mb-12">
           <Badge className="mb-3 rounded-full px-4 py-1 bg-primary/5 text-primary border-none font-bold uppercase tracking-widest text-[10px]">The Clinical Advantage</Badge>
-          <h2 className="text-3xl lg:text-5xl font-black mb-4 tracking-tighter text-slate-900 dark:text-white uppercase italic">Built for Medical Success</h2>
+          <h2 className="text-3xl lg:text-5xl font-black mb-4 tracking-tighter text-black uppercase italic">Built for Medical Success</h2>
           <p className="text-base lg:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto font-medium leading-relaxed">
             Our platform is engineered using clinical AI to help you master the DHA, SMLE, and MOH blueprints.
           </p>
         </div>
         <div className="container px-4 mx-auto">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {settings.features.map((feature, index) => (
-              <div key={index} className="bg-slate-50 dark:bg-slate-900/50 p-8 rounded-3xl border border-transparent hover:border-primary/10 hover:bg-white hover:shadow-xl transition-all duration-500 group">
-                <div className="mb-6 p-4 bg-white dark:bg-slate-800 rounded-2xl w-fit shadow-sm group-hover:bg-primary group-hover:text-white transition-colors duration-500">
-                  {getIcon(feature.icon)}
-                </div>
-                <h3 className="text-xl font-black mb-3 text-slate-900 dark:text-white uppercase tracking-tight">{feature.title}</h3>
+              <div key={index} className="bg-slate-50 dark:bg-slate-900/50 p-8 rounded-3xl border border-transparent hover:border-primary/10 hover:bg-white hover:shadow-xl transition-all duration-300 group">
+                <h3 className="text-xl font-black mb-3 text-slate-900 group-hover:text-black dark:text-white dark:group-hover:text-white uppercase tracking-tight transition-colors">
+                  {feature.title}
+                </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
                   {feature.description}
                 </p>
@@ -185,8 +165,8 @@ const LandingPage = () => {
       </section>
 
       {/* Pricing Section */}
-      <section className="py-20 lg:py-24 bg-slate-50 dark:bg-slate-900/20">
-        <div className="container px-4 mx-auto text-center mb-16">
+      <section className="py-16 lg:py-20 bg-slate-50 dark:bg-slate-900/20">
+        <div className="container px-4 mx-auto text-center mb-12">
           <h2 className="text-3xl lg:text-5xl font-black mb-4 tracking-tighter text-slate-900 dark:text-white uppercase italic">{settings.pricingCta.title}</h2>
           <p className="text-base lg:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto font-medium">
             {settings.pricingCta.subtitle}

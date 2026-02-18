@@ -83,7 +83,7 @@ const LandingPage = () => {
                     </Button>
                   </Link>
                   <Link to="/quiz" className="w-full sm:w-auto">
-                    <Button size="lg" variant="outline" className="h-12 px-8 text-base font-black uppercase tracking-widest rounded-xl w-full border-2 border-white/20 hover:bg-white/10 text-white">
+                    <Button size="lg" className="h-12 px-8 text-base font-black uppercase tracking-widest rounded-xl w-full bg-white text-black border-2 border-white hover:bg-transparent hover:text-white transition-all shadow-xl">
                       {settings.hero.ctaSecondaryText}
                     </Button>
                   </Link>
@@ -153,7 +153,7 @@ const LandingPage = () => {
             {settings.features.map((feature, index) => (
               <div key={index} className="bg-slate-50 dark:bg-slate-900/50 p-8 rounded-3xl border border-transparent hover:border-primary/10 hover:bg-white hover:shadow-xl transition-all duration-300 group">
                 {/* Heading explicitly forced to black on hover, even in dark mode */}
-                <h3 className="text-xl font-black mb-3 text-slate-700 dark:text-slate-300 group-hover:text-black dark:group-hover:text-black uppercase tracking-tight transition-colors">
+                <h3 className="text-xl font-black mb-3 text-slate-700 dark:text-slate-300 group-hover:text-black dark:group-hover:text-white uppercase tracking-tight transition-colors">
                   {feature.title}
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">

@@ -32,11 +32,11 @@ const defaultHero: z.infer<typeof heroSectionSchema> = {
 
 const defaultFeatures: z.infer<typeof featuresSectionSchema> = [
   { icon: "Stethoscope", title: "AI Clinical Cases", description: "Immerse yourself in complex patient scenarios with multi-step interactive clinical cases designed to test your diagnostic logic." },
-  { icon: "ShieldCheck", title: "Verified Accuracy", description: "Our content is continuously audited by clinical AI to ensure 100% accuracy, clarity, and relevance to the latest exam standards." },
-  { icon: "ClipboardCheck", title: "Simulated Tests", description: "Prepare with timed, customizable tests. Configure question count, difficulty, and time limits to mirror real exam conditions." },
-  { icon: "Youtube", title: "Curated Video Library", description: "Access a hand-picked selection of high-yield medical videos from Ninja Nerd, Osmosis, and more, all mapped to specific topics." },
-  { icon: "BrainCircuit", title: "AI Medical Assistant", description: "Get instant answers to your clinical queries with our integrated AI chatbot, available 24/7 to support your learning journey." },
-  { icon: "Trophy", title: "Daily Challenge", description: "Compete in our Question of the Day leaderboard. Earn points for correct answers and win free premium subscription months!" },
+  { icon: "CalendarCheck", title: "AI Study Planner", description: "Receive a personalized daily study roadmap based on your exam date, ensuring you cover every high-yield specialty." },
+  { icon: "Zap", title: "Memory Master (SRS)", description: "Master clinical pearls using our Spaced Repetition flashcard system (Anki-style), designed for maximum long-term retention." },
+  { icon: "ClipboardCheck", title: "Simulated Mock Exams", description: "Prepare with timed, customizable tests. Configure question count and difficulty to mirror real exam conditions." },
+  { icon: "ShieldCheck", title: "Pass Prediction", description: "Track your readiness with advanced analytics. Our engine predicts your pass probability based on real-time performance data." },
+  { icon: "Youtube", title: "Expert Video Library", description: "Access high-yield medical masterclasses from curated sources, all mapped to specific topics in your curriculum." },
 ];
 
 const defaultPricingCta: z.infer<typeof pricingCtaSchema> = {

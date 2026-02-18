@@ -30,11 +30,11 @@ const defaultHero: HeroSection = {
 
 const defaultFeatures: FeatureItem[] = [
   { icon: "Stethoscope", title: "AI Clinical Cases", description: "Immerse yourself in complex patient scenarios for DHA and SMLE with interactive clinical cases designed to test your diagnostic logic." },
-  { icon: "ShieldCheck", title: "Exam-Aligned Accuracy", description: "Our question bank is mapped to current DHA, MOH, and SCFHS blueprints to ensure you are studying the most relevant exam patterns." },
+  { icon: "CalendarCheck", title: "AI Study Planner", description: "Receive a personalized daily study roadmap based on your exam date, ensuring you cover every high-yield specialty before your test." },
+  { icon: "Zap", title: "Memory Master (SRS)", description: "Master clinical pearls using our Spaced Repetition flashcard system (Anki-style), designed for maximum long-term retention of exam facts." },
   { icon: "ClipboardCheck", title: "Simulated Mock Exams", description: "Prepare for your Prometric test with timed simulations that mirror the real DHA, HAAD, and SMLE testing interface." },
-  { icon: "Youtube", title: "Video Explanations", description: "Access high-yield medical videos from Ninja Nerd and Osmosis, curated to help you master difficult DHA and MOH exam topics." },
-  { icon: "BrainCircuit", title: "24/7 AI Medical Tutor", description: "Get instant clinical clarifications for your SMLE and HAAD study questions with our integrated AI assistant." },
-  { icon: "Trophy", title: "Daily SMLE Challenge", description: "Answer our Question of the Day correctly to earn points toward free premium months for your Prometric exam preparation." },
+  { icon: "ShieldCheck", title: "Pass Prediction", description: "Track your readiness with advanced analytics. Our engine predicts your pass probability based on real-time performance data." },
+  { icon: "Youtube", title: "Expert Video Library", description: "Access high-yield medical masterclasses from curated sources, all mapped to specific topics in your licensing curriculum." },
 ];
 
 const defaultPricingCta: PricingCta = {

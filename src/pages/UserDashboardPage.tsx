@@ -80,11 +80,12 @@ const UserDashboardPage = () => {
           fetchFlashcardStats()
         ]);
         
-        const trialShownThisSession = sessionStorage.getItem('trial_popup_shown');
-        if (user && !user.has_active_subscription && !user.trial_taken && !trialShownThisSession) {
-            setShowTrialPopup(true);
-            sessionStorage.setItem('trial_popup_shown', 'true');
-        }
+        // DISABLED: Automatic Trial Popup
+        // const trialShownThisSession = sessionStorage.getItem('trial_popup_shown');
+        // if (user && !user.has_active_subscription && !user.trial_taken && !trialShownThisSession) {
+        //     setShowTrialPopup(true);
+        //     sessionStorage.setItem('trial_popup_shown', 'true');
+        // }
         
         setIsPageLoading(false);
       };

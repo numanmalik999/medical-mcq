@@ -81,7 +81,7 @@ const SignUp = () => {
         description: "Please check your email to confirm your account.",
       });
     } catch (error: any) {
-      console.error("Signup Error:", error);
+      console.error("SignUp Error:", error);
       toast({ title: "Signup Failed", description: error.message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
@@ -103,7 +103,7 @@ const SignUp = () => {
               </div>
               <div>
                 <p className="text-lg font-bold">Verification Email Sent!</p>
-                <p className="text-sm text-muted-foreground mt-2">Check your inbox to confirm your account. You can then claim your 3-day trial from the dashboard.</p>
+                <p className="text-sm text-muted-foreground mt-2">Check your inbox to confirm your account. You can then log in to access your student dashboard.</p>
               </div>
               <Link to="/login" className="block"><Button className="w-full h-12 rounded-xl">Back to Login</Button></Link>
             </div>

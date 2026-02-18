@@ -53,8 +53,8 @@ const LandingPage = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="relative py-16 lg:py-24 overflow-hidden bg-slate-900 text-white">
+      {/* Hero Section - Reduced top padding */}
+      <section className="relative pt-8 pb-16 lg:pt-12 lg:pb-24 overflow-hidden bg-slate-900 text-white">
         <div className="absolute inset-0 opacity-20 pointer-events-none">
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2"></div>
           <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-600 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/2"></div>
@@ -82,7 +82,6 @@ const LandingPage = () => {
                     </Button>
                   </Link>
                   <Link to="/quiz" className="w-full sm:w-auto">
-                    {/* Button: Black text, white background by default. White text, outline on hover. */}
                     <Button size="lg" className="h-12 px-8 text-base font-black uppercase tracking-widest rounded-xl w-full bg-white text-black border-2 border-white hover:bg-transparent hover:text-white transition-all shadow-xl">
                       {settings.hero.ctaSecondaryText}
                     </Button>
@@ -152,7 +151,7 @@ const LandingPage = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {settings.features.map((feature, index) => (
               <div key={index} className="bg-slate-50 dark:bg-slate-900/50 p-8 rounded-3xl border border-transparent hover:border-primary/10 hover:bg-white hover:shadow-xl transition-all duration-300 group">
-                <h3 className="text-xl font-black mb-3 text-slate-700 dark:text-slate-300 group-hover:text-[#000000] dark:group-hover:text-white uppercase tracking-tight transition-colors">
+                <h3 className="text-xl font-black mb-3 text-slate-700 dark:text-slate-300 group-hover:text-black dark:group-hover:text-white uppercase tracking-tight transition-colors">
                   {feature.title}
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">

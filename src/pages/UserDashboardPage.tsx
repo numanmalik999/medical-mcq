@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
@@ -79,14 +78,6 @@ const UserDashboardPage = () => {
           fetchVideoStats(),
           fetchFlashcardStats()
         ]);
-        
-        // DISABLED: Automatic Trial Popup
-        // const trialShownThisSession = sessionStorage.getItem('trial_popup_shown');
-        // if (user && !user.has_active_subscription && !user.trial_taken && !trialShownThisSession) {
-        //     setShowTrialPopup(true);
-        //     sessionStorage.setItem('trial_popup_shown', 'true');
-        // }
-        
         setIsPageLoading(false);
       };
       fetchData();
@@ -225,8 +216,6 @@ const UserDashboardPage = () => {
   const readinessScore = useMemo(() => {
       if (!quizPerformance || quizPerformance.totalAttempts < 50) return null;
       
-      // Calculate a predictive score (DHA/SMLE passing is usually around 60-70%)
-      // We scale the raw accuracy to reflect exam pressure and difficulty
       const baseReadiness = quizPerformance.accuracy;
       let passProbability = 0;
       
@@ -251,7 +240,6 @@ const UserDashboardPage = () => {
   const daysRemaining = Math.max(0, Math.ceil(hoursRemaining / 24));
   const isCurrentlyOnTrial = user?.has_active_subscription && hoursRemaining > 0 && hoursRemaining <= 72;
 
-  // Items for the Weak Point summary
   const weakPointItems = areasForImprovement.map(area => ({
     title: `Specialty Focus: ${area.name}`,
     content: `You currently have a ${area.accuracy.toFixed(1)}% accuracy in this field after ${area.totalAttempts} attempts. High priority review is recommended. Master the core clinical blueprints for this system to improve your overall exam readiness index.`,
@@ -485,7 +473,6 @@ const UserDashboardPage = () => {
       {user && (
         <TrialOfferDialog open={showTrialPopup} onOpenChange={setShowTrialPopup} userId={user.id} />
       )}
-      <MadeWithDyad />
     </div>
   );
 };

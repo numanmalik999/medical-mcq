@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/components/SessionContextProvider';
@@ -770,7 +769,6 @@ const QuizPage = () => {
             featureName="Specialty Question Bank" 
             description="Accessing full specialties and historical mistake reviews is a premium feature. Please upgrade to unlock the complete Gulf licensing curriculum."
         />
-        <MadeWithDyad />
       </div>
     );
   }
@@ -876,7 +874,6 @@ const QuizPage = () => {
         </Card>
         <QuizNavigator mcqs={quizQuestions} userAnswers={userAnswers} currentQuestionIndex={currentQuestionIndex} goToQuestion={goToQuestion} showResults={false} score={0} />
       </div>
-      <MadeWithDyad />
 
       <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
         <DialogContent className="rounded-2xl"><DialogHeader><DialogTitle>Clinical Feedback</DialogTitle></DialogHeader>

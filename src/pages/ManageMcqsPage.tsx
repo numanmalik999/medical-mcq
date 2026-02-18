@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from 'react'; 
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { createMcqColumns, MCQ } from '@/components/mcq-columns';
 import { useToast } from '@/hooks/use-toast';
@@ -402,7 +401,6 @@ const ManageMcqsPage = () => {
       {selectedMcqForEdit && (
         <EditMcqDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mcq={selectedMcqForEdit} onSave={fetchMcqs} />
       )}
-      <MadeWithDyad />
     </div>
   );
 };

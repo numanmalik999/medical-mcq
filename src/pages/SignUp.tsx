@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -166,7 +165,7 @@ const SignUp = () => {
                     className="w-full h-14 rounded-2xl text-base font-black uppercase tracking-widest shadow-xl mt-4" 
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UserPlus className="mr-2 h-5 w-5" />}
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-5 w-5" />}
                     Create Account
                   </Button>
                 </form>
@@ -188,7 +187,6 @@ const SignUp = () => {
           )}
         </CardContent>
       </Card>
-      <MadeWithDyad />
     </div>
   );
 };

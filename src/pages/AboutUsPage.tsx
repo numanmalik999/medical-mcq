@@ -2,7 +2,6 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MadeWithDyad } from "@/components/made-with-dyad";
 import { Link } from "react-router-dom";
 import { Heart, ShieldCheck, Zap, Award, Users, BookOpen } from "lucide-react";
 import { cn } from '@/lib/utils';
@@ -132,10 +131,6 @@ const AboutUsPage = () => {
           </div>
         </div>
       </section>
-
-      <div className="pb-12">
-        <MadeWithDyad />
-      </div>
     </div>
   );
 };

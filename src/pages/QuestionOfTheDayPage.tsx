@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { CheckCircle2, AlertCircle, Loader2, Trophy, MessageSquare } from 'lucide-react'; 
 import { Link } from 'react-router-dom';
 import * as z from 'zod';
@@ -424,7 +423,6 @@ const QuestionOfTheDayPage = () => {
             <Button onClick={fetchDailyMcq}>Retry</Button>
           </CardFooter>
         </Card>
-        <MadeWithDyad />
       </div>
     );
   }
@@ -616,7 +614,6 @@ const QuestionOfTheDayPage = () => {
           </CardContent>
         </Card>
       </div>
-      <MadeWithDyad />
 
       {/* Discussion Dialog */}
       {dailyMcq && (

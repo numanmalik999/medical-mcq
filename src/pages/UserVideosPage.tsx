@@ -20,7 +20,6 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useSession } from '@/components/SessionContextProvider';
 import { Button } from '@/components/ui/button';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -508,8 +507,6 @@ const UserVideosPage = () => {
         featureName="Video Masterclass" 
         description="Detailed video modules are reserved for our premium students. Upgrade your plan to unlock the full clinical curriculum."
       />
-      
-      <MadeWithDyad />
     </div>
   );
 };

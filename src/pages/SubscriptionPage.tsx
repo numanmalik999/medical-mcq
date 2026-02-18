@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 
@@ -148,8 +147,6 @@ const SubscriptionPage = () => {
           })}
         </div>
       )}
-
-      <MadeWithDyad />
     </div>
   );
 };

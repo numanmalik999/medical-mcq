@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -197,8 +196,6 @@ const UserSuggestionsPage = () => {
           )}
         </CardContent>
       </Card>
-
-      <MadeWithDyad />
     </div>
   );
 };

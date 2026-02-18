@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -290,16 +289,16 @@ const SubmitMcqPage = () => {
                           <SelectValue placeholder="Select difficulty" />
                         </SelectTrigger>
                       </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Easy">Easy</SelectItem>
-                      <SelectItem value="Medium">Medium</SelectItem>
-                      <SelectItem value="Hard">Hard</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                      <SelectContent>
+                        <SelectItem value="Easy">Easy</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="Hard">Hard</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button type="submit" className="w-full sm:flex-1" disabled={isSubmitting}>
@@ -319,7 +318,6 @@ const SubmitMcqPage = () => {
           </Form>
         </CardContent>
       </Card>
-      <MadeWithDyad />
     </div>
   );
 };

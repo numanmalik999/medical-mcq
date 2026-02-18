@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Loader2, Wand2, CheckCircle2, AlertCircle, ArrowRight, RotateCcw, Trophy, Send, Search, BrainCircuit, History } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -460,8 +459,6 @@ const CaseStudiesPage = () => {
           </div>
         </div>
       )}
-
-      <MadeWithDyad />
     </div>
   );
 };

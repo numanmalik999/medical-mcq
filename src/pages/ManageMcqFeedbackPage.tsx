@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
@@ -166,8 +165,6 @@ const ManageMcqFeedbackPage = () => {
           <DataTable columns={columns} data={feedbackItems} />
         </CardContent>
       </Card>
-
-      <MadeWithDyad />
 
       {selectedFeedbackForReview && (
         <ReviewFeedbackDialog

@@ -1,6 +1,5 @@
 "use client";
 
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import EditLandingPageSection from '@/components/EditLandingPageSection';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,8 +12,6 @@ import {
   pricingCtaSchema,
 } from '@/utils/landingPageSchemas';
 import * as z from 'zod';
-
-// --- Default Values matching new design ---
 
 const defaultSeo: z.infer<typeof seoMetadataSchema> = {
   metaTitle: "Prometric Exam Preparation for Gulf Countries | StudyPrometric – Online MCQs & Practice Tests",
@@ -45,12 +42,10 @@ const defaultPricingCta: z.infer<typeof pricingCtaSchema> = {
 };
 
 const ManageLandingPage = () => {
-  // Need a wrapper schema for the features list to use useFieldArray
   const featuresWrapperSchema = z.object({
     links: featuresSectionSchema,
   });
 
-  // --- SEO Metadata Form ---
   const renderSeoForm = (form: UseFormReturn<z.infer<typeof seoMetadataSchema>>) => (
     <div className="space-y-4">
       <FormField
@@ -89,7 +84,6 @@ const ManageLandingPage = () => {
     </div>
   );
 
-  // --- Hero Section Form ---
   const renderHeroForm = (form: UseFormReturn<z.infer<typeof heroSectionSchema>>) => (
     <div className="space-y-4">
       <FormField
@@ -150,7 +144,6 @@ const ManageLandingPage = () => {
     </div>
   );
 
-  // --- Features Section Form (List) ---
   const renderFeaturesForm = (form: UseFormReturn<z.infer<typeof featuresWrapperSchema>>, index?: number) => (
     <div className="space-y-3">
       <h4 className="font-semibold">Feature #{index !== undefined ? index + 1 : 'New'}</h4>
@@ -190,7 +183,6 @@ const ManageLandingPage = () => {
     </div>
   );
 
-  // --- Pricing CTA Form ---
   const renderPricingCtaForm = (form: UseFormReturn<z.infer<typeof pricingCtaSchema>>) => (
     <div className="space-y-4">
       <FormField
@@ -263,8 +255,6 @@ const ManageLandingPage = () => {
       >
         {renderPricingCtaForm}
       </EditLandingPageSection>
-
-      <MadeWithDyad />
     </div>
   );
 };

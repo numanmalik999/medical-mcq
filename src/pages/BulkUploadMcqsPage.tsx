@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { showLoading, dismissToast, showError, showSuccess } from '@/utils/toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Loader2, Upload, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import * as XLSX from 'xlsx';
@@ -260,7 +259,6 @@ const BulkUploadMcqsPage = () => {
           </Button>
         </CardContent>
       </Card>
-      <MadeWithDyad />
     </div>
   );
 };

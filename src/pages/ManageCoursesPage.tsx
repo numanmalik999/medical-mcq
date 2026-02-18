@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal, BookOpen } from 'lucide-react';
@@ -144,8 +143,6 @@ const ManageCoursesPage = () => {
           <DataTable columns={columns} data={courses} />
         </CardContent>
       </Card>
-
-      <MadeWithDyad />
 
       <EditCourseDialog
         open={isEditDialogOpen}

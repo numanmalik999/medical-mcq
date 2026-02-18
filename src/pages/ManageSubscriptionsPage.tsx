@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
@@ -157,8 +156,6 @@ const ManageSubscriptionsPage = () => {
           <DataTable columns={columns} data={tiers} />
         </CardContent>
       </Card>
-
-      <MadeWithDyad />
 
       <EditSubscriptionTierDialog
         open={isEditDialogOpen}

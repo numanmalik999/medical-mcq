@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Link } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 
@@ -70,7 +69,6 @@ const Login = () => {
           </Link>
         </p>
       </div>
-      <MadeWithDyad />
     </div>
   );
 };

@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { differenceInDays, parseISO } from 'date-fns';
@@ -138,7 +137,6 @@ const UserSubscriptionsPage = () => {
             <Button onClick={() => navigate('/login')}>Go to Login</Button>
           </CardContent>
         </Card>
-        <MadeWithDyad />
       </div>
     );
   }
@@ -231,8 +229,6 @@ const UserSubscriptionsPage = () => {
           })}
         </div>
       )}
-
-      <MadeWithDyad />
     </div>
   );
 };

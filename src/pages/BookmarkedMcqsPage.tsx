@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { Bookmark, BookmarkCheck, MessageSquare } from 'lucide-react'; 
 import { MCQ } from '@/components/mcq-columns';
@@ -197,9 +196,6 @@ const BookmarkedMcqsPage = () => {
               <Button className="w-full sm:w-auto">Go to Login</Button>
             </Link>
           </CardContent>
-          <CardFooter className="flex justify-center">
-            <MadeWithDyad />
-          </CardFooter>
         </Card>
       </div>
     );
@@ -221,9 +217,6 @@ const BookmarkedMcqsPage = () => {
               <Button className="w-full sm:w-auto">Start a Quiz</Button>
             </Link>
           </CardContent>
-          <CardFooter className="flex justify-center">
-            <MadeWithDyad />
-          </CardFooter>
         </Card>
       </div>
     );
@@ -329,7 +322,6 @@ const BookmarkedMcqsPage = () => {
           </Button>
         </CardFooter>
       </Card>
-      <MadeWithDyad />
 
       {/* Discussion Dialog */}
       {currentMcq && (

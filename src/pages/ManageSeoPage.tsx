@@ -11,7 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Wand2, ShieldAlert, History, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const ManageSeoPage = () => {
@@ -275,7 +274,6 @@ const ManageSeoPage = () => {
           </div>
         </TabsContent>
       </Tabs>
-      <MadeWithDyad />
     </div>
   );
 };

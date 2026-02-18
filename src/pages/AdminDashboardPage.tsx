@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,6 @@ import { User } from '@supabase/supabase-js';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
 
-// Define interfaces for the new data
 interface RecentSubscription {
   id: string;
   created_at: string;
@@ -44,7 +42,6 @@ const AdminDashboardPage = () => {
   } | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   
-  // New states
   const [recentUsers, setRecentUsers] = useState<User[]>([]);
   const [recentSubscriptions, setRecentSubscriptions] = useState<RecentSubscription[]>([]);
   const [recentSuggestions, setRecentSuggestions] = useState<RecentSuggestion[]>([]);
@@ -56,7 +53,6 @@ const AdminDashboardPage = () => {
         setIsLoadingStats(true);
         setIsLoadingRecentData(true);
         
-        // Fetch daily stats
         try {
           const { data: dailyMcqData, error: dailyMcqError } = await supabase.functions.invoke('get-daily-mcq');
           if (dailyMcqError) throw dailyMcqError;
@@ -87,7 +83,6 @@ const AdminDashboardPage = () => {
           setIsLoadingStats(false);
         }
 
-        // Fetch recent users, subscriptions, and suggestions
         try {
           const [usersResponse, subsResponse, suggestionsResponse] = await Promise.all([
             supabase.functions.invoke('list-recent-users'),
@@ -305,8 +300,6 @@ const AdminDashboardPage = () => {
           </CardContent>
         </Card>
       </div>
-      
-      <MadeWithDyad />
     </div>
   );
 };

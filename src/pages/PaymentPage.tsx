@@ -8,7 +8,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 
 interface SubscriptionTier {
   id: string;
@@ -141,7 +140,6 @@ const PaymentPage = () => {
           </Button>
         </CardFooter>
       </Card>
-      <MadeWithDyad />
     </div>
   );
 };

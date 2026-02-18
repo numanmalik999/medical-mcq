@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
@@ -519,7 +518,6 @@ const TakeTestPage = () => {
            featureName="Mock Exam Engine" 
            description="Full length timed exams are a premium feature."
         />
-        <MadeWithDyad />
       </div>
     );
   }
@@ -691,7 +689,6 @@ const TakeTestPage = () => {
           </CardFooter>
         </Card>
       </div>
-      <MadeWithDyad />
     </div>
   );
 };

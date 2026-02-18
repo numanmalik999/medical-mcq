@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { MadeWithDyad } from "@/components/made-with-dyad";
 import { HelpCircle, BookOpen, CreditCard } from "lucide-react";
 
 const faqs = [
@@ -130,8 +129,6 @@ const FaqPage = () => {
             </Link>
           </CardContent>
         </section>
-        
-        <MadeWithDyad />
       </div>
     </div>
   );

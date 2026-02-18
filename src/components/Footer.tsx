@@ -1,7 +1,6 @@
 "use client";
 
 import { Link, useLocation } from 'react-router-dom';
-import { MadeWithDyad } from './made-with-dyad';
 import { MessageSquare, MapPin, Twitter, Facebook, Instagram, Linkedin, Globe, Youtube, ShieldCheck, Rss, Music2, Stethoscope, ArrowRight } from 'lucide-react';
 import { useGlobalSettings, SocialLink } from '@/hooks/useGlobalSettings';
 import { useNavigationData } from '@/hooks/useNavigationData';
@@ -135,10 +134,6 @@ const Footer = () => {
           <p className="text-[10px] font-bold tracking-widest uppercase">
             &copy; {currentYear} Study Prometric MCQs. All rights reserved.
           </p>
-        </div>
-        
-        <div className="mt-8 flex justify-center grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all">
-          <MadeWithDyad />
         </div>
       </div>
     </footer>

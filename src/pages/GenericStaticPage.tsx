@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ReactMarkdown from 'react-markdown';
@@ -78,7 +77,6 @@ const GenericStaticPage = () => {
             </Link>
           </CardFooter>
         </Card>
-        <MadeWithDyad />
       </div>
     );
   }
@@ -95,7 +93,6 @@ const GenericStaticPage = () => {
           </CardContent>
         </Card>
       </article>
-      <MadeWithDyad />
     </div>
   );
 };

@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal, ShieldCheck, AlertTriangle, Loader2, Send, Eye, Sparkles } from 'lucide-react';
@@ -390,7 +389,6 @@ const AdminSettingsPage = () => {
       <h1 className="text-3xl font-bold">Admin Settings</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Trial Tier Configuration Check */}
         <Card className={cn("border-l-4", isTrialConfigured ? "border-l-green-500" : "border-l-orange-500")}>
             <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
@@ -417,7 +415,6 @@ const AdminSettingsPage = () => {
             </CardContent>
         </Card>
 
-        {/* Weekly Tip Manual Trigger */}
         <Card className="border-l-4 border-l-blue-500">
             <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
@@ -450,8 +447,6 @@ const AdminSettingsPage = () => {
         </CardContent>
       </Card>
 
-      <MadeWithDyad />
-
       {/* Tip Preview Dialog */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
@@ -481,7 +476,6 @@ const AdminSettingsPage = () => {
                      <ReactMarkdown>{tipPreview.content}</ReactMarkdown>
                    </div>
                    
-                   {/* Promotional Preview */}
                    <div className="mt-8 p-6 bg-blue-50 border border-blue-100 rounded-xl">
                       <h3 className="text-blue-900 font-bold flex items-center gap-2 mt-0">
                         Unlock Premium Tools

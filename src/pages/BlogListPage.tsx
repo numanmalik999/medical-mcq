@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Link } from 'react-router-dom';
 import { Loader2, Calendar, ArrowRight, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
@@ -100,7 +99,6 @@ const BlogListPage = () => {
           </div>
         )}
       </div>
-      <MadeWithDyad />
     </div>
   );
 };

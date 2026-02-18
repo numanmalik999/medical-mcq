@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MadeWithDyad } from '@/components/made-with-dyad';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User as UserIcon, KeyRound, Loader2 } from 'lucide-react'; // Import KeyRound and Loader2
 import { Link } from 'react-router-dom';
@@ -256,8 +255,6 @@ const UserProfilePage = () => {
           </div>
         </CardContent>
       </Card>
-
-      <MadeWithDyad />
     </div>
   );
 };

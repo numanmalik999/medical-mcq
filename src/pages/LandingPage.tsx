@@ -53,8 +53,8 @@ const LandingPage = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* Hero Section - Reduced top padding */}
-      <section className="relative pt-8 pb-16 lg:pt-12 lg:pb-24 overflow-hidden bg-slate-900 text-white">
+      {/* Hero Section - Minimal top padding */}
+      <section className="relative pt-2 pb-16 lg:pt-4 lg:pb-24 overflow-hidden bg-slate-900 text-white">
         <div className="absolute inset-0 opacity-20 pointer-events-none">
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2"></div>
           <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-600 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/2"></div>

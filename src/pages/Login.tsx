@@ -32,7 +32,7 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-start bg-gray-50 p-4 pt-8 md:pt-12">
       <Card className="w-full max-w-md border-none shadow-2xl rounded-3xl overflow-hidden">
         <CardHeader className="bg-primary text-primary-foreground py-10 text-center relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">

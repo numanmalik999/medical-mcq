@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, ShieldCheck, AlertTriangle, Loader2, Send, Eye, Sparkles, UserCheck } from 'lucide-react';
+import { MoreHorizontal, ShieldCheck, AlertTriangle, Loader2, Send, Sparkles, UserCheck, Clock } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,124 +27,18 @@ import { useSession } from '@/components/SessionContextProvider';
 import { Badge } from '@/components/ui/badge';
 import SocialMediaSettingsCard from '@/components/SocialMediaSettingsCard';
 import { cn } from '@/lib/utils';
-import ReactMarkdown from 'react-markdown';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
 
-interface WeeklyTipPreview {
-  title: string;
-  content: string;
-  subject: string;
+interface InactiveUser {
+  id: string;
+  email: string;
+  name: string;
+  last_sign_in: string;
 }
-
-const roadToGulfContent = `
-# Your Road to Practicing in the Gulf
-
-Navigating the requirements for medical practice in the Gulf countries can be complex. This guide provides a clear overview of the DataFlow verification process and the specific licensing exams for each major Gulf country.
-
----
-
-## 1. Primary Source Verification (PSV) by DataFlow Group
-
-Primary Source Verification (PSV) is a mandatory process for all healthcare professionals seeking to practice in the Gulf region. The DataFlow Group is the designated body that verifies your credentials directly from the issuing source (e.g., your university, previous employers).
-
-**What is verified?**
-- **Educational Qualifications:** Degrees, Diplomas.
-- **Work Experience:** Certificates of employment.
-- **Professional Licenses:** Your home country's medical license.
-- **Good Standing Certificate:** A certificate from your home medical council.
-
-**The Process:**
-1.  **Create an Account:** Register on the DataFlow portal for the specific country's health authority.
-2.  **Submit Documents:** Upload clear scans of all required documents.
-3.  **Payment:** Pay the verification fees online.
-4.  **Verification:** DataFlow contacts the issuing authorities to verify your documents. This can take several weeks to months.
-5.  **Report:** Once completed, a PSV report is generated and sent to you and the relevant health authority.
-
-**Tip:** Start your DataFlow application as early as possible, as it is often the most time-consuming part of the licensing process.
-
----
-
-## 2. Country-Specific Licensing Exams
-
-After or during your PSV, you must pass the country-specific licensing exam. Below is a breakdown for each country.
-
-### 🇦🇪 United Arab Emirates (UAE)
-
-To practice in the UAE, you must obtain a license from one of three different health authorities, depending on the emirate:
-- **DHA (Dubai Health Authority):** For practicing in Dubai.
-- **MOHAP (Ministry of Health and Prevention):** For practicing in Sharjah, Ajman, Umm Al Quwain, Ras Al Khaimah, and Fujairah.
-- **DOH / HAAD (Department of Health - Abu Dhabi):** For practicing in Abu Dhabi.
-
-**Exam Format:** All are computer-based tests (CBT) consisting of multiple-choice questions.
-**Key Focus:** General medical knowledge, clinical scenarios, and specialty-specific questions.
-**Note:** Passing one authority's exam may allow for license transfer to another, but specific rules apply.
-
-### 🇸🇦 Saudi Arabia
-
-The licensing body in Saudi Arabia is the Saudi Commission for Health Specialties (SCFHS).
-**Authority:** Saudi Commission for Health Specialties (SCFHS).
-**Exam:** Saudi Medical Licensing Exam (SMLE).
-
-**Exam Format:** A computer-based test with MCQs.
-**Key Focus:** The exam is comprehensive and covers a broad range of medical topics. It is known for its clinical-vignette style questions.
-**Process:** You must first register with the SCFHS Mumaris Plus system before you can book your exam.
-
-### 🇶🇦 Qatar
-
-In Qatar, the process is managed by the Department of Healthcare Professions (DHP).
-**Authority:** Department of Healthcare Professions (DHP) under the Ministry of Public Health (MOPH), formerly QCHP.
-**Exam:** Qatar Prometric Exam.
-
-**Exam Format:** A computer-based MCQ exam administered by Prometric.
-**Key Focus:** Varies by specialty but generally covers foundational and clinical knowledge relevant to your field.
-**Process:** You need to create an account on the DHP e-licensing system and complete the initial credentialing before being eligible for the exam.
-
-### 🇴🇲 Oman
-
-The Oman Medical Specialty Board (OMSB) oversees the licensing process in Oman.
-**Authority:** Oman Medical Specialty Board (OMSB).
-**Exam:** Oman Prometric Exam.
-
-**Exam Format:** Computer-based MCQ exam.
-**Key Focus:** The exam tests the knowledge and skills required for your specific specialty.
-**Process:** Similar to other countries, you must apply through the OMSB portal and complete credentialing and PSV.
-
-### 🇰🇼 Kuwait
-
-The Ministry of Health (MOH) is responsible for licensing in Kuwait.
-**Authority:** Ministry of Health (MOH).
-**Exam:** Kuwait Medical Licensing Examination (KMLE).
-
-**Exam Format:** Typically a written or computer-based MCQ exam.
-**Key Focus:** General medicine and specialty-specific knowledge.
-**Process:** The process is managed by the MOH, and requirements can be specific. It's essential to check the latest guidelines on their official website.
-
-### 🇧🇭 Bahrain
-
-In Bahrain, the National Health Regulatory Authority (NHRA) is the governing body.
-**Authority:** National Health Regulatory Authority (NHRA).
-**Exam:** Bahrain Licensure Examination.
-
-**Exam Format:** Computer-based MCQ exam.
-**Key Focus:** Assesses the candidate's competency in their chosen specialty.
-**Process:** Application is done through the NHRA portal, followed by credential verification and the exam.
-
----
-
-**Disclaimer:** Licensing requirements and processes can change. Always refer to the official websites of the respective health authorities for the most up-to-date information.
-`;
-
-const defaultPages = [
-  { slug: 'about', title: 'About Us', content: '# About Study Prometric MCQs...', location: ['footer'] },
-  { slug: 'contact', title: 'Contact Us', content: '# Contact Us...', location: ['footer'] },
-  { slug: 'privacy', title: 'Privacy Policy', content: '# Privacy Policy...', location: ['footer'] },
-  { slug: 'terms', title: 'Terms of Service', content: '# Terms of Service...', location: ['footer'] },
-  { slug: 'faq', title: 'FAQ', content: '# Frequently Asked Questions...', location: ['footer'] },
-  { slug: 'refund', title: 'Return & Refund Policy', content: '# Return and Refund Policy...', location: ['footer'] },
-  { slug: 'reviews', title: 'Reviews', content: 'This page is dynamically generated.', location: ['footer'] },
-  { slug: 'road-to-gulf', title: 'Road to Gulf', content: roadToGulfContent, location: ['header', 'footer'] },
-  { slug: 'editorial-guidelines', title: 'Editorial Guidelines', content: '# Editorial Guidelines\n\nAt Study Prometric, we maintain strict clinical accuracy...', location: ['footer'] },
-  { slug: 'team', title: 'Our Team', content: '# Our Team\n\nMeet the experts behind the question bank...', location: ['footer'] },
-];
 
 const AdminSettingsPage = () => {
   const { toast } = useToast();
@@ -154,14 +48,14 @@ const AdminSettingsPage = () => {
   const [isTrialConfigured, setIsTrialConfigured] = useState(false);
   const [isFixingTrial, setIsFixingTrial] = useState(false);
   
-  // Weekly Tip States
-  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
-  const [isSendingTip, setIsSendingTip] = useState(false);
-  const [tipPreview, setTipPreview] = useState<WeeklyTipPreview | null>(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-
-  // Re-engagement States
-  const [isRunningReengagement, setIsRunningReengagement] = useState(false);
+  // Inactivity Reminder States
+  const [reminderStep, setReminderStep] = useState<'threshold' | 'content' | 'recipients' | 'idle'>('idle');
+  const [reminderDays, setReminderDays] = useState<number>(7);
+  const [isFetchingInactive, setIsFetchingInactive] = useState(false);
+  const [inactiveUsers, setInactiveUsers] = useState<InactiveUser[]>([]);
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
+  const [reminderContent, setReminderContent] = useState({ subject: '', body: '' });
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedPageForEdit, setSelectedPageForEdit] = useState<StaticPage | null>(null);
@@ -215,7 +109,7 @@ const AdminSettingsPage = () => {
         });
 
       if (error) throw error;
-      toast({ title: "Success", description: "3-Day Trial tier created. New signups will now receive access." });
+      toast({ title: "Success", description: "3-Day Trial tier created." });
       setIsTrialConfigured(true);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -224,119 +118,61 @@ const AdminSettingsPage = () => {
     }
   };
 
-  const handlePreviewWeeklyTip = async () => {
-    setIsGeneratingPreview(true);
+  const handleStartReminderFlow = () => setReminderStep('threshold');
+
+  const handlePrepareReminders = async (days: number) => {
+    setReminderDays(days);
+    setIsFetchingInactive(true);
     try {
-      const { data, error } = await supabase.functions.invoke('weekly-prometric-tip', {
-        body: { preview: true },
-      });
-      
-      if (error) throw error;
-      setTipPreview(data.tip);
-      setIsPreviewOpen(true);
-    } catch (error: any) {
-      console.error("Error previewing weekly tip:", error);
-      toast({ 
-        title: "Preview Failed", 
-        description: error.message || "Failed to generate AI tip.",
-        variant: "destructive" 
-      });
+      const [usersRes, contentRes] = await Promise.all([
+        supabase.functions.invoke('get-inactive-users', { body: { days } }),
+        supabase.functions.invoke('generate-reminder-content', { body: { days } })
+      ]);
+
+      if (usersRes.error) throw usersRes.error;
+      if (contentRes.error) throw contentRes.error;
+
+      setInactiveUsers(usersRes.data.users);
+      setSelectedRecipients(new Set(usersRes.data.users.map((u: any) => u.id)));
+      setReminderContent(contentRes.data);
+      setReminderStep('content');
+    } catch (e: any) {
+      toast({ title: "Flow Error", description: e.message, variant: "destructive" });
     } finally {
-      setIsGeneratingPreview(false);
+      setIsFetchingInactive(false);
     }
   };
 
-  const handleSendWeeklyTip = async () => {
-    if (!window.confirm("Confirm sending this tip to ALL unique users and subscribers?")) return;
+  const handleSendBulkReminders = async () => {
+    setIsSendingReminders(true);
+    const targetUsers = inactiveUsers.filter(u => selectedRecipients.has(u.id));
     
-    setIsSendingTip(true);
     try {
-      const { data, error } = await supabase.functions.invoke('weekly-prometric-tip', {
-        body: { preview: false },
-      });
-      
-      if (error) throw error;
-      
-      toast({ 
-        title: "Weekly Tip Sent", 
-        description: `Successfully sent AI study tips to ${data.count} recipients.`,
-        variant: "default" 
-      });
-      setIsPreviewOpen(false);
-    } catch (error: any) {
-      console.error("Error sending weekly tip:", error);
-      toast({ 
-        title: "Sending Failed", 
-        description: error.message || "Failed to trigger mailing list.",
-        variant: "destructive" 
-      });
-    } finally {
-      setIsSendingTip(false);
-    }
-  };
-
-  const handleRunReengagement = async () => {
-    setIsRunningReengagement(true);
-    try {
-        const { data, error } = await supabase.functions.invoke('reengagement-emails');
-        if (error) throw error;
-        toast({ 
-            title: "Check Complete", 
-            description: `Identified and notified ${data.sent} inactive users.` 
+      for (const user of targetUsers) {
+        const personalizedBody = reminderContent.body.replace('[Name]', user.name);
+        await supabase.functions.invoke('send-email', {
+          body: {
+            to: user.email,
+            subject: reminderContent.subject,
+            body: personalizedBody
+          }
         });
-    } catch (error: any) {
-        toast({ title: "Process Failed", description: error.message, variant: "destructive" });
+      }
+      toast({ title: "Campaign Sent", description: `Reminders sent to ${targetUsers.length} practitioners.` });
+      setReminderStep('idle');
+    } catch (e: any) {
+      toast({ title: "Send Error", description: e.message, variant: "destructive" });
     } finally {
-        setIsRunningReengagement(false);
+      setIsSendingReminders(false);
     }
   };
 
-  const ensureDefaultStaticPages = useCallback(async (currentPages: StaticPage[]) => {
-    const existingPagesMap = new Map(currentPages.map(p => [p.slug, p]));
-    const pagesToInsert = [];
-    const pagesToUpdate = [];
-
-    for (const defaultPage of defaultPages) {
-      const existingPage = existingPagesMap.get(defaultPage.slug);
-      if (!existingPage) {
-        pagesToInsert.push(defaultPage);
-      } else {
-        const existingLocation = existingPage.location || [];
-        const defaultLocation = defaultPage.location || [];
-        const needsLocationUpdate = defaultLocation.length !== existingLocation.length || !defaultLocation.every(loc => existingLocation.includes(loc));
-        
-        const needsContentUpdate = existingPage.slug === 'road-to-gulf' && existingPage.content !== roadToGulfContent;
-
-        if (needsLocationUpdate || needsContentUpdate) {
-          pagesToUpdate.push({
-            id: existingPage.id,
-            location: defaultPage.location,
-            content: needsContentUpdate ? defaultPage.content : existingPage.content,
-          });
-        }
-      }
-    }
-
-    let changesMade = false;
-
-    if (pagesToInsert.length > 0) {
-      changesMade = true;
-      const { error } = await supabase.from('static_pages').insert(pagesToInsert);
-      if (error) {
-        console.error('Error inserting default static pages:', error);
-      }
-    }
-
-    if (pagesToUpdate.length > 0) {
-      changesMade = true;
-      const updates = pagesToUpdate.map(page => 
-        supabase.from('static_pages').update({ location: page.location, content: page.content }).eq('id', page.id)
-      );
-      await Promise.all(updates);
-    }
-
-    return changesMade;
-  }, []);
+  const toggleRecipient = (id: string) => {
+    const next = new Set(selectedRecipients);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedRecipients(next);
+  };
 
   useEffect(() => {
     if (hasCheckedInitialSession) {
@@ -344,16 +180,15 @@ const AdminSettingsPage = () => {
         setIsPageLoading(true);
         const initialPages = await fetchStaticPages();
         setStaticPages(initialPages);
-        await ensureDefaultStaticPages(initialPages);
         await checkTrialTier();
         setIsPageLoading(false);
       };
       runSetup();
     }
-  }, [hasCheckedInitialSession, fetchStaticPages, ensureDefaultStaticPages, checkTrialTier]);
+  }, [hasCheckedInitialSession, fetchStaticPages, checkTrialTier]);
 
   const handleDeletePage = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this static page?")) return;
+    if (!window.confirm("Are you sure?")) return;
     try {
       const { error } = await supabase.from('static_pages').delete().eq('id', id);
       if (error) throw error;
@@ -362,11 +197,6 @@ const AdminSettingsPage = () => {
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
-  };
-
-  const openEditDialog = (page?: StaticPage) => {
-    setSelectedPageForEdit(page || null);
-    setIsEditDialogOpen(true);
   };
 
   const columns: ColumnDef<StaticPage>[] = [
@@ -391,7 +221,7 @@ const AdminSettingsPage = () => {
             <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => openEditDialog(row.original)}>Edit</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setSelectedPageForEdit(row.original); setIsEditDialogOpen(true); }}>Edit</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleDeletePage(row.original.id)} className="text-red-600">Delete</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -399,78 +229,44 @@ const AdminSettingsPage = () => {
     },
   ];
 
-  if (!hasCheckedInitialSession || isPageLoading) {
-    return <div className="min-h-screen flex items-center justify-center pt-24"><Loader2 className="animate-spin" /></div>;
-  }
+  if (!hasCheckedInitialSession || isPageLoading) return <div className="min-h-screen flex items-center justify-center pt-24"><Loader2 className="animate-spin" /></div>;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Admin Settings</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className={cn("border-l-4", isTrialConfigured ? "border-l-green-500" : "border-l-orange-500")}>
-            <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-                {isCheckingTrial ? <Loader2 className="h-5 w-5 animate-spin" /> : isTrialConfigured ? <ShieldCheck className="h-5 w-5 text-green-500" /> : <AlertTriangle className="h-5 w-5 text-orange-500" />}
-                <CardTitle className="text-lg">System Health: Trial Access</CardTitle>
-            </div>
-            <CardDescription>Ensures the mandatory '3-Day Trial' tier exists for automation.</CardDescription>
-            </CardHeader>
-            <CardContent>
-            {isTrialConfigured ? (
-                <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Automation is active. Signups correctly receive trial access.</p>
-                <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100 border-none">Ready</Badge>
-                </div>
-            ) : (
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <p className="text-sm text-orange-700 font-medium">The '3-Day Trial' tier is missing!</p>
-                <Button onClick={handleFixTrial} disabled={isFixingTrial} size="sm" variant="default">
-                    {isFixingTrial ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Fix Trial Tier
-                </Button>
-                </div>
-            )}
-            </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-blue-500">
-            <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                    <Send className="h-5 w-5 text-blue-500" />
-                    <CardTitle className="text-lg">Weekly Tip Broadcast</CardTitle>
-                </div>
-                <CardDescription>Email all users with high-yield clinical advice.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <p className="text-sm text-muted-foreground">Triggers AI content generation and mailing list.</p>
-                    <Button onClick={handlePreviewWeeklyTip} disabled={isGeneratingPreview || isSendingTip} size="sm">
-                        {isGeneratingPreview ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                        Preview & Send
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
-      </div>
+      <h1 className="text-3xl font-black uppercase italic tracking-tighter">Admin Settings</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="border-l-4 border-l-purple-500">
             <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
-                    <UserCheck className="h-5 w-5 text-purple-500" />
-                    <CardTitle className="text-lg">User Re-engagement</CardTitle>
+                    <Clock className="h-5 w-5 text-purple-500" />
+                    <CardTitle className="text-lg">Inactivity Reminders</CardTitle>
                 </div>
-                <CardDescription>Scan and email users inactive for 30+ days.</CardDescription>
+                <CardDescription>Manually trigger 7 or 14 day re-engagement campaigns.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <p className="text-sm text-muted-foreground">Sends a professional feature summary to bring users back.</p>
-                    <Button onClick={handleRunReengagement} disabled={isRunningReengagement} size="sm" variant="secondary">
-                        {isRunningReengagement ? <Loader2 className="mr-2 h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                        Run 30D Check
+                    <p className="text-sm text-muted-foreground">Scan for inactive users and send AI-crafted reminders.</p>
+                    <Button onClick={handleStartReminderFlow} size="sm" variant="secondary" className="rounded-xl font-bold uppercase text-[10px]">
+                        Start Campaign
                     </Button>
                 </div>
+            </CardContent>
+        </Card>
+
+        <Card className={cn("border-l-4", isTrialConfigured ? "border-l-green-500" : "border-l-orange-500")}>
+            <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+                {isCheckingTrial ? <Loader2 className="h-5 w-5 animate-spin" /> : isTrialConfigured ? <ShieldCheck className="h-5 w-5 text-green-500" /> : <AlertTriangle className="h-5 w-5 text-orange-500" />}
+                <CardTitle className="text-lg">Trial Access Health</CardTitle>
+            </div>
+            </CardHeader>
+            <CardContent>
+                {isTrialConfigured ? (
+                    <Badge variant="default" className="bg-green-100 text-green-800 border-none">System Ready</Badge>
+                ) : (
+                    <Button onClick={handleFixTrial} disabled={isFixingTrial} size="sm">Fix Trial Tier</Button>
+                )}
             </CardContent>
         </Card>
       </div>
@@ -479,70 +275,102 @@ const AdminSettingsPage = () => {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-xl">Static Pages Content</CardTitle>
-          <Button onClick={() => openEditDialog()}>Add New Page</Button>
+          <CardTitle className="text-xl">Static Pages</CardTitle>
+          <Button onClick={() => { setSelectedPageForEdit(null); setIsEditDialogOpen(true); }} size="sm">Add New Page</Button>
         </CardHeader>
         <CardContent>
           <DataTable columns={columns} data={staticPages} />
         </CardContent>
       </Card>
 
-      {/* Tip Preview Dialog */}
-      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" /> AI Generated Weekly Tip
-            </DialogTitle>
-            <DialogDescription>
-              Review the clinical content before broadcasting to all users and subscribers.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {tipPreview && (
-            <div className="space-y-6 py-4">
-              <div className="p-4 bg-muted rounded-lg border">
-                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-1">Email Subject:</p>
-                <p className="font-bold text-primary">🧠 Study Prometric: {tipPreview.subject}</p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 border-b pb-2">
-                   <Badge variant="outline">Email Body Preview</Badge>
-                </div>
-                <div className="prose dark:prose-invert max-w-none border p-6 rounded-2xl bg-white shadow-inner">
-                   <h2 className="text-xl font-black text-blue-900 mb-2">{tipPreview.title}</h2>
-                   <div className="mb-8">
-                     <ReactMarkdown>{tipPreview.content}</ReactMarkdown>
-                   </div>
-                   
-                   <div className="mt-8 p-6 bg-blue-50 border border-blue-100 rounded-xl">
-                      <h3 className="text-blue-900 font-bold flex items-center gap-2 mt-0">
-                        Unlock Premium Tools
-                      </h3>
-                      <ul className="text-sm text-blue-800 list-disc pl-5 mb-4">
-                        <li>5,000+ Verified MCQs</li>
-                        <li>AI Clinical Cases</li>
-                        <li>Realistic Mock Exams</li>
-                      </ul>
-                      <div className="text-center">
-                        <Button size="sm" className="bg-blue-900 text-white font-bold h-9">Upgrade to Premium</Button>
-                      </div>
-                   </div>
-                </div>
-              </div>
+      {/* Reminder Step 1: Threshold */}
+      <Dialog open={reminderStep === 'threshold'} onOpenChange={(o) => !o && setReminderStep('idle')}>
+        <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+                <DialogTitle>Select Inactivity Period</DialogTitle>
+                <DialogDescription>Choose which group of practitioners to target.</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-4 py-4">
+                <Button variant="outline" className="h-24 flex flex-col gap-2 rounded-2xl" onClick={() => handlePrepareReminders(7)} disabled={isFetchingInactive}>
+                    <span className="text-2xl font-black">7</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Days Idle</span>
+                </Button>
+                <Button variant="outline" className="h-24 flex flex-col gap-2 rounded-2xl" onClick={() => handlePrepareReminders(14)} disabled={isFetchingInactive}>
+                    <span className="text-2xl font-black">14</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Days Idle</span>
+                </Button>
             </div>
-          )}
+            {isFetchingInactive && (
+                <div className="flex flex-col items-center gap-2 py-2">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground animate-pulse">Analyzing User Activity...</p>
+                </div>
+            )}
+        </DialogContent>
+      </Dialog>
 
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setIsPreviewOpen(false)} disabled={isSendingTip}>
-              Discard & Close
-            </Button>
-            <Button onClick={handleSendWeeklyTip} disabled={isSendingTip} className="font-bold uppercase tracking-wider">
-              {isSendingTip ? <Loader2 className="mr-2 h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-              Broadcast to All Recipients
-            </Button>
-          </DialogFooter>
+      {/* Reminder Step 2: Content Review */}
+      <Dialog open={reminderStep === 'content'} onOpenChange={(o) => !o && setReminderStep('idle')}>
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> Review AI Reminder</DialogTitle>
+                <DialogDescription>Personalize the message for the {reminderDays}-day campaign.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase">Email Subject</Label>
+                    <Input value={reminderContent.subject} onChange={e => setReminderContent({...reminderContent, subject: e.target.value})} className="font-bold" />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase">Email Body (HTML)</Label>
+                    <Textarea value={reminderContent.body} onChange={e => setReminderContent({...reminderContent, body: e.target.value})} rows={12} className="text-xs font-mono" />
+                    <p className="text-[9px] text-muted-foreground italic">Use <b>[Name]</b> where you want the student's first name to appear.</p>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="ghost" onClick={() => setReminderStep('threshold')}>Back</Button>
+                <Button onClick={() => setReminderStep('recipients')}>Review Recipients ({inactiveUsers.length})</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reminder Step 3: Recipient Review */}
+      <Dialog open={reminderStep === 'recipients'} onOpenChange={(o) => !o && setReminderStep('idle')}>
+        <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><UserCheck className="h-5 w-5 text-primary" /> Final Recipient Audit</DialogTitle>
+                <DialogDescription>Deselect any users you don't wish to contact.</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="h-[300px] pr-4 my-4">
+                <div className="space-y-2">
+                    {inactiveUsers.map(user => (
+                        <div key={user.id} className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+                            <div className="flex items-center gap-3">
+                                <Checkbox id={`rem-${user.id}`} checked={selectedRecipients.has(user.id)} onCheckedChange={() => toggleRecipient(user.id)} />
+                                <div>
+                                    <p className="text-xs font-bold leading-none">{user.name}</p>
+                                    <p className="text-[10px] text-muted-foreground mt-1">{user.email}</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[9px] font-black text-muted-foreground uppercase">Last Seen</p>
+                                <p className="text-[10px] font-bold">{new Date(user.last_sign_in).toLocaleDateString()}</p>
+                            </div>
+                        </div>
+                    ))}
+                    {inactiveUsers.length === 0 && <p className="text-center py-10 text-muted-foreground italic">No users found for this threshold.</p>}
+                </div>
+            </ScrollArea>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2">
+                <div className="flex-1 flex items-center gap-2 text-xs font-bold">
+                    <Badge variant="secondary">{selectedRecipients.size} Selected</Badge>
+                </div>
+                <Button variant="ghost" onClick={() => setReminderStep('content')}>Edit Message</Button>
+                <Button onClick={handleSendBulkReminders} disabled={isSendingReminders || selectedRecipients.size === 0}>
+                    {isSendingReminders ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+                    Broadcast Reminders
+                </Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
 

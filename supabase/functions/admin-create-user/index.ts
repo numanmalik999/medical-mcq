@@ -3,6 +3,14 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
+declare global {
+  namespace Deno {
+    namespace env {
+      function get(key: string): string | undefined;
+    }
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -13,30 +21,35 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Initialize Supabase client with service role key
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
   try {
-    const { email, password, first_name, last_name, is_admin } = await req.json();
+    const { email, password, full_name, phone_number, whatsapp_number, is_admin } = await req.json();
 
-    if (!email || !password) {
-      return new Response(JSON.stringify({ error: 'Missing required fields: email or password.' }), {
+    if (!email || !password || !full_name || !phone_number || !whatsapp_number) {
+      return new Response(JSON.stringify({ error: 'Missing required fields: email, password, full_name, phone_number, and whatsapp_number are mandatory.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    const nameParts = full_name.trim().split(' ');
+    const firstName = nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
     // 1. Create user in auth.users
     const { data: userData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Automatically confirm email
+      email_confirm: true,
       user_metadata: {
-        first_name: first_name || null,
-        last_name: last_name || null,
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phone_number,
+        whatsapp_number: whatsapp_number,
       },
     });
 
@@ -47,20 +60,20 @@ serve(async (req: Request) => {
 
     const newUserId = userData.user.id;
 
-    // 2. Manually insert profile data (since the handle_new_user trigger might not set is_admin)
+    // 2. Manually upsert profile data
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .upsert({
         id: newUserId,
-        first_name: first_name || null,
-        last_name: last_name || null,
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phone_number,
+        whatsapp_number: whatsapp_number,
         is_admin: is_admin || false,
-        // Other fields will be handled by the existing trigger if they are not provided here
       }, { onConflict: 'id' });
 
     if (profileError) {
       console.error('Error upserting profile after user creation:', profileError);
-      // Note: We don't throw here, as the user is created, but we log the profile error.
     }
 
     return new Response(JSON.stringify({ message: 'User created successfully.', userId: newUserId }), {

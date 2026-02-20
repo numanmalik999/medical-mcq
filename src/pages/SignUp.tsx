@@ -26,8 +26,8 @@ const formSchema = z.object({
   email: z.string().email("Invalid email address.").min(1, "Email is required."),
   password: z.string().min(6, "Password must be at least 6 characters long."),
   full_name: z.string().min(3, "Full name is required (min 3 characters)."),
-  phone_number: z.string().min(10, "Valid phone number required."),
-  whatsapp_number: z.string().min(10, "WhatsApp number required."),
+  phone_number: z.string().min(10, "Valid phone number required (min 10 digits)."),
+  whatsapp_number: z.string().min(10, "WhatsApp number required (min 10 digits)."),
   is_whatsapp_same: z.boolean().default(false),
 });
 
@@ -55,7 +55,7 @@ const SignUp = () => {
   // Sync WhatsApp with Phone if the toggle is active
   useEffect(() => {
     if (isWhatsappSame) {
-      setValue('whatsapp_number', phoneNumber);
+      setValue('whatsapp_number', phoneNumber, { shouldValidate: true });
     }
   }, [isWhatsappSame, phoneNumber, setValue]);
 
@@ -72,7 +72,6 @@ const SignUp = () => {
 
     setIsSubmitting(true);
     try {
-      // Split full name into first and last name for database compatibility
       const nameParts = values.full_name.trim().split(' ');
       const firstName = nameParts[0];
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
@@ -120,7 +119,9 @@ const SignUp = () => {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="full_name" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</FormLabel>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex justify-between">
+                      Full Name <span className="text-red-500 font-black">*</span>
+                    </FormLabel>
                     <FormControl><Input placeholder="Dr. John Doe" className="h-11 rounded-xl" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -128,7 +129,9 @@ const SignUp = () => {
                 
                 <FormField control={form.control} name="email" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Email</FormLabel>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex justify-between">
+                      Email <span className="text-red-500 font-black">*</span>
+                    </FormLabel>
                     <FormControl><Input type="email" placeholder="you@doctor.com" className="h-11 rounded-xl" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -136,7 +139,9 @@ const SignUp = () => {
 
                 <FormField control={form.control} name="password" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Password</FormLabel>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex justify-between">
+                      Password <span className="text-red-500 font-black">*</span>
+                    </FormLabel>
                     <FormControl><Input type="password" placeholder="••••••••" className="h-11 rounded-xl" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -144,7 +149,9 @@ const SignUp = () => {
 
                 <FormField control={form.control} name="phone_number" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Phone Number</FormLabel>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex justify-between">
+                      Phone Number <span className="text-red-500 font-black">*</span>
+                    </FormLabel>
                     <FormControl><Input type="tel" placeholder="+971..." className="h-11 rounded-xl" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -154,7 +161,9 @@ const SignUp = () => {
                   <FormField control={form.control} name="whatsapp_number" render={({ field }) => (
                     <FormItem>
                       <div className="flex justify-between items-end">
-                        <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">WhatsApp Number</FormLabel>
+                        <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex gap-1">
+                          WhatsApp Number <span className="text-red-500 font-black">*</span>
+                        </FormLabel>
                         <div className="flex items-center gap-2 pb-1 group cursor-pointer" onClick={() => setValue('is_whatsapp_same', !isWhatsappSame)}>
                            <Checkbox 
                              id="same-phone" 

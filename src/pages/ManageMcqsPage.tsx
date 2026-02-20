@@ -11,11 +11,12 @@ import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Wand2, Loader2, Sparkles, CircleDashed, LayoutList, Search, Filter, CheckCircle } from 'lucide-react'; 
+import { Wand2, Loader2, Sparkles, CircleDashed, LayoutList, Search, Filter, CheckCircle, Database } from 'lucide-react'; 
 import { useSession } from '@/components/SessionContextProvider'; 
 import { RowSelectionState } from '@tanstack/react-table';
 import LoadingBar from '@/components/LoadingBar';
 import { showLoading, updateLoading, dismissToast } from '@/utils/toast';
+import { Badge } from '@/components/ui/badge';
 
 interface Category {
   id: string;
@@ -36,6 +37,7 @@ const ManageMcqsPage = () => {
   const [rawMcqs, setRawMcqs] = useState<DisplayMCQ[]>([]); 
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isFetchingMcqs, setIsFetchingMcqs] = useState(false);
+  const [totalGlobalCount, setTotalGlobalCount] = useState<number>(0);
   const { toast } = useToast();
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -78,6 +80,8 @@ const ManageMcqsPage = () => {
       const { count: totalMcqCount } = await supabase
         .from('mcqs')
         .select('id', { count: 'exact', head: true });
+
+      setTotalGlobalCount(totalMcqCount || 0);
 
       const uncategorizedMcqCount = (totalMcqCount || 0) - (linkedCount || 0);
 
@@ -221,7 +225,7 @@ const ManageMcqsPage = () => {
         fetchCategories();
       }
     } catch (error: any) {
-      updateLoading(activeToastId, `Error: ${error.message}`, 'error');
+      updateLoading(activeToastId, `Error: \${error.message}`, 'error');
     } finally {
       setIsProcessing(false);
       setTimeout(() => dismissToast(activeToastId), 3000);
@@ -251,10 +255,10 @@ const ManageMcqsPage = () => {
     const selectedMcqIds = selectedIndices.map(index => filteredMcqs[parseInt(index)].id);
 
     if (selectedMcqIds.length === 0) return;
-    if (!window.confirm(`Mark ${selectedMcqIds.length} questions as enhanced?`)) return;
+    if (!window.confirm(`Mark \${selectedMcqIds.length} questions as enhanced?`)) return;
 
     setIsProcessing(true);
-    const activeToastId = showLoading(`Updating ${selectedMcqIds.length} questions...`);
+    const activeToastId = showLoading(`Updating \${selectedMcqIds.length} questions...`);
 
     try {
       const { error } = await supabase
@@ -264,11 +268,11 @@ const ManageMcqsPage = () => {
 
       if (error) throw error;
       
-      updateLoading(activeToastId, `Successfully marked ${selectedMcqIds.length} items as enhanced.`, 'success');
+      updateLoading(activeToastId, `Successfully marked \${selectedMcqIds.length} items as enhanced.`, 'success');
       setRowSelection({});
       fetchMcqs();
     } catch (error: any) {
-      updateLoading(activeToastId, `Failed to update: ${error.message}`, 'error');
+      updateLoading(activeToastId, `Failed to update: \${error.message}`, 'error');
     } finally {
       setIsProcessing(false);
       setTimeout(() => dismissToast(activeToastId), 3000);
@@ -284,18 +288,18 @@ const ManageMcqsPage = () => {
       return;
     }
 
-    if (!window.confirm(`Optimize ${selectedMcqIds.length} MCQs one-by-one?`)) return;
+    if (!window.confirm(`Optimize \${selectedMcqIds.length} MCQs one-by-one?`)) return;
 
     setIsProcessing(true);
     let successCount = 0;
     let errorCount = 0;
     
-    const activeToastId = showLoading(`Initializing AI optimization for ${selectedMcqIds.length} scenarios...`);
+    const activeToastId = showLoading(`Initializing AI optimization for \${selectedMcqIds.length} scenarios...`);
 
     try {
       for (let i = 0; i < selectedMcqIds.length; i++) {
         const currentId = selectedMcqIds[i];
-        updateLoading(activeToastId, `AI Optimizing scenario ${i + 1} of ${selectedMcqIds.length}...`);
+        updateLoading(activeToastId, `AI Optimizing scenario \${i + 1} of \${selectedMcqIds.length}...`);
 
         try {
           const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
@@ -308,22 +312,22 @@ const ManageMcqsPage = () => {
             successCount++;
           }
         } catch (e) {
-          console.error(`Error enhancing MCQ ${currentId}:`, e);
+          console.error(`Error enhancing MCQ \${currentId}:`, e);
           errorCount++;
         }
       }
 
       if (errorCount > 0) {
-        updateLoading(activeToastId, `Optimization complete. Successfully updated ${successCount} items. ${errorCount} failed.`, 'error');
+        updateLoading(activeToastId, `Optimization complete. Successfully updated \${successCount} items. \${errorCount} failed.`, 'error');
       } else {
-        updateLoading(activeToastId, `Successfully optimized all ${successCount} scenarios with clinical AI insights.`, 'success');
+        updateLoading(activeToastId, `Successfully optimized all \${successCount} scenarios with clinical AI insights.`, 'success');
       }
 
       setRowSelection({});
       setTimeout(() => fetchMcqs(), 500);
       fetchCategories(); 
     } catch (error: any) {
-      updateLoading(activeToastId, `Enhancement Interrupted: ${error.message}`, 'error');
+      updateLoading(activeToastId, `Enhancement Interrupted: \${error.message}`, 'error');
     } finally {
       setIsProcessing(false);
       setTimeout(() => dismissToast(activeToastId), 5000);
@@ -348,7 +352,16 @@ const ManageMcqsPage = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Manage MCQs</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-3xl font-bold flex items-center gap-3">
+          Manage MCQs
+          {!isPageLoading && totalGlobalCount > 0 && (
+            <Badge variant="secondary" className="h-7 px-3 text-sm font-black bg-primary/10 text-primary border-none rounded-full">
+              {totalGlobalCount} Total
+            </Badge>
+          )}
+        </h1>
+      </div>
 
       <Card className="border-primary/20 shadow-lg">
         <CardHeader className="bg-primary/5 border-b pb-4">
@@ -436,6 +449,11 @@ const ManageMcqsPage = () => {
                             ? "Please wait while we sync with the medical database." 
                             : "Configure your specialty and keywords above, then click 'Apply Filters' to start managing scenarios."}
                     </p>
+                    {!isFetchingMcqs && totalGlobalCount > 0 && (
+                      <div className="flex items-center justify-center gap-2 mt-4 text-primary font-black uppercase tracking-widest text-[10px]">
+                        <Database className="h-3 w-3" /> {totalGlobalCount} Questions in Database
+                      </div>
+                    )}
                 </div>
             </div>
         </Card>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Link, useNavigate } from 'react-router-dom';
 import { Loader2, UserPlus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 const DISPOSABLE_DOMAINS = [
   'temp-mail.org', 'tempmail.com', 'guerrillamail.com', '10minutemail.com', 
@@ -23,10 +25,10 @@ const DISPOSABLE_DOMAINS = [
 const formSchema = z.object({
   email: z.string().email("Invalid email address.").min(1, "Email is required."),
   password: z.string().min(6, "Password must be at least 6 characters long."),
-  first_name: z.string().min(2, "First name is required (min 2 characters)."),
-  last_name: z.string().min(2, "Last name is required (min 2 characters)."),
+  full_name: z.string().min(3, "Full name is required (min 3 characters)."),
   phone_number: z.string().min(10, "Valid phone number required."),
   whatsapp_number: z.string().min(10, "WhatsApp number required."),
+  is_whatsapp_same: z.boolean().default(false),
 });
 
 const SignUp = () => {
@@ -39,12 +41,23 @@ const SignUp = () => {
     defaultValues: {
       email: "",
       password: "",
-      first_name: "",
-      last_name: "",
+      full_name: "",
       phone_number: "",
       whatsapp_number: "",
+      is_whatsapp_same: false,
     },
   });
+
+  const { watch, setValue } = form;
+  const isWhatsappSame = watch('is_whatsapp_same');
+  const phoneNumber = watch('phone_number');
+
+  // Sync WhatsApp with Phone if the toggle is active
+  useEffect(() => {
+    if (isWhatsappSame) {
+      setValue('whatsapp_number', phoneNumber);
+    }
+  }, [isWhatsappSame, phoneNumber, setValue]);
 
   const validateDisposableEmail = (email: string) => {
     const domain = email.split('@')[1]?.toLowerCase();
@@ -59,13 +72,18 @@ const SignUp = () => {
 
     setIsSubmitting(true);
     try {
+      // Split full name into first and last name for database compatibility
+      const nameParts = values.full_name.trim().split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
       const { error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         options: {
           data: {
-            first_name: values.first_name,
-            last_name: values.last_name,
+            first_name: firstName,
+            last_name: lastName,
             phone_number: values.phone_number,
             whatsapp_number: values.whatsapp_number,
           },
@@ -79,9 +97,6 @@ const SignUp = () => {
         description: "Your account has been created successfully. Welcome to Study Prometric!",
       });
 
-      // Redirect to the dashboard logic
-      // If auto-confirm is enabled in Supabase, the user will be logged in immediately.
-      // If not, the dashboard redirect will handle the state accordingly.
       navigate('/redirect');
       
     } catch (error: any) {
@@ -103,22 +118,13 @@ const SignUp = () => {
           <div className="space-y-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField control={form.control} name="first_name" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">First Name</FormLabel>
-                      <FormControl><Input placeholder="John" className="h-11 rounded-xl" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="last_name" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Last Name</FormLabel>
-                      <FormControl><Input placeholder="Doe" className="h-11 rounded-xl" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
+                <FormField control={form.control} name="full_name" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</FormLabel>
+                    <FormControl><Input placeholder="Dr. John Doe" className="h-11 rounded-xl" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 
                 <FormField control={form.control} name="email" render={({ field }) => (
                   <FormItem>
@@ -136,18 +142,38 @@ const SignUp = () => {
                   </FormItem>
                 )} />
 
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField control={form.control} name="phone_number" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Phone</FormLabel>
-                      <FormControl><Input type="tel" placeholder="+1..." className="h-11 rounded-xl" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                <FormField control={form.control} name="phone_number" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Phone Number</FormLabel>
+                    <FormControl><Input type="tel" placeholder="+971..." className="h-11 rounded-xl" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <div className="space-y-3">
                   <FormField control={form.control} name="whatsapp_number" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">WhatsApp</FormLabel>
-                      <FormControl><Input type="tel" placeholder="+1..." className="h-11 rounded-xl" {...field} /></FormControl>
+                      <div className="flex justify-between items-end">
+                        <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">WhatsApp Number</FormLabel>
+                        <div className="flex items-center gap-2 pb-1 group cursor-pointer" onClick={() => setValue('is_whatsapp_same', !isWhatsappSame)}>
+                           <Checkbox 
+                             id="same-phone" 
+                             checked={isWhatsappSame} 
+                             onCheckedChange={(checked) => setValue('is_whatsapp_same', !!checked)}
+                             className="rounded-sm border-muted-foreground/30 h-3.5 w-3.5"
+                           />
+                           <Label htmlFor="same-phone" className="text-[10px] font-bold uppercase text-muted-foreground cursor-pointer group-hover:text-primary transition-colors">Same as phone</Label>
+                        </div>
+                      </div>
+                      <FormControl>
+                        <Input 
+                          type="tel" 
+                          placeholder="+971..." 
+                          className="h-11 rounded-xl" 
+                          {...field} 
+                          disabled={isWhatsappSame}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />

@@ -92,18 +92,22 @@ const ManageUsersPage = () => {
     const combinedUsers: UserProfile[] = authUsersData.map(authUser => {
       const profile = profilesMap.get(authUser.id);
       const activeSub = activeSubsMap.get(authUser.id);
+      
+      // Get metadata fallbacks
+      const meta = authUser.user_metadata || {};
 
       return {
         id: authUser.id,
         email: authUser.email || null,
         created_at: authUser.created_at,
         last_sign_in_at: authUser.last_sign_in_at || null,
-        first_name: profile?.first_name || null,
-        last_name: profile?.last_name || null,
-        avatar_url: profile?.avatar_url || null,
-        is_admin: profile?.is_admin || false,
-        phone_number: profile?.phone_number || null,
-        whatsapp_number: profile?.whatsapp_number || null,
+        // Priority: Profile Table > Auth Metadata > Null
+        first_name: profile?.first_name || meta.first_name || null,
+        last_name: profile?.last_name || meta.last_name || null,
+        avatar_url: profile?.avatar_url || meta.avatar_url || null,
+        is_admin: profile?.is_admin || meta.is_admin || false,
+        phone_number: profile?.phone_number || meta.phone_number || null,
+        whatsapp_number: profile?.whatsapp_number || meta.whatsapp_number || null,
         has_active_subscription: profile?.has_active_subscription || false,
         subscription_status: activeSub?.status || null,
         subscription_end_date: activeSub?.end_date || null,

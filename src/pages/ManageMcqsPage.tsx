@@ -15,7 +15,7 @@ import { Wand2, Loader2, Sparkles, CircleDashed, LayoutList, Search, Filter } fr
 import { useSession } from '@/components/SessionContextProvider'; 
 import { RowSelectionState } from '@tanstack/react-table';
 import LoadingBar from '@/components/LoadingBar';
-import { showLoading, dismissToast, showError, showSuccess } from '@/utils/toast';
+import { showLoading, updateLoading, dismissToast } from '@/utils/toast';
 
 interface Category {
   id: string;
@@ -219,15 +219,13 @@ const ManageMcqsPage = () => {
     let successCount = 0;
     let errorCount = 0;
     
-    let activeToastId = showLoading(`Initializing AI optimization for ${selectedMcqIds.length} scenarios...`);
+    const activeToastId = showLoading(`Initializing AI optimization for ${selectedMcqIds.length} scenarios...`);
 
     try {
       for (let i = 0; i < selectedMcqIds.length; i++) {
         const currentId = selectedMcqIds[i];
         
-        // Update the existing toast if possible, or clear and show new one
-        dismissToast(activeToastId);
-        activeToastId = showLoading(`AI Optimizing scenario ${i + 1} of ${selectedMcqIds.length}...`);
+        updateLoading(activeToastId, `AI Optimizing scenario ${i + 1} of ${selectedMcqIds.length}...`);
 
         try {
           const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
@@ -245,24 +243,20 @@ const ManageMcqsPage = () => {
         }
       }
 
-      // Final cleanup of loading toast
-      dismissToast(activeToastId);
-      
       if (errorCount > 0) {
-        showError(`Optimization complete. Successfully updated ${successCount} items. ${errorCount} failed.`);
+        updateLoading(activeToastId, `Optimization complete. Successfully updated ${successCount} items. ${errorCount} failed.`, 'error');
       } else {
-        showSuccess(`Successfully optimized all ${successCount} scenarios with clinical AI insights.`);
+        updateLoading(activeToastId, `Successfully optimized all ${successCount} scenarios with clinical AI insights.`, 'success');
       }
 
       setRowSelection({});
-      // Small delay to let DB settle before re-fetch
       setTimeout(() => fetchMcqs(), 500);
-      fetchCategories(); // Update counts in sidebar/filter
+      fetchCategories(); 
     } catch (error: any) {
-      dismissToast(activeToastId);
-      showError(`Enhancement Interrupted: ${error.message}`);
+      updateLoading(activeToastId, `Enhancement Interrupted: ${error.message}`, 'error');
     } finally {
       setIsEnhancing(false);
+      setTimeout(() => dismissToast(activeToastId), 5000);
     }
   };
 

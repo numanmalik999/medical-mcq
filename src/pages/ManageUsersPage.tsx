@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User as UserIcon, MoreHorizontal } from 'lucide-react';
+import { User as UserIcon, MoreHorizontal, Phone, MessageSquare, ShieldCheck, Clock } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +22,7 @@ import EditUserDialog from '@/components/EditUserDialog';
 import AddUserDialog from '@/components/AddUserDialog'; 
 import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/SessionContextProvider';
-import { parseISO, differenceInHours } from 'date-fns'; 
+import { parseISO, differenceInHours, formatDistanceToNow } from 'date-fns'; 
 import { dismissToast } from '@/utils/toast'; 
 
 interface UserProfile {
@@ -32,6 +32,7 @@ interface UserProfile {
   avatar_url: string | null;
   email: string | null;
   created_at: string;
+  last_sign_in_at: string | null;
   is_admin: boolean;
   phone_number: string | null;
   whatsapp_number: string | null;
@@ -96,6 +97,7 @@ const ManageUsersPage = () => {
         id: authUser.id,
         email: authUser.email || null,
         created_at: authUser.created_at,
+        last_sign_in_at: authUser.last_sign_in_at || null,
         first_name: profile?.first_name || null,
         last_name: profile?.last_name || null,
         avatar_url: profile?.avatar_url || null,
@@ -136,29 +138,56 @@ const ManageUsersPage = () => {
 
   const columns: ColumnDef<UserProfile>[] = [
     {
-      accessorKey: 'avatar_url',
-      header: 'Avatar',
-      cell: ({ row }) => (
-        <Avatar>
-          <AvatarImage src={row.original.avatar_url || undefined} alt={`${row.original.first_name} ${row.original.last_name}`} />
-          <AvatarFallback><UserIcon className="h-5 w-5" /></AvatarFallback>
-        </Avatar>
-      ),
+      id: "identity",
+      header: "Professional Identity",
+      cell: ({ row }) => {
+        const u = row.original;
+        const fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Anonymous User';
+        return (
+          <div className="flex items-center gap-3">
+            <Avatar className="h-9 w-9 shrink-0">
+              <AvatarImage src={u.avatar_url || undefined} alt={fullName} />
+              <AvatarFallback className="bg-primary/5 text-primary">
+                <UserIcon className="h-4 w-4" />
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="text-sm font-black uppercase tracking-tight text-slate-800 truncate">{fullName}</p>
+              <p className="text-[10px] font-medium text-muted-foreground truncate">{u.email}</p>
+              {u.is_admin && <Badge className="h-4 px-1 text-[8px] font-black uppercase bg-red-100 text-red-700 hover:bg-red-100 mt-0.5 border-none">Administrator</Badge>}
+            </div>
+          </div>
+        );
+      }
     },
-    { accessorKey: 'first_name', header: 'First Name', cell: ({ row }) => row.original.first_name || 'N/A' },
-    { accessorKey: 'last_name', header: 'Last Name', cell: ({ row }) => row.original.last_name || 'N/A' },
-    { accessorKey: 'email', header: 'Email', cell: ({ row }) => row.original.email || 'N/A' },
-    { accessorKey: 'created_at', header: 'Joined On', cell: ({ row }) => new Date(row.original.created_at).toLocaleDateString() },
-    { accessorKey: 'is_admin', header: 'Admin', cell: ({ row }) => (row.original.is_admin ? 'Yes' : 'No') },
+    {
+      id: "contact",
+      header: "Verified Contact",
+      cell: ({ row }) => {
+        const u = row.original;
+        return (
+          <div className="space-y-1">
+             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                <Phone className="h-3 w-3 text-muted-foreground" />
+                <span>{u.phone_number || 'No Phone'}</span>
+             </div>
+             <div className="flex items-center gap-2 text-[10px] font-bold text-green-600">
+                <MessageSquare className="h-3 w-3 fill-green-500/10" />
+                <span>{u.whatsapp_number || 'No WhatsApp'}</span>
+             </div>
+          </div>
+        );
+      }
+    },
     {
       accessorKey: 'subscription_end_date',
-      header: 'Subscription',
+      header: 'Subscription Access',
       cell: ({ row }) => {
         const { subscription_end_date } = row.original;
-        if (!subscription_end_date) return <Badge variant="secondary">Inactive</Badge>;
+        if (!subscription_end_date) return <Badge variant="secondary" className="text-[9px] font-black uppercase">Standard</Badge>;
 
         const hoursLeft = differenceInHours(parseISO(subscription_end_date), new Date());
-        if (hoursLeft <= 0) return <Badge variant="secondary">Expired</Badge>;
+        if (hoursLeft <= 0) return <Badge variant="secondary" className="text-[9px] font-black uppercase opacity-50">Expired</Badge>;
         
         const daysLeft = Math.ceil(hoursLeft / 24);
 
@@ -168,13 +197,32 @@ const ManageUsersPage = () => {
 
         return (
           <div className="flex flex-col space-y-1">
-            <Badge variant={variant}>Active</Badge>
-            <span className="text-[10px] text-muted-foreground font-black uppercase">
-              {hoursLeft < 24 ? '< 24h left' : `${daysLeft} days left`}
+            <Badge variant={variant} className="w-fit text-[9px] font-black uppercase">Premium Active</Badge>
+            <span className="text-[9px] text-muted-foreground font-black uppercase tracking-tighter">
+              {hoursLeft < 24 ? '< 24h Left' : `${daysLeft} Days Left`}
             </span>
           </div>
         );
       },
+    },
+    {
+      id: "activity",
+      header: "System Activity",
+      cell: ({ row }) => {
+        const u = row.original;
+        return (
+          <div className="space-y-1">
+             <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground">
+                <ShieldCheck className="h-3 w-3" />
+                <span>Joined {new Date(u.created_at).toLocaleDateString()}</span>
+             </div>
+             <div className="flex items-center gap-2 text-[10px] font-black uppercase text-primary">
+                <Clock className="h-3 w-3" />
+                <span>{u.last_sign_in_at ? `Last Login: ${formatDistanceToNow(new Date(u.last_sign_in_at), { addSuffix: true })}` : 'Never Logged In'}</span>
+             </div>
+          </div>
+        );
+      }
     },
     {
       id: "actions",
@@ -203,14 +251,22 @@ const ManageUsersPage = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Manage Users</h1>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-xl">All Registered Users</CardTitle>
-          <Button onClick={() => setIsAddDialogOpen(true)}>Add New User</Button>
+      <h1 className="text-3xl font-black uppercase italic tracking-tighter">User Management</h1>
+      <Card className="border-none shadow-xl rounded-3xl overflow-hidden">
+        <CardHeader className="bg-muted/30 border-b pb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-xl font-bold">Clinical Practitioners</CardTitle>
+              <CardDescription className="font-medium">Total registered: {users.length}</CardDescription>
+            </div>
+            <Button onClick={() => setIsAddDialogOpen(true)} className="rounded-xl font-bold uppercase tracking-tight h-10 px-6">
+              Register New Practitioner
+            </Button>
+          </div>
         </CardHeader>
-        <CardDescription className="px-6">View, edit, and manage user profiles and subscriptions.</CardDescription>
-        <CardContent><DataTable columns={columns} data={users} /></CardContent>
+        <CardContent className="p-0">
+          <DataTable columns={columns} data={users} pageSize={50} />
+        </CardContent>
       </Card>
       {selectedUserForEdit && (
         <EditUserDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} userProfile={selectedUserForEdit} onSave={fetchUsers} />

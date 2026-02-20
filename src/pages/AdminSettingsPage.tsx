@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, ShieldCheck, AlertTriangle, Loader2, Send, Eye, Sparkles } from 'lucide-react';
+import { MoreHorizontal, ShieldCheck, AlertTriangle, Loader2, Send, Eye, Sparkles, UserCheck } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -160,6 +160,9 @@ const AdminSettingsPage = () => {
   const [tipPreview, setTipPreview] = useState<WeeklyTipPreview | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
+  // Re-engagement States
+  const [isRunningReengagement, setIsRunningReengagement] = useState(false);
+
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedPageForEdit, setSelectedPageForEdit] = useState<StaticPage | null>(null);
 
@@ -269,6 +272,22 @@ const AdminSettingsPage = () => {
       });
     } finally {
       setIsSendingTip(false);
+    }
+  };
+
+  const handleRunReengagement = async () => {
+    setIsRunningReengagement(true);
+    try {
+        const { data, error } = await supabase.functions.invoke('reengagement-emails');
+        if (error) throw error;
+        toast({ 
+            title: "Check Complete", 
+            description: `Identified and notified ${data.sent} inactive users.` 
+        });
+    } catch (error: any) {
+        toast({ title: "Process Failed", description: error.message, variant: "destructive" });
+    } finally {
+        setIsRunningReengagement(false);
     }
   };
 
@@ -419,16 +438,37 @@ const AdminSettingsPage = () => {
             <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                     <Send className="h-5 w-5 text-blue-500" />
-                    <CardTitle className="text-lg">Marketing Automation</CardTitle>
+                    <CardTitle className="text-lg">Weekly Tip Broadcast</CardTitle>
                 </div>
-                <CardDescription>Preview and send the weekly AI study tip email to all users.</CardDescription>
+                <CardDescription>Email all users with high-yield clinical advice.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <p className="text-sm text-muted-foreground">The AI will generate content based on high-yield Gulf medical topics.</p>
+                    <p className="text-sm text-muted-foreground">Triggers AI content generation and mailing list.</p>
                     <Button onClick={handlePreviewWeeklyTip} disabled={isGeneratingPreview || isSendingTip} size="sm">
                         {isGeneratingPreview ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                        Preview Weekly Tip
+                        Preview & Send
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border-l-4 border-l-purple-500">
+            <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                    <UserCheck className="h-5 w-5 text-purple-500" />
+                    <CardTitle className="text-lg">User Re-engagement</CardTitle>
+                </div>
+                <CardDescription>Scan and email users inactive for 30+ days.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <p className="text-sm text-muted-foreground">Sends a professional feature summary to bring users back.</p>
+                    <Button onClick={handleRunReengagement} disabled={isRunningReengagement} size="sm" variant="secondary">
+                        {isRunningReengagement ? <Loader2 className="mr-2 h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+                        Run 30D Check
                     </Button>
                 </div>
             </CardContent>

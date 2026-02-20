@@ -54,7 +54,7 @@ const SignUp = () => {
 
   // Sync WhatsApp with Phone if the toggle is active
   useEffect(() => {
-    if (isWhatsappSame) {
+    if (isWhatsappSame && phoneNumber) {
       setValue('whatsapp_number', phoneNumber, { shouldValidate: true });
     }
   }, [isWhatsappSame, phoneNumber, setValue]);
@@ -164,7 +164,7 @@ const SignUp = () => {
                         <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex gap-1">
                           WhatsApp Number <span className="text-red-500 font-black">*</span>
                         </FormLabel>
-                        <div className="flex items-center gap-2 pb-1 group cursor-pointer" onClick={() => setValue('is_whatsapp_same', !isWhatsappSame)}>
+                        <div className="flex items-center gap-2 pb-1 group">
                            <Checkbox 
                              id="same-phone" 
                              checked={isWhatsappSame} 

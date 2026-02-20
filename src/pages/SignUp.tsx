@@ -15,6 +15,8 @@ import { Loader2, UserPlus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
 
 const DISPOSABLE_DOMAINS = [
   'temp-mail.org', 'tempmail.com', 'guerrillamail.com', '10minutemail.com', 
@@ -106,15 +108,45 @@ const SignUp = () => {
     }
   };
 
+  const redirectToUrl = `${window.location.origin}/redirect`;
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4 pt-16">
       <Card className="w-full max-w-md border-none shadow-2xl rounded-3xl overflow-hidden">
         <CardHeader className="bg-primary text-primary-foreground py-10 text-center">
           <CardTitle className="text-2xl font-black uppercase tracking-tight">Create Account</CardTitle>
-          <CardDescription className="text-primary-foreground/70 font-medium">Join 10,000+ medical professionals.</CardDescription>
+          <CardDescription className="text-primary-foreground/70 font-medium">Start your medical exam preparation today.</CardDescription>
         </CardHeader>
         <CardContent className="p-8">
           <div className="space-y-6">
+            <Auth
+              supabaseClient={supabase}
+              providers={['google']}
+              onlyThirdPartyProviders
+              appearance={{
+                theme: ThemeSupa,
+                variables: {
+                  default: {
+                    colors: {
+                      brand: 'hsl(var(--primary))',
+                      brandAccent: 'hsl(var(--primary-foreground))',
+                    },
+                  },
+                },
+              }}
+              theme="light"
+              redirectTo={redirectToUrl}
+            />
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <Separator className="w-full" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground font-bold">Or continue with email</span>
+              </div>
+            </div>
+
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="full_name" render={({ field }) => (

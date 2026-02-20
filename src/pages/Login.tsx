@@ -7,68 +7,81 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ShieldCheck, Stethoscope } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 const Login = () => {
   const { hasCheckedInitialSession, session, user } = useSession();
   const navigate = useNavigate();
 
-  // Automatic redirect if session is detected
   useEffect(() => {
     if (hasCheckedInitialSession && session && user) {
-      console.log("[Auth] Active session detected, redirecting to dashboard...");
       navigate('/redirect');
     }
   }, [hasCheckedInitialSession, session, user, navigate]);
-
-  // Clear any existing session fragments if the user is on the login page but not fully logged in
-  useEffect(() => {
-    const clearStaleSession = async () => {
-      if (!session && !window.location.hash.includes('access_token')) {
-        await supabase.auth.signOut();
-      }
-    };
-    clearStaleSession();
-  }, [session]);
 
   const redirectToUrl = `${window.location.origin}/redirect`;
 
   if (!hasCheckedInitialSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 pt-16">
-        <p className="text-gray-700">Loading security protocols...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <p className="text-gray-700">Securing your session...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4 pt-16">
-      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
-        <h1 className="text-3xl font-bold text-center text-gray-900 mb-6">Login</h1>
-        <Auth
-          supabaseClient={supabase}
-          providers={['google']}
-          appearance={{
-            theme: ThemeSupa,
-            variables: {
-              default: {
-                colors: {
-                  brand: 'hsl(var(--primary))',
-                  brandAccent: 'hsl(var(--primary-foreground))',
+    <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-md border-none shadow-2xl rounded-3xl overflow-hidden">
+        <CardHeader className="bg-primary text-primary-foreground py-10 text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+             <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-white rounded-full blur-2xl"></div>
+          </div>
+          <div className="bg-white/20 p-3 rounded-2xl w-fit mx-auto mb-4 backdrop-blur-md relative z-10">
+            <Stethoscope className="h-8 w-8 text-white" />
+          </div>
+          <CardTitle className="text-3xl font-black uppercase italic tracking-tighter leading-none mb-2 relative z-10">Welcome Back</CardTitle>
+          <CardDescription className="text-primary-foreground/70 font-medium relative z-10">Log in to your clinical dashboard.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-8">
+          <div className="space-y-6">
+            <Auth
+              supabaseClient={supabase}
+              providers={['google']}
+              appearance={{
+                theme: ThemeSupa,
+                variables: {
+                  default: {
+                    colors: {
+                      brand: 'hsl(var(--primary))',
+                      brandAccent: 'hsl(var(--primary-foreground))',
+                    },
+                  },
                 },
-              },
-            },
-          }}
-          theme="light"
-          view="sign_in"
-          redirectTo={redirectToUrl}
-        />
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          Don't have an account?{" "}
-          <Link to="/signup" className="text-primary hover:underline">
-            Sign Up
-          </Link>
-        </p>
-      </div>
+              }}
+              theme="light"
+              view="sign_in"
+              redirectTo={redirectToUrl}
+            />
+            
+            <div className="flex items-center gap-4 py-2">
+                <Separator className="flex-1" />
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-muted-foreground tracking-widest">
+                  <ShieldCheck className="h-3.5 w-3.5" /> Secure Access
+                </div>
+                <Separator className="flex-1" />
+            </div>
+
+            <p className="text-center text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link to="/signup" className="text-primary font-black uppercase hover:underline">
+                Sign Up
+              </Link>
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

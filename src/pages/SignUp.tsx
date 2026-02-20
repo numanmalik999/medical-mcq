@@ -111,7 +111,7 @@ const SignUp = () => {
   const redirectToUrl = `${window.location.origin}/redirect`;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4 pt-16">
+    <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md border-none shadow-2xl rounded-3xl overflow-hidden">
         <CardHeader className="bg-primary text-primary-foreground py-10 text-center">
           <CardTitle className="text-2xl font-black uppercase tracking-tight">Create Account</CardTitle>

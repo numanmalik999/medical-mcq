@@ -11,7 +11,7 @@ import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Wand2, Loader2, Sparkles, CircleDashed, LayoutList, Search, Filter } from 'lucide-react'; 
+import { Wand2, Loader2, Sparkles, CircleDashed, LayoutList, Search, Filter, CheckCircle } from 'lucide-react'; 
 import { useSession } from '@/components/SessionContextProvider'; 
 import { RowSelectionState } from '@tanstack/react-table';
 import LoadingBar from '@/components/LoadingBar';
@@ -47,7 +47,7 @@ const ManageMcqsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const { hasCheckedInitialSession } = useSession();
 
@@ -205,7 +205,7 @@ const ManageMcqsPage = () => {
   };
 
   const handleSingleEnhance = async (mcqId: string) => {
-    setIsEnhancing(true);
+    setIsProcessing(true);
     const activeToastId = showLoading(`Optimizing clinical scenario with AI...`);
 
     try {
@@ -223,7 +223,54 @@ const ManageMcqsPage = () => {
     } catch (error: any) {
       updateLoading(activeToastId, `Error: ${error.message}`, 'error');
     } finally {
-      setIsEnhancing(false);
+      setIsProcessing(false);
+      setTimeout(() => dismissToast(activeToastId), 3000);
+    }
+  };
+
+  const handleMarkAsEnhanced = async (mcqId: string) => {
+    setIsProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('mcqs')
+        .update({ difficulty: 'Medium' })
+        .eq('id', mcqId);
+
+      if (error) throw error;
+      toast({ title: "Updated", description: "Question marked as enhanced." });
+      fetchMcqs();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBulkMarkAsEnhanced = async () => {
+    const selectedIndices = Object.keys(rowSelection);
+    const selectedMcqIds = selectedIndices.map(index => filteredMcqs[parseInt(index)].id);
+
+    if (selectedMcqIds.length === 0) return;
+    if (!window.confirm(`Mark ${selectedMcqIds.length} questions as enhanced?`)) return;
+
+    setIsProcessing(true);
+    const activeToastId = showLoading(`Updating ${selectedMcqIds.length} questions...`);
+
+    try {
+      const { error } = await supabase
+        .from('mcqs')
+        .update({ difficulty: 'Medium' })
+        .in('id', selectedMcqIds);
+
+      if (error) throw error;
+      
+      updateLoading(activeToastId, `Successfully marked ${selectedMcqIds.length} items as enhanced.`, 'success');
+      setRowSelection({});
+      fetchMcqs();
+    } catch (error: any) {
+      updateLoading(activeToastId, `Failed to update: ${error.message}`, 'error');
+    } finally {
+      setIsProcessing(false);
       setTimeout(() => dismissToast(activeToastId), 3000);
     }
   };
@@ -237,19 +284,18 @@ const ManageMcqsPage = () => {
       return;
     }
 
-    if (!window.confirm(`Optimize \${selectedMcqIds.length} MCQs one-by-one?`)) return;
+    if (!window.confirm(`Optimize ${selectedMcqIds.length} MCQs one-by-one?`)) return;
 
-    setIsEnhancing(true);
+    setIsProcessing(true);
     let successCount = 0;
     let errorCount = 0;
     
-    const activeToastId = showLoading(`Initializing AI optimization for \${selectedMcqIds.length} scenarios...`);
+    const activeToastId = showLoading(`Initializing AI optimization for ${selectedMcqIds.length} scenarios...`);
 
     try {
       for (let i = 0; i < selectedMcqIds.length; i++) {
         const currentId = selectedMcqIds[i];
-        
-        updateLoading(activeToastId, `AI Optimizing scenario \${i + 1} of \${selectedMcqIds.length}...`);
+        updateLoading(activeToastId, `AI Optimizing scenario ${i + 1} of ${selectedMcqIds.length}...`);
 
         try {
           const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
@@ -262,24 +308,24 @@ const ManageMcqsPage = () => {
             successCount++;
           }
         } catch (e) {
-          console.error(`Error enhancing MCQ \${currentId}:`, e);
+          console.error(`Error enhancing MCQ ${currentId}:`, e);
           errorCount++;
         }
       }
 
       if (errorCount > 0) {
-        updateLoading(activeToastId, `Optimization complete. Successfully updated \${successCount} items. \${errorCount} failed.`, 'error');
+        updateLoading(activeToastId, `Optimization complete. Successfully updated ${successCount} items. ${errorCount} failed.`, 'error');
       } else {
-        updateLoading(activeToastId, `Successfully optimized all \${successCount} scenarios with clinical AI insights.`, 'success');
+        updateLoading(activeToastId, `Successfully optimized all ${successCount} scenarios with clinical AI insights.`, 'success');
       }
 
       setRowSelection({});
       setTimeout(() => fetchMcqs(), 500);
       fetchCategories(); 
     } catch (error: any) {
-      updateLoading(activeToastId, `Enhancement Interrupted: \${error.message}`, 'error');
+      updateLoading(activeToastId, `Enhancement Interrupted: ${error.message}`, 'error');
     } finally {
-      setIsEnhancing(false);
+      setIsProcessing(false);
       setTimeout(() => dismissToast(activeToastId), 5000);
     }
   };
@@ -292,8 +338,9 @@ const ManageMcqsPage = () => {
   const columns = useMemo(() => createMcqColumns({ 
     onDelete: handleDeleteMcq, 
     onEdit: handleEditClick,
-    onEnhance: handleSingleEnhance 
-  }), [categories, rawMcqs]); // Re-create columns when data changes
+    onEnhance: handleSingleEnhance,
+    onMarkEnhanced: handleMarkAsEnhanced
+  }), [categories, rawMcqs]);
 
   if (!hasCheckedInitialSession || isPageLoading) return <LoadingBar />;
 
@@ -402,10 +449,15 @@ const ManageMcqsPage = () => {
                         </CardTitle>
                         <CardDescription>Filtering specialty: {categories.find(c => c.id === selectedFilterCategory)?.name || 'Custom selection'}</CardDescription>
                     </div>
-                    <Button onClick={handleBulkEnhance} disabled={isEnhancing || numSelected === 0} className="rounded-xl font-bold">
-                        {isEnhancing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                        Bulk Enhance Selected ({numSelected})
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleBulkMarkAsEnhanced} disabled={isProcessing || numSelected === 0} className="rounded-xl font-bold border-green-600 text-green-700 hover:bg-green-50">
+                            <CheckCircle className="mr-2 h-4 w-4" /> Mark Selected Enhanced ({numSelected})
+                        </Button>
+                        <Button onClick={handleBulkEnhance} disabled={isProcessing || numSelected === 0} className="rounded-xl font-bold">
+                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                            Bulk AI Optimize ({numSelected})
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent className="pt-6">
                     <DataTable 

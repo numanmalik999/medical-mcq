@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Wand2, Sparkles } from "lucide-react";
+import { MoreHorizontal, Wand2, Sparkles, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -48,9 +48,10 @@ interface MCQColumnsProps {
   onDelete: (mcqId: string, explanationId: string | null) => void;
   onEdit: (mcq: MCQ) => void;
   onEnhance: (mcqId: string) => void;
+  onMarkEnhanced: (mcqId: string) => void;
 }
 
-export const createMcqColumns = ({ onDelete, onEdit, onEnhance }: MCQColumnsProps): ColumnDef<DisplayMCQ>[] => [
+export const createMcqColumns = ({ onDelete, onEdit, onEnhance, onMarkEnhanced }: MCQColumnsProps): ColumnDef<DisplayMCQ>[] => [
   {
     id: "select",
     header: ({ table }) => (
@@ -165,6 +166,13 @@ export const createMcqColumns = ({ onDelete, onEdit, onEnhance }: MCQColumnsProp
             >
               <Sparkles className="h-4 w-4 mr-2" />
               Enhance with AI
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => onMarkEnhanced(mcq.id)}
+              className="text-green-600 font-bold"
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Mark as Enhanced
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => onDelete(mcq.id, mcq.explanation_id)}

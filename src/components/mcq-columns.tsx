@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Wand2 } from "lucide-react";
+import { MoreHorizontal, Wand2, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -47,9 +47,10 @@ type DisplayMCQ = MCQ;
 interface MCQColumnsProps {
   onDelete: (mcqId: string, explanationId: string | null) => void;
   onEdit: (mcq: MCQ) => void;
+  onEnhance: (mcqId: string) => void;
 }
 
-export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnDef<DisplayMCQ>[] => [
+export const createMcqColumns = ({ onDelete, onEdit, onEnhance }: MCQColumnsProps): ColumnDef<DisplayMCQ>[] => [
   {
     id: "select",
     header: ({ table }) => (
@@ -157,6 +158,13 @@ export const createMcqColumns = ({ onDelete, onEdit }: MCQColumnsProps): ColumnD
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onEdit(mcq)}>
               Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => onEnhance(mcq.id)}
+              className="text-blue-600 font-bold"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Enhance with AI
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => onDelete(mcq.id, mcq.explanation_id)}

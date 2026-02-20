@@ -204,6 +204,30 @@ const ManageMcqsPage = () => {
     }
   };
 
+  const handleSingleEnhance = async (mcqId: string) => {
+    setIsEnhancing(true);
+    const activeToastId = showLoading(`Optimizing clinical scenario with AI...`);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
+        body: { mcq_ids: [mcqId] },
+      });
+
+      if (error || data?.errorCount > 0) {
+        updateLoading(activeToastId, `Clinical optimization failed for this question.`, 'error');
+      } else {
+        updateLoading(activeToastId, `Question successfully enhanced with clinical pearls.`, 'success');
+        fetchMcqs();
+        fetchCategories();
+      }
+    } catch (error: any) {
+      updateLoading(activeToastId, `Error: ${error.message}`, 'error');
+    } finally {
+      setIsEnhancing(false);
+      setTimeout(() => dismissToast(activeToastId), 3000);
+    }
+  };
+
   const handleBulkEnhance = async () => {
     const selectedIndices = Object.keys(rowSelection);
     const selectedMcqIds = selectedIndices.map(index => filteredMcqs[parseInt(index)].id);
@@ -213,19 +237,19 @@ const ManageMcqsPage = () => {
       return;
     }
 
-    if (!window.confirm(`Optimize ${selectedMcqIds.length} MCQs one-by-one?`)) return;
+    if (!window.confirm(`Optimize \${selectedMcqIds.length} MCQs one-by-one?`)) return;
 
     setIsEnhancing(true);
     let successCount = 0;
     let errorCount = 0;
     
-    const activeToastId = showLoading(`Initializing AI optimization for ${selectedMcqIds.length} scenarios...`);
+    const activeToastId = showLoading(`Initializing AI optimization for \${selectedMcqIds.length} scenarios...`);
 
     try {
       for (let i = 0; i < selectedMcqIds.length; i++) {
         const currentId = selectedMcqIds[i];
         
-        updateLoading(activeToastId, `AI Optimizing scenario ${i + 1} of ${selectedMcqIds.length}...`);
+        updateLoading(activeToastId, `AI Optimizing scenario \${i + 1} of \${selectedMcqIds.length}...`);
 
         try {
           const { data, error } = await supabase.functions.invoke('bulk-enhance-mcqs', {
@@ -238,22 +262,22 @@ const ManageMcqsPage = () => {
             successCount++;
           }
         } catch (e) {
-          console.error(`Error enhancing MCQ ${currentId}:`, e);
+          console.error(`Error enhancing MCQ \${currentId}:`, e);
           errorCount++;
         }
       }
 
       if (errorCount > 0) {
-        updateLoading(activeToastId, `Optimization complete. Successfully updated ${successCount} items. ${errorCount} failed.`, 'error');
+        updateLoading(activeToastId, `Optimization complete. Successfully updated \${successCount} items. \${errorCount} failed.`, 'error');
       } else {
-        updateLoading(activeToastId, `Successfully optimized all ${successCount} scenarios with clinical AI insights.`, 'success');
+        updateLoading(activeToastId, `Successfully optimized all \${successCount} scenarios with clinical AI insights.`, 'success');
       }
 
       setRowSelection({});
       setTimeout(() => fetchMcqs(), 500);
       fetchCategories(); 
     } catch (error: any) {
-      updateLoading(activeToastId, `Enhancement Interrupted: ${error.message}`, 'error');
+      updateLoading(activeToastId, `Enhancement Interrupted: \${error.message}`, 'error');
     } finally {
       setIsEnhancing(false);
       setTimeout(() => dismissToast(activeToastId), 5000);
@@ -265,7 +289,11 @@ const ManageMcqsPage = () => {
     setIsEditDialogOpen(true);
   };
 
-  const columns = useMemo(() => createMcqColumns({ onDelete: handleDeleteMcq, onEdit: handleEditClick }), []);
+  const columns = useMemo(() => createMcqColumns({ 
+    onDelete: handleDeleteMcq, 
+    onEdit: handleEditClick,
+    onEnhance: handleSingleEnhance 
+  }), [categories, rawMcqs]); // Re-create columns when data changes
 
   if (!hasCheckedInitialSession || isPageLoading) return <LoadingBar />;
 

@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/components/SessionContextProvider';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RefreshCcw } from 'lucide-react';
 import { differenceInDays, parseISO } from 'date-fns';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 
@@ -41,6 +41,7 @@ const UserSubscriptionsPage = () => {
   
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
   const [userActiveSubscription, setUserActiveSubscription] = useState<UserSubscription | null>(null);
+  const [latestSubscription, setLatestSubscription] = useState<UserSubscription | null>(null);
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const [isFetchingData, setIsFetchingData] = useState(true);
 
@@ -70,6 +71,8 @@ const UserSubscriptionsPage = () => {
         console.error('Error fetching user subscriptions:', userSubError);
         toast({ title: "Error", description: "Failed to load your subscription status.", variant: "destructive" });
       } else if (userSubsData && userSubsData.length > 0) {
+        setLatestSubscription(userSubsData[0]); // Keep track of the most recent record
+        
         const activeSub = userSubsData.find(sub => sub.status === 'active');
         if (activeSub) {
           setUserActiveSubscription(activeSub);
@@ -83,6 +86,7 @@ const UserSubscriptionsPage = () => {
         }
       } else {
         setUserActiveSubscription(null);
+        setLatestSubscription(null);
         setDaysRemaining(null);
       }
     }
@@ -159,6 +163,11 @@ const UserSubscriptionsPage = () => {
               <span className="text-sm text-muted-foreground ml-2">
                 ({daysRemaining} day{daysRemaining === 1 ? '' : 's'} remaining)
               </span>
+            </div>
+          ) : latestSubscription?.status === 'refunded' ? (
+            <div className="flex items-center gap-2 text-orange-600 font-semibold">
+              <RefreshCcw className="h-5 w-5" />
+              <span>Your last subscription was refunded and cancelled.</span>
             </div>
           ) : (
             <div className="flex items-center gap-2 text-red-600 font-semibold">

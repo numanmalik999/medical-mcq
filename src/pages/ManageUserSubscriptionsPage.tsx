@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
@@ -45,7 +45,6 @@ const ManageUserSubscriptionsPage = () => {
   const { toast } = useToast();
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -106,7 +105,6 @@ const ManageUserSubscriptionsPage = () => {
         return;
     }
 
-    setIsProcessing(true);
     try {
         const { data, error } = await supabase.functions.invoke('admin-refund-subscription', {
             body: { subscription_id: sub.id }
@@ -121,8 +119,6 @@ const ManageUserSubscriptionsPage = () => {
         fetchSubscriptions();
     } catch (e: any) {
         toast({ title: "Refund Failed", description: e.message, variant: "destructive" });
-    } finally {
-        setIsProcessing(false);
     }
   };
 

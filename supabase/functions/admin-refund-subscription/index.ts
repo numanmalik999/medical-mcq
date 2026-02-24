@@ -40,10 +40,10 @@ serve(async (req: Request) => {
     const { subscription_id } = await req.json();
     if (!subscription_id) throw new Error("Subscription ID required.");
 
-    // 1. Fetch Subscription Details
+    // 1. Fetch Subscription Details including email
     const { data: sub, error: fetchError } = await supabaseAdmin
       .from('user_subscriptions')
-      .select('*, profiles(first_name, email)')
+      .select('*, profiles(first_name, email), subscription_tiers(name)')
       .eq('id', subscription_id)
       .single();
 
@@ -84,7 +84,6 @@ serve(async (req: Request) => {
       } catch (stripeError: any) {
         console.error("Stripe Error:", stripeError);
         stripeMessage = `Stripe Partial Error: ${stripeError.message}`;
-        // We continue to revoke access locally even if Stripe fails (e.g. already cancelled)
       }
     }
 
@@ -99,14 +98,51 @@ serve(async (req: Request) => {
       .update({ has_active_subscription: false })
       .eq('id', sub.user_id);
 
-    // 4. Log Action
+    // 4. Send Email Notification
+    // Get email from profile join, fallback to auth admin get user if needed, but profile should have it via sync
+    let userEmail = sub.profiles?.email;
+    
+    // Fallback if profile email is missing (legacy data)
+    if (!userEmail) {
+        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(sub.user_id);
+        userEmail = authUser?.user?.email;
+    }
+
+    if (userEmail) {
+        const userName = sub.profiles?.first_name || 'Doctor';
+        const planName = sub.subscription_tiers?.name || 'Subscription';
+        const appUrl = Deno.env.get('APP_BASE_URL') || 'https://www.studyprometric.com';
+
+        await supabaseAdmin.functions.invoke('send-email', {
+            body: {
+                to: userEmail,
+                subject: 'Subscription Refund Processed',
+                body: `
+                    <div style="font-family: sans-serif; color: #333;">
+                        <h2>Refund Confirmation</h2>
+                        <p>Hi ${userName},</p>
+                        <p>As requested, we have processed a refund for your <strong>${planName}</strong> subscription.</p>
+                        <p>The funds should appear in your account within 5-10 business days, depending on your bank's processing time.</p>
+                        <p>Your premium access has been cancelled immediately. You can still access your profile and free content.</p>
+                        <p>If you decide to return, we'd love to help you with your exam preparation again!</p>
+                        <br/>
+                        <a href="${appUrl}/subscription" style="color: #1e3a8a; text-decoration: none; font-weight: bold;">View Available Plans</a>
+                        <br/><br/>
+                        <p>Best regards,<br/>The Study Prometric Team</p>
+                    </div>
+                `
+            }
+        });
+    }
+
+    // 5. Log Action
     await supabaseAdmin.from('user_email_logs').insert({
         user_id: sub.user_id,
         email_type: `admin_refund_${subscription_id}`
     });
 
     return new Response(JSON.stringify({ 
-      message: "Refund processed successfully.", 
+      message: "Refund processed and user notified.", 
       details: stripeMessage 
     }), {
       status: 200,
@@ -114,6 +150,7 @@ serve(async (req: Request) => {
     });
 
   } catch (error: any) {
+    console.error("Refund Edge Function Error:", error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
   }
 });

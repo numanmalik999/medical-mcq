@@ -26,6 +26,7 @@ const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
 const ManageMcqsPage = lazy(() => import("./pages/ManageMcqsPage"));
 const ManageCategoriesPage = lazy(() => import("./pages/ManageCategoriesPage"));
 const ManageSubscriptionsPage = lazy(() => import("./pages/ManageSubscriptionsPage"));
+const ManageUserSubscriptionsPage = lazy(() => import("./pages/ManageUserSubscriptionsPage")); // New Page
 const ManageUsersPage = lazy(() => import("./pages/ManageUsersPage"));
 const UserSubscriptionsPage = lazy(() => import("./pages/UserSubscriptionsPage"));
 const BulkUploadMcqsPage = lazy(() => import("./pages/BulkUploadMcqsPage"));
@@ -134,6 +135,7 @@ const AppContent = () => {
               <Route path="manage-videos" element={<ManageVideosPage />} />
               <Route path="manage-flashcards" element={<ManageFlashcardsPage />} />
               <Route path="manage-subscriptions" element={<ManageSubscriptionsPage />} />
+              <Route path="manage-user-subscriptions" element={<ManageUserSubscriptionsPage />} />
               <Route path="manage-users" element={<ManageUsersPage />} />
               <Route path="manage-feedback" element={<ManageMcqFeedbackPage />} />
               <Route path="manage-suggestions" element={<ManageSuggestionsPage />} />

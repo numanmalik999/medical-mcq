@@ -31,14 +31,14 @@ interface UserSubscription {
   profiles: {
     first_name: string | null;
     last_name: string | null;
-    email?: string | null; // Added optional email property
+    email?: string | null;
   } | null;
   subscription_tiers: {
     name: string;
     price: number;
     currency: string;
   } | null;
-  user_email?: string | null; // Top level for easier access
+  user_email?: string | null;
 }
 
 const ManageUserSubscriptionsPage = () => {
@@ -52,12 +52,11 @@ const ManageUserSubscriptionsPage = () => {
   const fetchSubscriptions = async () => {
     setIsPageLoading(true);
     
-    // 1. Fetch Subscriptions (Removed email from profiles selection)
+    // 1. Fetch Subscriptions WITHOUT joining profiles (avoids 400 error if FK is missing)
     let query = supabase
       .from('user_subscriptions')
       .select(`
         *,
-        profiles (first_name, last_name),
         subscription_tiers (name, price, currency)
       `)
       .order('created_at', { ascending: false });
@@ -77,10 +76,10 @@ const ManageUserSubscriptionsPage = () => {
     
     let subsData = data as unknown as UserSubscription[];
 
-    // 2. Extract User IDs to fetch emails
+    // 2. Extract User IDs to fetch details (Name + Email)
     const userIds = Array.from(new Set(subsData.map(s => s.user_id)));
 
-    // 3. Fetch Emails via Edge Function
+    // 3. Fetch User Details via Edge Function
     if (userIds.length > 0) {
         try {
             const { data: profilesWithEmail, error: profilesError } = await supabase.functions.invoke('get-public-profiles', {
@@ -88,21 +87,27 @@ const ManageUserSubscriptionsPage = () => {
             });
 
             if (!profilesError && profilesWithEmail) {
-                const emailMap = new Map<string, string>(profilesWithEmail.map((p: any) => [p.id, p.email]));
+                // Map for quick lookup
+                const userMap = new Map<string, { first_name: string, last_name: string, email: string }>(
+                    profilesWithEmail.map((p: any) => [p.id, p])
+                );
                 
-                // Merge emails into subscription data
-                subsData = subsData.map(sub => ({
-                    ...sub,
-                    user_email: emailMap.get(sub.user_id) || null,
-                    profiles: {
-                        first_name: sub.profiles?.first_name || null,
-                        last_name: sub.profiles?.last_name || null,
-                        email: emailMap.get(sub.user_id) || null
-                    }
-                }));
+                // Hydrate subscription data
+                subsData = subsData.map(sub => {
+                    const userDetails = userMap.get(sub.user_id);
+                    return {
+                        ...sub,
+                        user_email: userDetails?.email || null,
+                        profiles: {
+                            first_name: userDetails?.first_name || null,
+                            last_name: userDetails?.last_name || null,
+                            email: userDetails?.email || null
+                        }
+                    };
+                });
             }
         } catch (e) {
-            console.error("Error fetching emails:", e);
+            console.error("Error fetching user details:", e);
         }
     }
 
@@ -161,11 +166,10 @@ const ManageUserSubscriptionsPage = () => {
       header: "User",
       cell: ({ row }) => {
         const p = row.original.profiles;
-        const email = row.original.user_email;
         return (
           <div>
-            <p className="font-bold text-sm">{p?.first_name} {p?.last_name}</p>
-            <p className="text-xs text-muted-foreground">{email || "Email Hidden"}</p>
+            <p className="font-bold text-sm">{p?.first_name || 'Unknown'} {p?.last_name || ''}</p>
+            <p className="text-xs text-muted-foreground">{p?.email || "Email Hidden"}</p>
           </div>
         );
       }

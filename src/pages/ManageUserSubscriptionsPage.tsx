@@ -31,13 +31,14 @@ interface UserSubscription {
   profiles: {
     first_name: string | null;
     last_name: string | null;
-    email: string | null;
+    email?: string | null; // Added optional email property
   } | null;
   subscription_tiers: {
     name: string;
     price: number;
     currency: string;
   } | null;
+  user_email?: string | null; // Top level for easier access
 }
 
 const ManageUserSubscriptionsPage = () => {
@@ -50,11 +51,13 @@ const ManageUserSubscriptionsPage = () => {
 
   const fetchSubscriptions = async () => {
     setIsPageLoading(true);
+    
+    // 1. Fetch Subscriptions (Removed email from profiles selection)
     let query = supabase
       .from('user_subscriptions')
       .select(`
         *,
-        profiles (first_name, last_name, email),
+        profiles (first_name, last_name),
         subscription_tiers (name, price, currency)
       `)
       .order('created_at', { ascending: false });
@@ -66,31 +69,61 @@ const ManageUserSubscriptionsPage = () => {
     const { data, error } = await query;
 
     if (error) {
+      console.error("Fetch error:", error);
       toast({ title: "Error", description: "Failed to load subscriptions.", variant: "destructive" });
-    } else {
-      // Client-side search filtering because deep relation filtering is complex in Supabase JS
-      let filtered = (data as any[]).map(sub => {
-         // Manually fetch email if not in profile (older users)
-         return sub;
-      });
+      setIsPageLoading(false);
+      return;
+    } 
+    
+    let subsData = data as unknown as UserSubscription[];
 
-      if (searchTerm) {
-        const lowerTerm = searchTerm.toLowerCase();
-        filtered = filtered.filter(sub => 
-            sub.profiles?.email?.toLowerCase().includes(lowerTerm) || 
-            sub.profiles?.first_name?.toLowerCase().includes(lowerTerm) ||
-            sub.profiles?.last_name?.toLowerCase().includes(lowerTerm) ||
-            sub.stripe_subscription_id?.toLowerCase().includes(lowerTerm)
-        );
-      }
-      setSubscriptions(filtered);
+    // 2. Extract User IDs to fetch emails
+    const userIds = Array.from(new Set(subsData.map(s => s.user_id)));
+
+    // 3. Fetch Emails via Edge Function
+    if (userIds.length > 0) {
+        try {
+            const { data: profilesWithEmail, error: profilesError } = await supabase.functions.invoke('get-public-profiles', {
+                body: { user_ids: userIds }
+            });
+
+            if (!profilesError && profilesWithEmail) {
+                const emailMap = new Map<string, string>(profilesWithEmail.map((p: any) => [p.id, p.email]));
+                
+                // Merge emails into subscription data
+                subsData = subsData.map(sub => ({
+                    ...sub,
+                    user_email: emailMap.get(sub.user_id) || null,
+                    profiles: {
+                        first_name: sub.profiles?.first_name || null,
+                        last_name: sub.profiles?.last_name || null,
+                        email: emailMap.get(sub.user_id) || null
+                    }
+                }));
+            }
+        } catch (e) {
+            console.error("Error fetching emails:", e);
+        }
     }
+
+    // 4. Client-side Search Filtering
+    if (searchTerm) {
+      const lowerTerm = searchTerm.toLowerCase();
+      subsData = subsData.filter(sub => 
+          sub.user_email?.toLowerCase().includes(lowerTerm) || 
+          sub.profiles?.first_name?.toLowerCase().includes(lowerTerm) ||
+          sub.profiles?.last_name?.toLowerCase().includes(lowerTerm) ||
+          sub.stripe_subscription_id?.toLowerCase().includes(lowerTerm)
+      );
+    }
+    
+    setSubscriptions(subsData);
     setIsPageLoading(false);
   };
 
   useEffect(() => {
     if (hasCheckedInitialSession) fetchSubscriptions();
-  }, [hasCheckedInitialSession, statusFilter]); // Refetch on status filter change
+  }, [hasCheckedInitialSession, statusFilter]);
 
   // Debounced search effect
   useEffect(() => {
@@ -101,7 +134,7 @@ const ManageUserSubscriptionsPage = () => {
   }, [searchTerm]);
 
   const handleRefund = async (sub: UserSubscription) => {
-    if (!window.confirm(`⚠️ REFUND WARNING ⚠️\n\nThis will:\n1. Immediately refund the last payment in Stripe.\n2. Cancel the Stripe subscription.\n3. Revoke user access immediately.\n\nAre you sure you want to refund ${sub.profiles?.email}?`)) {
+    if (!window.confirm(`⚠️ REFUND WARNING ⚠️\n\nThis will:\n1. Immediately refund the last payment in Stripe.\n2. Cancel the Stripe subscription.\n3. Revoke user access immediately.\n\nAre you sure you want to refund ${sub.user_email}?`)) {
         return;
     }
 
@@ -128,10 +161,11 @@ const ManageUserSubscriptionsPage = () => {
       header: "User",
       cell: ({ row }) => {
         const p = row.original.profiles;
+        const email = row.original.user_email;
         return (
           <div>
             <p className="font-bold text-sm">{p?.first_name} {p?.last_name}</p>
-            <p className="text-xs text-muted-foreground">{p?.email || "Email Hidden"}</p>
+            <p className="text-xs text-muted-foreground">{email || "Email Hidden"}</p>
           </div>
         );
       }

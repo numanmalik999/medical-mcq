@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, AlertTriangle, Loader2, RefreshCcw, Search, Filter } from 'lucide-react';
+import { MoreHorizontal, ShieldAlert, Loader2, RefreshCcw, Search, Filter } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,7 +52,6 @@ const ManageUserSubscriptionsPage = () => {
   const fetchSubscriptions = async () => {
     setIsPageLoading(true);
     
-    // 1. Fetch Subscriptions WITHOUT joining profiles (avoids 400 error if FK is missing)
     let query = supabase
       .from('user_subscriptions')
       .select(`
@@ -75,11 +74,8 @@ const ManageUserSubscriptionsPage = () => {
     } 
     
     let subsData = data as unknown as UserSubscription[];
-
-    // 2. Extract User IDs to fetch details (Name + Email)
     const userIds = Array.from(new Set(subsData.map(s => s.user_id)));
 
-    // 3. Fetch User Details via Edge Function
     if (userIds.length > 0) {
         try {
             const { data: profilesWithEmail, error: profilesError } = await supabase.functions.invoke('get-public-profiles', {
@@ -87,12 +83,10 @@ const ManageUserSubscriptionsPage = () => {
             });
 
             if (!profilesError && profilesWithEmail) {
-                // Map for quick lookup
                 const userMap = new Map<string, { first_name: string, last_name: string, email: string }>(
                     profilesWithEmail.map((p: any) => [p.id, p])
                 );
                 
-                // Hydrate subscription data
                 subsData = subsData.map(sub => {
                     const userDetails = userMap.get(sub.user_id);
                     return {
@@ -111,7 +105,6 @@ const ManageUserSubscriptionsPage = () => {
         }
     }
 
-    // 4. Client-side Search Filtering
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       subsData = subsData.filter(sub => 
@@ -130,7 +123,6 @@ const ManageUserSubscriptionsPage = () => {
     if (hasCheckedInitialSession) fetchSubscriptions();
   }, [hasCheckedInitialSession, statusFilter]);
 
-  // Debounced search effect
   useEffect(() => {
     const timer = setTimeout(() => {
         if (hasCheckedInitialSession) fetchSubscriptions();
@@ -138,25 +130,25 @@ const ManageUserSubscriptionsPage = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const handleRefund = async (sub: UserSubscription) => {
-    if (!window.confirm(`⚠️ REFUND WARNING ⚠️\n\nThis will:\n1. Immediately refund the last payment in Stripe.\n2. Cancel the Stripe subscription.\n3. Revoke user access immediately.\n\nAre you sure you want to refund ${sub.user_email}?`)) {
+  const handleRevoke = async (sub: UserSubscription) => {
+    if (!window.confirm(`⚠️ REVOKE ACCESS ⚠️\n\nThis will immediately disable premium access for \${sub.user_email} in the application. It will NOT trigger a refund in Stripe.\n\nContinue?`)) {
         return;
     }
 
     try {
-        const { data, error } = await supabase.functions.invoke('admin-refund-subscription', {
+        const { error } = await supabase.functions.invoke('admin-revoke-subscription', {
             body: { subscription_id: sub.id }
         });
 
-        if (error || data?.error) throw new Error(error?.message || data?.error);
+        if (error) throw error;
 
         toast({ 
-            title: "Refund Processed", 
-            description: data.details || "Subscription cancelled and refunded."
+            title: "Access Revoked", 
+            description: "User access has been updated in the database."
         });
         fetchSubscriptions();
     } catch (e: any) {
-        toast({ title: "Refund Failed", description: e.message, variant: "destructive" });
+        toast({ title: "Operation Failed", description: e.message, variant: "destructive" });
     }
   };
 
@@ -183,7 +175,7 @@ const ManageUserSubscriptionsPage = () => {
           <div>
             <Badge variant="outline" className="text-[10px] uppercase font-black">{t?.name || "Unknown Plan"}</Badge>
             <p className="text-xs mt-1 font-mono text-muted-foreground">
-                {t ? `${t.currency} ${t.price}` : 'N/A'}
+                {t ? `\${t.currency} \${t.price}` : 'N/A'}
             </p>
           </div>
         );
@@ -194,7 +186,7 @@ const ManageUserSubscriptionsPage = () => {
         header: "Status",
         cell: ({ row }) => {
             const s = row.original.status;
-            const variant = s === 'active' ? 'default' : s === 'refunded' ? 'destructive' : 'secondary';
+            const variant = s === 'active' ? 'default' : s === 'cancelled' ? 'destructive' : 'secondary';
             return <Badge variant={variant} className="capitalize">{s}</Badge>;
         }
     },
@@ -233,8 +225,8 @@ const ManageUserSubscriptionsPage = () => {
                 Copy Stripe ID
             </DropdownMenuItem>
             {row.original.status === 'active' && (
-                <DropdownMenuItem onClick={() => handleRefund(row.original)} className="text-red-600 font-bold focus:text-red-700">
-                    <AlertTriangle className="mr-2 h-4 w-4" /> Refund & Revoke
+                <DropdownMenuItem onClick={() => handleRevoke(row.original)} className="text-red-600 font-bold focus:text-red-700">
+                    <ShieldAlert className="mr-2 h-4 w-4" /> Revoke Access
                 </DropdownMenuItem>
             )}
           </DropdownMenuContent>
@@ -250,10 +242,10 @@ const ManageUserSubscriptionsPage = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h1 className="text-3xl font-bold tracking-tight">Active Subscriptions</h1>
-            <p className="text-muted-foreground">Monitor revenue, expiry dates, and process refunds.</p>
+            <p className="text-muted-foreground">Monitor revenue and manage user access.</p>
         </div>
         <Button onClick={fetchSubscriptions} variant="outline" size="sm" disabled={isPageLoading}>
-            <RefreshCcw className={`mr-2 h-4 w-4 ${isPageLoading ? 'animate-spin' : ''}`} /> Refresh
+            <RefreshCcw className={`mr-2 h-4 w-4 \${isPageLoading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>
 
@@ -278,7 +270,6 @@ const ManageUserSubscriptionsPage = () => {
                         <SelectContent>
                             <SelectItem value="active">Active Only</SelectItem>
                             <SelectItem value="expired">Expired</SelectItem>
-                            <SelectItem value="refunded">Refunded</SelectItem>
                             <SelectItem value="cancelled">Cancelled</SelectItem>
                             <SelectItem value="all">All Records</SelectItem>
                         </SelectContent>

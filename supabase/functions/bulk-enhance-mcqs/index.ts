@@ -29,7 +29,7 @@ function parseAiJson(text: string) {
     return JSON.parse(cleaned);
   } catch (e: any) {
     console.error("[bulk-enhance-mcqs] JSON Parse Error. Raw text:", text);
-    throw new Error(`Failed to parse AI response as valid JSON: ${e.message}`);
+    throw new Error(`Failed to parse AI response as valid JSON: \${e.message}`);
   }
 }
 
@@ -45,12 +45,12 @@ async function generateEnhancedContent(
     : `The question already has a category. Return null for "suggested_category_name". DO NOT suggest a category.`;
 
   const prompt = `You are an expert medical educator for 'Study Prometric'. Analyze this MCQ:
-  Question: "${question}"
-  Options: A: ${options.A}, B: ${options.B}, C: ${options.C}, D: ${options.D}
+  Question: "\${question}"
+  Options: A: \${options.A}, B: \${options.B}, C: \${options.C}, D: \${options.D}
 
-  Available categories: ${categoryList.join(', ')}
+  Available categories: \${categoryList.join(', ')}
 
-  ${categoryInstruction}
+  \${categoryInstruction}
 
   Generate a structured explanation including:
   - Scenario Analysis
@@ -100,7 +100,7 @@ serve(async (req: Request) => {
 
     for (const mcq of (mcqs || [])) {
       try {
-        // 1. Double check current category status in the database
+        // 1. Check current category status
         const { count: linkCount } = await supabaseAdmin
           .from('mcq_category_links')
           .select('*', { count: 'exact', head: true })
@@ -116,7 +116,7 @@ serve(async (req: Request) => {
           isUncategorized
         );
 
-        // 2. Category Logic: Only apply if we verified the question was uncategorized before the AI call
+        // 2. Category Logic
         if (isUncategorized && aiResponse.suggested_category_name) {
             let categoryId;
             let existingCategory = (categories || []).find((c: any) => c.name.toLowerCase() === aiResponse.suggested_category_name?.toLowerCase());

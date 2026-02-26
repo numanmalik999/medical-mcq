@@ -6,7 +6,7 @@ import { useSession } from '@/components/SessionContextProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Loader2, Users, CreditCard, ArrowRight, Lightbulb } from 'lucide-react';
+import { Loader2, Users, CreditCard, ArrowRight, Lightbulb, Database, Sparkles, AlertTriangle } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
@@ -33,6 +33,12 @@ interface RecentSuggestion {
   user_email: string;
 }
 
+interface SystemStats {
+    totalMcqs: number;
+    enhancedMcqs: number;
+    uncategorizedMcqs: number;
+}
+
 const AdminDashboardPage = () => {
   const { hasCheckedInitialSession } = useSession();
   const [dailyStats, setDailyStats] = useState<{
@@ -45,6 +51,7 @@ const AdminDashboardPage = () => {
   const [recentUsers, setRecentUsers] = useState<User[]>([]);
   const [recentSubscriptions, setRecentSubscriptions] = useState<RecentSubscription[]>([]);
   const [recentSuggestions, setRecentSuggestions] = useState<RecentSuggestion[]>([]);
+  const [systemStats, setSystemStats] = useState<SystemStats>({ totalMcqs: 0, enhancedMcqs: 0, uncategorizedMcqs: 0 });
   const [isLoadingRecentData, setIsLoadingRecentData] = useState(true);
 
   useEffect(() => {
@@ -84,7 +91,7 @@ const AdminDashboardPage = () => {
         }
 
         try {
-          const [usersResponse, subsResponse, suggestionsResponse] = await Promise.all([
+          const [usersResponse, subsResponse, suggestionsResponse, totalRes, enhancedRes, linkedRes] = await Promise.all([
             supabase.functions.invoke('list-recent-users'),
             supabase
               .from('user_subscriptions')
@@ -101,7 +108,10 @@ const AdminDashboardPage = () => {
               .from('user_suggestions')
               .select('id, suggestion_text, user_id, created_at')
               .order('created_at', { ascending: false })
-              .limit(5)
+              .limit(5),
+            supabase.from('mcqs').select('id', { count: 'exact', head: true }),
+            supabase.from('mcqs').select('id', { count: 'exact', head: true }).not('difficulty', 'is', null),
+            supabase.from('mcq_category_links').select('mcq_id')
           ]);
 
           if (usersResponse.error) throw usersResponse.error;
@@ -128,6 +138,13 @@ const AdminDashboardPage = () => {
             setRecentSuggestions(suggestionsWithDetails);
           }
 
+          const uniqueLinked = new Set(linkedRes.data?.map(l => l.mcq_id) || []);
+          setSystemStats({
+              totalMcqs: totalRes.count || 0,
+              enhancedMcqs: enhancedRes.count || 0,
+              uncategorizedMcqs: (totalRes.count || 0) - uniqueLinked.size
+          });
+
         } catch (error: any) {
           console.error("Error fetching recent activity:", error);
         } finally {
@@ -152,15 +169,37 @@ const AdminDashboardPage = () => {
       <h1 className="text-3xl font-bold">Admin Dashboard</h1>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Welcome</CardTitle>
+        <Card className="border-l-4 border-l-primary">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Database className="h-4 w-4" /> System Overview
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Use the sidebar to navigate through content management, user management, and other administrative tasks.
-            </p>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center">
+                <span className="text-sm font-bold">Total MCQs</span>
+                <span className="text-xl font-black">{systemStats.totalMcqs}</span>
+            </div>
+            <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold">AI Enhanced</span>
+                    <Sparkles className="h-3 w-3 text-blue-500" />
+                </div>
+                <span className="text-xl font-black text-blue-600">{systemStats.enhancedMcqs}</span>
+            </div>
+            <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold">Uncategorized</span>
+                    <AlertTriangle className="h-3 w-3 text-orange-500" />
+                </div>
+                <span className="text-xl font-black text-orange-600">{systemStats.uncategorizedMcqs}</span>
+            </div>
           </CardContent>
+          <CardFooter className="pt-2">
+            <Button asChild variant="link" className="p-0 h-auto font-black uppercase text-[10px] tracking-widest">
+                <Link to="/admin/manage-mcqs">View Question Bank <ArrowRight className="ml-1 h-3 w-3" /></Link>
+            </Button>
+          </CardFooter>
         </Card>
 
         <Card>

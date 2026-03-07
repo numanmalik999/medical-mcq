@@ -7,14 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, ShieldAlert, Loader2, RefreshCcw, Search, Filter } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { ShieldAlert, Loader2, RefreshCcw, Search, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -131,7 +124,7 @@ const ManageUserSubscriptionsPage = () => {
   }, [searchTerm]);
 
   const handleRevoke = async (sub: UserSubscription) => {
-    if (!window.confirm(`⚠️ REVOKE ACCESS ⚠️\n\nThis will immediately disable premium access for \${sub.user_email} in the application. It will NOT trigger a refund in Stripe.\n\nContinue?`)) {
+    if (!window.confirm(`⚠️ REVOKE ACCESS ⚠️\n\nThis will immediately disable premium access for ${sub.user_email || 'this user'} in the application.\n\nRemember to manually process the refund in Stripe if required.\n\nContinue?`)) {
         return;
     }
 
@@ -161,7 +154,7 @@ const ManageUserSubscriptionsPage = () => {
         return (
           <div>
             <p className="font-bold text-sm">{p?.first_name || 'Unknown'} {p?.last_name || ''}</p>
-            <p className="text-xs text-muted-foreground">{p?.email || "Email Hidden"}</p>
+            <p className="text-xs text-muted-foreground">{row.original.user_email || "Email Hidden"}</p>
           </div>
         );
       }
@@ -175,7 +168,7 @@ const ManageUserSubscriptionsPage = () => {
           <div>
             <Badge variant="outline" className="text-[10px] uppercase font-black">{t?.name || "Unknown Plan"}</Badge>
             <p className="text-xs mt-1 font-mono text-muted-foreground">
-                {t ? `\${t.currency} \${t.price}` : 'N/A'}
+                {t ? `${t.currency} ${t.price}` : 'N/A'}
             </p>
           </div>
         );
@@ -211,27 +204,22 @@ const ManageUserSubscriptionsPage = () => {
     },
     {
       id: "actions",
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem 
-                onClick={() => navigator.clipboard.writeText(row.original.stripe_subscription_id || '')}
-                disabled={!row.original.stripe_subscription_id}
-            >
-                Copy Stripe ID
-            </DropdownMenuItem>
-            {row.original.status === 'active' && (
-                <DropdownMenuItem onClick={() => handleRevoke(row.original)} className="text-red-600 font-bold focus:text-red-700">
-                    <ShieldAlert className="mr-2 h-4 w-4" /> Revoke Access
-                </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
+      header: "Actions",
+      cell: ({ row }) => {
+        const sub = row.original;
+        if (sub.status !== 'active') return null;
+
+        return (
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={() => handleRevoke(sub)}
+            className="h-8 rounded-lg font-bold uppercase text-[9px] tracking-tight"
+          >
+            <ShieldAlert className="mr-1.5 h-3 w-3" /> Revoke Subscription
+          </Button>
+        );
+      },
     },
   ];
 
@@ -245,7 +233,7 @@ const ManageUserSubscriptionsPage = () => {
             <p className="text-muted-foreground">Monitor revenue and manage user access.</p>
         </div>
         <Button onClick={fetchSubscriptions} variant="outline" size="sm" disabled={isPageLoading}>
-            <RefreshCcw className={`mr-2 h-4 w-4 \${isPageLoading ? 'animate-spin' : ''}`} /> Refresh
+            <RefreshCcw className={`mr-2 h-4 w-4 ${isPageLoading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>
 

@@ -42,11 +42,11 @@ serve(async (req: Request) => {
     }
 
     // 2. Update the subscription status
-    // Using 'inactive' as it's the standard deactivation status in this project
+    // Using 'expired' to strictly comply with the database check constraints
     const { error: updateSubError } = await supabaseAdmin
       .from('user_subscriptions')
       .update({ 
-        status: 'inactive', 
+        status: 'expired', 
         end_date: new Date().toISOString() 
       })
       .eq('id', subscription_id);

@@ -95,7 +95,7 @@ serve(async (req: Request) => {
       if (currentActiveSubId) {
         const { error } = await supabaseAdmin
           .from('user_subscriptions')
-          .update({ status: 'inactive', end_date: new Date().toISOString() })
+          .update({ status: 'expired', end_date: new Date().toISOString() }) // Changed from 'inactive' to 'expired'
           .eq('id', currentActiveSubId);
         if (error) throw error;
       }

@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/SessionContextProvider';
 import { parseISO, differenceInHours, formatDistanceToNow, isPast } from 'date-fns'; 
 import { dismissToast } from '@/utils/toast'; 
+import { cn } from "@/lib/utils";
 
 interface UserProfile {
   id: string;

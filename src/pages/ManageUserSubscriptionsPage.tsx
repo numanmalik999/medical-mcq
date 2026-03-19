@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { ShieldAlert, Loader2, RefreshCcw, Search, Filter, AlertTriangle, Clock } from 'lucide-react';
+import { ShieldAlert, Loader2, RefreshCcw, Search, Filter, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

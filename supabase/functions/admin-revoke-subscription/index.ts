@@ -3,14 +3,6 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
-declare global {
-  namespace Deno {
-    namespace env {
-      function get(key: string): string | undefined;
-    }
-  }
-}
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -19,38 +11,39 @@ const corsHeaders = {
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
-  // Initialize Supabase client with service role key to bypass RLS
-  const supabaseAdmin = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  );
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(JSON.stringify({ error: "Server configuration error (Keys missing)." }), { status: 500, headers: corsHeaders });
+  }
+
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
     const { subscription_id } = await req.json();
 
     if (!subscription_id) {
-      throw new Error('Missing subscription_id in request body.');
+      return new Response(JSON.stringify({ error: "Missing subscription_id in request." }), { status: 400, headers: corsHeaders });
     }
 
-    console.log(`[revoke] Attempting to revoke subscription: ${subscription_id}`);
+    console.log(`[REVOKE] Processing ID: ${subscription_id}`);
 
-    // 1. Fetch the subscription to verify it exists and get the user ID
+    // 1. Get the user_id for this subscription
     const { data: sub, error: fetchError } = await supabaseAdmin
       .from('user_subscriptions')
-      .select('user_id, status')
+      .select('user_id')
       .eq('id', subscription_id)
       .single();
 
     if (fetchError || !sub) {
-        console.error(`[revoke] Subscription ${subscription_id} not found.`);
-        throw new Error("Subscription record not found.");
+      console.error("[REVOKE] Subscription lookup failed:", fetchError);
+      return new Response(JSON.stringify({ error: "Subscription not found.", details: fetchError }), { status: 404, headers: corsHeaders });
     }
 
-    console.log(`[revoke] Found subscription for user ${sub.user_id}. Current status: ${sub.status}`);
-
-    // 2. Update the subscription record
-    // We use 'inactive' as it is a standard allowed value in the status check constraint
-    const { error: subUpdateError } = await supabaseAdmin
+    // 2. Update the subscription status
+    // Using 'inactive' as it's the standard deactivation status in this project
+    const { error: updateSubError } = await supabaseAdmin
       .from('user_subscriptions')
       .update({ 
         status: 'inactive', 
@@ -58,40 +51,31 @@ serve(async (req: Request) => {
       })
       .eq('id', subscription_id);
 
-    if (subUpdateError) {
-        console.error(`[revoke] Database error during status update:`, subUpdateError);
-        throw subUpdateError;
+    if (updateSubError) {
+      console.error("[REVOKE] Failed to update user_subscriptions:", updateSubError);
+      return new Response(JSON.stringify({ error: "Database update failed for subscription table.", details: updateSubError }), { status: 500, headers: corsHeaders });
     }
 
-    // 3. Update the user's profile
-    const { error: profileUpdateError } = await supabaseAdmin
+    // 3. Update the profile
+    const { error: updateProfileError } = await supabaseAdmin
       .from('profiles')
       .update({ has_active_subscription: false })
       .eq('id', sub.user_id);
 
-    if (profileUpdateError) {
-        console.error(`[revoke] Database error during profile update:`, profileUpdateError);
-        throw profileUpdateError;
+    if (updateProfileError) {
+      console.error("[REVOKE] Failed to update profile:", updateProfileError);
+      return new Response(JSON.stringify({ error: "Database update failed for profile table.", details: updateProfileError }), { status: 500, headers: corsHeaders });
     }
 
-    console.log(`[revoke] Successfully revoked access for user ${sub.user_id}`);
+    console.log(`[REVOKE] Successfully revoked access for user ${sub.user_id}`);
 
-    return new Response(JSON.stringify({ 
-        message: 'Access revoked successfully.',
-        status: 'inactive'
-    }), {
+    return new Response(JSON.stringify({ message: "Revoked successfully." }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
-    console.error('[revoke] Unhandled Error:', error.message);
-    return new Response(JSON.stringify({ 
-        error: error.message,
-        details: error.details || null
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error("[REVOKE] Critical error:", error.message);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
   }
 });

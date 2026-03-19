@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User as UserIcon, MoreHorizontal, Phone, MessageSquare, ShieldCheck, Clock } from 'lucide-react';
+import { User as UserIcon, MoreHorizontal, Phone, MessageSquare, ShieldCheck, Clock, Zap, UserCheck } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +22,7 @@ import EditUserDialog from '@/components/EditUserDialog';
 import AddUserDialog from '@/components/AddUserDialog'; 
 import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/SessionContextProvider';
-import { parseISO, differenceInHours, formatDistanceToNow } from 'date-fns'; 
+import { parseISO, differenceInHours, formatDistanceToNow, isPast } from 'date-fns'; 
 import { dismissToast } from '@/utils/toast'; 
 
 interface UserProfile {
@@ -93,7 +93,6 @@ const ManageUsersPage = () => {
       const profile = profilesMap.get(authUser.id);
       const activeSub = activeSubsMap.get(authUser.id);
       
-      // Get metadata fallbacks
       const meta = authUser.user_metadata || {};
 
       return {
@@ -101,7 +100,6 @@ const ManageUsersPage = () => {
         email: authUser.email || null,
         created_at: authUser.created_at,
         last_sign_in_at: authUser.last_sign_in_at || null,
-        // Priority: Profile Table > Auth Metadata > Null
         first_name: profile?.first_name || meta.first_name || null,
         last_name: profile?.last_name || meta.last_name || null,
         avatar_url: profile?.avatar_url || meta.avatar_url || null,
@@ -143,13 +141,13 @@ const ManageUsersPage = () => {
   const columns: ColumnDef<UserProfile>[] = [
     {
       id: "identity",
-      header: "Professional Identity",
+      header: "Student Profile",
       cell: ({ row }) => {
         const u = row.original;
         const fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Anonymous User';
         return (
           <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9 shrink-0">
+            <Avatar className="h-9 w-9 shrink-0 border-2 border-muted">
               <AvatarImage src={u.avatar_url || undefined} alt={fullName} />
               <AvatarFallback className="bg-primary/5 text-primary">
                 <UserIcon className="h-4 w-4" />
@@ -166,44 +164,51 @@ const ManageUsersPage = () => {
     },
     {
       id: "contact",
-      header: "Verified Contact",
+      header: "Contact Info",
       cell: ({ row }) => {
         const u = row.original;
         return (
           <div className="space-y-1">
              <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
                 <Phone className="h-3 w-3 text-muted-foreground" />
-                <span>{u.phone_number || 'No Phone'}</span>
+                <span>{u.phone_number || 'N/A'}</span>
              </div>
              <div className="flex items-center gap-2 text-[10px] font-bold text-green-600">
                 <MessageSquare className="h-3 w-3 fill-green-500/10" />
-                <span>{u.whatsapp_number || 'No WhatsApp'}</span>
+                <span>{u.whatsapp_number || 'N/A'}</span>
              </div>
           </div>
         );
       }
     },
     {
-      accessorKey: 'subscription_end_date',
-      header: 'Subscription Access',
+      id: "status",
+      header: "Subscription Access",
       cell: ({ row }) => {
-        const { subscription_end_date } = row.original;
-        if (!subscription_end_date) return <Badge variant="secondary" className="text-[9px] font-black uppercase">Standard</Badge>;
-
-        const hoursLeft = differenceInHours(parseISO(subscription_end_date), new Date());
-        if (hoursLeft <= 0) return <Badge variant="secondary" className="text-[9px] font-black uppercase opacity-50">Expired</Badge>;
+        const { subscription_end_date, has_active_subscription } = row.original;
         
-        const daysLeft = Math.ceil(hoursLeft / 24);
+        if (!subscription_end_date) {
+            return <Badge variant="outline" className="text-[9px] font-black uppercase bg-slate-50 text-slate-400 border-slate-200">Standard</Badge>;
+        }
 
-        let variant: "default" | "secondary" | "destructive" | "outline" = "default";
-        if (daysLeft <= 3) variant = "destructive";
-        else if (daysLeft <= 30) variant = "outline";
+        const expired = isPast(parseISO(subscription_end_date));
+        
+        if (expired || !has_active_subscription) {
+            return (
+                <div className="space-y-1">
+                    <Badge variant="outline" className="text-[9px] font-black uppercase bg-orange-50 text-orange-600 border-orange-200">Expired Access</Badge>
+                    <p className="text-[8px] font-bold text-muted-foreground uppercase text-center">Since {new Date(subscription_end_date).toLocaleDateString()}</p>
+                </div>
+            );
+        }
 
         return (
           <div className="flex flex-col space-y-1">
-            <Badge variant={variant} className="w-fit text-[9px] font-black uppercase">Premium Active</Badge>
+            <Badge variant="default" className="w-fit text-[9px] font-black uppercase gap-1 bg-green-600">
+                <Zap className="h-2 w-2 fill-current" /> Premium Active
+            </Badge>
             <span className="text-[9px] text-muted-foreground font-black uppercase tracking-tighter">
-              {hoursLeft < 24 ? '< 24h Left' : `${daysLeft} Days Left`}
+              Expires: {new Date(subscription_end_date).toLocaleDateString()}
             </span>
           </div>
         );
@@ -211,18 +216,21 @@ const ManageUsersPage = () => {
     },
     {
       id: "activity",
-      header: "System Activity",
+      header: "Platform Engagement",
       cell: ({ row }) => {
         const u = row.original;
         return (
-          <div className="space-y-1">
+          <div className="space-y-1.5">
              <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground">
-                <ShieldCheck className="h-3 w-3" />
+                <UserCheck className="h-3 w-3" />
                 <span>Joined {new Date(u.created_at).toLocaleDateString()}</span>
              </div>
-             <div className="flex items-center gap-2 text-[10px] font-black uppercase text-primary">
+             <div className={cn(
+                 "flex items-center gap-2 text-[10px] font-black uppercase",
+                 u.last_sign_in_at ? "text-primary" : "text-slate-400"
+             )}>
                 <Clock className="h-3 w-3" />
-                <span>{u.last_sign_in_at ? `Last Login: ${formatDistanceToNow(new Date(u.last_sign_in_at), { addSuffix: true })}` : 'Never Logged In'}</span>
+                <span>{u.last_sign_in_at ? `Last Active: ${formatDistanceToNow(new Date(u.last_sign_in_at), { addSuffix: true })}` : 'Never Logged In'}</span>
              </div>
           </div>
         );
@@ -237,11 +245,11 @@ const ManageUsersPage = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleEditClick(userProfile)}>Edit User</DropdownMenuItem>
+            <DropdownMenuContent align="end" className="rounded-xl">
+              <DropdownMenuLabel>User Controls</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleEditClick(userProfile)}>Edit Profile / Access</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleDeleteUser(userProfile.id, userProfile.email)} className="text-red-600">Delete User</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDeleteUser(userProfile.id, userProfile.email)} className="text-red-600 font-bold">Delete Account</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -250,30 +258,42 @@ const ManageUsersPage = () => {
   ];
 
   if (!hasCheckedInitialSession || isPageLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900"><p className="text-gray-700 dark:text-gray-300">Loading users...</p></div>;
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+            <Loader2 className="animate-spin h-8 w-8 text-primary/20" />
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground animate-pulse">Syncing Global User Directory...</p>
+        </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-black uppercase italic tracking-tighter">User Management</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 className="text-3xl font-black uppercase italic tracking-tighter">User Directory</h1>
+            <p className="text-muted-foreground font-medium">Manage student accounts and verify clinical credentials.</p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="rounded-full font-black uppercase tracking-widest text-[10px] h-10 px-8 shadow-lg">
+            Add New Student
+        </Button>
+      </div>
+
       <Card className="border-none shadow-xl rounded-3xl overflow-hidden">
         <CardHeader className="bg-muted/30 border-b pb-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-xl font-bold">Clinical Practitioners</CardTitle>
-              <CardDescription className="font-medium">Total registered: {users.length}</CardDescription>
-            </div>
-            <Button onClick={() => setIsAddDialogOpen(true)} className="rounded-xl font-bold uppercase tracking-tight h-10 px-6">
-              Register New Practitioner
-            </Button>
-          </div>
+            <CardTitle className="text-sm font-black uppercase tracking-widest text-primary/40">Registered Practitioners ({users.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <DataTable columns={columns} data={users} pageSize={50} />
+          <DataTable columns={columns} data={users} pageSize={25} />
         </CardContent>
       </Card>
+      
       {selectedUserForEdit && (
-        <EditUserDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} userProfile={selectedUserForEdit} onSave={fetchUsers} />
+        <EditUserDialog 
+            open={isEditDialogOpen} 
+            onOpenChange={setIsEditDialogOpen} 
+            userProfile={selectedUserForEdit} 
+            onSave={fetchUsers} 
+        />
       )}
       <AddUserDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} onSave={fetchUsers} />
     </div>

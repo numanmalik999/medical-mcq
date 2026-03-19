@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User as UserIcon, MoreHorizontal, Phone, MessageSquare, ShieldCheck, Clock, Zap, UserCheck } from 'lucide-react';
+import { User as UserIcon, MoreHorizontal, Phone, MessageSquare, ShieldCheck, Clock, Zap, UserCheck, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,

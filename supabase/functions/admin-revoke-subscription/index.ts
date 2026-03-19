@@ -19,7 +19,7 @@ const corsHeaders = {
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
-  // Initialize Supabase client with service role key
+  // Initialize Supabase client with service role key to bypass RLS
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -29,49 +29,67 @@ serve(async (req: Request) => {
     const { subscription_id } = await req.json();
 
     if (!subscription_id) {
-      return new Response(JSON.stringify({ error: 'Missing subscription_id.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      throw new Error('Missing subscription_id in request body.');
     }
 
-    // 1. Fetch the subscription to get the user ID
+    console.log(`[revoke] Attempting to revoke subscription: ${subscription_id}`);
+
+    // 1. Fetch the subscription to verify it exists and get the user ID
     const { data: sub, error: fetchError } = await supabaseAdmin
       .from('user_subscriptions')
-      .select('user_id')
+      .select('user_id, status')
       .eq('id', subscription_id)
       .single();
 
-    if (fetchError || !sub) throw new Error("Subscription record not found.");
+    if (fetchError || !sub) {
+        console.error(`[revoke] Subscription ${subscription_id} not found.`);
+        throw new Error("Subscription record not found.");
+    }
 
-    // 2. Update the specific subscription record to 'inactive'
-    // Status 'inactive' is the valid value accepted by the database check constraint
+    console.log(`[revoke] Found subscription for user ${sub.user_id}. Current status: ${sub.status}`);
+
+    // 2. Update the subscription record
+    // We use 'inactive' as it is a standard allowed value in the status check constraint
     const { error: subUpdateError } = await supabaseAdmin
       .from('user_subscriptions')
       .update({ 
         status: 'inactive', 
-        end_date: new Date().toISOString() // End access immediately
+        end_date: new Date().toISOString() 
       })
       .eq('id', subscription_id);
 
-    if (subUpdateError) throw subUpdateError;
+    if (subUpdateError) {
+        console.error(`[revoke] Database error during status update:`, subUpdateError);
+        throw subUpdateError;
+    }
 
-    // 3. Update the user's profile to reflect they no longer have an active subscription
+    // 3. Update the user's profile
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .update({ has_active_subscription: false })
       .eq('id', sub.user_id);
 
-    if (profileUpdateError) throw profileUpdateError;
+    if (profileUpdateError) {
+        console.error(`[revoke] Database error during profile update:`, profileUpdateError);
+        throw profileUpdateError;
+    }
 
-    return new Response(JSON.stringify({ message: 'Access revoked successfully in the database.' }), {
+    console.log(`[revoke] Successfully revoked access for user ${sub.user_id}`);
+
+    return new Response(JSON.stringify({ 
+        message: 'Access revoked successfully.',
+        status: 'inactive'
+    }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
-    console.error('Error in admin-revoke-subscription:', error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
+  } catch (error: any) {
+    console.error('[revoke] Unhandled Error:', error.message);
+    return new Response(JSON.stringify({ 
+        error: error.message,
+        details: error.details || null
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

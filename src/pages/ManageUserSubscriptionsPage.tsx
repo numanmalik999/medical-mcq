@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
@@ -272,7 +272,7 @@ const ManageUserSubscriptionsPage = () => {
                         <SelectContent>
                             <SelectItem value="active">Active Access</SelectItem>
                             <SelectItem value="expired">Expired Access</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                            <SelectItem value="inactive">Inactive / Revoked</SelectItem>
                             <SelectItem value="all">All Records</SelectItem>
                         </SelectContent>
                     </Select>

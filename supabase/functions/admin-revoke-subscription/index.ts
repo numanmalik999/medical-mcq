@@ -44,11 +44,12 @@ serve(async (req: Request) => {
 
     if (fetchError || !sub) throw new Error("Subscription record not found.");
 
-    // 2. Update the specific subscription record to 'cancelled'
+    // 2. Update the specific subscription record to 'inactive'
+    // Status 'inactive' is the valid value accepted by the database check constraint
     const { error: subUpdateError } = await supabaseAdmin
       .from('user_subscriptions')
       .update({ 
-        status: 'cancelled', 
+        status: 'inactive', 
         end_date: new Date().toISOString() // End access immediately
       })
       .eq('id', subscription_id);

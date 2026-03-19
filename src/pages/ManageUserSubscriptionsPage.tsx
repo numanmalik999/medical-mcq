@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { ShieldAlert, Loader2, RefreshCcw, Search, Filter } from 'lucide-react';
+import { ShieldAlert, Loader2, RefreshCcw, Search, Filter, AlertTriangle, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSession } from '@/components/SessionContextProvider';
-import { format } from 'date-fns';
+import { format, isPast, parseISO } from 'date-fns';
 
 interface UserSubscription {
   id: string;
@@ -53,10 +53,7 @@ const ManageUserSubscriptionsPage = () => {
       `)
       .order('created_at', { ascending: false });
 
-    if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter);
-    }
-
+    // Note: We fetch more than just the filter to handle "Expired" logic in-memory
     const { data, error } = await query;
 
     if (error) {
@@ -98,6 +95,16 @@ const ManageUserSubscriptionsPage = () => {
         }
     }
 
+    // Client-side filtering to account for calculated "Expired" status
+    if (statusFilter !== 'all') {
+      subsData = subsData.filter(sub => {
+          const expired = isPast(parseISO(sub.end_date));
+          if (statusFilter === 'expired') return expired && sub.status === 'active';
+          if (statusFilter === 'active') return !expired && sub.status === 'active';
+          return sub.status === statusFilter;
+      });
+    }
+
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       subsData = subsData.filter(sub => 
@@ -124,7 +131,7 @@ const ManageUserSubscriptionsPage = () => {
   }, [searchTerm]);
 
   const handleRevoke = async (sub: UserSubscription) => {
-    if (!window.confirm(`⚠️ REVOKE ACCESS ⚠️\n\nThis will immediately disable premium access for ${sub.user_email || 'this user'} in the application.\n\nRemember to manually process the refund in Stripe if required.\n\nContinue?`)) {
+    if (!window.confirm(`⚠️ REVOKE ACCESS ⚠️\n\nThis will immediately disable premium access for ${sub.user_email || 'this user'}.\n\nContinue?`)) {
         return;
     }
 
@@ -135,10 +142,7 @@ const ManageUserSubscriptionsPage = () => {
 
         if (error) throw error;
 
-        toast({ 
-            title: "Access Revoked", 
-            description: "User access has been updated in the database."
-        });
+        toast({ title: "Access Revoked", description: "User access has been updated." });
         fetchSubscriptions();
     } catch (e: any) {
         toast({ title: "Operation Failed", description: e.message, variant: "destructive" });
@@ -176,11 +180,28 @@ const ManageUserSubscriptionsPage = () => {
     },
     {
         accessorKey: "status",
-        header: "Status",
+        header: "Status Audit",
         cell: ({ row }) => {
-            const s = row.original.status;
-            const variant = s === 'active' ? 'default' : s === 'cancelled' ? 'destructive' : 'secondary';
-            return <Badge variant={variant} className="capitalize">{s}</Badge>;
+            const sub = row.original;
+            const expired = isPast(parseISO(sub.end_date));
+            
+            if (sub.status === 'active' && expired) {
+                return (
+                    <Badge variant="destructive" className="gap-1.5 bg-orange-100 text-orange-700 hover:bg-orange-100 border-orange-200">
+                        <AlertTriangle className="h-3 w-3" /> Expired
+                    </Badge>
+                );
+            }
+
+            if (sub.status === 'active') {
+                return (
+                    <Badge variant="default" className="gap-1.5 bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
+                        <CheckCircle2 className="h-3 w-3" /> Active
+                    </Badge>
+                );
+            }
+
+            return <Badge variant="secondary" className="capitalize">{sub.status}</Badge>;
         }
     },
     {
@@ -188,26 +209,19 @@ const ManageUserSubscriptionsPage = () => {
         header: "Billing Cycle",
         cell: ({ row }) => (
             <div className="text-xs text-muted-foreground">
-                <p>Start: {format(new Date(row.original.start_date), 'MMM dd, yyyy')}</p>
-                <p>End: {format(new Date(row.original.end_date), 'MMM dd, yyyy')}</p>
-            </div>
-        )
-    },
-    {
-        id: "gateway",
-        header: "Gateway ID",
-        cell: ({ row }) => (
-            <div className="font-mono text-[10px] text-muted-foreground" title={row.original.stripe_subscription_id || ''}>
-                {row.original.stripe_subscription_id ? row.original.stripe_subscription_id.substring(0, 12) + '...' : 'Manual/Free'}
+                <p className="flex items-center gap-1"><Clock className="h-3 w-3 opacity-40" /> {format(new Date(row.original.end_date), 'MMM dd, yyyy')}</p>
             </div>
         )
     },
     {
       id: "actions",
-      header: "Actions",
+      header: "Admin Actions",
       cell: ({ row }) => {
         const sub = row.original;
-        if (sub.status !== 'active') return null;
+        const expired = isPast(parseISO(sub.end_date));
+        
+        // Only show revoke if it's marked active AND has not yet reached its end date
+        if (sub.status !== 'active' || expired) return null;
 
         return (
           <Button 
@@ -216,7 +230,7 @@ const ManageUserSubscriptionsPage = () => {
             onClick={() => handleRevoke(sub)}
             className="h-8 rounded-lg font-bold uppercase text-[9px] tracking-tight"
           >
-            <ShieldAlert className="mr-1.5 h-3 w-3" /> Revoke Subscription
+            <ShieldAlert className="mr-1.5 h-3 w-3" /> Revoke Access
           </Button>
         );
       },
@@ -229,35 +243,35 @@ const ManageUserSubscriptionsPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-            <h1 className="text-3xl font-bold tracking-tight">Active Subscriptions</h1>
-            <p className="text-muted-foreground">Monitor revenue and manage user access.</p>
+            <h1 className="text-3xl font-black uppercase italic tracking-tighter">Subscriber Audit</h1>
+            <p className="text-muted-foreground font-medium">Verify credentials and manage active clinical access.</p>
         </div>
-        <Button onClick={fetchSubscriptions} variant="outline" size="sm" disabled={isPageLoading}>
-            <RefreshCcw className={`mr-2 h-4 w-4 ${isPageLoading ? 'animate-spin' : ''}`} /> Refresh
+        <Button onClick={fetchSubscriptions} variant="outline" size="sm" disabled={isPageLoading} className="rounded-full">
+            <RefreshCcw className={`mr-2 h-4 w-4 ${isPageLoading ? 'animate-spin' : ''}`} /> Sync Data
         </Button>
       </div>
 
-      <Card>
+      <Card className="border-none shadow-xl rounded-2xl overflow-hidden">
         <CardHeader className="border-b bg-muted/40 pb-4">
             <div className="flex flex-col md:flex-row gap-4 justify-between">
                 <div className="flex items-center gap-2 flex-1">
                     <Search className="h-4 w-4 text-muted-foreground" />
                     <Input 
-                        placeholder="Search by email, name or ID..." 
+                        placeholder="Search practitioners..." 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="max-w-sm bg-white"
+                        className="max-w-sm bg-white rounded-xl h-10 border-none shadow-inner"
                     />
                 </div>
                 <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-muted-foreground" />
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-[180px] bg-white">
-                            <SelectValue placeholder="Filter by status" />
+                        <SelectTrigger className="w-[180px] bg-white rounded-xl h-10 border-none shadow-inner font-bold text-xs">
+                            <SelectValue placeholder="Filter Status" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="active">Active Only</SelectItem>
-                            <SelectItem value="expired">Expired</SelectItem>
+                            <SelectItem value="active">Active Access</SelectItem>
+                            <SelectItem value="expired">Expired Access</SelectItem>
                             <SelectItem value="cancelled">Cancelled</SelectItem>
                             <SelectItem value="all">All Records</SelectItem>
                         </SelectContent>

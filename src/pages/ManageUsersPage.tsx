@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User as UserIcon, MoreHorizontal, Phone, MessageSquare, ShieldCheck, Clock, Zap, UserCheck, Loader2 } from 'lucide-react';
+import { User as UserIcon, MoreHorizontal, Phone, MessageSquare, ShieldCheck, Clock, Zap, UserCheck, Loader2, MousePointer2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +22,7 @@ import EditUserDialog from '@/components/EditUserDialog';
 import AddUserDialog from '@/components/AddUserDialog'; 
 import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/SessionContextProvider';
-import { parseISO, differenceInHours, formatDistanceToNow, isPast } from 'date-fns'; 
+import { parseISO, formatDistanceToNow, isPast } from 'date-fns'; 
 import { dismissToast } from '@/utils/toast'; 
 import { cn } from "@/lib/utils";
 
@@ -220,6 +220,8 @@ const ManageUsersPage = () => {
       header: "Platform Engagement",
       cell: ({ row }) => {
         const u = row.original;
+        const lastLogin = u.last_sign_in_at;
+        
         return (
           <div className="space-y-1.5">
              <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground">
@@ -228,10 +230,17 @@ const ManageUsersPage = () => {
              </div>
              <div className={cn(
                  "flex items-center gap-2 text-[10px] font-black uppercase",
-                 u.last_sign_in_at ? "text-primary" : "text-slate-400"
+                 lastLogin ? "text-primary" : "text-slate-400"
              )}>
                 <Clock className="h-3 w-3" />
-                <span>{u.last_sign_in_at ? `Last Active: ${formatDistanceToNow(new Date(u.last_sign_in_at), { addSuffix: true })}` : 'Never Logged In'}</span>
+                {lastLogin ? (
+                    <div className="flex flex-col">
+                        <span className="leading-tight">Last Login:</span>
+                        <span className="text-primary font-bold">{formatDistanceToNow(new Date(lastLogin), { addSuffix: true })}</span>
+                    </div>
+                ) : (
+                    <span>Never Logged In</span>
+                )}
              </div>
           </div>
         );

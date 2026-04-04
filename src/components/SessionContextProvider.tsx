@@ -58,17 +58,30 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       const profileData = profileRes.data;
       const latestSub = subRes.data;
       
-      let currentHasActiveSubscription = profileData?.has_active_subscription || false;
-      const latestSubEndDate = latestSub?.end_date || null;
+      let currentHasActiveSubscription = false;
+      let latestSubEndDate = null;
 
-      if (currentHasActiveSubscription && latestSubEndDate) {
+      // Strictly verify if there is a valid, non-expired active subscription
+      if (latestSub && latestSub.status === 'active') {
+        latestSubEndDate = latestSub.end_date;
         const endDate = parseISO(latestSubEndDate);
-        if (isPast(endDate)) {
-          currentHasActiveSubscription = false;
+        
+        if (!isPast(endDate)) {
+          currentHasActiveSubscription = true;
+        } else {
+          // It's past the end date but still marked active, auto-expire it in the background
           supabase.functions.invoke('update-expired-subscription-status', {
             body: { user_id: supabaseUser.id, is_active: false },
           }).catch(() => {});
         }
+      }
+
+      // If the profile thinks they are premium, but we found no valid active subscription, 
+      // we must correct the profile in the background.
+      if (profileData && profileData.has_active_subscription && !currentHasActiveSubscription) {
+         supabase.functions.invoke('update-expired-subscription-status', {
+            body: { user_id: supabaseUser.id, is_active: false },
+         }).catch(() => {});
       }
     
       setUser({
@@ -78,7 +91,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         last_name: profileData?.last_name || supabaseUser.user_metadata?.last_name || null,
         phone_number: profileData?.phone_number || null,
         whatsapp_number: profileData?.whatsapp_number || null,
-        has_active_subscription: currentHasActiveSubscription,
+        has_active_subscription: currentHasActiveSubscription, // Use strict computed value
         trial_taken: profileData?.trial_taken || false,
         subscription_end_date: latestSubEndDate,
       } as AuthUser);

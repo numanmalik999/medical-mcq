@@ -191,10 +191,12 @@ const LandingPage = () => {
                         <div className="mb-8">
                           <h3 className="text-lg font-black mb-2 text-slate-900 dark:text-white uppercase tracking-tight">{tier.name}</h3>
                           <div className="flex items-baseline gap-1">
-                              <span className="text-4xl font-black text-slate-900 dark:text-white">${monthlyPrice}</span>
-                              <span className="text-slate-400 font-black uppercase text-[10px]">/mo</span>
+                              <span className="text-4xl font-black text-slate-900 dark:text-white">${tier.price.toFixed(2)}</span>
+                              <span className="text-slate-400 font-black uppercase text-[10px]">total</span>
                           </div>
-                          <p className="text-[9px] text-slate-400 mt-2 font-black uppercase tracking-widest">Total: ${tier.price.toFixed(2)}</p>
+                          {tier.price > 0 && tier.duration_in_months > 1 && (
+                            <p className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-widest">Only ${monthlyPrice}/mo</p>
+                          )}
                         </div>
                         <ul className="space-y-4 mb-8 flex-1">
                         {tier.features?.map((feature: string, idx: number) => (

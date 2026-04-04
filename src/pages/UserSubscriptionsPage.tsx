@@ -202,10 +202,17 @@ const UserSubscriptionsPage = () => {
                   <CardDescription>{tier.description}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow space-y-4">
-                  <p className="text-4xl font-bold">
-                    {tier.price === 0 ? "Free" : `${tier.currency} ${tier.price.toFixed(2)}`}
-                    <span className="text-lg font-normal text-muted-foreground"> / {tier.duration_in_months} month{tier.duration_in_months > 1 ? 's' : ''}</span>
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-4xl font-bold">
+                      {tier.price === 0 ? "Free" : `${tier.currency} ${tier.price.toFixed(2)}`}
+                      {tier.price > 0 && <span className="text-lg font-normal text-muted-foreground ml-1">total</span>}
+                    </p>
+                    {tier.price > 0 && tier.duration_in_months > 1 && (
+                      <p className="text-sm text-muted-foreground font-medium">
+                        (Equates to {tier.currency} {(tier.price / tier.duration_in_months).toFixed(2)} / month)
+                      </p>
+                    )}
+                  </div>
                   {tier.features && tier.features.length > 0 && (
                     <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                       {tier.features.map((feature, index) => (

@@ -46,8 +46,8 @@ serve(async (req: Request) => {
       throw new Error(`Subscription not found. ${fetchError?.message || ''}`);
     }
 
-    // 2. If it's a Stripe subscription, cancel it so they don't get billed again
-    if (sub.stripe_subscription_id) {
+    // 2. Cancel it in Stripe if a subscription ID exists
+    if (sub.stripe_subscription_id && sub.stripe_subscription_id.startsWith('sub_')) {
       const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
       if (stripeKey) {
         const stripe = new Stripe(stripeKey, {
@@ -58,16 +58,16 @@ serve(async (req: Request) => {
           await stripe.subscriptions.cancel(sub.stripe_subscription_id);
           console.log(`[REVOKE] Cancelled Stripe subscription: ${sub.stripe_subscription_id}`);
         } catch (stripeErr: any) {
-          console.warn(`[REVOKE] Warning: Failed to cancel Stripe subscription (it might already be cancelled). ${stripeErr.message}`);
+          console.warn(`[REVOKE] Warning: Failed to cancel Stripe subscription. ${stripeErr.message}`);
         }
       }
     }
 
-    // 3. Update the local subscription status
+    // 3. Update the local subscription status using the valid 'expired' enum
     const { error: updateSubError } = await supabaseAdmin
       .from('user_subscriptions')
       .update({ 
-        status: 'inactive', // Safe fallback status
+        status: 'expired', // Safe database-approved status
         end_date: new Date().toISOString() 
       })
       .eq('id', subscription_id);

@@ -53,7 +53,6 @@ const ManageUserSubscriptionsPage = () => {
       `)
       .order('created_at', { ascending: false });
 
-    // Note: We fetch more than just the filter to handle "Expired" logic in-memory
     const { data, error } = await query;
 
     if (error) {
@@ -95,7 +94,6 @@ const ManageUserSubscriptionsPage = () => {
         }
     }
 
-    // Client-side filtering to account for calculated "Expired" status
     if (statusFilter !== 'all') {
       subsData = subsData.filter(sub => {
           const expired = isPast(parseISO(sub.end_date));
@@ -136,13 +134,31 @@ const ManageUserSubscriptionsPage = () => {
     }
 
     try {
-        const { error } = await supabase.functions.invoke('admin-revoke-subscription', {
-            body: { subscription_id: sub.id }
-        });
+        // Direct DB Update (works because RLS is disabled)
+        const { error: subError } = await supabase
+            .from('user_subscriptions')
+            .update({ 
+                status: 'expired', 
+                end_date: new Date().toISOString() 
+            })
+            .eq('id', sub.id);
 
-        if (error) throw error;
+        if (subError) throw subError;
 
-        toast({ title: "Access Revoked", description: "User access has been updated." });
+        // Try direct profile update
+        const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ has_active_subscription: false })
+            .eq('id', sub.user_id);
+            
+        // If profile update fails due to RLS, fallback to the edge function that handles status updates
+        if (profileError) {
+            await supabase.functions.invoke('update-expired-subscription-status', {
+                body: { user_id: sub.user_id, is_active: false }
+            });
+        }
+
+        toast({ title: "Access Revoked", description: "User access has been updated successfully." });
         fetchSubscriptions();
     } catch (e: any) {
         toast({ title: "Operation Failed", description: e.message, variant: "destructive" });

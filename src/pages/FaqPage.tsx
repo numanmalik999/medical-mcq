@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { HelpCircle, BookOpen, CreditCard } from "lucide-react";
+import { useSeo } from '@/hooks/use-seo';
 
 const faqs = [
   {
@@ -57,6 +58,13 @@ const faqs = [
 ];
 
 const FaqPage = () => {
+  useSeo({
+    title: 'FAQ | Study Prometric',
+    description: 'Get answers about Study Prometric features, subscriptions, AI clinical cases, and DHA, MOH, HAAD, and SMLE exam preparation.',
+    canonicalPath: '/faq',
+    ogType: 'website',
+  });
+
   useEffect(() => {
     const faqSchema = {
       "@context": "https://schema.org",

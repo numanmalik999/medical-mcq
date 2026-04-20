@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import LoadingBar from "@/components/LoadingBar";
 import { useLandingPageSettings } from '@/hooks/useLandingPageSettings';
+import { useSeo } from '@/hooks/use-seo';
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -21,12 +22,15 @@ const LandingPage = () => {
   const [tiers, setTiers] = useState<any[]>([]);
   const { settings, isLoading: settingsLoading } = useLandingPageSettings();
 
-  useEffect(() => {
-    // Set page title and meta description dynamically
-    document.title = settings.seo.metaTitle;
-    const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute('content', settings.seo.metaDescription);
+  useSeo({
+    title: settings.seo.metaTitle,
+    description: settings.seo.metaDescription,
+    keywords: settings.seo.keywords,
+    canonicalPath: "/",
+    ogType: "website",
+  });
 
+  useEffect(() => {
     const fetchTiers = async () => {
       const { data, error } = await supabase
         .from('subscription_tiers')
@@ -39,15 +43,15 @@ const LandingPage = () => {
       }
       
       if (data) {
-        setTiers(data.filter(t => 
-          !t.name.toLowerCase().includes('trial') && 
+        setTiers(data.filter(t =>
+          !t.name.toLowerCase().includes('trial') &&
           !t.name.toLowerCase().includes('free') &&
           t.price > 0
         ));
       }
     };
     fetchTiers();
-  }, [settings.seo]);
+  }, []);
 
   if (settingsLoading) return <LoadingBar />;
 

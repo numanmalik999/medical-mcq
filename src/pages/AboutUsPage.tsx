@@ -5,8 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Heart, ShieldCheck, Zap, Award, Users, BookOpen } from "lucide-react";
 import { cn } from '@/lib/utils';
+import { useSeo } from '@/hooks/use-seo';
 
 const AboutUsPage = () => {
+  useSeo({
+    title: 'About Study Prometric | DHA, MOH, HAAD & SMLE Preparation',
+    description: 'Learn how Study Prometric supports healthcare professionals with clinically reviewed question banks and AI-powered tools for Gulf licensing exams.',
+    canonicalPath: '/about',
+    ogType: 'website',
+  });
+
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}

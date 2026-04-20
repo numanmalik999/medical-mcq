@@ -9,8 +9,6 @@ Disallow: /redirect
 
 # 2. Global rules for generic bots
 User-agent: *
-# Block indexing of all parameterized URLs
-Disallow: /*?*
 # Block internal search results
 Disallow: /quiz?search=
 # satisfy tool checks for WordPress endpoints (dummy rules)
@@ -44,7 +42,7 @@ Disallow: /
 User-agent: Rogerbot
 Disallow: /
 
-User-agent: Mozlila
+User-agent: Moz
 Disallow: /
 
 User-agent: Majestic-12

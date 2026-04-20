@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { useSeo } from '@/hooks/use-seo';
 
 interface Blog {
   id: string;
@@ -39,6 +40,14 @@ const BlogDetailsPage = () => {
 
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
 
+  useSeo({
+    title: blog?.title ? `${blog.title} | Study Prometric` : 'Medical Blog | Study Prometric',
+    description: blog?.meta_description || 'Read evidence-aligned licensing exam guidance and preparation strategies for DHA, MOH, HAAD, and SMLE.',
+    canonicalPath: slug ? `/blog/${slug}` : '/blog',
+    ogType: 'article',
+    robots: blog ? 'index,follow' : 'noindex,follow',
+  });
+
   useEffect(() => {
     const fetchBlog = async () => {
       const { data, error } = await supabase
@@ -50,7 +59,6 @@ const BlogDetailsPage = () => {
 
       if (!error && data) {
         setBlog(data);
-        document.title = data.title;
         
         const { data: related } = await supabase
           .from('blogs')

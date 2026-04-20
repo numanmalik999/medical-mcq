@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Loader2, Calendar, ArrowRight, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
+import { useSeo } from '@/hooks/use-seo';
 
 interface Blog {
   id: string;
@@ -20,6 +21,13 @@ interface Blog {
 const BlogListPage = () => {
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  useSeo({
+    title: 'Medical Education Blog | Study Prometric',
+    description: 'Explore expert articles, licensing exam strategies, and DHA, MOH, HAAD, and SMLE study guidance from Study Prometric.',
+    canonicalPath: '/blog',
+    ogType: 'website',
+  });
 
   useEffect(() => {
     const fetchBlogs = async () => {

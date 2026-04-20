@@ -12,6 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, User, MessageSquare, Send, Loader2 } from 'lucide-react';
+import { useSeo } from '@/hooks/use-seo';
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -21,6 +22,13 @@ const formSchema = z.object({
 });
 
 const ContactPage = () => {
+  useSeo({
+    title: 'Contact Study Prometric Support',
+    description: 'Contact Study Prometric for help with subscriptions, exam preparation tools, billing, and account support.',
+    canonicalPath: '/contact',
+    ogType: 'website',
+  });
+
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 

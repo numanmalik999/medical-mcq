@@ -11,7 +11,7 @@ import EditMcqDialog from '@/components/EditMcqDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Wand2, Loader2, Sparkles, CircleDashed, LayoutList, Search, Filter, CheckCircle, Database } from 'lucide-react'; 
+import { Wand2, Loader2, Sparkles, CircleDashed, LayoutList, Search, Filter, CheckCircle, Database, Trash2 } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider'; 
 import { RowSelectionState } from '@tanstack/react-table';
 import LoadingBar from '@/components/LoadingBar';
@@ -325,12 +325,69 @@ const ManageMcqsPage = () => {
 
       setRowSelection({});
       setTimeout(() => fetchMcqs(), 500);
-      fetchCategories(); 
+      fetchCategories();
     } catch (error: any) {
       updateLoading(activeToastId, `Enhancement Interrupted: \${error.message}`, 'error');
     } finally {
       setIsProcessing(false);
       setTimeout(() => dismissToast(activeToastId), 5000);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const selectedIndices = Object.keys(rowSelection);
+    const selectedMcqs = selectedIndices
+      .map(index => filteredMcqs[parseInt(index)])
+      .filter(Boolean);
+
+    const selectedMcqIds = selectedMcqs.map(mcq => mcq.id);
+    const explanationIds = selectedMcqs
+      .map(mcq => mcq.explanation_id)
+      .filter((id): id is string => Boolean(id));
+
+    if (selectedMcqIds.length === 0) {
+      toast({ title: "No MCQs Selected", variant: "destructive" });
+      return;
+    }
+
+    if (!window.confirm(`Delete \${selectedMcqIds.length} selected MCQ(s)? This action cannot be undone.`)) return;
+
+    setIsProcessing(true);
+    const activeToastId = showLoading(`Deleting \${selectedMcqIds.length} selected MCQ(s)...`);
+
+    try {
+      const { error: linksError } = await supabase
+        .from('mcq_category_links')
+        .delete()
+        .in('mcq_id', selectedMcqIds);
+
+      if (linksError) throw linksError;
+
+      const { error: mcqError } = await supabase
+        .from('mcqs')
+        .delete()
+        .in('id', selectedMcqIds);
+
+      if (mcqError) throw mcqError;
+
+      if (explanationIds.length > 0) {
+        const { error: explanationError } = await supabase
+          .from('mcq_explanations')
+          .delete()
+          .in('id', explanationIds);
+
+        if (explanationError) throw explanationError;
+      }
+
+      updateLoading(activeToastId, `Deleted \${selectedMcqIds.length} selected MCQ(s).`, 'success');
+      setRowSelection({});
+      await fetchMcqs();
+      await fetchCategories();
+    } catch (error: any) {
+      updateLoading(activeToastId, `Failed to delete selected MCQs: \${error.message}`, 'error');
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => dismissToast(activeToastId), 3000);
     }
   };
 
@@ -467,7 +524,15 @@ const ManageMcqsPage = () => {
                         </CardTitle>
                         <CardDescription>Filtering specialty: {categories.find(c => c.id === selectedFilterCategory)?.name || 'Custom selection'}</CardDescription>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap justify-end">
+                        <Button
+                          variant="destructive"
+                          onClick={handleBulkDelete}
+                          disabled={isProcessing || numSelected === 0}
+                          className="rounded-xl font-bold"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete Selected ({numSelected})
+                        </Button>
                         <Button variant="outline" onClick={handleBulkMarkAsEnhanced} disabled={isProcessing || numSelected === 0} className="rounded-xl font-bold border-green-600 text-green-700 hover:bg-green-50">
                             <CheckCircle className="mr-2 h-4 w-4" /> Mark Selected Enhanced ({numSelected})
                         </Button>

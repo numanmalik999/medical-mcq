@@ -28,8 +28,10 @@ serve(async (req: Request) => {
     const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
     if (!stripeSecretKey) throw new Error('STRIPE_SECRET_KEY is not set.');
 
-    const { price_id, user_id } = await req.json();
+    const { price_id, user_id, purchase_type = 'subscription_tier', category_id = null, duration_in_months = null } = await req.json();
     if (!price_id || !user_id) throw new Error('Missing price_id or user_id.');
+    if (purchase_type === 'category_unlock' && !category_id) throw new Error('Missing category_id for category unlock.');
+    if (purchase_type === 'category_unlock' && !duration_in_months) throw new Error('Missing duration_in_months for category unlock.');
 
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
     const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20', httpClient: Stripe.createFetchHttpClient() });
@@ -58,7 +60,13 @@ serve(async (req: Request) => {
       line_items: [{ price: price_id, quantity: 1 }],
       success_url,
       cancel_url,
-      metadata: { user_id, price_id },
+      metadata: {
+        user_id,
+        price_id,
+        purchase_type,
+        ...(category_id ? { category_id } : {}),
+        ...(duration_in_months ? { duration_in_months: String(duration_in_months) } : {}),
+      },
     });
 
     return new Response(JSON.stringify({ url: session.url }), {

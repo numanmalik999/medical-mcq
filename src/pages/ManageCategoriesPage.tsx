@@ -24,6 +24,9 @@ interface Category {
   name: string;
   display_order: number;
   mcq_count?: number;
+  stripe_price_id_1m?: string | null;
+  stripe_price_id_2m?: string | null;
+  stripe_price_id_3m?: string | null;
 }
 
 const ManageCategoriesPage = () => {
@@ -35,6 +38,9 @@ const ManageCategoriesPage = () => {
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState('');
   const [displayOrder, setDisplayOrder] = useState('0');
+  const [stripePriceId1m, setStripePriceId1m] = useState('');
+  const [stripePriceId2m, setStripePriceId2m] = useState('');
+  const [stripePriceId3m, setStripePriceId3m] = useState('');
 
   const { hasCheckedInitialSession } = useSession();
 
@@ -95,9 +101,12 @@ const ManageCategoriesPage = () => {
     try {
       const { error } = await supabase
         .from('categories')
-        .insert({ 
+        .insert({
           name: categoryName.trim(),
-          display_order: parseInt(displayOrder) || 0 
+          display_order: parseInt(displayOrder) || 0,
+          stripe_price_id_1m: stripePriceId1m.trim() || null,
+          stripe_price_id_2m: stripePriceId2m.trim() || null,
+          stripe_price_id_3m: stripePriceId3m.trim() || null,
         });
 
       if (error) throw error;
@@ -121,7 +130,10 @@ const ManageCategoriesPage = () => {
         .from('categories')
         .update({ 
           name: categoryName.trim(),
-          display_order: parseInt(displayOrder) || 0 
+          display_order: parseInt(displayOrder) || 0,
+          stripe_price_id_1m: stripePriceId1m.trim() || null,
+          stripe_price_id_2m: stripePriceId2m.trim() || null,
+          stripe_price_id_3m: stripePriceId3m.trim() || null,
         })
         .eq('id', currentCategory.id);
 
@@ -139,6 +151,9 @@ const ManageCategoriesPage = () => {
   const resetForm = () => {
     setCategoryName('');
     setDisplayOrder('0');
+    setStripePriceId1m('');
+    setStripePriceId2m('');
+    setStripePriceId3m('');
     setCurrentCategory(null);
   };
 
@@ -162,6 +177,9 @@ const ManageCategoriesPage = () => {
       setCurrentCategory(category);
       setCategoryName(category.name);
       setDisplayOrder((category.display_order ?? 0).toString());
+      setStripePriceId1m(category.stripe_price_id_1m || '');
+      setStripePriceId2m(category.stripe_price_id_2m || '');
+      setStripePriceId3m(category.stripe_price_id_3m || '');
     } else {
       resetForm();
     }
@@ -182,6 +200,21 @@ const ManageCategoriesPage = () => {
       accessorKey: 'name', 
       header: 'Category Name',
       cell: ({ row }) => <span className="font-bold">{row.original.name} ({row.original.mcq_count || 0})</span>,
+    },
+    {
+      accessorKey: 'stripe_price_id_1m',
+      header: '1M Price ID',
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.stripe_price_id_1m || '-'}</span>,
+    },
+    {
+      accessorKey: 'stripe_price_id_2m',
+      header: '2M Price ID',
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.stripe_price_id_2m || '-'}</span>,
+    },
+    {
+      accessorKey: 'stripe_price_id_3m',
+      header: '3M Price ID',
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.stripe_price_id_3m || '-'}</span>,
     },
     {
       id: 'actions',
@@ -246,6 +279,36 @@ const ManageCategoriesPage = () => {
                 onChange={(e) => setDisplayOrder(e.target.value)}
                 className="col-span-3"
                 placeholder="e.g. 1"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="stripePriceId1m" className="text-right">Stripe 1M</Label>
+              <Input
+                id="stripePriceId1m"
+                value={stripePriceId1m}
+                onChange={(e) => setStripePriceId1m(e.target.value)}
+                className="col-span-3"
+                placeholder="price_xxx (1 month - $10)"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="stripePriceId2m" className="text-right">Stripe 2M</Label>
+              <Input
+                id="stripePriceId2m"
+                value={stripePriceId2m}
+                onChange={(e) => setStripePriceId2m(e.target.value)}
+                className="col-span-3"
+                placeholder="price_xxx (2 months - $20)"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="stripePriceId3m" className="text-right">Stripe 3M</Label>
+              <Input
+                id="stripePriceId3m"
+                value={stripePriceId3m}
+                onChange={(e) => setStripePriceId3m(e.target.value)}
+                className="col-span-3"
+                placeholder="price_xxx (3 months - $25)"
               />
             </div>
           </div>

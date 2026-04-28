@@ -116,6 +116,7 @@ const TakeTestPage = () => {
   
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
   const [isDiscussionOpen, setIsDiscussionOpen] = useState(false);
+  const [unlockedCategoryIds, setUnlockedCategoryIds] = useState<Set<string>>(new Set());
   const [discussionMcq, setDiscussionMcq] = useState<MCQ | null>(null);
 
   const timerIntervalRef = useRef<number | null>(null);
@@ -249,6 +250,13 @@ const TakeTestPage = () => {
     setAllCategories([...(categoriesData || []), { id: UNCATEGORIZED_ID, name: 'General Medical Practice' }]);
 
     if (user) {
+      const { data: unlockRows } = await supabase
+        .from('user_category_unlocks')
+        .select('category_id, end_date')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .gt('end_date', new Date().toISOString());
+      setUnlockedCategoryIds(new Set((unlockRows || []).map((r: any) => r.category_id)));
       const { data: dbSessions } = await supabase.from('user_quiz_sessions').select('*').eq('user_id', user.id).eq('is_trial_session', false).order('updated_at', { ascending: false });
       if (dbSessions) {
         const loadedSavedTests = dbSessions.map((dbSession: DbQuizSession) => {
@@ -268,6 +276,8 @@ const TakeTestPage = () => {
         });
         setActiveSavedTests(loadedSavedTests);
       }
+    } else {
+      setUnlockedCategoryIds(new Set());
     }
     setIsPageLoading(false);
   };
@@ -297,7 +307,11 @@ const TakeTestPage = () => {
   };
 
   const startTestPreparation = async () => {
-    if (!user?.has_active_subscription) {
+    const hasFullAccess = !!user?.has_active_subscription;
+    const hasOnlyUnlockedSelections = selectedCategoryIds.length > 0
+      && selectedCategoryIds.every((id) => id !== UNCATEGORIZED_ID && unlockedCategoryIds.has(id));
+
+    if (!hasFullAccess && !hasOnlyUnlockedSelections) {
       setIsUpgradeDialogOpen(true);
       return;
     }
@@ -363,7 +377,11 @@ const TakeTestPage = () => {
   };
 
   const continueTestSession = useCallback(async (loadedSession: LoadedTestSession) => {
-    if (!user?.has_active_subscription) {
+    const hasFullAccess = !!user?.has_active_subscription;
+    const hasOnlyUnlockedSelections = loadedSession.categoryIds.length > 0
+      && loadedSession.categoryIds.every((id) => id !== UNCATEGORIZED_ID && unlockedCategoryIds.has(id));
+
+    if (!hasFullAccess && !hasOnlyUnlockedSelections) {
       setIsUpgradeDialogOpen(true);
       return;
     }
@@ -386,7 +404,7 @@ const TakeTestPage = () => {
     setShowConfiguration(false);
     setShowInstructions(false);
     setIsPageLoading(false);
-  }, [user]);
+  }, [user, unlockedCategoryIds]);
 
   const handleNext = useCallback(() => {
     if (currentQuestionIndex < mcqs.length - 1) setCurrentQuestionIndex((prev) => prev + 1);

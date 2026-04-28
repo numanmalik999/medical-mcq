@@ -125,6 +125,7 @@ const QuizPage = () => {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [isDiscussionOpen, setIsDiscussionOpen] = useState(false);
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
+  const [unlockedCategoryIds, setUnlockedCategoryIds] = useState<Set<string>>(new Set());
 
   const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<LoadedQuizSession[]>([]);
   const [currentCorrectnessPercentage, setCurrentCorrectnessPercentage] = useState('0.00%');
@@ -135,6 +136,13 @@ const QuizPage = () => {
   // --- Derived Values ---
   const currentMcq = quizQuestions[currentQuestionIndex];
   const isGuest = !user;
+  const canAccessCategory = (categoryId: string | null) => {
+    if (!categoryId) return !!user?.has_active_subscription;
+    if (categoryId === ALL_TRIAL_MCQS_ID) return true;
+    if (user?.has_active_subscription) return true;
+    if (categoryId === UNCATEGORIZED_ID) return false;
+    return unlockedCategoryIds.has(categoryId);
+  };
 
   // --- Hooks that depend on currentMcq ---
   const { isBookmarked, toggleBookmark, isLoading: isBookmarkLoading } = useBookmark(currentMcq?.id || null);
@@ -446,6 +454,14 @@ const QuizPage = () => {
     }
 
     if (user) {
+      const { data: unlockRows } = await supabase
+        .from('user_category_unlocks')
+        .select('category_id, end_date')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .gt('end_date', new Date().toISOString());
+      setUnlockedCategoryIds(new Set((unlockRows || []).map((r: any) => r.category_id)));
+
       const { data: dbSessions } = await supabase.from('user_quiz_sessions').select('*').eq('user_id', user.id).is('test_duration_seconds', null).order('updated_at', { ascending: false });
       if (dbSessions) {
         setActiveSavedQuizzes(dbSessions.map((dbSession: DbQuizSession) => ({
@@ -460,6 +476,8 @@ const QuizPage = () => {
           isOffline: false,
         } as LoadedQuizSession)));
       }
+    } else {
+      setUnlockedCategoryIds(new Set());
     }
 
     setCategoryStats(categoriesWithStats);
@@ -505,12 +523,12 @@ const QuizPage = () => {
     const isGuestUser = !user;
 
     // Check if user is allowed to access this category
-    if (!isSubscribed && selectedCategoryId !== ALL_TRIAL_MCQS_ID) {
+    if (!canAccessCategory(selectedCategoryId)) {
       setIsUpgradeDialogOpen(true);
       return;
     }
 
-    let sessionIsTrial = selectedCategoryId === ALL_TRIAL_MCQS_ID || isGuestUser || !isSubscribed;
+    let sessionIsTrial = selectedCategoryId === ALL_TRIAL_MCQS_ID || isGuestUser || (!isSubscribed && !unlockedCategoryIds.has(selectedCategoryId || ''));
     
     if (sessionIsTrial && mode === 'incorrect') {
       toast({ title: "Feature Restricted", description: "This feature is only available for subscribed users.", variant: "default" });
@@ -938,7 +956,7 @@ const QuizPage = () => {
                         <span>Accuracy: <span className="text-foreground font-bold">{cat.user_accuracy}</span></span>
                         <span>Attempts: <span className="text-foreground font-bold">{cat.user_attempts}</span></span>
                     </div>
-                    {!user?.has_active_subscription && !cat.is_trial_virtual && cat.total_trial_mcqs < cat.total_mcqs && (
+                    {!canAccessCategory(cat.id) && !cat.is_trial_virtual && cat.total_trial_mcqs < cat.total_mcqs && (
                         <div className="flex items-center gap-1 text-[10px] text-orange-600 font-bold bg-orange-50 dark:bg-orange-950/20 p-1.5 rounded-lg">
                             <Lock className="h-3 w-3" />
                             <span>{cat.total_mcqs - cat.total_trial_mcqs} locked</span>

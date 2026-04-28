@@ -297,7 +297,7 @@ const QuizPage = () => {
     const categoriesMap = new Map(categoriesData?.map(cat => [cat.id, cat]) || []);
     
     // Efficiently count all MCQs and Trial MCQs in a single step to avoid N+1 queries
-    const { data: totalLinks } = await supabase.from('mcq_category_links').select('category_id');
+    const { data: totalLinks } = await supabase.from('mcq_category_links').select('category_id, mcq_id');
     const { data: trialMcqs } = await supabase.from('mcqs').select('id').eq('is_trial_mcq', true);
     const trialMcqSet = new Set(trialMcqs?.map(m => m.id) || []);
     
@@ -412,6 +412,39 @@ const QuizPage = () => {
     setIsPageLoading(false);
   };
 
+  const fetchMcqsByIdsBatched = async (ids: string[]): Promise<MCQ[]> => {
+    if (ids.length === 0) return [];
+
+    const batchSize = 500;
+    const combined: any[] = [];
+
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batch = ids.slice(i, i + batchSize);
+      const { data, error } = await supabase
+        .from('mcqs')
+        .select('*, mcq_category_links(category_id, categories(name))')
+        .in('id', batch);
+
+      if (error) throw error;
+      combined.push(...(data || []));
+    }
+
+    const byId = new Map(
+      combined.map((m: any) => [
+        m.id,
+        {
+          ...m,
+          category_links: (m.mcq_category_links || []).map((l: any) => ({
+            category_id: l.category_id,
+            category_name: l.categories?.name,
+          })),
+        } as MCQ,
+      ])
+    );
+
+    return ids.map((id) => byId.get(id)).filter((m): m is MCQ => !!m);
+  };
+
   const startQuizSession = async (selectedCategoryId: string | null, mode: 'random' | 'incorrect', isOffline: boolean) => {
     setIsOfflineQuiz(isOffline);
     const isSubscribed = user?.has_active_subscription;
@@ -440,22 +473,48 @@ const QuizPage = () => {
           mcqsToLoad = await getOfflineMcqs(shuffleArray(mcqIdsToConsider));
         } else {
           let baseMcqQuery = supabase.from('mcqs').select('id, is_trial_mcq');
-          
+
           if (selectedCategoryId === ALL_TRIAL_MCQS_ID) {
-              baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
+            baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
+            const { data: idsData } = await baseMcqQuery;
+            mcqIdsToConsider = idsData?.map(m => m.id) || [];
           } else if (selectedCategoryId === UNCATEGORIZED_ID) {
             const { data: links } = await supabase.from('mcq_category_links').select('mcq_id');
             const categorized = Array.from(new Set(links?.map(l => l.mcq_id) || []));
-            if (categorized.length > 0) baseMcqQuery = baseMcqQuery.not('id', 'in', `(\${categorized.join(',')})`);
+            if (categorized.length > 0) baseMcqQuery = baseMcqQuery.not('id', 'in', `(${categorized.join(',')})`);
+            if (sessionIsTrial) baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
+            const { data: idsData } = await baseMcqQuery;
+            mcqIdsToConsider = idsData?.map(m => m.id) || [];
           } else if (selectedCategoryId) {
-            const { data: links = [] } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', selectedCategoryId);
-            baseMcqQuery = baseMcqQuery.in('id', Array.from(new Set(links?.map(l => l.mcq_id) || [])));
+            const { data: links = [] } = await supabase
+              .from('mcq_category_links')
+              .select('mcq_id')
+              .eq('category_id', selectedCategoryId);
+
+            const linkedIds = Array.from(new Set(links?.map(l => l.mcq_id) || []));
+
+            if (linkedIds.length > 0 && sessionIsTrial) {
+              const trialFiltered: string[] = [];
+              const batchSize = 500;
+              for (let i = 0; i < linkedIds.length; i += batchSize) {
+                const batch = linkedIds.slice(i, i + batchSize);
+                const { data: trialIds, error } = await supabase
+                  .from('mcqs')
+                  .select('id')
+                  .in('id', batch)
+                  .eq('is_trial_mcq', true);
+                if (error) throw error;
+                trialFiltered.push(...(trialIds?.map(m => m.id) || []));
+              }
+              mcqIdsToConsider = trialFiltered;
+            } else {
+              mcqIdsToConsider = linkedIds;
+            }
+          } else {
+            if (sessionIsTrial) baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
+            const { data: idsData } = await baseMcqQuery;
+            mcqIdsToConsider = idsData?.map(m => m.id) || [];
           }
-          
-          if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
-          
-          const { data: idsData } = await baseMcqQuery;
-          mcqIdsToConsider = idsData?.map(m => m.id) || [];
 
           if (mode === 'incorrect' && user && isSubscribed) {
             const { data: attempts } = await supabase.from('user_quiz_attempts').select('mcq_id').eq('user_id', user.id).in('mcq_id', mcqIdsToConsider).eq('is_correct', false);
@@ -465,19 +524,7 @@ const QuizPage = () => {
           let finalIds = shuffleArray(mcqIdsToConsider);
           if (sessionIsTrial && selectedCategoryId !== ALL_TRIAL_MCQS_ID) finalIds = finalIds.slice(0, TRIAL_MCQ_LIMIT);
 
-          const { data: mcqs } = await supabase.from('mcqs').select('*, mcq_category_links(category_id, categories(name))').in('id', finalIds);
-          
-          mcqsToLoad = finalIds.map(id => {
-            const m = (mcqs || []).find(x => x.id === id);
-            if (!m) return null;
-            return { 
-                ...m, 
-                category_links: m.mcq_category_links.map((l: any) => ({ 
-                    category_id: l.category_id, 
-                    category_name: l.categories?.name 
-                })) 
-            };
-          }).filter((m): m is MCQ => !!m);
+          mcqsToLoad = await fetchMcqsByIdsBatched(finalIds);
         }
 
         if (mcqsToLoad.length === 0) {
@@ -521,8 +568,7 @@ const QuizPage = () => {
         if (loadedSession.isOffline) {
             mcqsData = await getOfflineMcqs(loadedSession.mcqs.map(m => m.id));
         } else {
-            const { data } = await supabase.from('mcqs').select('*, mcq_category_links(category_id, categories(name))').in('id', loadedSession.mcqs.map(m => m.id));
-            mcqsData = (data || []).map((m: any) => ({ ...m, category_links: m.mcq_category_links.map((l: any) => ({ category_id: l.category_id, category_name: l.categories?.name })) }));
+            mcqsData = await fetchMcqsByIdsBatched(loadedSession.mcqs.map(m => m.id));
         }
 
         mcqsData = loadedSession.mcqs.map(l => mcqsData.find(f => f.id === l.id)).filter((m): m is MCQ => !!m);

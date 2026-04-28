@@ -271,6 +271,32 @@ const QuizPage = () => {
     }
   }, []);
 
+  const fetchAllLinkedMcqIds = async (): Promise<Set<string>> => {
+    const linkedIds = new Set<string>();
+    const pageSize = 1000;
+    let from = 0;
+
+    while (true) {
+      const to = from + pageSize - 1;
+      const { data, error } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id')
+        .range(from, to);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      data.forEach((row: any) => {
+        if (row.mcq_id) linkedIds.add(row.mcq_id);
+      });
+
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+
+    return linkedIds;
+  };
+
   const fetchQuizOverview = async () => {
     setIsPageLoading(true);
 
@@ -318,7 +344,10 @@ const QuizPage = () => {
 
     const { count: totalMcqCount } = await supabase.from('mcqs').select('id', { count: 'exact', head: true });
     
-    const uniqueLinkedMcqIds = new Set(totalLinks?.map(l => (l as any).mcq_id) || []);
+    let uniqueLinkedMcqIds = new Set(totalLinks?.map(l => (l as any).mcq_id).filter(Boolean) || []);
+    if (totalLinks && totalLinks.length >= 1000) {
+      uniqueLinkedMcqIds = await fetchAllLinkedMcqIds();
+    }
     const uncategorizedTotal = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
     
     let userAttemptsData: any[] = [];
@@ -479,8 +508,7 @@ const QuizPage = () => {
             const { data: idsData } = await baseMcqQuery;
             mcqIdsToConsider = idsData?.map(m => m.id) || [];
           } else if (selectedCategoryId === UNCATEGORIZED_ID) {
-            const { data: links } = await supabase.from('mcq_category_links').select('mcq_id');
-            const categorized = Array.from(new Set(links?.map(l => l.mcq_id) || []));
+            let categorized = Array.from(await fetchAllLinkedMcqIds());
             if (categorized.length > 0) baseMcqQuery = baseMcqQuery.not('id', 'in', `(${categorized.join(',')})`);
             if (sessionIsTrial) baseMcqQuery = baseMcqQuery.eq('is_trial_mcq', true);
             const { data: idsData } = await baseMcqQuery;

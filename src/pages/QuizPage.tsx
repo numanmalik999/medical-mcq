@@ -271,8 +271,37 @@ const QuizPage = () => {
     }
   }, []);
 
+  const fetchAllCategoryLinks = async (): Promise<Array<{ mcq_id: string; category_id: string }>> => {
+    const allLinks: Array<{ mcq_id: string; category_id: string }> = [];
+    const pageSize = 1000;
+    let from = 0;
+
+    while (true) {
+      const to = from + pageSize - 1;
+      const { data, error } = await supabase
+        .from('mcq_category_links')
+        .select('mcq_id, category_id')
+        .range(from, to);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      allLinks.push(...(data as Array<{ mcq_id: string; category_id: string }>));
+
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+
+    return allLinks;
+  };
+
   const fetchAllLinkedMcqIds = async (): Promise<Set<string>> => {
-    const linkedIds = new Set<string>();
+    const allLinks = await fetchAllCategoryLinks();
+    return new Set(allLinks.map((row) => row.mcq_id).filter(Boolean));
+  };
+
+  const fetchMcqIdsByCategoryPaged = async (categoryId: string): Promise<string[]> => {
+    const ids = new Set<string>();
     const pageSize = 1000;
     let from = 0;
 
@@ -281,20 +310,21 @@ const QuizPage = () => {
       const { data, error } = await supabase
         .from('mcq_category_links')
         .select('mcq_id')
+        .eq('category_id', categoryId)
         .range(from, to);
 
       if (error) throw error;
       if (!data || data.length === 0) break;
 
       data.forEach((row: any) => {
-        if (row.mcq_id) linkedIds.add(row.mcq_id);
+        if (row.mcq_id) ids.add(row.mcq_id);
       });
 
       if (data.length < pageSize) break;
       from += pageSize;
     }
 
-    return linkedIds;
+    return Array.from(ids);
   };
 
   const fetchQuizOverview = async () => {
@@ -322,32 +352,24 @@ const QuizPage = () => {
 
     const categoriesMap = new Map(categoriesData?.map(cat => [cat.id, cat]) || []);
     
-    // Efficiently count all MCQs and Trial MCQs in a single step to avoid N+1 queries
-    const { data: totalLinks } = await supabase.from('mcq_category_links').select('category_id, mcq_id');
+    // Build counts from fully paginated link data to avoid 1000-row caps.
+    const allLinks = await fetchAllCategoryLinks();
     const { data: trialMcqs } = await supabase.from('mcqs').select('id').eq('is_trial_mcq', true);
     const trialMcqSet = new Set(trialMcqs?.map(m => m.id) || []);
-    
-    const { data: trialLinks } = await supabase.from('mcq_category_links').select('category_id, mcq_id');
-    
+
     const categoryTotalCounts = new Map<string, number>();
     const categoryTrialCounts = new Map<string, number>();
-    
-    totalLinks?.forEach(l => {
-        categoryTotalCounts.set(l.category_id, (categoryTotalCounts.get(l.category_id) || 0) + 1);
-    });
-    
-    trialLinks?.forEach(l => {
-        if (trialMcqSet.has(l.mcq_id)) {
-            categoryTrialCounts.set(l.category_id, (categoryTrialCounts.get(l.category_id) || 0) + 1);
-        }
+
+    allLinks.forEach((l) => {
+      categoryTotalCounts.set(l.category_id, (categoryTotalCounts.get(l.category_id) || 0) + 1);
+      if (trialMcqSet.has(l.mcq_id)) {
+        categoryTrialCounts.set(l.category_id, (categoryTrialCounts.get(l.category_id) || 0) + 1);
+      }
     });
 
     const { count: totalMcqCount } = await supabase.from('mcqs').select('id', { count: 'exact', head: true });
     
-    let uniqueLinkedMcqIds = new Set(totalLinks?.map(l => (l as any).mcq_id).filter(Boolean) || []);
-    if (totalLinks && totalLinks.length >= 1000) {
-      uniqueLinkedMcqIds = await fetchAllLinkedMcqIds();
-    }
+    const uniqueLinkedMcqIds = await fetchAllLinkedMcqIds();
     const uncategorizedTotal = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
     
     let userAttemptsData: any[] = [];
@@ -514,12 +536,7 @@ const QuizPage = () => {
             const { data: idsData } = await baseMcqQuery;
             mcqIdsToConsider = idsData?.map(m => m.id) || [];
           } else if (selectedCategoryId) {
-            const { data: links = [] } = await supabase
-              .from('mcq_category_links')
-              .select('mcq_id')
-              .eq('category_id', selectedCategoryId);
-
-            const linkedIds = Array.from(new Set(links?.map(l => l.mcq_id) || []));
+            const linkedIds = await fetchMcqIdsByCategoryPaged(selectedCategoryId);
 
             if (linkedIds.length > 0 && sessionIsTrial) {
               const trialFiltered: string[] = [];

@@ -73,12 +73,19 @@ const Login = () => {
                 <Separator className="flex-1" />
             </div>
 
-            <p className="text-center text-sm text-muted-foreground">
-              Don't have an account?{" "}
-              <Link to="/signup" className="text-primary font-black uppercase hover:underline">
-                Sign Up
-              </Link>
-            </p>
+            <div className="space-y-2 text-center text-sm text-muted-foreground">
+              <p>
+                <Link to="/forgot-password" className="text-primary font-black uppercase hover:underline">
+                  Forgot Password?
+                </Link>
+              </p>
+              <p>
+                Don't have an account?{" "}
+                <Link to="/signup" className="text-primary font-black uppercase hover:underline">
+                  Sign Up
+                </Link>
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>

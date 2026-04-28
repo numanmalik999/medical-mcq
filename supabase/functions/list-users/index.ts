@@ -33,17 +33,29 @@ serve(async (req) => {
     // For this example, we'll assume the presence of a token from an authenticated user is sufficient
     // as this function is called from an authenticated admin page.
 
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers();
+    const perPage = 1000;
+    let page = 1;
+    const allUsers: any[] = [];
 
-    if (error) {
-      console.error('Error listing users:', error);
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    while (true) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+
+      if (error) {
+        console.error('Error listing users:', error);
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const users = data?.users || [];
+      allUsers.push(...users);
+
+      if (users.length < perPage) break;
+      page += 1;
     }
 
-    return new Response(JSON.stringify(data.users), {
+    return new Response(JSON.stringify(allUsers), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

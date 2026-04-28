@@ -37,7 +37,8 @@ serve(async (req: Request) => {
       phone_number, 
       whatsapp_number, 
       has_active_subscription, 
-      subscriptionEndDate 
+      subscriptionEndDate,
+      admin_category_unlock
     } = await req.json();
 
     if (!id) {
@@ -148,7 +149,46 @@ serve(async (req: Request) => {
       }
     }
 
-    return new Response(JSON.stringify({ message: 'User profile and subscription updated successfully.' }), {
+    if (admin_category_unlock?.category_id) {
+      const duration = Number(admin_category_unlock.duration_in_months);
+      if (![1, 2, 3].includes(duration)) {
+        throw new Error('Invalid category unlock duration. Allowed values: 1, 2, 3 months.');
+      }
+
+      const { data: existingUnlock } = await supabaseAdmin
+        .from('user_category_unlocks')
+        .select('end_date')
+        .eq('user_id', id)
+        .eq('category_id', admin_category_unlock.category_id)
+        .maybeSingle();
+
+      const now = new Date();
+      const existingEnd = existingUnlock?.end_date ? new Date(existingUnlock.end_date) : null;
+      const startFrom = existingEnd && existingEnd > now ? existingEnd : now;
+      const endDate = new Date(startFrom);
+      endDate.setMonth(endDate.getMonth() + duration);
+
+      const { error: unlockError } = await supabaseAdmin
+        .from('user_category_unlocks')
+        .upsert({
+          user_id: id,
+          category_id: admin_category_unlock.category_id,
+          status: 'active',
+          start_date: now.toISOString(),
+          end_date: endDate.toISOString(),
+          stripe_checkout_session_id: null,
+          stripe_customer_id: null,
+          stripe_price_id: null,
+          purchase_type: 'admin_manual'
+        }, { onConflict: 'user_id,category_id' });
+
+      if (unlockError) {
+        console.error('Error applying manual category unlock:', unlockError);
+        throw new Error(`Failed to apply category unlock: ${unlockError.message}`);
+      }
+    }
+
+    return new Response(JSON.stringify({ message: 'User profile, subscription, and category access updated successfully.' }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

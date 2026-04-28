@@ -50,6 +50,7 @@ const QuestionOfTheDayPage = lazy(() => import("./pages/QuestionOfTheDayPage"));
 const ManageDailyMcqsPage = lazy(() => import("./pages/ManageDailyMcqsPage"));
 const PasswordResetPage = lazy(() => import("./pages/PasswordResetPage"));
 const ReviewsPage = lazy(() => import("./pages/ReviewsPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const UserSuggestionsPage = lazy(() => import("./pages/UserSuggestionsPage"));
 const ManageSuggestionsPage = lazy(() => import("./pages/ManageSuggestionsPage"));
 const ManageVideosPage = lazy(() => import("./pages/ManageVideosPage"));
@@ -112,6 +113,7 @@ const AppContent = () => {
             <Route path="/blog/:slug" element={<BlogDetailsPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<PasswordResetPage />} />
             <Route path="/:slug" element={<GenericStaticPage />} />
           </Route>

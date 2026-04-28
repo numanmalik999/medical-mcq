@@ -13,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User as UserIcon, CalendarIcon, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, differenceInDays } from 'date-fns';
@@ -56,6 +57,9 @@ interface EditUserDialogProps {
 const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDialogProps) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [manualCategoryId, setManualCategoryId] = useState<string>('none');
+  const [manualDurationMonths, setManualDurationMonths] = useState<'1' | '2' | '3'>('1');
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -109,6 +113,18 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
   useEffect(() => {
     if (open) {
       fetchSubscriptionData();
+
+      supabase
+        .from('categories')
+        .select('id, name')
+        .order('name', { ascending: true })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error loading categories:', error);
+            return;
+          }
+          setCategories((data || []) as Array<{ id: string; name: string }>);
+        });
     }
   }, [open, fetchSubscriptionData]);
 
@@ -125,6 +141,12 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
         whatsapp_number: values.whatsapp_number || null,
         has_active_subscription: values.has_active_subscription,
         subscriptionEndDate: values.subscriptionEndDate?.toISOString() || null,
+        admin_category_unlock: manualCategoryId !== 'none'
+          ? {
+              category_id: manualCategoryId,
+              duration_in_months: Number(manualDurationMonths),
+            }
+          : null,
       };
 
       // Call the secure Edge Function to handle all updates
@@ -138,7 +160,7 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
 
       toast({
         title: "Success!",
-        description: "User profile and subscription status updated successfully.",
+        description: "User profile, subscription status, and category unlocks updated successfully.",
       });
       
       setTimeout(() => {
@@ -341,6 +363,45 @@ const EditUserDialog = ({ open, onOpenChange, userProfile, onSave }: EditUserDia
                 )}
               />
             )}
+
+            <FormItem className="rounded-lg border p-4 space-y-3">
+              <div className="space-y-0.5">
+                <FormLabel className="text-base">Manual Category Activation</FormLabel>
+                <FormDescription>
+                  Grant paid category access directly for this user (for offline/direct payments).
+                </FormDescription>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <FormLabel>Category</FormLabel>
+                  <Select value={manualCategoryId} onValueChange={setManualCategoryId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No manual activation</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <FormLabel>Duration</FormLabel>
+                  <Select value={manualDurationMonths} onValueChange={(v) => setManualDurationMonths(v as '1' | '2' | '3')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 month</SelectItem>
+                      <SelectItem value="2">2 months</SelectItem>
+                      <SelectItem value="3">3 months</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </FormItem>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)} type="button">Cancel</Button>

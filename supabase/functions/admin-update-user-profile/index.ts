@@ -175,11 +175,7 @@ serve(async (req: Request) => {
           category_id: admin_category_unlock.category_id,
           status: 'active',
           start_date: now.toISOString(),
-          end_date: endDate.toISOString(),
-          stripe_checkout_session_id: null,
-          stripe_customer_id: null,
-          stripe_price_id: null,
-          purchase_type: 'admin_manual'
+          end_date: endDate.toISOString()
         }, { onConflict: 'user_id,category_id' });
 
       if (unlockError) {

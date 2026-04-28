@@ -57,7 +57,10 @@ const UserSubscriptionsPage = () => {
       console.error('Error fetching subscription tiers:', tiersError);
       toast({ title: "Error", description: "Failed to load subscription plans.", variant: "destructive" });
     } else {
-      setSubscriptionTiers(tiersData || []);
+      setSubscriptionTiers((tiersData || []).filter((t: any) => {
+        const name = (t?.name || '').toLowerCase();
+        return !name.includes('3 day') && !name.includes('3-day');
+      }));
     }
 
     if (user) {

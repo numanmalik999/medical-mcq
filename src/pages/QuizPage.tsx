@@ -125,6 +125,7 @@ const QuizPage = () => {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [isDiscussionOpen, setIsDiscussionOpen] = useState(false);
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
+  const [upgradeTargetCategoryId, setUpgradeTargetCategoryId] = useState<string | null>(null);
   const [unlockedCategoryIds, setUnlockedCategoryIds] = useState<Set<string>>(new Set());
 
   const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<LoadedQuizSession[]>([]);
@@ -524,6 +525,7 @@ const QuizPage = () => {
 
     // Check if user is allowed to access this category
     if (!canAccessCategory(selectedCategoryId)) {
+      setUpgradeTargetCategoryId(selectedCategoryId);
       setIsUpgradeDialogOpen(true);
       return;
     }
@@ -978,9 +980,10 @@ const QuizPage = () => {
         
         <SubscribePromptDialog 
             open={isUpgradeDialogOpen} 
-            onOpenChange={setIsUpgradeDialogOpen} 
-            featureName="Specialty Question Bank" 
-            description="Accessing full specialties and historical mistake reviews is a premium feature. Please upgrade to unlock the complete Gulf licensing curriculum."
+            onOpenChange={setIsUpgradeDialogOpen}
+            featureName="Specialty Question Bank"
+            description="Select a plan below to unlock now."
+            lockedCategoryId={upgradeTargetCategoryId}
         />
       </div>
     );

@@ -747,7 +747,7 @@ const QuizPage = () => {
     if (hasCheckedInitialSession) {
       fetchQuizOverview();
     }
-  }, [hasCheckedInitialSession, user]);
+  }, [hasCheckedInitialSession, user?.id]);
 
   if (!hasCheckedInitialSession || isPageLoading) return <LoadingBar />;
 

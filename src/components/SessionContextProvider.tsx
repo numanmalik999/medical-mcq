@@ -119,11 +119,17 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (!isMounted.current) return;
-      
+
       setSession(currentSession);
-      
+
       if (currentSession) {
-        hydrateProfile(currentSession.user);
+        // Avoid re-hydrating user profile on background token refreshes,
+        // which can cause page-level loading states to fire when the app regains focus.
+        if (event !== 'TOKEN_REFRESHED') {
+          hydrateProfile(currentSession.user);
+        } else {
+          setHasCheckedInitialSession(true);
+        }
       } else {
         setUser(null);
         setHasCheckedInitialSession(true);

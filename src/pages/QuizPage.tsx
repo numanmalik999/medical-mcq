@@ -80,6 +80,7 @@ interface LoadedQuizSession {
 const TRIAL_MCQ_LIMIT = 50;
 const ALL_TRIAL_MCQS_ID = 'all-trial-mcqs-virtual-id';
 const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id';
+const QUIZ_DRAFT_STORAGE_PREFIX = 'quiz-draft-v1';
 
 function shuffleArray<T>(array: T[]): T[] {
   const newArray = [...array];
@@ -137,6 +138,8 @@ const QuizPage = () => {
 
   // --- Hooks that depend on currentMcq ---
   const { isBookmarked, toggleBookmark, isLoading: isBookmarkLoading } = useBookmark(currentMcq?.id || null);
+
+  const storageKey = `${QUIZ_DRAFT_STORAGE_PREFIX}:${user?.id || 'guest'}`;
 
   // Sync search query from URL to state
   useEffect(() => {
@@ -714,6 +717,7 @@ const QuizPage = () => {
     setQuizQuestions([]);
     setCurrentQuestionIndex(0);
     setUserAnswers(new Map());
+    sessionStorage.removeItem(storageKey);
     fetchQuizOverview();
   };
 
@@ -739,6 +743,7 @@ const QuizPage = () => {
     setScore(count);
     setShowResults(true);
     if (currentDbSessionId && !isOfflineQuiz) clearSpecificQuizState(currentDbSessionId);
+    sessionStorage.removeItem(storageKey);
   };
 
   const filteredCategories = categoryStats.filter(cat => cat.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -748,6 +753,105 @@ const QuizPage = () => {
       fetchQuizOverview();
     }
   }, [hasCheckedInitialSession, user?.id]);
+
+  // Restore in-progress quiz from sessionStorage after hard reload/discard.
+  useEffect(() => {
+    if (!hasCheckedInitialSession || showResults) return;
+
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as {
+        questionIds: string[];
+        userAnswers: Array<[string, UserAnswerData]>;
+        currentQuestionIndex: number;
+        currentQuizCategoryId: string | null;
+        isTrialActiveSession: boolean;
+        isOfflineQuiz: boolean;
+        showCategorySelection: boolean;
+      };
+
+      if (!parsed?.questionIds?.length || parsed.showCategorySelection) return;
+
+      const restore = async () => {
+        setIsInitializingQuiz(true);
+        try {
+          const restoredMcqs = parsed.isOfflineQuiz
+            ? await getOfflineMcqs(parsed.questionIds)
+            : await fetchMcqsByIdsBatched(parsed.questionIds);
+
+          if (!restoredMcqs.length) return;
+
+          const orderedMcqs = parsed.questionIds
+            .map((id) => restoredMcqs.find((m) => m.id === id))
+            .filter((m): m is MCQ => !!m);
+
+          if (!orderedMcqs.length) return;
+
+          const restoredAnswers = new Map<string, UserAnswerData>(parsed.userAnswers || []);
+          const safeIndex = Math.min(Math.max(parsed.currentQuestionIndex || 0, 0), orderedMcqs.length - 1);
+          const cur = orderedMcqs[safeIndex];
+          const ans = restoredAnswers.get(cur.id);
+
+          setQuizQuestions(orderedMcqs);
+          setUserAnswers(restoredAnswers);
+          setCurrentQuestionIndex(safeIndex);
+          setCurrentQuizCategoryId(parsed.currentQuizCategoryId ?? null);
+          setIsTrialActiveSession(!!parsed.isTrialActiveSession);
+          setIsOfflineQuiz(!!parsed.isOfflineQuiz);
+          setShowCategorySelection(false);
+          setSelectedAnswer(ans?.selectedOption || null);
+          setFeedback(ans?.submitted ? (ans.isCorrect ? 'Correct!' : `Incorrect. Correct: ${cur.correct_answer}.`) : null);
+          setShowExplanation(!!ans?.submitted);
+        } finally {
+          setIsInitializingQuiz(false);
+        }
+      };
+
+      restore();
+    } catch {
+      // Ignore restore parse/load errors.
+    }
+  }, [hasCheckedInitialSession, showResults, storageKey, getOfflineMcqs]);
+
+  // Persist in-progress quiz state so focus/tab/app switches don't lose progress on refresh/discard.
+  useEffect(() => {
+    if (!hasCheckedInitialSession || showResults || showCategorySelection || quizQuestions.length === 0) return;
+
+    const persist = () => {
+      const payload = {
+        questionIds: quizQuestions.map((q) => q.id),
+        userAnswers: Array.from(userAnswers.entries()),
+        currentQuestionIndex,
+        currentQuizCategoryId,
+        isTrialActiveSession,
+        isOfflineQuiz,
+        showCategorySelection,
+      };
+      sessionStorage.setItem(storageKey, JSON.stringify(payload));
+    };
+
+    persist();
+    window.addEventListener('pagehide', persist);
+    document.addEventListener('visibilitychange', persist);
+
+    return () => {
+      window.removeEventListener('pagehide', persist);
+      document.removeEventListener('visibilitychange', persist);
+    };
+  }, [
+    hasCheckedInitialSession,
+    showResults,
+    showCategorySelection,
+    quizQuestions,
+    userAnswers,
+    currentQuestionIndex,
+    currentQuizCategoryId,
+    isTrialActiveSession,
+    isOfflineQuiz,
+    storageKey,
+  ]);
 
   if (!hasCheckedInitialSession || isPageLoading) return <LoadingBar />;
 

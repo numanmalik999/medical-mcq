@@ -174,6 +174,9 @@ const LandingPage = () => {
           <p className="text-base lg:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto font-medium">
             {settings.pricingCta.subtitle}
           </p>
+          <p className="mt-3 text-xs md:text-sm text-slate-500 dark:text-slate-400 font-semibold">
+            You can now choose between full premium plans or single-category unlocks (1, 2, or 3 months).
+          </p>
         </div>
         
         <div className="container px-4 mx-auto">
@@ -223,6 +226,48 @@ const LandingPage = () => {
                     </div>
                 );
             })}
+
+            <div className="relative flex flex-col p-8 bg-white dark:bg-slate-800 rounded-3xl border-2 border-dashed border-primary/50 shadow-sm hover:shadow-lg transition-all duration-500">
+              <div className="mb-6">
+                <h3 className="text-lg font-black mb-2 text-slate-900 dark:text-white uppercase tracking-tight">Single Category Plan</h3>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-black text-slate-900 dark:text-white">Flexible</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-widest">1 / 2 / 3 month access options</p>
+              </div>
+              <ul className="space-y-4 mb-8 flex-1">
+                <li className="flex items-start gap-2">
+                  <div className="mt-1 bg-green-100 dark:bg-green-900/30 p-1 rounded-full shrink-0">
+                    <Check className="w-2.5 h-2.5 text-green-600" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 leading-tight">Unlock only the category you need</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <div className="mt-1 bg-green-100 dark:bg-green-900/30 p-1 rounded-full shrink-0">
+                    <Check className="w-2.5 h-2.5 text-green-600" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 leading-tight">Category-specific pricing based on your selected track</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <div className="mt-1 bg-green-100 dark:bg-green-900/30 p-1 rounded-full shrink-0">
+                    <Check className="w-2.5 h-2.5 text-green-600" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 leading-tight">Upgrade to full premium anytime</span>
+                </li>
+              </ul>
+              <Link to="/subscription" className="mt-auto">
+                <Button className="w-full h-12 rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all" variant="outline">
+                  View & Select Category Plan
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-6 text-center">
+            <Link to="/subscription" className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline">
+              See full plan comparison and category pricing
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
           
           <div className="mt-16 max-w-2xl mx-auto text-center p-8 bg-primary text-primary-foreground rounded-3xl shadow-xl relative overflow-hidden">

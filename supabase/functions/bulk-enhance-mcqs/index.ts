@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 // @ts-ignore
-import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.14.0";
+import OpenAI from 'https://esm.sh/openai@4.52.0?target=deno';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,7 +37,8 @@ async function generateEnhancedContent(
   question: string,
   options: { A: string; B: string; C: string; D: string },
   categoryList: string[],
-  model: any,
+  openai: any,
+  openaiModel: string,
   isUncategorized: boolean
 ) {
   const categoryInstruction = isUncategorized 
@@ -68,10 +69,17 @@ async function generateEnhancedContent(
   Expected JSON structure:
   {"correct_answer": "...", "explanation_text": "...", "difficulty": "...", "suggested_category_name": "..."}`;
 
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  const text = response.text();
-  
+  const completion = await openai.chat.completions.create({
+    model: openaiModel,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.2,
+  });
+
+  const text = completion.choices?.[0]?.message?.content ?? '';
+  if (!text) {
+    throw new Error('AI returned an empty response.');
+  }
+
   return parseAiJson(text);
 }
 
@@ -83,9 +91,41 @@ serve(async (req: Request) => {
     if (!mcq_ids || !Array.isArray(mcq_ids)) throw new Error('Missing mcq_ids array');
 
     // @ts-ignore
-    const geminiKey = Deno.env.get('GEMINI_API_KEY');
-    const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    // @ts-ignore
+    const openaiBaseUrl = Deno.env.get('OPENAI_BASE_URL');
+    // @ts-ignore
+    const openaiModel = Deno.env.get('OPENAI_MODEL') || 'gpt-4o-mini';
+
+    if (!openaiApiKey) {
+      throw new Error('OPENAI_API_KEY is not set.');
+    }
+
+    const normalizedBaseUrl = openaiBaseUrl?.trim().replace(/\/$/, '');
+    const baseUrlCandidates = normalizedBaseUrl
+      ? (normalizedBaseUrl.endsWith('/v1') ? [normalizedBaseUrl] : [normalizedBaseUrl, `${normalizedBaseUrl}/v1`])
+      : [undefined];
+
+    let openai: any = null;
+    let lastError: any = null;
+
+    for (const candidate of baseUrlCandidates) {
+      try {
+        openai = new OpenAI({
+          apiKey: openaiApiKey,
+          ...(candidate ? { baseURL: candidate } : {}),
+        });
+
+        await openai.models.list();
+        break;
+      } catch (err: any) {
+        lastError = err;
+      }
+    }
+
+    if (!openai) {
+      throw lastError || new Error('Failed to initialize OpenAI client.');
+    }
 
     // @ts-ignore
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
@@ -96,7 +136,7 @@ serve(async (req: Request) => {
     const { data: mcqs } = await supabaseAdmin.from('mcqs').select('*').in('id', mcq_ids);
 
     let successCount = 0;
-    const errors = [];
+    const errors: string[] = [];
 
     for (const mcq of (mcqs || [])) {
       try {
@@ -112,7 +152,8 @@ serve(async (req: Request) => {
           mcq.question_text, 
           { A: mcq.option_a, B: mcq.option_b, C: mcq.option_c, D: mcq.option_d }, 
           categoryList, 
-          model,
+          openai,
+          openaiModel,
           isUncategorized
         );
 

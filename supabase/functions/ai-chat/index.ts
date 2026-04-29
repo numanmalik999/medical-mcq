@@ -1,7 +1,7 @@
 // @ts-ignore
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // @ts-ignore
-import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.14.0";
+import OpenAI from 'https://esm.sh/openai@4.52.0?target=deno';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,32 +10,59 @@ const corsHeaders = {
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-  
+
   try {
     // @ts-ignore
-    const geminiKey = Deno.env.get('GEMINI_API_KEY');
-    const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    // @ts-ignore
+    const openaiBaseUrl = Deno.env.get('OPENAI_BASE_URL');
+    // @ts-ignore
+    const openaiModel = Deno.env.get('OPENAI_MODEL') || 'gpt-4o-mini';
+
+    if (!openaiApiKey) {
+      throw new Error('OPENAI_API_KEY is not set.');
+    }
+
+    const normalizedBaseUrl = openaiBaseUrl?.trim().replace(/\/$/, '');
+    const baseUrlCandidates = normalizedBaseUrl
+      ? (normalizedBaseUrl.endsWith('/v1') ? [normalizedBaseUrl] : [normalizedBaseUrl, `${normalizedBaseUrl}/v1`])
+      : [undefined];
 
     const { messages } = await req.json();
-    
-    // Convert OpenAI format to Gemini format
-    const chat = model.startChat({
-      history: messages.slice(0, -1).map((m: any) => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }],
-      })),
-    });
 
-    const userMessage = messages[messages.length - 1].content;
-    const result = await chat.sendMessageStream(userMessage);
+    let stream: any = null;
+    let lastError: any = null;
+
+    for (const candidate of baseUrlCandidates) {
+      try {
+        const openai = new OpenAI({
+          apiKey: openaiApiKey,
+          ...(candidate ? { baseURL: candidate } : {}),
+        });
+
+        stream = await openai.chat.completions.create({
+          model: openaiModel,
+          messages,
+          stream: true,
+        });
+        break;
+      } catch (err: any) {
+        lastError = err;
+      }
+    }
+
+    if (!stream) {
+      throw lastError || new Error('Failed to initialize AI stream.');
+    }
 
     const readableStream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
-        for await (const chunk of result.stream) {
-          const chunkText = chunk.text();
-          const data = { choices: [{ delta: { content: chunkText } }] };
+        for await (const chunk of stream) {
+          const deltaText = chunk.choices?.[0]?.delta?.content ?? '';
+          if (!deltaText) continue;
+
+          const data = { choices: [{ delta: { content: deltaText } }] };
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
         }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
@@ -43,8 +70,13 @@ serve(async (req: Request) => {
       },
     });
 
-    return new Response(readableStream, { headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' } });
+    return new Response(readableStream, {
+      headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
+    });
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

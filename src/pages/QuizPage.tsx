@@ -130,6 +130,7 @@ const QuizPage = () => {
 
   const [activeSavedQuizzes, setActiveSavedQuizzes] = useState<LoadedQuizSession[]>([]);
   const [currentCorrectnessPercentage, setCurrentCorrectnessPercentage] = useState('0.00%');
+  const [totalGlobalCount, setTotalGlobalCount] = useState(0);
   
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
@@ -365,30 +366,38 @@ const QuizPage = () => {
     const categoriesMap = new Map(categoriesData?.map(cat => [cat.id, cat]) || []);
     
     // Build counts from fully paginated link data to avoid 1000-row caps.
-    const allLinks = await fetchAllCategoryLinks();
-    const { data: trialMcqs } = await supabase.from('mcqs').select('id').eq('is_trial_mcq', true);
-    const trialMcqSet = new Set(trialMcqs?.map(m => m.id) || []);
+    const allLinksPromise = fetchAllCategoryLinks();
+    const totalMcqCountPromise = supabase.from('mcqs').select('id', { count: 'exact', head: true });
+    const trialMcqIdsPromise = supabase.from('mcqs').select('id').eq('is_trial_mcq', true);
+    const userAttemptsPromise = user
+      ? supabase.from('user_quiz_attempts').select('is_correct, category_id').eq('user_id', user.id)
+      : Promise.resolve({ data: [] as any[] });
 
+    const [allLinks, totalMcqCountRes, trialMcqsRes, userAttemptsRes] = await Promise.all([
+      allLinksPromise,
+      totalMcqCountPromise,
+      trialMcqIdsPromise,
+      userAttemptsPromise,
+    ]);
+
+    const trialMcqSet = new Set((trialMcqsRes.data || []).map(m => m.id));
     const categoryTotalCounts = new Map<string, number>();
     const categoryTrialCounts = new Map<string, number>();
+    const uniqueLinkedMcqIds = new Set<string>();
 
     allLinks.forEach((l) => {
+      uniqueLinkedMcqIds.add(l.mcq_id);
       categoryTotalCounts.set(l.category_id, (categoryTotalCounts.get(l.category_id) || 0) + 1);
       if (trialMcqSet.has(l.mcq_id)) {
         categoryTrialCounts.set(l.category_id, (categoryTrialCounts.get(l.category_id) || 0) + 1);
       }
     });
 
-    const { count: totalMcqCount } = await supabase.from('mcqs').select('id', { count: 'exact', head: true });
-    
-    const uniqueLinkedMcqIds = await fetchAllLinkedMcqIds();
-    const uncategorizedTotal = (totalMcqCount || 0) - uniqueLinkedMcqIds.size;
-    
-    let userAttemptsData: any[] = [];
-    if (user) {
-      const { data } = await supabase.from('user_quiz_attempts').select('is_correct, category_id').eq('user_id', user.id);
-      userAttemptsData = data || [];
-    }
+    const totalMcqCount = totalMcqCountRes.count || 0;
+    setTotalGlobalCount(totalMcqCount);
+
+    const uncategorizedTotal = totalMcqCount - uniqueLinkedMcqIds.size;
+    const userAttemptsData: any[] = userAttemptsRes.data || [];
 
     const categoriesWithStats: CategoryStat[] = [];
     const categoryUserAttempts = new Map<string, { total: number; correct: number }>();
@@ -455,15 +464,26 @@ const QuizPage = () => {
     }
 
     if (user) {
-      const { data: unlockRows } = await supabase
-        .from('user_category_unlocks')
-        .select('category_id, end_date')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .gt('end_date', new Date().toISOString());
+      const [unlockRowsRes, dbSessionsRes] = await Promise.all([
+        supabase
+          .from('user_category_unlocks')
+          .select('category_id, end_date')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .gt('end_date', new Date().toISOString()),
+        supabase
+          .from('user_quiz_sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .is('test_duration_seconds', null)
+          .order('updated_at', { ascending: false }),
+      ]);
+
+      const unlockRows = unlockRowsRes.data;
+      const dbSessions = dbSessionsRes.data;
+
       setUnlockedCategoryIds(new Set((unlockRows || []).map((r: any) => r.category_id)));
 
-      const { data: dbSessions } = await supabase.from('user_quiz_sessions').select('*').eq('user_id', user.id).is('test_duration_seconds', null).order('updated_at', { ascending: false });
       if (dbSessions) {
         setActiveSavedQuizzes(dbSessions.map((dbSession: DbQuizSession) => ({
           dbSessionId: dbSession.id,
@@ -910,9 +930,17 @@ const QuizPage = () => {
         <Card className="w-full max-w-7xl mx-auto shadow-xl border-none">
           <CardHeader className="text-center pb-4 border-b">
             <CardTitle className="text-4xl font-extrabold text-foreground">Select a Practice Specialty</CardTitle>
-            <CardDescription className="text-lg mt-2">Access high-yield MCQs mapped to current Gulf licensing blueprints.</CardDescription>
+            <CardDescription className="text-lg mt-2">
+              Access high-yield MCQs mapped to current Gulf licensing blueprints.
+              <br />
+              <b>(You can subscribe to full access or purchase a single category based on your exam focus.)</b>
+            </CardDescription>
           </CardHeader>
           <CardContent className="pt-6 space-y-6">
+            <div className="text-center bg-primary/5 border border-primary/20 rounded-2xl py-5 px-4">
+              <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground font-semibold">Total MCQs Available</p>
+              <p className="text-5xl md:text-6xl font-black text-primary leading-none mt-2">{totalGlobalCount.toLocaleString()}</p>
+            </div>
             {activeSavedQuizzes.length > 0 && !isGuest && (
               <div className="p-4 rounded-2xl border border-border">
                 <h3 className="text-lg font-bold flex items-center gap-2 mb-3 text-foreground"><RotateCcw className="h-4 w-4 text-primary" /> Continue Recent Practice</h3>

@@ -31,13 +31,17 @@ interface DbMcqCategoryLink {
 
 type DisplayMCQ = MCQ;
 
-const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id'; 
+const UNCATEGORIZED_ID = 'uncategorized-mcqs-virtual-id';
+const MANAGE_MCQ_CACHE_KEY = 'manage-mcqs-page-cache-v1';
 
 const ManageMcqsPage = () => {
   const [rawMcqs, setRawMcqs] = useState<DisplayMCQ[]>([]); 
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isFetchingMcqs, setIsFetchingMcqs] = useState(false);
   const [totalGlobalCount, setTotalGlobalCount] = useState<number>(0);
+  const [serverPage, setServerPage] = useState(0);
+  const [serverPageSize] = useState(100);
+  const [serverTotalCount, setServerTotalCount] = useState(0);
   const { toast } = useToast();
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -52,6 +56,45 @@ const ManageMcqsPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { hasCheckedInitialSession } = useSession();
+
+  useEffect(() => {
+    const cached = sessionStorage.getItem(MANAGE_MCQ_CACHE_KEY);
+    if (!cached) return;
+
+    try {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed.rawMcqs)) setRawMcqs(parsed.rawMcqs);
+      if (Array.isArray(parsed.categories)) setCategories(parsed.categories);
+      if (typeof parsed.selectedFilterCategory === 'string' || parsed.selectedFilterCategory === null) {
+        setSelectedFilterCategory(parsed.selectedFilterCategory);
+      }
+      if (parsed.enhancementFilter === 'all' || parsed.enhancementFilter === 'enhanced' || parsed.enhancementFilter === 'unenhanced') {
+        setEnhancementFilter(parsed.enhancementFilter);
+      }
+      if (typeof parsed.searchTerm === 'string') setSearchTerm(parsed.searchTerm);
+      if (typeof parsed.totalGlobalCount === 'number') setTotalGlobalCount(parsed.totalGlobalCount);
+      if (typeof parsed.serverPage === 'number') setServerPage(parsed.serverPage);
+      if (typeof parsed.serverTotalCount === 'number') setServerTotalCount(parsed.serverTotalCount);
+      if (typeof parsed.isEditDialogOpen === 'boolean') setIsEditDialogOpen(false);
+      if (parsed.rawMcqs?.length || parsed.categories?.length) setIsPageLoading(false);
+    } catch {
+      sessionStorage.removeItem(MANAGE_MCQ_CACHE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    const payload = {
+      rawMcqs,
+      categories,
+      selectedFilterCategory,
+      enhancementFilter,
+      searchTerm,
+      totalGlobalCount,
+      serverPage,
+      serverTotalCount,
+    };
+    sessionStorage.setItem(MANAGE_MCQ_CACHE_KEY, JSON.stringify(payload));
+  }, [rawMcqs, categories, selectedFilterCategory, enhancementFilter, searchTerm, totalGlobalCount, serverPage, serverTotalCount]);
 
   const fetchCategories = async () => {
     const { data: categoriesData, error: categoriesError } = await supabase
@@ -89,78 +132,123 @@ const ManageMcqsPage = () => {
     }
   };
 
-  const fetchMcqs = async () => {
+  const fetchMcqs = async (page = serverPage) => {
     if (!selectedFilterCategory) return;
 
     setIsFetchingMcqs(true);
-    let allMcqs: any[] = [];
-    let allMcqCategoryLinks: DbMcqCategoryLink[] = [];
-    const limit = 1000; 
+    const from = page * serverPageSize;
+    const to = from + serverPageSize - 1;
 
     try {
-      let mcqIdsToFetch: string[] | null = null;
+      let pageMcqs: any[] = [];
+      let pageLinks: DbMcqCategoryLink[] = [];
+      const q = searchTerm.trim();
 
-      if (selectedFilterCategory !== "all") {
-        if (selectedFilterCategory === UNCATEGORIZED_ID) {
-          const { data: linked } = await supabase.from('mcq_category_links').select('mcq_id');
-          const linkedIds = new Set(linked?.map(l => l.mcq_id) || []);
-          const { data: all } = await supabase.from('mcqs').select('id');
-          mcqIdsToFetch = (all?.map(m => m.id) || []).filter(id => !linkedIds.has(id));
-        } else {
-          const { data: links } = await supabase.from('mcq_category_links').select('mcq_id').eq('category_id', selectedFilterCategory);
-          mcqIdsToFetch = links?.map(l => l.mcq_id) || [];
-        }
-      }
+      if (selectedFilterCategory === 'all') {
+        let mcqsQuery = supabase
+          .from('mcqs')
+          .select(`id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation_id, difficulty, is_trial_mcq`, { count: 'exact' })
+          .order('created_at', { ascending: true })
+          .range(from, to);
 
-      let offsetMcqs = 0;
-      let hasMoreMcqs = true;
-      
-      while (hasMoreMcqs) {
+        if (q) mcqsQuery = mcqsQuery.ilike('question_text', `%${q}%`);
+
+        const { data, error, count } = await mcqsQuery;
+        if (error) throw error;
+
+        pageMcqs = data || [];
+        setServerTotalCount(count || 0);
+      } else if (selectedFilterCategory === UNCATEGORIZED_ID) {
         let mcqsQuery = supabase
           .from('mcqs')
           .select(`id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation_id, difficulty, is_trial_mcq`)
-          .range(offsetMcqs, offsetMcqs + limit - 1);
+          .order('created_at', { ascending: true });
 
-        if (mcqIdsToFetch) {
-          if (mcqIdsToFetch.length === 0) break;
-          mcqsQuery = mcqsQuery.in('id', mcqIdsToFetch);
-        }
+        if (q) mcqsQuery = mcqsQuery.ilike('question_text', `%${q}%`);
 
-        if (searchTerm) {
-          mcqsQuery = mcqsQuery.ilike('question_text', `%${searchTerm}%`);
-        }
-        
-        mcqsQuery = mcqsQuery.order('created_at', { ascending: true });
+        const { data: allData, error: allError } = await mcqsQuery;
+        if (allError) throw allError;
 
-        const { data, error } = await mcqsQuery;
-        if (error) throw error;
+        const allMcqs = allData || [];
 
-        if (data && data.length > 0) {
-          allMcqs = allMcqs.concat(data);
-          offsetMcqs += data.length;
-          hasMoreMcqs = data.length === limit;
+        if (allMcqs.length > 0) {
+          const allLinkedIds = new Set<string>();
+          let linksOffset = 0;
+          let hasMoreLinks = true;
+
+          while (hasMoreLinks) {
+            const { data: linkedRows, error: linkedError } = await supabase
+              .from('mcq_category_links')
+              .select('mcq_id')
+              .range(linksOffset, linksOffset + 999);
+
+            if (linkedError) throw linkedError;
+
+            if (linkedRows && linkedRows.length > 0) {
+              linkedRows.forEach((r) => allLinkedIds.add(r.mcq_id));
+              linksOffset += linkedRows.length;
+              hasMoreLinks = linkedRows.length === 1000;
+            } else {
+              hasMoreLinks = false;
+            }
+          }
+
+          const uncategorized = allMcqs.filter((m) => !allLinkedIds.has(m.id));
+          setServerTotalCount(uncategorized.length);
+          pageMcqs = uncategorized.slice(from, to + 1);
         } else {
-          hasMoreMcqs = false;
+          setServerTotalCount(0);
+          pageMcqs = [];
+        }
+      } else {
+        const { data: linkRows, error: linkError, count } = await supabase
+          .from('mcq_category_links')
+          .select('mcq_id, category_id', { count: 'exact' })
+          .eq('category_id', selectedFilterCategory)
+          .order('mcq_id', { ascending: true })
+          .range(from, to);
+
+        if (linkError) throw linkError;
+
+        const mcqIds = (linkRows || []).map((l) => l.mcq_id);
+        pageLinks = linkRows || [];
+        setServerTotalCount(count || 0);
+
+        if (mcqIds.length > 0) {
+          const { data: mcqRows, error: mcqError } = await supabase
+            .from('mcqs')
+            .select(`id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation_id, difficulty, is_trial_mcq`)
+            .in('id', mcqIds)
+            .order('created_at', { ascending: true });
+
+          if (mcqError) throw mcqError;
+
+          pageMcqs = q
+            ? (mcqRows || []).filter((m) => (m.question_text || '').toLowerCase().includes(q.toLowerCase()))
+            : (mcqRows || []);
+        } else {
+          pageMcqs = [];
         }
       }
 
-      const mcqIds = allMcqs.map(m => m.id);
-      if (mcqIds.length > 0) {
-        const { data: linksData } = await supabase
+      if (pageMcqs.length > 0 && pageLinks.length === 0) {
+        const pageIds = pageMcqs.map(m => m.id);
+        const { data: linksData, error: linksError } = await supabase
           .from('mcq_category_links')
           .select('mcq_id, category_id')
-          .in('mcq_id', mcqIds);
-        allMcqCategoryLinks = linksData || [];
+          .in('mcq_id', pageIds);
+        if (linksError) throw linksError;
+        pageLinks = linksData || [];
       }
 
       const categoryNameMap = new Map(categories.map(cat => [cat.id, cat.name]));
       const mcqLinksMap = new Map<string, DbMcqCategoryLink[]>();
-      allMcqCategoryLinks.forEach(link => { 
+      pageLinks.forEach(link => {
         if (!mcqLinksMap.has(link.mcq_id)) mcqLinksMap.set(link.mcq_id, []);
         mcqLinksMap.get(link.mcq_id)?.push(link);
       });
 
-      const displayMcqs: DisplayMCQ[] = allMcqs.map((mcq: any) => { 
+      const displayMcqs: DisplayMCQ[] = pageMcqs.map((mcq: any) => {
         const linksForMcq = mcqLinksMap.get(mcq.id) || [];
         const hydratedLinks = linksForMcq.map(link => ({
           category_id: link.category_id,
@@ -168,8 +256,9 @@ const ManageMcqsPage = () => {
         }));
         return { ...mcq, category_links: hydratedLinks };
       });
-      
+
       setRawMcqs(displayMcqs);
+      setServerPage(page);
     } catch (error: any) {
       console.error('[ManageMcqsPage] Error fetching MCQs:', error.message);
       toast({ title: "Error", description: "Failed to load MCQs.", variant: "destructive" });
@@ -179,20 +268,42 @@ const ManageMcqsPage = () => {
   };
 
   useEffect(() => {
-    if (hasCheckedInitialSession) {
-      fetchCategories().then(() => setIsPageLoading(false));
+    if (!hasCheckedInitialSession) return;
+
+    if (categories.length > 0) {
+      setIsPageLoading(false);
+      return;
     }
-  }, [hasCheckedInitialSession]);
+
+    fetchCategories().then(() => setIsPageLoading(false));
+  }, [hasCheckedInitialSession, categories.length]);
 
   const filteredMcqs = useMemo(() => {
     let result = rawMcqs;
+
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      result = result.filter((mcq) =>
+        [
+          mcq.question_text,
+          mcq.option_a,
+          mcq.option_b,
+          mcq.option_c,
+          mcq.option_d,
+        ]
+          .filter(Boolean)
+          .some((text) => text.toLowerCase().includes(q))
+      );
+    }
+
     if (enhancementFilter === 'enhanced') {
       result = result.filter(mcq => !!mcq.difficulty);
     } else if (enhancementFilter === 'unenhanced') {
       result = result.filter(mcq => !mcq.difficulty);
     }
+
     return result;
-  }, [rawMcqs, enhancementFilter]);
+  }, [rawMcqs, searchTerm, enhancementFilter]);
 
   const handleDeleteMcq = async (mcqId: string, explanationId: string | null) => {
     if (!window.confirm("Are you sure you want to delete this MCQ?")) return;
@@ -473,8 +584,8 @@ const ManageMcqsPage = () => {
               </Select>
             </div>
 
-            <Button 
-                onClick={fetchMcqs} 
+            <Button
+                onClick={() => fetchMcqs(0)}
                 className="h-11 rounded-xl font-bold bg-primary text-primary-foreground"
                 disabled={isFetchingMcqs || !selectedFilterCategory}
             >
@@ -483,7 +594,7 @@ const ManageMcqsPage = () => {
             </Button>
 
             <Button 
-                onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); setEnhancementFilter('all'); setRawMcqs([]); }} 
+                onClick={() => { setSelectedFilterCategory(null); setSearchTerm(''); setEnhancementFilter('all'); setRawMcqs([]); setServerPage(0); setServerTotalCount(0); }}
                 variant="outline" 
                 className="h-11 rounded-xl"
             >
@@ -542,14 +653,35 @@ const ManageMcqsPage = () => {
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent className="pt-6">
-                    <DataTable 
-                        columns={columns} 
-                        data={filteredMcqs} 
-                        rowSelection={rowSelection} 
+                <CardContent className="pt-6 space-y-4">
+                    <DataTable
+                        columns={columns}
+                        data={filteredMcqs}
+                        rowSelection={rowSelection}
                         setRowSelection={setRowSelection}
-                        pageSize={100} 
+                        pageSize={100}
                     />
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        Server Page {serverPage + 1} / {Math.max(1, Math.ceil(serverTotalCount / serverPageSize))} · {serverTotalCount} total
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => fetchMcqs(serverPage - 1)}
+                          disabled={isFetchingMcqs || serverPage === 0}
+                        >
+                          Previous Batch
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => fetchMcqs(serverPage + 1)}
+                          disabled={isFetchingMcqs || (serverPage + 1) * serverPageSize >= serverTotalCount}
+                        >
+                          Next Batch
+                        </Button>
+                      </div>
+                    </div>
                 </CardContent>
             </Card>
         </div>

@@ -2,8 +2,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-// @ts-ignore
-import OpenAI from 'https://esm.sh/openai@4.52.0?target=deno';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,7 +12,7 @@ const corsHeaders = {
 function parseAiJson(text: string) {
   try {
     let cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    
+
     const start = cleaned.indexOf('{');
     const end = cleaned.lastIndexOf('}');
     if (start !== -1 && end !== -1) {
@@ -29,7 +27,7 @@ function parseAiJson(text: string) {
     return JSON.parse(cleaned);
   } catch (e: any) {
     console.error("[bulk-enhance-mcqs] JSON Parse Error. Raw text:", text);
-    throw new Error(`Failed to parse AI response as valid JSON: \${e.message}`);
+    throw new Error(`Failed to parse AI response as valid JSON: ${e.message}`);
   }
 }
 
@@ -37,50 +35,112 @@ async function generateEnhancedContent(
   question: string,
   options: { A: string; B: string; C: string; D: string },
   categoryList: string[],
-  openai: any,
+  baseUrl: string,
+  apiKey: string,
   openaiModel: string,
   isUncategorized: boolean
 ) {
-  const categoryInstruction = isUncategorized 
+  const categoryInstruction = isUncategorized
     ? `The question is currently UN-CATEGORIZED. Suggest the best "suggested_category_name" from the provided list or a relevant medical specialty.`
     : `The question already has a category. Return null for "suggested_category_name". DO NOT suggest a category.`;
 
   const prompt = `You are an expert medical educator for 'Study Prometric'. Analyze this MCQ:
-  Question: "\${question}"
-  Options: A: \${options.A}, B: \${options.B}, C: \${options.C}, D: \${options.D}
+Question: "${question}"
+Options:
+A) ${options.A}
+B) ${options.B}
+C) ${options.C}
+D) ${options.D}
 
-  Available categories: \${categoryList.join(', ')}
+Available categories: ${categoryList.join(', ')}
+${categoryInstruction}
 
-  \${categoryInstruction}
+CRITICAL CONTENT REQUIREMENTS FOR explanation_text:
+- Write clear, exam-focused medical reasoning.
+- Explicitly explain the clinical scenario.
+- Explain why the selected correct answer is correct.
+- Explain why EACH incorrect option (A, B, C, D except the correct one) is incorrect.
+- Include ALL of these section headings exactly as markdown H2:
+  ## Scenario Explanation
+  ## Why the Correct Answer Is Correct
+  ## Why the Other Options Are Incorrect
+  ## The Diagnosis
+  ## Best Initial Diagnostic Test
+  ## Best Initial Definitive Treatment
 
-  Generate a structured explanation including:
-  - Scenario Analysis
-  - Correct Answer Justification
-  - Incorrect Options Analysis
-  - The Diagnosis (if applicable)
-  - Best Initial/Diagnostic Test (if applicable)
-  - Best Initial/Definitive Treatment (if applicable)
+SECTION RULES:
+- In "Why the Other Options Are Incorrect", use bullet points for each incorrect option with labels like "- A:", "- B:", etc.
+- For any section that is not applicable, write "Not applicable for this scenario." (do not omit the section).
+- Keep the explanation clinically accurate and concise.
 
-  OUTPUT FORMAT REQUIREMENTS:
-  1. Return ONLY a valid JSON object.
-  2. Use the keys: "correct_answer", "explanation_text", "difficulty", "suggested_category_name".
-  3. "difficulty" must be exactly one of: "Easy", "Medium", or "Hard".
+OUTPUT FORMAT REQUIREMENTS:
+1. Return ONLY a valid JSON object.
+2. Use keys exactly: "correct_answer", "explanation_text", "difficulty", "suggested_category_name".
+3. "correct_answer" must be exactly one of: "A", "B", "C", "D".
+4. "difficulty" must be exactly one of: "Easy", "Medium", "Hard".
+5. "suggested_category_name" must be a string when suggesting a category, otherwise null.
 
-  Expected JSON structure:
-  {"correct_answer": "...", "explanation_text": "...", "difficulty": "...", "suggested_category_name": "..."}`;
+Expected JSON structure:
+{"correct_answer":"A|B|C|D","explanation_text":"...","difficulty":"Easy|Medium|Hard","suggested_category_name":null}`;
 
-  const completion = await openai.chat.completions.create({
-    model: openaiModel,
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.2,
+  const endpoint = `${baseUrl}/chat/completions`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: openaiModel,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    }),
   });
 
-  const text = completion.choices?.[0]?.message?.content ?? '';
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`OpenAI API error ${response.status}: ${errText}`);
+  }
+
+  const data = await response.json() as any;
+  const text = data?.choices?.[0]?.message?.content ?? '';
+
   if (!text) {
     throw new Error('AI returned an empty response.');
   }
 
-  return parseAiJson(text);
+  const parsed = parseAiJson(text);
+
+  if (!['A', 'B', 'C', 'D'].includes(parsed?.correct_answer)) {
+    throw new Error('AI returned an invalid correct_answer.');
+  }
+
+  if (!['Easy', 'Medium', 'Hard'].includes(parsed?.difficulty)) {
+    throw new Error('AI returned an invalid difficulty.');
+  }
+
+  if (typeof parsed?.explanation_text !== 'string' || !parsed.explanation_text.trim()) {
+    throw new Error('AI returned empty explanation_text.');
+  }
+
+  const requiredHeadings = [
+    '## Scenario Explanation',
+    '## Why the Correct Answer Is Correct',
+    '## Why the Other Options Are Incorrect',
+    '## The Diagnosis',
+    '## Best Initial Diagnostic Test',
+    '## Best Initial Definitive Treatment',
+  ];
+
+  const missingHeadings = requiredHeadings.filter((heading) => !parsed.explanation_text.includes(heading));
+  if (missingHeadings.length > 0) {
+    const filler = missingHeadings.map((h) => `${h}\nNot applicable for this scenario.`).join('\n\n');
+    parsed.explanation_text = `${parsed.explanation_text.trim()}\n\n${filler}`;
+  }
+
+  return parsed;
 }
 
 serve(async (req: Request) => {
@@ -103,28 +163,24 @@ serve(async (req: Request) => {
 
     const normalizedBaseUrl = openaiBaseUrl?.trim().replace(/\/$/, '');
     const baseUrlCandidates = normalizedBaseUrl
-      ? (normalizedBaseUrl.endsWith('/v1') ? [normalizedBaseUrl] : [normalizedBaseUrl, `${normalizedBaseUrl}/v1`])
-      : [undefined];
+      ? (normalizedBaseUrl.endsWith('/v1') ? [normalizedBaseUrl] : [`${normalizedBaseUrl}/v1`])
+      : ['https://api.openai.com/v1'];
 
-    let openai: any = null;
-    let lastError: any = null;
-
+    let resolvedBaseUrl: string | undefined;
     for (const candidate of baseUrlCandidates) {
       try {
-        openai = new OpenAI({
-          apiKey: openaiApiKey,
-          ...(candidate ? { baseURL: candidate } : {}),
-        });
-
-        await openai.models.list();
-        break;
-      } catch (err: any) {
-        lastError = err;
+        const testResp = await fetch(candidate, { method: 'HEAD' });
+        if (testResp.ok || testResp.status < 500) {
+          resolvedBaseUrl = candidate;
+          break;
+        }
+      } catch {
+        // try next candidate
       }
     }
 
-    if (!openai) {
-      throw lastError || new Error('Failed to initialize OpenAI client.');
+    if (!resolvedBaseUrl) {
+      throw new Error('Could not reach OpenAI API at any known endpoint.');
     }
 
     // @ts-ignore
@@ -132,7 +188,7 @@ serve(async (req: Request) => {
 
     const { data: categories } = await supabaseAdmin.from('categories').select('id, name');
     const categoryList = categories ? categories.map((c: any) => c.name) : [];
-    
+
     const { data: mcqs } = await supabaseAdmin.from('mcqs').select('*').in('id', mcq_ids);
 
     let successCount = 0;
@@ -149,10 +205,11 @@ serve(async (req: Request) => {
         const isUncategorized = (linkCount || 0) === 0;
 
         const aiResponse = await generateEnhancedContent(
-          mcq.question_text, 
-          { A: mcq.option_a, B: mcq.option_b, C: mcq.option_c, D: mcq.option_d }, 
-          categoryList, 
-          openai,
+          mcq.question_text,
+          { A: mcq.option_a, B: mcq.option_b, C: mcq.option_c, D: mcq.option_d },
+          categoryList,
+          resolvedBaseUrl,
+          openaiApiKey,
           openaiModel,
           isUncategorized
         );
@@ -161,7 +218,7 @@ serve(async (req: Request) => {
         if (isUncategorized && aiResponse.suggested_category_name) {
             let categoryId;
             let existingCategory = (categories || []).find((c: any) => c.name.toLowerCase() === aiResponse.suggested_category_name?.toLowerCase());
-            
+
             if (existingCategory) {
               categoryId = existingCategory.id;
             } else {
@@ -194,20 +251,20 @@ serve(async (req: Request) => {
 
         successCount++;
       } catch (e: any) {
-        console.error(`[bulk-enhance-mcqs] Error for MCQ \${mcq.id}:`, e.message);
-        errors.push(`MCQ \${mcq.id}: \${e.message}`);
+        console.error(`[bulk-enhance-mcqs] Error for MCQ ${mcq.id}:`, e.message);
+        errors.push(`MCQ ${mcq.id}: ${e.message}`);
       }
     }
 
-    return new Response(JSON.stringify({ successCount, errorCount: errors.length, errors }), { 
-      status: 200, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    return new Response(JSON.stringify({ successCount, errorCount: errors.length, errors }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error: any) {
     console.error("[bulk-enhance-mcqs] Unhandled Error:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), { 
-      status: 500, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });

@@ -65,8 +65,11 @@ CRITICAL CONTENT REQUIREMENTS FOR explanation_text:
   ## Why the Correct Answer Is Correct
   ## Why the Other Options Are Incorrect
   ## The Diagnosis
-  ## Best Initial Diagnostic Test
-  ## Best Initial Definitive Treatment
+  ## Best Initial Test
+  ## Best Initial  Treatment
+  ## Best Diagnostic Test
+  ## Best Definitive Treatment
+
 
 SECTION RULES:
 - In "Why the Other Options Are Incorrect", use bullet points for each incorrect option with labels like "- A:", "- B:", etc.
@@ -132,6 +135,8 @@ Expected JSON structure:
     '## The Diagnosis',
     '## Best Initial Diagnostic Test',
     '## Best Initial Definitive Treatment',
+    '## Best Diagnostic Test',
+    '## Best Definitive Treatment',
   ];
 
   const missingHeadings = requiredHeadings.filter((heading) => !parsed.explanation_text.includes(heading));
